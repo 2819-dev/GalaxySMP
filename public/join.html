@@ -3,97 +3,84 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>How to Join GalaxySMP</title>
-  <meta name="description" content="Step-by-step instructions for joining GalaxySMP on Minecraft Java and Bedrock.">
+  <title>How to join · GalaxySMP</title>
+  <meta name="description" content="How to join GalaxySMP on Minecraft Java and Bedrock.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <meta name="theme-color" content="#0e1129">
+  <meta name="theme-color" content="#0a0c1b">
   <link rel="stylesheet" href="/css/style.css">
-  <script type="module" src="/js/site.js"></script>
+  <script type="module" src="/js/join.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <div id="site-header" class="site-header-slot"></div>
 
   <main id="main">
-    <div class="container">
+    <div class="container narrow">
       <header class="page-head">
-        <span class="eyebrow">How to join</span>
-        <h1>Let's get you playing!</h1>
-        <p>First, find out which Minecraft you have. <strong>Java</strong> is on Windows, Mac and Linux computers. <strong>Bedrock</strong> is on phones, tablets, Xbox, PlayStation, Switch and Windows (from the Microsoft Store).</p>
+        <h1>How to join</h1>
+        <p>Choose your version of Minecraft. Java runs on Windows, Mac and Linux computers. Bedrock runs on phones, tablets, consoles and the Microsoft Store version on Windows.</p>
       </header>
 
-      <div class="grid grid-2">
-        <section class="card" aria-labelledby="java-h">
-          <span class="platform-tag">💻 Java Edition</span>
-          <h2 id="java-h">Java (computer)</h2>
-          <div class="address" style="margin:14px 0 18px">
-            <span class="label">Server address</span>
-            <code data-config="javaFull"></code>
-            <button class="btn btn-primary btn-sm" type="button" data-copy-config="javaFull">Copy</button>
-          </div>
-          <ol class="steps">
-            <li>Open Minecraft and make sure the version is <strong><span data-config="minecraftVersion"></span></strong> or newer.</li>
-            <li>Click <span class="kbd">Multiplayer</span>.</li>
-            <li>Click <span class="kbd">Add Server</span>.</li>
-            <li>For <strong>Server Name</strong>, type <code>GalaxySMP</code>.</li>
-            <li>For <strong>Server Address</strong>, paste the address above.</li>
-            <li>Click <span class="kbd">Done</span>, then double-click <strong>GalaxySMP</strong> to join.</li>
-          </ol>
-        </section>
+      <div class="tabs" role="tablist" aria-label="Minecraft version">
+        <button class="tab" role="tab" id="tab-java" aria-controls="panel-java" aria-selected="true">Java</button>
+        <button class="tab" role="tab" id="tab-bedrock" aria-controls="panel-bedrock" aria-selected="false" tabindex="-1">Bedrock</button>
+      </div>
 
-        <section class="card" aria-labelledby="bedrock-h">
-          <span class="platform-tag">📱 Bedrock Edition</span>
-          <h2 id="bedrock-h">Bedrock (phone, tablet, console)</h2>
-          <div class="grid" style="gap:10px;margin:14px 0 18px">
-            <div class="address">
-              <span class="label">Server address</span>
+      <section class="panel" role="tabpanel" id="panel-java" aria-labelledby="tab-java">
+        <span class="field-label">Server address</span>
+        <div class="field-copy">
+          <code data-config="javaFull"></code>
+          <button class="btn btn-primary btn-sm" type="button" data-copy-config="javaFull">Copy</button>
+        </div>
+        <hr class="divider" style="margin:24px 0">
+        <ol class="steps">
+          <li>Open Minecraft Java Edition. Version <strong data-config="minecraftVersion"></strong> or newer works.</li>
+          <li>Select <span class="ui">Multiplayer</span>, then <span class="ui">Add Server</span>.</li>
+          <li>Enter <code>GalaxySMP</code> as the server name and paste the address above.</li>
+          <li>Select <span class="ui">Done</span>, then double-click GalaxySMP in the list.</li>
+        </ol>
+      </section>
+
+      <section class="panel" role="tabpanel" id="panel-bedrock" aria-labelledby="tab-bedrock" hidden>
+        <div class="grid grid-2" style="gap:12px">
+          <div>
+            <span class="field-label">Server address</span>
+            <div class="field-copy">
               <code data-config="bedrockAddress"></code>
               <button class="btn btn-primary btn-sm" type="button" data-copy-config="bedrockAddress">Copy</button>
             </div>
-            <div class="address">
-              <span class="label">Port</span>
+          </div>
+          <div>
+            <span class="field-label">Port</span>
+            <div class="field-copy">
               <code data-config="bedrockPort"></code>
               <button class="btn btn-secondary btn-sm" type="button" data-copy-config="bedrockPort">Copy</button>
             </div>
           </div>
-          <ol class="steps">
-            <li>Open Minecraft and tap <span class="kbd">Play</span>.</li>
-            <li>Tap the <span class="kbd">Servers</span> tab at the top.</li>
-            <li>Scroll to the bottom and tap <span class="kbd">Add Server</span>.</li>
-            <li>For <strong>Server Name</strong>, type <code>GalaxySMP</code>.</li>
-            <li>For <strong>Server Address</strong>, paste the address above.</li>
-            <li>For <strong>Port</strong>, type <code data-config="bedrockPort"></code>.</li>
-            <li>Tap <span class="kbd">Save</span>, then tap <strong>GalaxySMP</strong> and <span class="kbd">Join Server</span>.</li>
-          </ol>
-        </section>
-      </div>
-
-      <section class="section">
-        <div class="notice warn">
-          <span aria-hidden="true">🎮</span>
-          <div><strong>On Xbox, PlayStation or Switch?</strong> Those consoles don't show an "Add Server" button for every server. Ask a grown-up to help, or ask in the <a href="/community">#help</a> channel and our staff will explain the easiest way.</div>
         </div>
+        <hr class="divider" style="margin:24px 0">
+        <ol class="steps">
+          <li>Open Minecraft and tap <span class="ui">Play</span>.</li>
+          <li>Open the <span class="ui">Servers</span> tab and scroll to <span class="ui">Add Server</span>.</li>
+          <li>Enter <code>GalaxySMP</code> as the name, then the address and port above.</li>
+          <li>Tap <span class="ui">Save</span>, select GalaxySMP and tap <span class="ui">Join Server</span>.</li>
+        </ol>
+        <p class="note warn small" style="margin:24px 0 0">Xbox, PlayStation and Switch don't let you add your own servers directly. Ask in the <a href="/community">#help</a> channel and staff will walk you through it.</p>
       </section>
 
-      <section class="section" aria-labelledby="inside-h">
-        <h2 id="inside-h">Once you're in</h2>
-        <div class="grid grid-2">
-          <div class="card">
-            <h3>🧭 Pick a world</h3>
-            <p class="muted">You start in the hub. Walk up to an NPC (a character standing still) and click it to teleport to Survival, Minigames, Skyblock or Creative.</p>
+      <section class="section" style="padding-bottom:0">
+        <h2>After you join</h2>
+        <div class="grid grid-2" style="margin-top:18px">
+          <div class="feature">
+            <span class="ico" data-icon="users"></span>
+            <div><h3>Pick a world</h3><p>You start in the hub. Walk up to an NPC and click it to travel to Survival, Minigames, Skyblock or Creative.</p></div>
           </div>
-          <div class="card">
-            <h3>🔗 Join the website chat</h3>
-            <p class="muted">Go to <a href="/community">Community</a> and pick a password. You'll get a code. In the game, type <code>/link</code> followed by your code. That's it!</p>
+          <div class="feature">
+            <span class="ico" data-icon="link"></span>
+            <div><h3>Link your account</h3><p>Create a website account on the <a href="/community">Community</a> page, then type <code>/link</code> and your code in game.</p></div>
           </div>
         </div>
-      </section>
-
-      <section class="section">
-        <div class="notice">
-          <span aria-hidden="true">❓</span>
-          <div><strong>Can't connect?</strong> Check that the server is online on the <a href="/status">Status page</a>, make sure you typed the address exactly, and update Minecraft to the newest version.</div>
-        </div>
+        <p class="note small" style="margin-top:28px"><strong>Can't connect?</strong> Check the <a href="/status">status page</a>, make sure the address is typed exactly, and update Minecraft to the latest version.</p>
       </section>
     </div>
   </main>

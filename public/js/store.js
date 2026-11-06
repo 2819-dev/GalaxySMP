@@ -39,7 +39,7 @@ async function loadRanks() {
   const wrap = document.getElementById("ranks");
   for (const r of data.ranks) {
     const card = document.createElement("div");
-    card.className = "card";
+    card.className = "panel";
     const h = document.createElement("h3");
     h.textContent = r.name;
     h.style.color = r.color;
@@ -47,7 +47,7 @@ async function loadRanks() {
     price.style.cssText = "font-size:1.6rem;font-weight:800;margin-bottom:10px";
     price.textContent = "$" + r.price;
     const ul = document.createElement("ul");
-    ul.className = "muted";
+    ul.className = "text-2";
     for (const p of r.perks) {
       const li = document.createElement("li");
       li.textContent = p;

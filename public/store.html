@@ -6,7 +6,7 @@
   <title>Store · GalaxySMP</title>
   <meta name="description" content="GalaxySMP ranks are coming soon.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <meta name="theme-color" content="#0e1129">
+  <meta name="theme-color" content="#0a0c1b">
   <link rel="stylesheet" href="/css/style.css">
   <script type="module" src="/js/store.js"></script>
 </head>
@@ -17,28 +17,20 @@
   <main id="main">
     <div class="container" style="max-width:900px">
       <header class="page-head">
-        <span class="eyebrow">Store</span>
-        <h1>Ranks</h1>
+        <h1>Store</h1>
       </header>
 
       <!-- Shown while there are no ranks in src/store/catalog.js -->
-      <section class="card card-accent" id="coming-soon" style="text-align:center;padding:44px 22px">
-        <div style="font-size:3rem;line-height:1" aria-hidden="true">🌌</div>
-        <h2 style="margin-top:14px">Ranks are coming soon</h2>
-        <p class="muted" style="max-width:520px;margin:0 auto 22px">We're working on cosmetic ranks like colorful names, titles and particles. They're just for fun and never make the game unfair.</p>
-        <button class="btn btn-primary btn-lg" type="button" data-checkout="">Coming soon</button>
-        <p class="faint small" style="margin:18px 0 0">Keep an eye on <a href="/community">#announcements</a> for news.</p>
+      <section class="panel" id="coming-soon">
+        <h2 style="font-size:1.3rem">Ranks are coming soon</h2>
+        <p class="text-2">We're preparing cosmetic ranks: name colors, chat titles and particle effects. They change how you look, never how the game plays.</p>
+        <button class="btn btn-secondary" type="button" data-checkout="">Coming soon</button>
       </section>
 
       <!-- Filled in automatically once ranks are added -->
       <section class="grid grid-2" id="ranks" hidden></section>
 
-      <section class="section">
-        <div class="notice">
-          <span aria-hidden="true">👪</span>
-          <div><strong>For parents:</strong> buying will always need a grown-up's payment method, and all perks are cosmetic. Everything that matters in the game is free for everyone.</div>
-        </div>
-      </section>
+      <p class="note small" style="margin-top:16px"><strong>For parents:</strong> purchases will always need a parent's payment method, and every perk is cosmetic. Everything that affects gameplay is free for all players.</p>
     </div>
   </main>
 

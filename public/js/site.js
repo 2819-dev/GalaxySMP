@@ -1,26 +1,44 @@
-// Shared code for every public page: header, footer, copy buttons and live status.
+// Shared code for every page: header, footer, icons, copy buttons and live status.
 import config from "/config.js";
 
 export const LOGO_SVG = `
-<svg viewBox="0 0 64 64" aria-hidden="true">
-  <defs>
-    <linearGradient id="gp" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#c4b1ff"/><stop offset=".55" stop-color="#8b5cf6"/><stop offset="1" stop-color="#3b2a9e"/>
-    </linearGradient>
-  </defs>
-  <ellipse cx="32" cy="34" rx="29" ry="9" fill="none" stroke="#a98bff" stroke-opacity=".45" stroke-width="3" transform="rotate(-18 32 34)"/>
-  <circle cx="32" cy="32" r="17" fill="url(#gp)"/>
-  <path d="M5.6 42.6C12 47 26 46 40 41s23-12 22-18" fill="none" stroke="#d9ccff" stroke-width="3" stroke-linecap="round" transform="rotate(-2 32 34)"/>
-  <circle cx="51" cy="12" r="2" fill="#fff"/><circle cx="12" cy="14" r="1.3" fill="#fff" opacity=".7"/>
+<svg viewBox="0 0 32 32" aria-hidden="true">
+  <circle cx="16" cy="16" r="9" fill="#8b5cf6"/>
+  <path d="M16 7a9 9 0 0 1 0 18" fill="#6d3fe0"/>
+  <ellipse cx="16" cy="16" rx="15" ry="4.6" fill="none" stroke="#c9b8ff" stroke-width="1.6" transform="rotate(-20 16 16)"/>
+  <circle cx="26.5" cy="5.5" r="1.3" fill="#fff"/>
 </svg>`;
 
+const ICONS = {
+  copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  flag: '<path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 8 2a6 6 0 0 0 3.6-1.2.6.6 0 0 1 .9.5V15a1 1 0 0 1-.4.8A6 6 0 0 1 16 17c-3 0-5-2-8-2a6 6 0 0 0-4 1.5"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  mountain: '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  cube: '<path d="M21 16V8l-9-5-9 5v8l9 5 9-5z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  close: '<path d="M18 6 6 18M6 6l12 12"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+};
+
+export function icon(name) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;
+}
+
 const NAV = [
-  ["/", "Home"],
   ["/join", "How to Join"],
   ["/rules", "Rules"],
   ["/status", "Status"],
   ["/store", "Store"],
 ];
+
+export const javaFull = Number(config.javaPort) === 25565 ? config.javaAddress : `${config.javaAddress}:${config.javaPort}`;
 
 function currentPath() {
   const p = location.pathname.replace(/\.html$/, "").replace(/\/index$/, "/");
@@ -38,12 +56,13 @@ function renderHeader() {
   <header class="site-header">
     <div class="container">
       <a class="brand" href="/">${LOGO_SVG}<span>${config.serverName}</span></a>
-      <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="site-nav">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-      </button>
+      <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="site-nav">${icon("menu")}</button>
       <nav class="nav" id="site-nav" aria-label="Main">
-        ${links}
-        <a class="btn btn-primary btn-sm" href="/community">Community</a>
+        <div class="nav-links">${links}</div>
+        <div class="nav-actions">
+          <button class="ip-chip" type="button" data-copy="${javaFull}" title="Copy server address">${icon("copy")}<span>${javaFull}</span></button>
+          <a class="btn btn-primary btn-sm" href="/community">Community</a>
+        </div>
       </nav>
     </div>
   </header>`;
@@ -53,6 +72,7 @@ function renderHeader() {
     const open = nav.classList.toggle("open");
     toggle.setAttribute("aria-expanded", String(open));
     toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    toggle.innerHTML = icon(open ? "close" : "menu");
   });
 }
 
@@ -62,11 +82,18 @@ function renderFooter() {
   slot.outerHTML = `
   <footer class="site-footer">
     <div class="container">
-      <nav aria-label="Footer">
-        <a href="/join">How to Join</a><a href="/rules">Rules</a><a href="/status">Status</a>
-        <a href="/store">Store</a><a href="/community">Community</a><a href="/privacy">Privacy</a>
-      </nav>
-      <div class="fine">© ${new Date().getFullYear()} ${config.serverName}. Not affiliated with Mojang or Microsoft.</div>
+      <div class="footer-grid">
+        <div>
+          <a class="brand" href="/">${LOGO_SVG}<span>${config.serverName}</span></a>
+          <p>A Java and Bedrock Minecraft server for players of all ages.</p>
+        </div>
+        <div><h4>Play</h4><ul><li><a href="/join">How to join</a></li><li><a href="/status">Server status</a></li><li><a href="/store">Store</a></li></ul></div>
+        <div><h4>Community</h4><ul><li><a href="/community">Chat</a></li><li><a href="/rules">Rules</a></li></ul></div>
+        <div><h4>About</h4><ul><li><a href="/privacy">Privacy</a></li></ul></div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">© ${new Date().getFullYear()} ${config.serverName}. Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.</div>
     </div>
   </footer>`;
 }
@@ -94,35 +121,30 @@ async function copyText(text) {
     const ta = document.createElement("textarea");
     ta.value = text;
     ta.setAttribute("readonly", "");
-    ta.style.position = "fixed";
-    ta.style.opacity = "0";
+    ta.style.cssText = "position:fixed;opacity:0";
     document.body.appendChild(ta);
     ta.select();
     document.execCommand("copy");
     ta.remove();
   }
-  toast("Copied!");
+  toast(`Copied ${text}`);
 }
 
-function wireCopyButtons() {
-  document.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-copy]");
-    if (btn) copyText(btn.getAttribute("data-copy"));
-  });
-}
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-copy]");
+  if (btn) copyText(btn.getAttribute("data-copy"));
+});
 
 // ---------- Fill in server info from config.js ----------
 function fillConfig() {
   const values = {
     serverName: config.serverName,
-    tagline: config.tagline,
-    description: config.description,
     javaAddress: config.javaAddress,
     javaPort: String(config.javaPort),
     bedrockAddress: config.bedrockAddress,
     bedrockPort: String(config.bedrockPort),
     minecraftVersion: config.minecraftVersion,
-    javaFull: Number(config.javaPort) === 25565 ? config.javaAddress : `${config.javaAddress}:${config.javaPort}`,
+    javaFull,
   };
   document.querySelectorAll("[data-config]").forEach((el) => {
     const v = values[el.getAttribute("data-config")];
@@ -131,6 +153,9 @@ function fillConfig() {
   document.querySelectorAll("[data-copy-config]").forEach((el) => {
     const v = values[el.getAttribute("data-copy-config")];
     if (v !== undefined) el.setAttribute("data-copy", v);
+  });
+  document.querySelectorAll("[data-icon]").forEach((el) => {
+    el.innerHTML = icon(el.getAttribute("data-icon"));
   });
 }
 
@@ -142,25 +167,24 @@ export async function fetchStatus() {
 }
 
 export function statusText(s) {
-  if (!s || !s.configured) return { cls: "", text: "Server address coming soon" };
-  if (s.reason === "lookup_failed") return { cls: "", text: "Status unavailable right now" };
-  if (!s.online) return { cls: "is-offline", text: "Server offline" };
+  if (!s || !s.configured) return { cls: "", text: "Opening soon" };
+  if (s.reason === "lookup_failed") return { cls: "", text: "Status unavailable" };
+  if (!s.online) return { cls: "is-offline", text: "Offline" };
   const n = s.players.online;
-  return { cls: "is-online", text: `${n} player${n === 1 ? "" : "s"} online` };
+  return { cls: "is-online", text: `Online · ${n} player${n === 1 ? "" : "s"}` };
 }
 
-// Updates every [data-status-pill] on the page, refreshing once a minute while visible.
-export function startStatusPills(onData) {
-  const pills = document.querySelectorAll("[data-status-pill]");
-  if (!pills.length && !onData) return;
+// Updates every [data-status] element, refreshing once a minute while the page is visible.
+export function startStatus(onData) {
+  const els = document.querySelectorAll("[data-status]");
   const update = async () => {
     let s = null;
-    try { s = await fetchStatus(); } catch { /* show unavailable */ }
-    const { cls, text } = s ? statusText(s) : { cls: "", text: "Status unavailable right now" };
-    pills.forEach((p) => {
-      p.classList.remove("is-online", "is-offline");
-      if (cls) p.classList.add(cls);
-      const label = p.querySelector("[data-status-text]");
+    try { s = await fetchStatus(); } catch { /* shown as unavailable */ }
+    const { cls, text } = s ? statusText(s) : { cls: "", text: "Status unavailable" };
+    els.forEach((el) => {
+      el.classList.remove("is-online", "is-offline");
+      if (cls) el.classList.add(cls);
+      const label = el.querySelector("[data-status-text]");
       if (label) label.textContent = text;
     });
     if (onData) onData(s);
@@ -172,6 +196,5 @@ export function startStatusPills(onData) {
 renderHeader();
 renderFooter();
 fillConfig();
-wireCopyButtons();
 
 export { config };
