@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GalaxySMP: Minecraft Java + Bedrock Server</title>
+  <meta name="description" content="GalaxySMP is a friendly Java + Bedrock Minecraft server with Survival, Minigames, Skyblock and Creative.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#0e1129">
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/home.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header" class="site-header-slot"></div>
+
+  <main id="main">
+    <section class="hero">
+      <div class="container">
+        <div class="logo-big" id="hero-logo"></div>
+        <h1 data-config="serverName">GalaxySMP</h1>
+        <p class="tagline" data-config="tagline">One server. Every adventure.</p>
+        <p class="lead" data-config="description"></p>
+        <a href="/status" class="pill" data-status-pill aria-live="polite">
+          <span class="dot"></span><span data-status-text>Checking server…</span>
+        </a>
+        <div class="hero-actions">
+          <a class="btn btn-primary btn-lg" href="/join">Join the server</a>
+          <a class="btn btn-secondary btn-lg" href="/community">Community chat</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="card card-accent">
+          <div class="grid grid-2" style="align-items:center">
+            <div>
+              <span class="eyebrow">Server address</span>
+              <h2 style="margin-bottom:.3em">Hop in from any device</h2>
+              <p class="muted" style="margin:0">Java and Bedrock players play together. Phones, tablets, consoles and PCs are all welcome.</p>
+            </div>
+            <div class="grid" style="gap:10px">
+              <div class="address">
+                <span class="label">Java</span>
+                <code data-config="javaFull"></code>
+                <button class="btn btn-secondary btn-sm" type="button" data-copy-config="javaFull">Copy</button>
+              </div>
+              <div class="address">
+                <span class="label">Bedrock</span>
+                <code><span data-config="bedrockAddress"></span> <span class="faint">port</span> <span data-config="bedrockPort"></span></code>
+                <button class="btn btn-secondary btn-sm" type="button" data-copy-config="bedrockAddress">Copy</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <span class="eyebrow">Worlds</span>
+        <h2>Pick your adventure</h2>
+        <p class="muted">Spawn in the hub, click an NPC, and you're teleported straight to that world.</p>
+        <div class="grid grid-4" id="modes"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="grid grid-2">
+          <div class="card">
+            <h3>🛡️ Safe and friendly</h3>
+            <p class="muted">Our chat filter blocks bad words, links and personal info. Staff are around to help, and you can report anything that feels wrong.</p>
+            <a href="/rules">Read the rules →</a>
+          </div>
+          <div class="card">
+            <h3>💬 Chat with the community</h3>
+            <p class="muted">Link your Minecraft account to join the GalaxySMP community chat. We never ask for your email or real name.</p>
+            <a href="/community">Open community chat →</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="site-footer"></div>
+</body>
+</html>

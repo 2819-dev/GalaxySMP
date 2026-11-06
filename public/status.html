@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Server Status · GalaxySMP</title>
+  <meta name="description" content="Live GalaxySMP server status and player count.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#0e1129">
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/status.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header" class="site-header-slot"></div>
+
+  <main id="main">
+    <div class="container" style="max-width:900px">
+      <header class="page-head">
+        <span class="eyebrow">Live status</span>
+        <h1>Server status</h1>
+        <p>Updates by itself every minute.</p>
+      </header>
+
+      <section class="card card-accent" aria-live="polite">
+        <div class="status-big" id="status-big">
+          <span class="dot"></span>
+          <span class="word skeleton" id="status-word">Checking…</span>
+        </div>
+        <p class="muted" id="status-motd" style="margin:12px 0 0"></p>
+      </section>
+
+      <section class="section">
+        <div class="grid grid-4">
+          <div class="stat"><div class="k">Players online</div><div class="v" id="st-players">-</div></div>
+          <div class="stat"><div class="k">Version</div><div class="v" id="st-version">-</div></div>
+          <div class="stat"><div class="k">Java</div><div class="v" id="st-java">-</div></div>
+          <div class="stat"><div class="k">Bedrock</div><div class="v" id="st-bedrock">-</div></div>
+        </div>
+      </section>
+
+      <section class="grid grid-2">
+        <div class="address">
+          <span class="label">Java address</span>
+          <code data-config="javaFull"></code>
+          <button class="btn btn-secondary btn-sm" type="button" data-copy-config="javaFull">Copy</button>
+        </div>
+        <div class="address">
+          <span class="label">Bedrock address · port <span data-config="bedrockPort"></span></span>
+          <code data-config="bedrockAddress"></code>
+          <button class="btn btn-secondary btn-sm" type="button" data-copy-config="bedrockAddress">Copy</button>
+        </div>
+      </section>
+
+      <p class="faint small" style="margin-top:18px">Last checked: <span id="st-checked">-</span>. Status comes from mcsrvstat.us through our own server, so your device never talks to them directly.</p>
+    </div>
+  </main>
+
+  <div id="site-footer"></div>
+</body>
+</html>

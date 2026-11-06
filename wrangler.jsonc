@@ -1,0 +1,30 @@
+// Cloudflare settings for the GalaxySMP website.
+// Secrets (DATABASE_URL, PLUGIN_SECRET) are NOT stored here. They are added in the
+// Cloudflare dashboard under: Worker > Settings > Variables and Secrets.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "galaxysmp",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-25",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Plain files (pages, styles, pictures) come from /public and are served for free.
+  // Only /api/* runs our code, which keeps us far below the free daily request limit.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // Keep variables that were added in the dashboard when a new version is deployed.
+  "keep_vars": true,
+
+  // Non-secret settings.
+  "vars": {
+    // These Minecraft names automatically become Admin when they link their account.
+    "OWNER_USERNAMES": "Ashcore2261,.VisionDevs"
+  },
+
+  "observability": { "enabled": true }
+}
