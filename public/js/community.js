@@ -1,5 +1,6 @@
 import { toast } from "/js/site.js";
 import { startChat, stopChat } from "/js/chat.js";
+import "/js/mod.js";
 
 const $ = (id) => document.getElementById(id);
 const views = ["loading", "auth", "code", "chat"];

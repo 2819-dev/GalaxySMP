@@ -8,6 +8,7 @@ import { serveStatic } from "./lib/static.js";
 import { linkStart, linkPoll, login, logout, me } from "./routes/auth.js";
 import { pluginPing, pluginLink } from "./routes/plugin.js";
 import { bootstrap, history, connect } from "./routes/chat.js";
+import * as mod from "./routes/mod.js";
 
 export { CommunityHub } from "./chat/hub.js";
 
@@ -27,6 +28,21 @@ const routes = [
   ["GET", "/api/chat/bootstrap", (req, env) => bootstrap(req, env)],
   ["GET", "/api/chat/channels/:id/messages", history],
   ["GET", "/api/chat/connect", (req, env) => connect(req, env)],
+  ["POST", "/api/reports", (req, env) => mod.createReport(req, env)],
+  ["POST", "/api/messages/:id/delete", mod.deleteMessage],
+  ["GET", "/api/mod/summary", (req, env) => mod.staffSummary(req, env)],
+  ["GET", "/api/mod/reports", mod.listReports],
+  ["POST", "/api/mod/reports/:id/resolve", mod.resolveReport],
+  ["GET", "/api/mod/members", mod.searchMembers],
+  ["POST", "/api/mod/members/:id/mute", mod.mute],
+  ["POST", "/api/mod/members/:id/unmute", mod.unmute],
+  ["POST", "/api/mod/members/:id/ban", mod.ban],
+  ["POST", "/api/mod/members/:id/unban", mod.unban],
+  ["POST", "/api/mod/members/:id/role", mod.setRole],
+  ["GET", "/api/mod/words", (req, env) => mod.listWords(req, env)],
+  ["POST", "/api/mod/words", (req, env) => mod.addWord(req, env)],
+  ["POST", "/api/mod/words/:id/delete", mod.removeWord],
+  ["GET", "/api/mod/audit", mod.listAudit],
 ];
 
 function matchPath(pattern, pathname) {

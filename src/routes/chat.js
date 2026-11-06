@@ -65,6 +65,6 @@ export async function connect(request, env) {
   if (!origin || new URL(origin).host !== new URL(request.url).host) throw new HttpError(403, "Forbidden.");
   const user = await requireUser(request, env);
   const headers = new Headers(request.headers);
-  headers.set("X-GSMP-User", JSON.stringify({ id: Number(user.id), username: user.username }));
+  headers.set("X-GSMP-User", JSON.stringify({ id: Number(user.id), username: user.username, power: Number(user.role_power) }));
   return hubStub(env).fetch(new Request(request.url, { headers }));
 }

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Staff Tools · GalaxySMP</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#0a0c1b">
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/staff.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header" class="site-header-slot"></div>
+
+  <main id="main">
+    <div class="container" style="max-width:960px">
+      <header class="page-head" style="padding-bottom:20px">
+        <h1>Staff Tools</h1>
+        <p id="staff-intro">Loading…</p>
+        <p style="margin-top:8px"><a href="/staff-guide">Read the staff guide</a></p>
+      </header>
+
+      <div id="staff-denied" class="panel" hidden>
+        <p style="margin:0">This page is only for GalaxySMP staff. <a href="/community">Return to the community</a>.</p>
+      </div>
+
+      <div id="staff-app" hidden>
+        <div class="staff-tabs" role="tablist">
+          <button role="tab" data-tab="reports" aria-selected="true">Reports <span class="count-badge" id="tab-reports-count"></span></button>
+          <button role="tab" data-tab="members" aria-selected="false">Members</button>
+          <button role="tab" data-tab="words" aria-selected="false">Word filter</button>
+          <button role="tab" data-tab="audit" aria-selected="false">Audit log</button>
+        </div>
+
+        <section data-panel="reports">
+          <div class="stack" id="reports-open"></div>
+          <h2 style="font-size:1.1rem;margin:32px 0 12px">Recently handled</h2>
+          <div class="panel" style="padding:0" id="reports-closed"></div>
+        </section>
+
+        <section data-panel="members" hidden>
+          <div class="toolbar">
+            <input class="input" id="member-search" type="search" placeholder="Search by username" autocomplete="off">
+            <select class="input" id="member-filter" aria-label="Show">
+              <option value="all">Everyone</option>
+              <option value="staff">Staff</option>
+              <option value="muted">Muted</option>
+              <option value="banned">Banned</option>
+            </select>
+          </div>
+          <div class="panel" style="padding:0" id="member-results"></div>
+        </section>
+
+        <section data-panel="words" hidden>
+          <div class="panel" style="margin-bottom:16px">
+            <form class="toolbar" id="word-form" style="margin:0">
+              <input class="input" id="word-input" maxlength="40" placeholder="Add a word or phrase" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+              <select class="input" id="word-match" aria-label="Match">
+                <option value="word">Whole word only</option>
+                <option value="contains">Anywhere, even inside other words</option>
+              </select>
+              <button class="btn btn-primary" type="submit">Add</button>
+            </form>
+            <p class="hint" style="margin:10px 0 0">"Whole word only" blocks the word on its own, so adding "ass" still allows "class". "Anywhere" blocks it even when hidden inside other letters. The filter also catches spellings like sh1t, $hit and s h i t. Changes apply within a minute.</p>
+          </div>
+          <div class="toolbar">
+            <input class="input" id="word-search" type="search" placeholder="Search the list" autocomplete="off">
+            <button class="btn btn-secondary" type="button" id="word-reveal">Show words</button>
+          </div>
+          <div class="panel" id="word-list"></div>
+        </section>
+
+        <section data-panel="audit" hidden>
+          <div class="panel" style="padding:0" id="audit-list"></div>
+          <button class="btn btn-secondary" type="button" id="audit-more" style="margin-top:12px" hidden>Load older entries</button>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div id="site-footer"></div>
+</body>
+</html>

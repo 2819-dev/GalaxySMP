@@ -611,4 +611,4 @@ export function stopChat() {
   state.ws = null;
 }
 
-export { state as chatState, api as chatApi, note as chatNote, renderMembers, renderMessages };
+export { state as chatState, api as chatApi, note as chatNote, renderMembers, renderMessages, renderComposer, roleOf };

@@ -98,6 +98,15 @@ export class CommunityHub extends DurableObject {
       this.words = null;
       return;
     }
+    if (event.staffOnly) {
+      const text = JSON.stringify(event);
+      for (const ws of this.ctx.getWebSockets()) {
+        if ((ws.deserializeAttachment()?.power || 0) >= 50) {
+          try { ws.send(text); } catch { /* gone */ }
+        }
+      }
+      return;
+    }
     this.broadcast(event);
   }
 
