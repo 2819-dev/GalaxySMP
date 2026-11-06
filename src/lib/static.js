@@ -50,8 +50,11 @@ export function serveStatic(request) {
   const headers = {
     "Content-Type": asset.type,
     ETag: asset.etag,
-    // Pages: re-check after 5 minutes. Styles/scripts/images: keep for a day.
-    "Cache-Control": isHtml(asset) ? "public, max-age=300" : "public, max-age=86400",
+    // Versioned files (?v=...) never change, so browsers may keep them for a year.
+    // Pages and unversioned files must be re-checked every time (a quick "not modified" reply).
+    "Cache-Control": !isHtml(asset) && url.searchParams.has("v")
+      ? "public, max-age=31536000, immutable"
+      : "no-cache",
     ...SECURITY_HEADERS,
   };
   if (request.headers.get("If-None-Match") === asset.etag) {

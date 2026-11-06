@@ -30,12 +30,25 @@ function walk(dir) {
   });
 }
 
+const files = walk(publicDir)
+  .map((file) => ({ file, rel: "/" + relative(publicDir, file).split("\\").join("/") }))
+  .filter((f) => f.rel !== "/_headers")
+  .sort((a, b) => a.rel.localeCompare(b.rel));
+
+// One version stamp for the whole site. Every link to a style, script or image gets
+// "?v=<stamp>", so after an update browsers fetch the new files instead of old saved copies.
+const versionHash = createHash("sha256");
+for (const f of files) versionHash.update(f.rel).update(readFileSync(f.file));
+const version = versionHash.digest("hex").slice(0, 10);
+const ASSET_REF = /(["'(])(\/(?:css|js|img)\/[^"'()?#\s]+|\/config\.js|\/favicon\.png|\/apple-touch-icon\.png)(?=["')])/g;
+
 const assets = {};
-for (const file of walk(publicDir)) {
-  const rel = "/" + relative(publicDir, file).split("\\").join("/");
-  if (rel === "/_headers") continue;
+for (const { file, rel } of files) {
   const ext = extname(file).toLowerCase();
-  const buf = readFileSync(file);
+  let buf = readFileSync(file);
+  if ([".html", ".js", ".css"].includes(ext)) {
+    buf = Buffer.from(buf.toString("utf8").replace(ASSET_REF, (_, open, path) => `${open}${path}?v=${version}`));
+  }
   const etag = '"' + createHash("sha256").update(buf).digest("hex").slice(0, 20) + '"';
   assets[rel] = TEXT.has(ext)
     ? { type: TYPES[ext] || "application/octet-stream", etag, text: buf.toString("utf8") }
