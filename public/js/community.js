@@ -1,9 +1,12 @@
 import { toast } from "/js/site.js";
+import { startChat, stopChat } from "/js/chat.js";
 
 const $ = (id) => document.getElementById(id);
-const views = ["loading", "auth", "code", "home"];
+const views = ["loading", "auth", "code", "chat"];
 function show(name) {
   for (const v of views) $("view-" + v).hidden = v !== name;
+  $("auth-wrap").hidden = name === "chat";
+  document.body.classList.toggle("app-mode", name === "chat");
   window.scrollTo(0, 0);
 }
 
@@ -17,16 +20,19 @@ async function api(path, body) {
   return data;
 }
 
-// ---------- Signed in ----------
-function showHome(user) {
-  $("me-name").textContent = user.username;
-  const role = $("me-role");
-  role.textContent = user.role.name;
-  role.style.color = user.role.color;
-  show("home");
+// ---------- Signed in: open the chat ----------
+async function showChat() {
+  show("chat");
+  try {
+    await startChat({ onSignedOut: () => show("auth") });
+  } catch (e) {
+    show("auth");
+    toast(e.message || "Couldn't open the chat. Please try again.");
+  }
 }
 
 $("sign-out").addEventListener("click", async () => {
+  stopChat();
   await api("/api/auth/logout", {}).catch(() => {});
   show("auth");
 });
@@ -173,7 +179,7 @@ $("code-restart").addEventListener("click", () => {
 async function loadMe() {
   try {
     const { user } = await api("/api/me");
-    if (user) showHome(user);
+    if (user) await showChat();
     else show("auth");
   } catch {
     show("auth");

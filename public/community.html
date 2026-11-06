@@ -16,7 +16,7 @@
   <div id="site-header" class="site-header-slot"></div>
 
   <main id="main">
-    <div class="container" style="padding-top:48px">
+    <div class="container" id="auth-wrap" style="padding-top:48px">
 
       <!-- Loading -->
       <div id="view-loading" class="auth-card"><p class="text-3">Loading…</p></div>
@@ -89,18 +89,50 @@
         <button class="btn btn-ghost btn-block" type="button" id="code-restart" style="margin-top:12px">Start over</button>
       </section>
 
-      <!-- Signed in (chat arrives in the next stage) -->
-      <section id="view-home" class="auth-card" hidden>
-        <div class="panel">
-          <p class="text-3 small" style="margin:0 0 4px">Signed in as</p>
-          <h1 style="font-size:1.7rem;margin-bottom:8px" id="me-name"></h1>
-          <span class="badge" id="me-role"></span>
-          <hr class="divider" style="margin:20px 0">
-          <p class="text-2">Your account is ready. Community chat opens soon.</p>
-          <button class="btn btn-secondary" type="button" id="sign-out">Sign out</button>
+
+    </div>
+
+    <!-- Community chat (shown when signed in) -->
+    <div id="view-chat" class="chat" hidden>
+      <aside class="chat-side" id="chat-side" aria-label="Channels">
+        <div class="chat-side-head">GalaxySMP</div>
+        <nav class="channel-list" id="channel-list"></nav>
+        <div class="me-panel">
+          <div class="avatar sm" id="me-avatar"></div>
+          <div class="who"><strong id="me-name"></strong><span id="me-role"></span></div>
+          <button class="icon-btn" type="button" id="sign-out" title="Sign out" aria-label="Sign out" data-icon="logout"></button>
+        </div>
+      </aside>
+
+      <section class="chat-main" aria-label="Messages">
+        <header class="chat-top">
+          <button class="icon-btn only-mobile" type="button" id="open-channels" aria-label="Channels" data-icon="sidebar"></button>
+          <div class="title"><span class="hash">#</span><span id="channel-name"></span></div>
+          <div class="topic" id="channel-topic"></div>
+          <span class="conn" id="conn-state" hidden>Reconnecting…</span>
+          <button class="icon-btn members-toggle" type="button" id="open-members" aria-label="Members" data-icon="users"></button>
+        </header>
+        <div class="messages" id="messages" aria-live="polite"></div>
+        <button class="btn btn-primary btn-sm jump-latest" type="button" id="jump-latest" hidden>Jump to latest</button>
+        <div class="composer-wrap">
+          <p class="composer-note" id="composer-note" role="alert" hidden></p>
+          <div class="reply-bar" id="reply-bar" hidden>
+            <span>Replying to <b id="reply-name"></b></span>
+            <button class="icon-btn" type="button" id="reply-cancel" aria-label="Cancel reply" data-icon="close"></button>
+          </div>
+          <form class="composer" id="composer">
+            <textarea id="composer-input" rows="1" maxlength="500" aria-label="Message"></textarea>
+            <button class="btn btn-primary send" type="submit" aria-label="Send" data-icon="send"></button>
+          </form>
+          <div class="composer-meta"><span id="composer-count"></span></div>
         </div>
       </section>
 
+      <aside class="chat-members" id="chat-members" aria-label="Members">
+        <div class="chat-side-head">Members</div>
+        <div class="member-list" id="member-list"></div>
+      </aside>
+      <div class="drawer-scrim" id="drawer-scrim"></div>
     </div>
   </main>
 

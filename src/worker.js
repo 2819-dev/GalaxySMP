@@ -7,8 +7,11 @@ import { listRanks, checkout } from "./routes/store.js";
 import { serveStatic } from "./lib/static.js";
 import { linkStart, linkPoll, login, logout, me } from "./routes/auth.js";
 import { pluginPing, pluginLink } from "./routes/plugin.js";
+import { bootstrap, history, connect } from "./routes/chat.js";
 
-// Each entry: [method, path, handler]. Later stages add accounts, chat and moderation here.
+export { CommunityHub } from "./chat/hub.js";
+
+// Each entry: [method, path, handler]. A path segment like ":id" matches any value.
 const routes = [
   ["GET", "/api/status", (req, env, ctx) => handleStatus(req, ctx)],
   ["GET", "/api/health", (req, env) => health(env)],
@@ -21,7 +24,22 @@ const routes = [
   ["GET", "/api/me", (req, env) => me(req, env)],
   ["GET", "/api/plugin/ping", (req, env) => pluginPing(req, env)],
   ["POST", "/api/plugin/link", (req, env) => pluginLink(req, env)],
+  ["GET", "/api/chat/bootstrap", (req, env) => bootstrap(req, env)],
+  ["GET", "/api/chat/channels/:id/messages", history],
+  ["GET", "/api/chat/connect", (req, env) => connect(req, env)],
 ];
+
+function matchPath(pattern, pathname) {
+  const a = pattern.split("/");
+  const b = pathname.split("/");
+  if (a.length !== b.length) return null;
+  const params = {};
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].startsWith(":")) params[a[i].slice(1)] = decodeURIComponent(b[i]);
+    else if (a[i] !== b[i]) return null;
+  }
+  return params;
+}
 
 // Lets you check, from a browser, that the settings reached the app.
 // It never shows the values themselves.
@@ -54,13 +72,14 @@ export default {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return serveStatic(request);
     try {
+      let pathFound = false;
       for (const [method, path, handler] of routes) {
-        if (url.pathname === path) {
-          if (request.method !== method) return error("Method not allowed.", 405);
-          return await handler(request, env, ctx, url);
-        }
+        const params = matchPath(path, url.pathname);
+        if (!params) continue;
+        pathFound = true;
+        if (request.method === method) return await handler(request, env, ctx, url, params);
       }
-      return error("Not found.", 404);
+      return pathFound ? error("Method not allowed.", 405) : error("Not found.", 404);
     } catch (e) {
       if (e instanceof HttpError) return error(e.message, e.status, e.extra);
       console.error("Unhandled error", e);
