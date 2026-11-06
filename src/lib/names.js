@@ -18,13 +18,13 @@ export function parseRequestedName(raw, platform) {
   if (platform === "bedrock") {
     const base = name.replace(/^[.*]+/, "").replace(/ /g, "_");
     if (!BEDROCK_RE.test(base)) {
-      return { error: "Bedrock names can only use letters, numbers, spaces and underscores." };
+      return { error: "Bedrock usernames may contain only letters, numbers, spaces and underscores." };
     }
     return { name: "." + base, platform: "bedrock" };
   }
-  if (platform !== "java") return { error: "Choose Java or Bedrock." };
+  if (platform !== "java") return { error: "Please select Java or Bedrock." };
   if (!JAVA_RE.test(name)) {
-    return { error: "Java names are 3 to 16 letters, numbers or underscores." };
+    return { error: "Java usernames must be 3 to 16 characters: letters, numbers or underscores." };
   }
   return { name, platform: "java" };
 }

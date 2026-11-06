@@ -49,8 +49,8 @@ document.querySelectorAll("[data-platform]").forEach((b) =>
     platform = b.dataset.platform;
     document.querySelectorAll("[data-platform]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     $("su-name-hint").textContent = platform === "bedrock"
-      ? "Your Xbox gamertag. You don't need to type the dot in front."
-      : "Exactly as it appears in game.";
+      ? "Your Xbox gamertag. The leading dot is added automatically."
+      : "Enter it exactly as it appears in game.";
   })
 );
 
@@ -66,9 +66,9 @@ $("form-signup").addEventListener("submit", async (e) => {
   err.textContent = "";
   const username = $("su-name").value.trim();
   const password = $("su-pass").value;
-  if (!username) return (err.textContent = "Enter your Minecraft username.");
-  if (password.length < 8) return (err.textContent = "Your password needs at least 8 characters.");
-  if (password !== $("su-pass2").value) return (err.textContent = "The two passwords don't match.");
+  if (!username) return (err.textContent = "Please enter your Minecraft username.");
+  if (password.length < 8) return (err.textContent = "Passwords must be at least 8 characters.");
+  if (password !== $("su-pass2").value) return (err.textContent = "The passwords do not match.");
   busy(form, true);
   try {
     const data = await api("/api/auth/link/start", { username, password, platform });
@@ -123,7 +123,7 @@ function startWaiting({ code, username, expiresAt, pollToken }) {
   $("code-copy").onclick = async () => {
     try { await navigator.clipboard.writeText(command); toast("Copied"); } catch { toast(command); }
   };
-  setCodeStatus("Waiting for you to type it in game");
+  setCodeStatus("Waiting for confirmation from the server");
   show("code");
 
   const end = new Date(expiresAt).getTime();
@@ -131,7 +131,7 @@ function startWaiting({ code, username, expiresAt, pollToken }) {
     const left = Math.max(0, Math.round((end - Date.now()) / 1000));
     $("code-timer").textContent = left
       ? `Code expires in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`
-      : "This code has expired. Start over to get a new one.";
+      : "This code has expired. Start over to generate a new one.";
   };
   tick();
   clockTimer = setInterval(tick, 1000);
@@ -141,7 +141,7 @@ function startWaiting({ code, username, expiresAt, pollToken }) {
       const data = await api("/api/auth/link/poll", { pollToken });
       if (data.status === "linked") {
         stopWaiting();
-        setCodeStatus("Linked!", "is-online");
+        setCodeStatus("Account linked", "is-online");
         toast("Account linked");
         return loadMe();
       }
@@ -151,7 +151,7 @@ function startWaiting({ code, username, expiresAt, pollToken }) {
       }
       if (data.status === "banned") {
         stopWaiting();
-        return setCodeStatus("This account is banned from the community", "is-offline");
+        return setCodeStatus("This account has been banned from the community", "is-offline");
       }
       if (data.status === "claimed") {
         stopWaiting();

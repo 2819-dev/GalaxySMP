@@ -32,17 +32,17 @@ export async function pluginLink(request, env) {
   if (!UUID_RE.test(uuid) || !name || name.length > 32) throw new HttpError(400, "Bad player data.");
 
   const reply = (ok, message) => json({ ok, message });
-  if (code.length !== 6) return reply(false, "Codes look like ABC-123. Check the code on the website and try again.");
+  if (code.length !== 6) return reply(false, "Invalid code format. Codes look like ABC-123.");
 
   const sql = getDb(env);
   const rows = await sql`
     SELECT id, requested_name, used_at, expires_at > now() AS active FROM link_codes WHERE code = ${code}`;
   const row = rows[0];
   if (!row || row.used_at || !row.active) {
-    return reply(false, "That code is wrong or has expired. Get a new one on the website.");
+    return reply(false, "This code is invalid or has expired. Generate a new one on the website.");
   }
   if (!namesMatch(row.requested_name, name, bedrock)) {
-    return reply(false, `This code was made for ${row.requested_name}, not you. Make a new code with your own name.`);
+    return reply(false, `This code belongs to ${row.requested_name}. Generate a new code using your own username.`);
   }
 
   const platform = bedrock ? "bedrock" : "java";
@@ -69,11 +69,11 @@ export async function pluginLink(request, env) {
     sql`DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE mc_uuid = ${uuid}::uuid)`,
   ]);
   const user = results[2][0];
-  if (user.banned) return reply(true, "Linked, but this account is banned from the website community.");
+  if (user.banned) return reply(true, "Account linked, but this account is banned from the community.");
   if (user.created) {
     return reply(true, owner
-      ? "Linked! Your website account is ready, with Admin powers."
-      : "Linked! Your GalaxySMP website account is ready. Go back to the website.");
+      ? "Account linked with Admin access. Return to the website to continue."
+      : "Account linked. Return to the website to continue.");
   }
-  return reply(true, "Linked! Your website password has been updated. Go back to the website.");
+  return reply(true, "Account linked and password updated. Return to the website to continue.");
 }

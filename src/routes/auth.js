@@ -12,9 +12,9 @@ const BCRYPT_COST = 10;
 function checkPassword(password, name) {
   const pw = String(password || "");
   const bytes = new TextEncoder().encode(pw).length;
-  if (pw.length < 8) throw new HttpError(400, "Your password needs at least 8 characters.");
-  if (bytes > 72) throw new HttpError(400, "That password is too long (72 characters max).");
-  if (pw.toLowerCase().includes(baseName(name))) throw new HttpError(400, "Your password can't contain your username.");
+  if (pw.length < 8) throw new HttpError(400, "Passwords must be at least 8 characters.");
+  if (bytes > 72) throw new HttpError(400, "Passwords can be at most 72 characters.");
+  if (pw.toLowerCase().includes(baseName(name))) throw new HttpError(400, "Your password cannot contain your username.");
   return pw;
 }
 
@@ -30,7 +30,7 @@ export async function linkStart(request, env) {
   const [{ recent }] = await sql`
     SELECT count(*)::int AS recent FROM link_codes
      WHERE lower(requested_name) = lower(${parsed.name}) AND created_at > now() - interval '10 minutes'`;
-  if (recent >= 5) throw new HttpError(429, "Too many codes for this name. Please wait 10 minutes.");
+  if (recent >= 5) throw new HttpError(429, "Too many codes have been requested for this username. Please wait 10 minutes.");
 
   const pollToken = randomToken(24);
   const pollHash = await sha256(pollToken);
@@ -55,7 +55,7 @@ export async function linkStart(request, env) {
       if (!String(e.message).includes("link_codes_code_key")) throw e;
     }
   }
-  throw new HttpError(500, "Couldn't make a code. Please try again.");
+  throw new HttpError(500, "A code could not be generated. Please try again.");
 }
 
 // Step 2: the website asks every few seconds whether the player has typed /link yet.
@@ -92,7 +92,7 @@ export async function login(request, env) {
   const name = String(body.username || "").trim().toLowerCase();
   const password = String(body.password || "");
   if (!name || !password || name.length > 32 || password.length > 200) {
-    throw new HttpError(400, "Enter your username and password.");
+    throw new HttpError(400, "Please enter your username and password.");
   }
   const candidates = name.startsWith(".") ? [name] : [name, "." + name];
   const sql = getDb(env);
@@ -103,9 +103,9 @@ export async function login(request, env) {
       FROM users WHERE username_lower = ANY(${candidates})`;
   const user = rows.find((r) => r.ok) || rows.find((r) => r.username_lower === name) || rows[0];
 
-  const wrong = "Wrong username or password. Not linked yet? Create an account first.";
+  const wrong = "Incorrect username or password. New to GalaxySMP? Create an account first.";
   if (!user) throw new HttpError(401, wrong);
-  if (user.locked) throw new HttpError(429, "Too many wrong passwords. Try again in 10 minutes.");
+  if (user.locked) throw new HttpError(429, "Too many failed attempts. Please try again in 10 minutes.");
   if (!user.ok) {
     await sql`
       UPDATE users SET
@@ -115,7 +115,7 @@ export async function login(request, env) {
     throw new HttpError(401, wrong);
   }
   if (user.banned) {
-    throw new HttpError(403, "This account is banned from the community." + (user.ban_reason ? ` Reason: ${user.ban_reason}` : ""));
+    throw new HttpError(403, "This account has been banned from the community." + (user.ban_reason ? ` Reason: ${user.ban_reason}` : ""));
   }
   await sql`UPDATE users SET failed_logins = 0, locked_until = NULL, last_seen_at = now() WHERE id = ${user.id}`;
   const token = await createSession(sql, user.id);

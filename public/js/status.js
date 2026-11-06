@@ -11,12 +11,12 @@ function render(s) {
 
   if (!s || s.reason === "lookup_failed") {
     word.textContent = "Status unavailable";
-    motd.textContent = "We couldn't reach the server just now. Trying again in a minute.";
+    motd.textContent = "Status information is temporarily unavailable. Retrying shortly.";
     return;
   }
   if (!s.configured) {
-    word.textContent = "Opening soon";
-    motd.textContent = "The server address hasn't been published yet.";
+    word.textContent = "Launching soon";
+    motd.textContent = "The server address will be published here soon.";
   } else if (s.online) {
     hero.classList.add("is-online");
     word.textContent = "Online";
@@ -24,7 +24,7 @@ function render(s) {
   } else {
     hero.classList.add("is-offline");
     word.textContent = "Offline";
-    motd.textContent = "The server may be restarting. Check back in a few minutes.";
+    motd.textContent = "The server may be restarting. Please check back shortly.";
   }
 
   const updown = (v) => (v ? "Up" : "Down");

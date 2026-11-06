@@ -58,7 +58,7 @@ export async function getUser(request, env) {
 
 export async function requireUser(request, env) {
   const user = await getUser(request, env);
-  if (!user) throw new HttpError(401, "Please sign in first.");
+  if (!user) throw new HttpError(401, "Please sign in to continue.");
   return user;
 }
 

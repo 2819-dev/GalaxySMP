@@ -24,7 +24,7 @@
       <!-- Signed out -->
       <section id="view-auth" class="auth-card" hidden>
         <h1 style="font-size:1.9rem">Community</h1>
-        <p class="text-2">Chat with other GalaxySMP players. Your account is linked to your Minecraft name, and we never ask for your email.</p>
+        <p class="text-2">Join the conversation with other GalaxySMP players. Accounts are verified through Minecraft and never require an email address.</p>
 
         <div class="seg" role="group" aria-label="Choose" style="margin:22px 0 18px">
           <button type="button" data-mode="signup" aria-pressed="true">Create account</button>
@@ -42,20 +42,20 @@
           <div>
             <label class="field-label" for="su-name">Minecraft username</label>
             <input class="input" id="su-name" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="20" required>
-            <p class="hint" id="su-name-hint">Exactly as it appears in game.</p>
+            <p class="hint" id="su-name-hint">Enter it exactly as it appears in game.</p>
           </div>
           <div>
             <label class="field-label" for="su-pass">Choose a password</label>
             <input class="input" id="su-pass" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
-            <p class="hint">At least 8 characters. Don't use a password from another game or app.</p>
+            <p class="hint">At least 8 characters. Avoid reusing a password from another game or app.</p>
           </div>
           <div>
-            <label class="field-label" for="su-pass2">Type it again</label>
+            <label class="field-label" for="su-pass2">Confirm password</label>
             <input class="input" id="su-pass2" type="password" autocomplete="new-password" maxlength="72" required>
           </div>
           <p class="form-error" id="su-error" role="alert"></p>
-          <button class="btn btn-primary btn-lg btn-block" type="submit">Get my link code</button>
-          <p class="hint" style="margin:0">Forgot your password? Create your account again with the same name. Linking again sets a new password.</p>
+          <button class="btn btn-primary btn-lg btn-block" type="submit">Continue</button>
+          <p class="hint" style="margin:0">Forgotten your password? Repeat these steps with the same username to set a new one.</p>
         </form>
 
         <form id="form-signin" class="panel form" novalidate hidden>
@@ -78,12 +78,12 @@
         <div class="panel">
           <ol class="steps">
             <li>Join GalaxySMP in Minecraft as <strong id="code-name"></strong>.</li>
-            <li>Open chat and type this command, then press Enter:</li>
+            <li>Open chat and enter the following command:</li>
           </ol>
           <div class="code-display" id="code-command" style="margin:14px 0 10px"></div>
           <button class="btn btn-secondary btn-block" type="button" id="code-copy">Copy command</button>
           <hr class="divider" style="margin:20px 0">
-          <p class="status-line" id="code-status" style="margin:0"><span class="dot"></span><span>Waiting for you to type it in game</span></p>
+          <p class="status-line" id="code-status" style="margin:0"><span class="dot"></span><span>Waiting for confirmation from the server</span></p>
           <p class="hint" id="code-timer"></p>
         </div>
         <button class="btn btn-ghost btn-block" type="button" id="code-restart" style="margin-top:12px">Start over</button>
@@ -96,7 +96,7 @@
           <h1 style="font-size:1.7rem;margin-bottom:8px" id="me-name"></h1>
           <span class="badge" id="me-role"></span>
           <hr class="divider" style="margin:20px 0">
-          <p class="text-2">The community chat is being set up and opens soon. Your account is ready.</p>
+          <p class="text-2">Your account is ready. Community chat opens soon.</p>
           <button class="btn btn-secondary" type="button" id="sign-out">Sign out</button>
         </div>
       </section>

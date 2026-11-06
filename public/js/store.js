@@ -15,9 +15,9 @@ async function startCheckout(rankId, button) {
       location.href = data.url;
       return;
     }
-    toast(data.message || data.error || "The store is coming soon!");
+    toast(data.message || data.error || "The store is opening soon.");
   } catch {
-    toast("Couldn't reach the store. Try again later.");
+    toast("The store is unavailable right now. Please try again later.");
   } finally {
     button.disabled = false;
   }

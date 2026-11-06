@@ -6,7 +6,7 @@ export async function limit(env, binding, key) {
   const limiter = env[binding];
   if (!limiter || typeof limiter.limit !== "function") return;
   const { success } = await limiter.limit({ key });
-  if (!success) throw new HttpError(429, "Too many tries. Please wait a minute and try again.");
+  if (!success) throw new HttpError(429, "Too many requests. Please wait a minute and try again.");
 }
 
 export function clientIp(request) {

@@ -78,15 +78,15 @@ function renderFooter() {
       <div class="footer-grid">
         <div>
           <a class="brand" href="/" aria-label="${config.serverName} home"><img src="/img/wordmark.png" alt="${config.serverName}" width="150" height="26"></a>
-          <p>A Java and Bedrock Minecraft server for players of all ages.</p>
+          <p>A family-friendly Minecraft server for Java and Bedrock players.</p>
         </div>
-        <div><h4>Play</h4><ul><li><a href="/join">How to join</a></li><li><a href="/status">Server status</a></li><li><a href="/store">Store</a></li></ul></div>
-        <div><h4>Community</h4><ul><li><a href="/community">Chat</a></li><li><a href="/rules">Rules</a></li></ul></div>
-        <div><h4>About</h4><ul><li><a href="/privacy">Privacy</a></li></ul></div>
+        <div><h4>Play</h4><ul><li><a href="/join">How to Join</a></li><li><a href="/status">Server Status</a></li><li><a href="/store">Store</a></li></ul></div>
+        <div><h4>Community</h4><ul><li><a href="/community">Community Chat</a></li><li><a href="/rules">Rules</a></li></ul></div>
+        <div><h4>Legal</h4><ul><li><a href="/privacy">Privacy Policy</a></li></ul></div>
       </div>
     </div>
     <div class="footer-bottom">
-      <div class="container">© ${new Date().getFullYear()} ${config.serverName}. Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.</div>
+      <div class="container">© ${new Date().getFullYear()} ${config.serverName}. NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</div>
     </div>
   </footer>`;
 }
@@ -120,7 +120,7 @@ async function copyText(text) {
     document.execCommand("copy");
     ta.remove();
   }
-  toast(`Copied ${text}`);
+  toast(`Copied to clipboard`);
 }
 
 document.addEventListener("click", (e) => {
@@ -160,7 +160,7 @@ export async function fetchStatus() {
 }
 
 export function statusText(s) {
-  if (!s || !s.configured) return { cls: "", text: "Opening soon" };
+  if (!s || !s.configured) return { cls: "", text: "Launching soon" };
   if (s.reason === "lookup_failed") return { cls: "", text: "Status unavailable" };
   if (!s.online) return { cls: "is-offline", text: "Offline" };
   const n = s.players.online;

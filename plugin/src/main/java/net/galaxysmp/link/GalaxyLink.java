@@ -72,11 +72,11 @@ public final class GalaxyLink extends JavaPlugin implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Only players can use /link.");
+            sender.sendMessage("This command can only be used by players.");
             return true;
         }
         if (args.length != 1) {
-            player.sendMessage(Component.text("Usage: /link CODE  (get your code on the GalaxySMP website)", NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("Usage: /link <code>. Generate a code on the GalaxySMP website.", NamedTextColor.YELLOW));
             return true;
         }
         long now = System.currentTimeMillis();
@@ -92,7 +92,7 @@ public final class GalaxyLink extends JavaPlugin implements CommandExecutor {
         String name = player.getName();
         boolean bedrock = isBedrock(uuid);
 
-        player.sendMessage(Component.text("Checking your code...", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("Verifying your code...", NamedTextColor.GRAY));
         getServer().getScheduler().runTaskAsynchronously(this, () -> {
             Component reply = sendLink(code, uuid, name, bedrock);
             getServer().getScheduler().runTask(this, () -> {
@@ -127,7 +127,7 @@ public final class GalaxyLink extends JavaPlugin implements CommandExecutor {
             return Component.text(message, ok ? NamedTextColor.GREEN : NamedTextColor.RED);
         } catch (Exception e) {
             getLogger().warning("Could not reach the website: " + e.getMessage());
-            return Component.text("Couldn't reach the website right now. Try again in a minute.", NamedTextColor.RED);
+            return Component.text("The website could not be reached. Please try again shortly.", NamedTextColor.RED);
         }
     }
 
