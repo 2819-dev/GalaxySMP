@@ -4,3 +4,4 @@ node_modules/
 plugin/target/
 plugin/build/
 *.log
+src/generated/

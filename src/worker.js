@@ -1,9 +1,10 @@
 // GalaxySMP website: main entry point.
-// Plain pages are served straight from /public. Only /api/* requests reach this code.
+// Pages come from /public (packed in at deploy time); /api/* is the back end.
 import { json, error, HttpError } from "./lib/http.js";
 import { getDb } from "./lib/db.js";
 import { handleStatus } from "./routes/status.js";
 import { listRanks, checkout } from "./routes/store.js";
+import { serveStatic } from "./lib/static.js";
 
 // Each entry: [method, path, handler]. Later stages add accounts, chat and moderation here.
 const routes = [
@@ -42,6 +43,7 @@ async function health(env) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (!url.pathname.startsWith("/api/")) return serveStatic(request);
     try {
       for (const [method, path, handler] of routes) {
         if (url.pathname === path) {

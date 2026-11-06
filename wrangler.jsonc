@@ -7,15 +7,11 @@
   "main": "src/worker.js",
   "compatibility_date": "2026-10-25",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
 
-  // Plain files (pages, styles, pictures) come from /public and are served for free.
-  // Only /api/* runs our code, which keeps us far below the free daily request limit.
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS",
-    "not_found_handling": "404-page",
-    "run_worker_first": ["/api/*"]
-  },
+  // Pages, styles and scripts in /public are packed into the Worker before each deploy.
+  "build": { "command": "node scripts/build-assets.mjs", "watch_dir": "public" },
 
   // Keep variables that were added in the dashboard when a new version is deployed.
   "keep_vars": true,

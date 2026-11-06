@@ -2,9 +2,9 @@
 
 Website and community chat for the GalaxySMP Minecraft server (Java + Bedrock).
 
-- **Hosting:** Cloudflare Workers (free plan). Pages in `public/`, back-end code in `src/`.
+- **Hosting:** Cloudflare Workers (free plan) at https://galaxysmp.access-b.workers.dev. Pages in `public/` (packed into the Worker by `scripts/build-assets.mjs`), back-end code in `src/`.
 - **Database:** Neon Postgres. Schema in `migrations/`.
-- **Auto-deploy:** every change to the `main` branch goes live in about a minute.
+- **Deploy:** `CLOUDFLARE_API_TOKEN=... npx wrangler deploy` (Claude does this after each change).
 
 ## Files you might edit
 
