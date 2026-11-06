@@ -1,13 +1,6 @@
 // Shared code for every page: header, footer, icons, copy buttons and live status.
 import config from "/config.js";
 
-export const LOGO_SVG = `
-<svg viewBox="0 0 32 32" aria-hidden="true">
-  <circle cx="16" cy="16" r="9" fill="#8b5cf6"/>
-  <path d="M16 7a9 9 0 0 1 0 18" fill="#6d3fe0"/>
-  <ellipse cx="16" cy="16" rx="15" ry="4.6" fill="none" stroke="#c9b8ff" stroke-width="1.6" transform="rotate(-20 16 16)"/>
-  <circle cx="26.5" cy="5.5" r="1.3" fill="#fff"/>
-</svg>`;
 
 const ICONS = {
   copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
@@ -55,7 +48,7 @@ function renderHeader() {
   slot.outerHTML = `
   <header class="site-header">
     <div class="container">
-      <a class="brand" href="/">${LOGO_SVG}<span>${config.serverName}</span></a>
+      <a class="brand" href="/" aria-label="${config.serverName} home"><img src="/img/wordmark.png" alt="${config.serverName}" width="150" height="26"></a>
       <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="site-nav">${icon("menu")}</button>
       <nav class="nav" id="site-nav" aria-label="Main">
         <div class="nav-links">${links}</div>
@@ -84,7 +77,7 @@ function renderFooter() {
     <div class="container">
       <div class="footer-grid">
         <div>
-          <a class="brand" href="/">${LOGO_SVG}<span>${config.serverName}</span></a>
+          <a class="brand" href="/" aria-label="${config.serverName} home"><img src="/img/wordmark.png" alt="${config.serverName}" width="150" height="26"></a>
           <p>A Java and Bedrock Minecraft server for players of all ages.</p>
         </div>
         <div><h4>Play</h4><ul><li><a href="/join">How to join</a></li><li><a href="/status">Server status</a></li><li><a href="/store">Store</a></li></ul></div>

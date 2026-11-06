@@ -12,11 +12,11 @@
   --text: #e9ebf8;
   --text-2: #b4b8d6;
   --text-3: #8186ad;
-  --accent: #8b5cf6;
-  --accent-hover: #9a70f7;
-  --accent-press: #7a4aea;
-  --accent-tint: rgba(139, 92, 246, 0.14);
-  --accent-text: #b8a2fb;
+  --accent: #2457eb;
+  --accent-hover: #3567f2;
+  --accent-press: #1d46cc;
+  --accent-tint: rgba(36, 87, 235, 0.18);
+  --accent-text: #6fd3fb;
   --ok: #34c77b;
   --bad: #f0566f;
   --warn: #e8b84a;
@@ -74,7 +74,7 @@ h3 { font-size: 1.06rem; letter-spacing: -0.01em; }
 p { margin: 0 0 1em; }
 code, .mono { font-family: var(--mono); font-size: .94em; }
 :focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 2px; border-radius: 6px; }
-::selection { background: rgba(139, 92, 246, .4); }
+::selection { background: rgba(36, 87, 235, .5); }
 
 .skip-link {
   position: absolute; left: -999px; top: 8px; z-index: 100;
@@ -101,7 +101,7 @@ code, .mono { font-family: var(--mono); font-size: .94em; }
 .site-header .container { height: var(--header-h); display: flex; align-items: center; gap: 28px; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 700; font-size: 1.05rem; letter-spacing: -0.01em; }
 .brand:hover { text-decoration: none; }
-.brand svg { width: 28px; height: 28px; }
+.brand img { height: 28px; width: auto; display: block; }
 .nav { display: flex; align-items: center; gap: 2px; flex: 1; }
 .nav-links { display: flex; gap: 2px; }
 .nav-links a { color: var(--text-2); font-weight: 500; font-size: .94rem; padding: 7px 11px; border-radius: 7px; }
@@ -187,6 +187,7 @@ main { flex: 1; }
 .hero-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 56px; align-items: center; }
 @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; gap: 36px; } .hero { padding: 40px 0 32px; } }
 .hero .status-line { margin-bottom: 18px; }
+.hero-wordmark { display: block; width: min(100%, 440px); height: auto; margin: 0 0 26px -4px; }
 .hero h1 { max-width: 14em; }
 .hero .lead { color: var(--text-2); font-size: 1.1rem; max-width: 34em; margin-bottom: 28px; }
 .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
