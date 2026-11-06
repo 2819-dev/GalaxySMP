@@ -1,0 +1,183 @@
+import { toast } from "/js/site.js";
+
+const $ = (id) => document.getElementById(id);
+const views = ["loading", "auth", "code", "home"];
+function show(name) {
+  for (const v of views) $("view-" + v).hidden = v !== name;
+  window.scrollTo(0, 0);
+}
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined
+    ? { credentials: "same-origin" }
+    : { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  let data = {};
+  try { data = await res.json(); } catch { /* empty */ }
+  if (!res.ok) throw new Error(data.error || "Something went wrong. Please try again.");
+  return data;
+}
+
+// ---------- Signed in ----------
+function showHome(user) {
+  $("me-name").textContent = user.username;
+  const role = $("me-role");
+  role.textContent = user.role.name;
+  role.style.color = user.role.color;
+  show("home");
+}
+
+$("sign-out").addEventListener("click", async () => {
+  await api("/api/auth/logout", {}).catch(() => {});
+  show("auth");
+});
+
+// ---------- Create account / sign in toggles ----------
+let mode = "signup";
+let platform = "java";
+
+document.querySelectorAll("[data-mode]").forEach((b) =>
+  b.addEventListener("click", () => {
+    mode = b.dataset.mode;
+    document.querySelectorAll("[data-mode]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    $("form-signup").hidden = mode !== "signup";
+    $("form-signin").hidden = mode !== "signin";
+  })
+);
+
+document.querySelectorAll("[data-platform]").forEach((b) =>
+  b.addEventListener("click", () => {
+    platform = b.dataset.platform;
+    document.querySelectorAll("[data-platform]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    $("su-name-hint").textContent = platform === "bedrock"
+      ? "Your Xbox gamertag. You don't need to type the dot in front."
+      : "Exactly as it appears in game.";
+  })
+);
+
+function busy(form, on) {
+  form.querySelector('button[type="submit"]').disabled = on;
+}
+
+// ---------- Create account ----------
+$("form-signup").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const err = $("su-error");
+  err.textContent = "";
+  const username = $("su-name").value.trim();
+  const password = $("su-pass").value;
+  if (!username) return (err.textContent = "Enter your Minecraft username.");
+  if (password.length < 8) return (err.textContent = "Your password needs at least 8 characters.");
+  if (password !== $("su-pass2").value) return (err.textContent = "The two passwords don't match.");
+  busy(form, true);
+  try {
+    const data = await api("/api/auth/link/start", { username, password, platform });
+    form.reset();
+    startWaiting(data);
+  } catch (ex) {
+    err.textContent = ex.message;
+  } finally {
+    busy(form, false);
+  }
+});
+
+// ---------- Sign in ----------
+$("form-signin").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const err = $("si-error");
+  err.textContent = "";
+  busy(form, true);
+  try {
+    await api("/api/auth/login", { username: $("si-name").value.trim(), password: $("si-pass").value });
+    form.reset();
+    await loadMe();
+  } catch (ex) {
+    err.textContent = ex.message;
+  } finally {
+    busy(form, false);
+  }
+});
+
+// ---------- Waiting for /link ----------
+let pollTimer = null;
+let clockTimer = null;
+
+function stopWaiting() {
+  clearTimeout(pollTimer);
+  clearInterval(clockTimer);
+}
+
+function setCodeStatus(text, cls) {
+  const s = $("code-status");
+  s.classList.remove("is-online", "is-offline");
+  if (cls) s.classList.add(cls);
+  s.querySelector("span:last-child").textContent = text;
+}
+
+function startWaiting({ code, username, expiresAt, pollToken }) {
+  stopWaiting();
+  const command = `/link ${code}`;
+  $("code-name").textContent = username;
+  $("code-command").textContent = command;
+  $("code-copy").onclick = async () => {
+    try { await navigator.clipboard.writeText(command); toast("Copied"); } catch { toast(command); }
+  };
+  setCodeStatus("Waiting for you to type it in game");
+  show("code");
+
+  const end = new Date(expiresAt).getTime();
+  const tick = () => {
+    const left = Math.max(0, Math.round((end - Date.now()) / 1000));
+    $("code-timer").textContent = left
+      ? `Code expires in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`
+      : "This code has expired. Start over to get a new one.";
+  };
+  tick();
+  clockTimer = setInterval(tick, 1000);
+
+  const poll = async () => {
+    try {
+      const data = await api("/api/auth/link/poll", { pollToken });
+      if (data.status === "linked") {
+        stopWaiting();
+        setCodeStatus("Linked!", "is-online");
+        toast("Account linked");
+        return loadMe();
+      }
+      if (data.status === "expired") {
+        stopWaiting();
+        return setCodeStatus("Code expired", "is-offline");
+      }
+      if (data.status === "banned") {
+        stopWaiting();
+        return setCodeStatus("This account is banned from the community", "is-offline");
+      }
+      if (data.status === "claimed") {
+        stopWaiting();
+        show("auth");
+        return;
+      }
+    } catch { /* network blip: keep trying */ }
+    if (document.visibilityState === "visible" || Date.now() < end) pollTimer = setTimeout(poll, 3000);
+  };
+  pollTimer = setTimeout(poll, 3000);
+}
+
+$("code-restart").addEventListener("click", () => {
+  stopWaiting();
+  show("auth");
+});
+
+// ---------- Start ----------
+async function loadMe() {
+  try {
+    const { user } = await api("/api/me");
+    if (user) showHome(user);
+    else show("auth");
+  } catch {
+    show("auth");
+  }
+}
+
+loadMe();

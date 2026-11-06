@@ -5,6 +5,8 @@ import { getDb } from "./lib/db.js";
 import { handleStatus } from "./routes/status.js";
 import { listRanks, checkout } from "./routes/store.js";
 import { serveStatic } from "./lib/static.js";
+import { linkStart, linkPoll, login, logout, me } from "./routes/auth.js";
+import { pluginPing, pluginLink } from "./routes/plugin.js";
 
 // Each entry: [method, path, handler]. Later stages add accounts, chat and moderation here.
 const routes = [
@@ -12,6 +14,13 @@ const routes = [
   ["GET", "/api/health", (req, env) => health(env)],
   ["GET", "/api/store/ranks", () => listRanks()],
   ["POST", "/api/store/checkout", (req, env) => checkout(req, env)],
+  ["POST", "/api/auth/link/start", (req, env) => linkStart(req, env)],
+  ["POST", "/api/auth/link/poll", (req, env) => linkPoll(req, env)],
+  ["POST", "/api/auth/login", (req, env) => login(req, env)],
+  ["POST", "/api/auth/logout", (req, env) => logout(req, env)],
+  ["GET", "/api/me", (req, env) => me(req, env)],
+  ["GET", "/api/plugin/ping", (req, env) => pluginPing(req, env)],
+  ["POST", "/api/plugin/link", (req, env) => pluginLink(req, env)],
 ];
 
 // Lets you check, from a browser, that the settings reached the app.

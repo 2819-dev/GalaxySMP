@@ -4,22 +4,105 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Community · GalaxySMP</title>
+  <meta name="description" content="Sign in to the GalaxySMP community chat.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#0a0c1b">
   <link rel="stylesheet" href="/css/style.css">
-  <script type="module" src="/js/site.js"></script>
+  <script type="module" src="/js/community.js"></script>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to content</a>
   <div id="site-header" class="site-header-slot"></div>
+
   <main id="main">
-    <section class="hero">
-      <div class="container narrow">
-        <h1>Community chat</h1>
-        <p class="lead">The GalaxySMP community chat is launching soon. You'll be able to link your Minecraft account and chat with other players right here.</p>
-        <a class="btn btn-primary btn-lg" href="/join">Join the server meanwhile</a>
-      </div>
-    </section>
+    <div class="container" style="padding-top:48px">
+
+      <!-- Loading -->
+      <div id="view-loading" class="auth-card"><p class="text-3">Loading…</p></div>
+
+      <!-- Signed out -->
+      <section id="view-auth" class="auth-card" hidden>
+        <h1 style="font-size:1.9rem">Community</h1>
+        <p class="text-2">Chat with other GalaxySMP players. Your account is linked to your Minecraft name, and we never ask for your email.</p>
+
+        <div class="seg" role="group" aria-label="Choose" style="margin:22px 0 18px">
+          <button type="button" data-mode="signup" aria-pressed="true">Create account</button>
+          <button type="button" data-mode="signin" aria-pressed="false">Sign in</button>
+        </div>
+
+        <form id="form-signup" class="panel form" novalidate>
+          <div>
+            <span class="field-label" id="plat-label">I play on</span>
+            <div class="seg" role="group" aria-labelledby="plat-label">
+              <button type="button" data-platform="java" aria-pressed="true">Java</button>
+              <button type="button" data-platform="bedrock" aria-pressed="false">Bedrock</button>
+            </div>
+          </div>
+          <div>
+            <label class="field-label" for="su-name">Minecraft username</label>
+            <input class="input" id="su-name" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="20" required>
+            <p class="hint" id="su-name-hint">Exactly as it appears in game.</p>
+          </div>
+          <div>
+            <label class="field-label" for="su-pass">Choose a password</label>
+            <input class="input" id="su-pass" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
+            <p class="hint">At least 8 characters. Don't use a password from another game or app.</p>
+          </div>
+          <div>
+            <label class="field-label" for="su-pass2">Type it again</label>
+            <input class="input" id="su-pass2" type="password" autocomplete="new-password" maxlength="72" required>
+          </div>
+          <p class="form-error" id="su-error" role="alert"></p>
+          <button class="btn btn-primary btn-lg btn-block" type="submit">Get my link code</button>
+          <p class="hint" style="margin:0">Forgot your password? Create your account again with the same name. Linking again sets a new password.</p>
+        </form>
+
+        <form id="form-signin" class="panel form" novalidate hidden>
+          <div>
+            <label class="field-label" for="si-name">Minecraft username</label>
+            <input class="input" id="si-name" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="20" required>
+          </div>
+          <div>
+            <label class="field-label" for="si-pass">Password</label>
+            <input class="input" id="si-pass" name="password" type="password" autocomplete="current-password" maxlength="200" required>
+          </div>
+          <p class="form-error" id="si-error" role="alert"></p>
+          <button class="btn btn-primary btn-lg btn-block" type="submit">Sign in</button>
+        </form>
+      </section>
+
+      <!-- Waiting for /link -->
+      <section id="view-code" class="auth-card" hidden>
+        <h1 style="font-size:1.9rem">Link your account</h1>
+        <div class="panel">
+          <ol class="steps">
+            <li>Join GalaxySMP in Minecraft as <strong id="code-name"></strong>.</li>
+            <li>Open chat and type this command, then press Enter:</li>
+          </ol>
+          <div class="code-display" id="code-command" style="margin:14px 0 10px"></div>
+          <button class="btn btn-secondary btn-block" type="button" id="code-copy">Copy command</button>
+          <hr class="divider" style="margin:20px 0">
+          <p class="status-line" id="code-status" style="margin:0"><span class="dot"></span><span>Waiting for you to type it in game</span></p>
+          <p class="hint" id="code-timer"></p>
+        </div>
+        <button class="btn btn-ghost btn-block" type="button" id="code-restart" style="margin-top:12px">Start over</button>
+      </section>
+
+      <!-- Signed in (chat arrives in the next stage) -->
+      <section id="view-home" class="auth-card" hidden>
+        <div class="panel">
+          <p class="text-3 small" style="margin:0 0 4px">Signed in as</p>
+          <h1 style="font-size:1.7rem;margin-bottom:8px" id="me-name"></h1>
+          <span class="badge" id="me-role"></span>
+          <hr class="divider" style="margin:20px 0">
+          <p class="text-2">The community chat is being set up and opens soon. Your account is ready.</p>
+          <button class="btn btn-secondary" type="button" id="sign-out">Sign out</button>
+        </div>
+      </section>
+
+    </div>
   </main>
+
   <div id="site-footer"></div>
 </body>
 </html>

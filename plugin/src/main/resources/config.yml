@@ -1,0 +1,5 @@
+# GalaxyLink settings.
+# website: the address of the GalaxySMP website (no slash at the end).
+# secret: must match PLUGIN_SECRET in Cloudflare. Keep it private.
+website: '${galaxylink.api}'
+secret: '${galaxylink.secret}'

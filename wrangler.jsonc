@@ -22,5 +22,11 @@
     "OWNER_USERNAMES": "Ashcore2261,.VisionDevs"
   },
 
+  // Free built-in rate limiters (per visitor IP) for sign-in and code requests.
+  "ratelimits": [
+    { "name": "AUTH_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
+    { "name": "POLL_LIMITER", "namespace_id": "1002", "simple": { "limit": 60, "period": 60 } }
+  ],
+
   "observability": { "enabled": true }
 }
