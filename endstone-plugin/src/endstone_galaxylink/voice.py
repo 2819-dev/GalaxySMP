@@ -14,14 +14,19 @@ import threading
 import time
 import urllib.parse
 
-# Shown before a player's name above their head (like Simple Voice Chat).
+# Shown before a player's name above their head, like Simple Voice Chat.
+# These characters are drawn by the "GalaxySMP Voice Icons" resource pack
+# (resource-pack/ in the website repository), which the server sends to players.
 ICONS = {
-    "talking": "§a♪",      # green note: talking right now
-    "connected": "§7♪",    # grey note: in voice
-    "muted": "§c✖",        # red cross: microphone off
-    "deafened": "§c✖",     # red cross: deafened
-    "voice_muted": "§4✖",  # dark red cross: muted by staff
+    "talking": "\ue200",         # white speaker: talking nearby
+    "talking_group": "\ue201",   # green speaker: talking in a group
+    "talking_global": "\ue202",  # gold speaker: talking on the Global Mic
+    "muted": "\ue203",           # microphone crossed out: muted themselves
+    "deafened": "\ue204",        # headphones crossed out: deafened
+    "voice_muted": "\ue205",     # grey microphone crossed out: muted by staff
+    "disconnected": "\ue206",    # unplugged cable: not connected to voice
 }
+# In voice and quiet ("connected") shows no icon, like Simple Voice Chat.
 
 POSITION_TICKS = 6  # 20 ticks = 1 second, so about 3 updates per second
 
@@ -152,7 +157,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.1",
+                    "User-Agent": "GalaxyLink-Endstone/2.2",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 delay = 2
@@ -194,6 +199,9 @@ class VoiceLink:
 
     # ---------- main server thread ----------
     def _tick(self):
+        self._ticks = getattr(self, "_ticks", 0) + 1
+        if self._ticks % 4 == 0:
+            self._apply_icons()  # catches players who just joined the server
         if not self.active or not self.ws:
             return
         players = []
@@ -221,7 +229,7 @@ class VoiceLink:
     def _apply_icons(self):
         for p in self.plugin.server.online_players:
             key = str(p.unique_id).lower()
-            icon = self.wanted.get(key)
+            icon = self.wanted.get(key, "disconnected")
             if self.applied.get(key) == icon:
                 continue
             try:

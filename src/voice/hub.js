@@ -112,8 +112,8 @@ export class VoiceHub extends DurableObject {
     if (this.isVoiceMuted(a)) return "voice_muted";
     if (a.deafened) return "deafened";
     if (!a.micOn) return "muted";
-    if (a.talking) return "talking";
-    return "connected";
+    if (a.talking) return a.global && a.canGlobal ? "talking_global" : a.groupId ? "talking_group" : "talking";
+    return "connected"; // in voice and quiet: no icon, like Simple Voice Chat
   }
 
   sendIcons() {

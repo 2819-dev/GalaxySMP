@@ -27,12 +27,25 @@ const VICONS = {
 };
 const vicon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${VICONS[name] || ""}</svg>`;
 
+// Same pixel icons players see above heads in game (resource pack), like Simple Voice Chat.
 function stateOf(u) {
   if (u.voiceMuted) return { icon: "voice_muted", cls: "bad", label: "Muted by staff" };
   if (u.deafened) return { icon: "deafened", cls: "bad", label: "Deafened" };
   if (!u.mic) return { icon: "muted", cls: "bad", label: "Muted" };
-  if (u.talking) return { icon: "talking", cls: "ok", label: "Talking" };
-  return { icon: "connected", cls: "", label: "In voice" };
+  if (u.talking) {
+    if (u.global && u.canGlobal) return { icon: "talking_global", cls: "ok", label: "Talking on the Global Mic" };
+    if (u.group) return { icon: "talking_group", cls: "ok", label: "Talking in a group" };
+    return { icon: "talking", cls: "ok", label: "Talking" };
+  }
+  return { icon: "talking", cls: "idle", label: "In voice" };
+}
+
+function pixelIcon(name, label) {
+  const img = new Image(16, 16);
+  img.src = `/img/voice/${name}.png`;
+  img.alt = label;
+  img.className = "pixel";
+  return img;
 }
 
 // ---------- State ----------
@@ -394,7 +407,7 @@ function rowFor(u) {
   const st = stateOf(u);
   const row = h("div", { class: "vrow", "data-id": u.id });
   const ic = h("span", { class: `vstate ${st.cls}`, title: st.label });
-  ic.innerHTML = vicon(st.icon);
+  ic.append(pixelIcon(st.icon, st.label));
   const name = h("span", { class: "vname", text: u.username });
   name.style.color = u.color;
   const info = h("div", { class: "vinfo" }, h("div", {}, name, u.id === S.myId ? h("span", { class: "text-3 small", text: " (you)" }) : null), h("div", { class: "vdetail", text: detail(u) }));

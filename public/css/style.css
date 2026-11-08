@@ -590,8 +590,10 @@ textarea.input { height: auto; padding: 10px 14px; resize: vertical; min-height:
 .vrow.mine { background: var(--accent-tint); }
 .vstate { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--surface-2); color: var(--text-3); }
 .vstate svg { width: 17px; height: 17px; }
+.vstate img.pixel { width: 20px; height: 20px; image-rendering: pixelated; image-rendering: crisp-edges; }
+.vstate.idle img.pixel { opacity: .35; }
 .vstate.ok { color: var(--ok); box-shadow: 0 0 0 2px rgba(52, 199, 123, .45); }
-.vstate.bad { color: var(--bad); }
+.vstate.bad { color: var(--bad); background: rgba(240, 86, 111, .1); }
 .vinfo { flex: 1; min-width: 140px; }
 .vname { font-weight: 600; }
 .vdetail { font-size: .82rem; color: var(--text-3); }

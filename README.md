@@ -36,3 +36,10 @@ The plugin also powers website voice chat: it streams player positions to the
 `VoiceHub` Durable Object (`src/voice/hub.js`) over a WebSocket while anyone is in
 voice, and shows voice icons before players' names in game. Audio goes through
 Cloudflare Realtime (secrets `REALTIME_APP_ID`, `REALTIME_APP_SECRET`).
+
+## Voice icons resource pack
+
+`resource-pack/` holds the "GalaxySMP Voice Icons" Bedrock resource pack. It adds the
+Simple Voice Chat-style icons shown before players' names (font glyphs U+E200–U+E206,
+drawn by `resource-pack/draw_icons.py`). Build with `resource-pack/build.sh out/`.
+The same PNGs are used on the website's Voice page (`public/img/voice/`).
