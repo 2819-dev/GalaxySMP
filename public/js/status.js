@@ -1,4 +1,4 @@
-import { startStatus } from "/js/site.js";
+import { startStatus, statusText } from "/js/site.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -15,13 +15,15 @@ function render(s) {
     return;
   }
   if (s.manual) {
-    if (s.online) hero.classList.add("is-online"); else hero.classList.add("is-offline");
+    hero.classList.remove("is-maintenance");
+    hero.classList.add(statusText(s).cls);
     word.textContent = s.title;
     motd.textContent = s.message;
     $("st-players").textContent = "–";
     $("st-version").textContent = "–";
-    $("st-java").textContent = s.online ? "Open" : "Closed";
-    $("st-bedrock").textContent = s.online ? "Open" : "Closed";
+    const state = s.online ? "Open" : s.color === "amber" ? "Paused" : "Closed";
+    $("st-java").textContent = state;
+    $("st-bedrock").textContent = state;
     $("st-checked").textContent = new Date(s.checkedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     return;
   }

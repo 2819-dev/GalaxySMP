@@ -174,7 +174,10 @@ export async function fetchStatus() {
 }
 
 export function statusText(s) {
-  if (s && s.manual) return { cls: s.online ? "is-online" : "is-offline", text: s.title };
+  if (s && s.manual) {
+    const cls = { green: "is-online", amber: "is-maintenance", red: "is-offline" }[s.color] || (s.online ? "is-online" : "is-offline");
+    return { cls, text: s.title };
+  }
   if (!s || !s.configured) return { cls: "", text: "Launching soon" };
   if (s.reason === "lookup_failed") return { cls: "", text: "Status unavailable" };
   if (!s.online) return { cls: "is-offline", text: "Offline" };
@@ -190,7 +193,7 @@ export function startStatus(onData) {
     try { s = await fetchStatus(); } catch { /* shown as unavailable */ }
     const { cls, text } = s ? statusText(s) : { cls: "", text: "Status unavailable" };
     els.forEach((el) => {
-      el.classList.remove("is-online", "is-offline");
+      el.classList.remove("is-online", "is-offline", "is-maintenance");
       if (cls) el.classList.add(cls);
       const label = el.querySelector("[data-status-text]");
       if (label) label.textContent = text;

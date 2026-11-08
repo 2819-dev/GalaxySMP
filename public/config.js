@@ -12,11 +12,13 @@ const config = {
 
   // Manual status. While enabled, the website shows this instead of a live check.
   // Use it for Realm closures or maintenance. Set enabled: false to go back to automatic.
+  // color: "green" (open), "amber" (maintenance / migrating), "red" (closed)
   manualStatus: {
     enabled: true,
     open: false,
-    title: "Temporarily Closed",
-    message: "Closed due to technical difficulties.",
+    color: "amber",
+    title: "Migrating to Server",
+    message: "We're moving GalaxySMP from our Realm to our own server. Check back soon.",
   },
 
   // Java players type this in Multiplayer > Add Server.

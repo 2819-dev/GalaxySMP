@@ -30,6 +30,7 @@ export async function buildStatus() {
       manual: true,
       hosting: config.hosting,
       online: Boolean(manual.open),
+      color: ["green", "amber", "red"].includes(manual.color) ? manual.color : manual.open ? "green" : "red",
       title: String(manual.title || (manual.open ? "Open" : "Closed")),
       message: String(manual.message || ""),
       checkedAt: new Date().toISOString(),

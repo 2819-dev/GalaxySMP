@@ -210,6 +210,7 @@ main { flex: 1; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); flex: none; }
 .is-online .dot { background: var(--ok); box-shadow: 0 0 0 3px rgba(52, 199, 123, .18); }
 .is-offline .dot { background: var(--bad); box-shadow: 0 0 0 3px rgba(240, 86, 111, .18); }
+.is-maintenance .dot { background: var(--warn); box-shadow: 0 0 0 3px rgba(232, 184, 74, .18); }
 .badge { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600; padding: 3px 9px; border-radius: 6px; background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
 
 /* ---------- Feature rows ---------- */
