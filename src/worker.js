@@ -9,8 +9,10 @@ import { linkStart, linkPoll, login, logout, me } from "./routes/auth.js";
 import { pluginPing, pluginLink } from "./routes/plugin.js";
 import { bootstrap, history, connect } from "./routes/chat.js";
 import * as mod from "./routes/mod.js";
+import { voiceConnect, voiceServer } from "./routes/voice.js";
 
 export { CommunityHub } from "./chat/hub.js";
+export { VoiceHub } from "./voice/hub.js";
 
 // Each entry: [method, path, handler]. A path segment like ":id" matches any value.
 const routes = [
@@ -43,6 +45,12 @@ const routes = [
   ["POST", "/api/mod/words", (req, env) => mod.addWord(req, env)],
   ["POST", "/api/mod/words/:id/delete", mod.removeWord],
   ["GET", "/api/mod/audit", mod.listAudit],
+  ["GET", "/api/voice/connect", (req, env) => voiceConnect(req, env)],
+  ["GET", "/api/voice/server", (req, env) => voiceServer(req, env)],
+  ["POST", "/api/mod/members/:id/voice-mute", mod.voiceMute],
+  ["POST", "/api/mod/members/:id/voice-unmute", mod.voiceUnmute],
+  ["POST", "/api/mod/members/:id/voice-kick", mod.voiceKick],
+  ["POST", "/api/mod/members/:id/global-mic", mod.setGlobalMic],
 ];
 
 function matchPath(pattern, pathname) {

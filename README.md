@@ -31,3 +31,8 @@ The `/link` command for the Bedrock server lives in `endstone-plugin/` (Python, 
 
 Build: `PLUGIN_SECRET=... endstone-plugin/build.sh out/` produces `endstone_galaxylink-*.whl`.
 Install: upload the `.whl` file into the server's `plugins` folder and restart.
+
+The plugin also powers website voice chat: it streams player positions to the
+`VoiceHub` Durable Object (`src/voice/hub.js`) over a WebSocket while anyone is in
+voice, and shows voice icons before players' names in game. Audio goes through
+Cloudflare Realtime (secrets `REALTIME_APP_ID`, `REALTIME_APP_SECRET`).

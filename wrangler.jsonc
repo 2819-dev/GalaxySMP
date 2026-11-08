@@ -11,7 +11,7 @@
   "preview_urls": false,
 
   // Pages, styles and scripts in /public are packed into the Worker before each deploy.
-  "build": { "command": "node scripts/build-assets.mjs", "watch_dir": "public" },
+  "build": { "command": "node scripts/build-assets.mjs", "watch_dir": ["public", "src/lib", "src/routes", "src/chat", "src/voice", "src/store"] },
 
   // Keep variables that were added in the dashboard when a new version is deployed.
   "keep_vars": true,
@@ -24,9 +24,15 @@
 
   // Live chat: one Durable Object (SQLite-backed, available on the free plan).
   "durable_objects": {
-    "bindings": [{ "name": "HUB", "class_name": "CommunityHub" }]
+    "bindings": [
+      { "name": "HUB", "class_name": "CommunityHub" },
+      { "name": "VOICE", "class_name": "VoiceHub" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CommunityHub"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["CommunityHub"] },
+    { "tag": "v2", "new_sqlite_classes": ["VoiceHub"] }
+  ],
 
   // Free built-in rate limiters (per visitor IP) for sign-in and code requests.
   "ratelimits": [

@@ -8,7 +8,7 @@ const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "no-referrer",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  "Permissions-Policy": "camera=(), microphone=(self), geolocation=(), payment=(), usb=()",
   "Cross-Origin-Opener-Policy": "same-origin",
 };
 

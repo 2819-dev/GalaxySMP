@@ -121,3 +121,16 @@ export function roleDialog(member, onDone) {
     ],
   });
 }
+
+export function voiceMuteDialog(member, onDone) {
+  const len = select("vmute-len", Object.entries(MUTE_LABELS), 60);
+  const reason = h("input", { class: "input", id: "vmute-reason", maxlength: 300, placeholder: "Optional, shown in the audit log" });
+  openDialog({
+    title: `Mute ${member.username} in voice`,
+    body: h("div", { class: "form" }, h("p", { class: "text-2", text: "They can still listen in voice, but nobody will hear them until the mute ends." }), field("Length", len), field("Reason", reason)),
+    actions: [
+      { label: "Cancel" },
+      { label: "Mute in voice", kind: "primary", onClick: async () => { await postJson(`/api/mod/members/${member.id}/voice-mute`, { minutes: Number(len.value), reason: reason.value }); onDone?.("Muted in voice."); } },
+    ],
+  });
+}

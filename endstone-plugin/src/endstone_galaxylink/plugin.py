@@ -15,6 +15,7 @@ from endstone.command import Command, CommandSender
 from endstone.plugin import Plugin
 
 from endstone_galaxylink import settings
+from endstone_galaxylink.voice import VoiceLink
 
 COOLDOWN_SECONDS = 5
 TIMEOUT_SECONDS = 15
@@ -41,11 +42,19 @@ class GalaxyLink(Plugin):
 
     def on_enable(self) -> None:
         self._last_use = {}
+        self._voice = None
         self._base = settings.WEBSITE.rstrip("/")
         if not settings.SECRET or settings.SECRET.startswith("PASTE_"):
             self.logger.warning("GalaxyLink is missing its secret. Download a fresh build from the website team.")
             return
         threading.Thread(target=self._ping, daemon=True).start()
+        # Voice chat: positions out, name-tag icons in.
+        self._voice = VoiceLink(self, self._base, settings.SECRET)
+        self._voice.start()
+
+    def on_disable(self) -> None:
+        if getattr(self, "_voice", None):
+            self._voice.stop()
 
     # ---------- Website requests (run on a background thread) ----------
     def _request(self, path, body=None):
@@ -57,7 +66,7 @@ class GalaxyLink(Plugin):
             headers={
                 "Authorization": "Bearer " + settings.SECRET,
                 "Content-Type": "application/json",
-                "User-Agent": "GalaxyLink-Endstone/2.0",
+                "User-Agent": "GalaxyLink-Endstone/2.1",
             },
         )
         try:

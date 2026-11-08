@@ -12,6 +12,7 @@ import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
 import { isOwner } from "../lib/names.js";
 import { hubBroadcast } from "./chat.js";
+import { voiceEvent } from "./voice.js";
 
 const MOD = 50;
 const ADMIN = 100;
@@ -169,6 +170,7 @@ export async function ban(request, env, ctx, url, params) {
     audit(sql, actor.id, "user.ban", { userId: target.id, details: { reason } }),
   ]);
   await hubBroadcast(env, { type: "kick", userId: Number(target.id), reason: "Your account has been banned from the community." });
+  await voiceEvent(env, { type: "banned", userId: Number(target.id) });
   await hubBroadcast(env, { type: "member_removed", userId: Number(target.id) });
   return json({ ok: true });
 }
@@ -199,6 +201,7 @@ export async function setRole(request, env, ctx, url, params) {
     audit(sql, actor.id, "user.role", { userId: target.id, details: { from: target.role, to: body.role } }),
   ]);
   await memberUpdated(env, sql, target.id);
+  await voiceEvent(env, { type: "role_changed", userId: Number(target.id) });
   return json({ ok: true });
 }
 
@@ -209,6 +212,7 @@ export async function searchMembers(request, env, ctx, url) {
   const sql = getDb(env);
   const rows = await sql`
     SELECT u.id, u.username, u.platform, u.banned, u.ban_reason, u.muted_until, u.mute_reason,
+           u.voice_muted_until, u.voice_mute_reason, u.global_mic,
            u.created_at, u.last_seen_at, r.key AS role, r.power,
            (SELECT count(*)::int FROM messages m WHERE m.user_id = u.id AND m.deleted_at IS NULL) AS messages,
            (SELECT count(*)::int FROM reports rp JOIN messages m ON m.id = rp.message_id WHERE m.user_id = u.id) AS reported
@@ -234,12 +238,76 @@ export async function searchMembers(request, env, ctx, url) {
       banReason: u.ban_reason,
       mutedUntil: u.muted_until && new Date(u.muted_until) > new Date() ? u.muted_until : null,
       muteReason: u.mute_reason,
+      voiceMutedUntil: u.voice_muted_until && new Date(u.voice_muted_until) > new Date() ? u.voice_muted_until : null,
+      voiceMuteReason: u.voice_mute_reason,
+      globalMic: Boolean(u.global_mic),
       joined: u.created_at,
       lastSeen: u.last_seen_at,
       messages: u.messages,
       reported: u.reported,
     })),
   });
+}
+
+// ---------- Staff: voice chat ----------
+export async function voiceMute(request, env, ctx, url, params) {
+  const actor = await requireStaff(request, env);
+  const body = await readJson(request);
+  const minutes = Number(body.minutes);
+  if (!MUTE_OPTIONS.includes(minutes)) throw new HttpError(400, "Choose a mute length.");
+  const sql = getDb(env);
+  const target = await loadTarget(sql, Number(params.id));
+  assertCanAct(env, actor, target);
+  const reason = cleanReason(body.reason);
+  const rows = await sql.transaction([
+    sql`UPDATE users SET voice_muted_until = now() + make_interval(mins => ${minutes}), voice_mute_reason = ${reason || null}
+         WHERE id = ${target.id} RETURNING voice_muted_until`,
+    audit(sql, actor.id, "voice.mute", { userId: target.id, details: { minutes, reason } }),
+  ]);
+  await voiceEvent(env, { type: "voice_mute", userId: Number(target.id), until: rows[0][0].voice_muted_until, reason });
+  return json({ ok: true });
+}
+
+export async function voiceUnmute(request, env, ctx, url, params) {
+  const actor = await requireStaff(request, env);
+  const sql = getDb(env);
+  const target = await loadTarget(sql, Number(params.id));
+  assertCanAct(env, actor, target);
+  await sql.transaction([
+    sql`UPDATE users SET voice_muted_until = NULL, voice_mute_reason = NULL WHERE id = ${target.id}`,
+    audit(sql, actor.id, "voice.unmute", { userId: target.id }),
+  ]);
+  await voiceEvent(env, { type: "voice_unmute", userId: Number(target.id) });
+  return json({ ok: true });
+}
+
+export async function voiceKick(request, env, ctx, url, params) {
+  const actor = await requireStaff(request, env);
+  const body = await readJson(request).catch(() => ({}));
+  const sql = getDb(env);
+  const target = await loadTarget(sql, Number(params.id));
+  assertCanAct(env, actor, target);
+  const reason = cleanReason(body.reason);
+  await audit(sql, actor.id, "voice.kick", { userId: target.id, details: { reason } });
+  await voiceEvent(env, { type: "voice_kick", userId: Number(target.id), reason: reason ? `Removed from voice by staff: ${reason}` : "" });
+  return json({ ok: true });
+}
+
+export async function setGlobalMic(request, env, ctx, url, params) {
+  const actor = await requireStaff(request, env, ADMIN);
+  const body = await readJson(request);
+  const allowed = Boolean(body.allowed);
+  const sql = getDb(env);
+  const target = await loadTarget(sql, Number(params.id));
+  if (Number(actor.id) !== Number(target.id) && Number(actor.role_power) <= Number(target.power) && !allowed) {
+    throw new HttpError(403, "You can only change this for members with a lower role than yours.");
+  }
+  await sql.transaction([
+    sql`UPDATE users SET global_mic = ${allowed} WHERE id = ${target.id}`,
+    audit(sql, actor.id, allowed ? "voice.global_grant" : "voice.global_revoke", { userId: target.id }),
+  ]);
+  await voiceEvent(env, { type: "global_mic", userId: Number(target.id), allowed });
+  return json({ ok: true });
 }
 
 // ---------- Staff: reports ----------
@@ -341,6 +409,7 @@ export async function addWord(request, env) {
   if (!rows.length) throw new HttpError(409, "That word is already on the list.");
   await audit(sql, actor.id, "filter.add", { details: { word, match } });
   await hubBroadcast(env, { type: "words_changed" });
+  await voiceEvent(env, { type: "words_changed" });
   return json({ ok: true });
 }
 
@@ -351,6 +420,7 @@ export async function removeWord(request, env, ctx, url, params) {
   if (!rows.length) throw new HttpError(404, "That word isn't on the list.");
   await audit(sql, actor.id, "filter.remove", { details: { word: rows[0].word, match: rows[0].match } });
   await hubBroadcast(env, { type: "words_changed" });
+  await voiceEvent(env, { type: "words_changed" });
   return json({ ok: true });
 }
 

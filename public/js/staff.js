@@ -1,6 +1,6 @@
 // Staff Tools page: reports, members, word filter and audit log.
 import { toast } from "/js/site.js";
-import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, roleDialog } from "/js/dialog.js";
+import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, roleDialog, voiceMuteDialog } from "/js/dialog.js";
 
 const $ = (id) => document.getElementById(id);
 const ROLE_NAMES = { member: "Member", vip: "VIP", moderator: "Moderator", admin: "Admin" };
@@ -110,6 +110,8 @@ function memberRow(m) {
   if (m.owner) status.push(h("span", { class: "pill-status owner", text: "Owner" }));
   if (m.banned) status.push(h("span", { class: "pill-status banned", text: "Banned" }));
   if (m.mutedUntil) status.push(h("span", { class: "pill-status muted", text: `Muted until ${fmt(m.mutedUntil)}` }));
+  if (m.voiceMutedUntil) status.push(h("span", { class: "pill-status muted", text: `Voice muted until ${fmt(m.voiceMutedUntil)}` }));
+  if (m.globalMic) status.push(h("span", { class: "pill-status owner", text: "Global Mic" }));
   const row = h("div", { class: "member-row" },
     h("div", { class: "info" },
       h("strong", {}, m.username, ...status),
@@ -124,7 +126,15 @@ function memberRow(m) {
     } else if (!m.banned) {
       actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Mute", onclick: () => muteDialog(m, refresh) }));
     }
+    if (m.voiceMutedUntil) {
+      actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Voice unmute", onclick: async () => { try { await postJson(`/api/mod/members/${m.id}/voice-unmute`); refresh("Unmuted in voice."); } catch (e) { toast(e.message); } } }));
+    } else if (!m.banned) {
+      actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Voice mute", onclick: () => voiceMuteDialog(m, refresh) }));
+    }
     if (power >= 100) {
+      if (m.power < 50) {
+        actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", text: m.globalMic ? "Take Global Mic" : "Give Global Mic", onclick: async () => { try { await postJson(`/api/mod/members/${m.id}/global-mic`, { allowed: !m.globalMic }); refresh(m.globalMic ? "Global Mic removed." : "Global Mic given."); } catch (e) { toast(e.message); } } }));
+      }
       actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Role", onclick: () => roleDialog(m, refresh) }));
       if (m.banned) {
         actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Unban", onclick: async () => { try { await postJson(`/api/mod/members/${m.id}/unban`); refresh("Member unbanned."); } catch (e) { toast(e.message); } } }));
@@ -195,6 +205,11 @@ const DESCRIBE = {
   "user.role": (e) => ["changed the role of ", e.target, ` from ${ROLE_NAMES[e.details.from] || e.details.from} to ${ROLE_NAMES[e.details.to] || e.details.to}`],
   "report.resolve": () => ["resolved a report"],
   "report.dismiss": () => ["dismissed a report"],
+  "voice.mute": (e) => ["muted ", e.target, ` in voice for ${MUTE_LABELS[e.details.minutes] || `${e.details.minutes} minutes`}`],
+  "voice.unmute": (e) => ["unmuted ", e.target, " in voice"],
+  "voice.kick": (e) => ["removed ", e.target, " from voice"],
+  "voice.global_grant": (e) => ["gave the Global Mic to ", e.target],
+  "voice.global_revoke": (e) => ["took the Global Mic from ", e.target],
   "filter.add": () => ["added a word to the filter"],
   "filter.remove": () => ["removed a word from the filter"],
 };

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voice · GalaxySMP</title>
+  <meta name="description" content="GalaxySMP proximity voice chat.">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#0a0c1b">
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/voice.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header" class="site-header-slot"></div>
+
+  <main id="main">
+    <div class="container voice-page">
+      <header class="page-head" style="padding-bottom:20px">
+        <h1>Voice</h1>
+        <p>Proximity voice chat for GalaxySMP. Players near you in game sound louder, and quieter as they walk away.</p>
+      </header>
+
+      <div id="v-loading" class="panel"><p class="text-3" style="margin:0">Loading…</p></div>
+
+      <!-- Not signed in -->
+      <section id="v-signin" class="panel" hidden>
+        <h2 style="font-size:1.2rem">Sign in to use voice</h2>
+        <p class="text-2">Voice uses your GalaxySMP account, the one you linked in game with <code>/link</code>. There's nothing else to set up.</p>
+        <a class="btn btn-primary" href="/community">Sign in or create an account</a>
+      </section>
+
+      <!-- Realm mode -->
+      <section id="v-realm" class="panel" hidden>
+        <h2 style="font-size:1.2rem">Voice opens with our server</h2>
+        <p class="text-2" style="margin:0">Proximity voice needs our own server to know where everyone is in game. It will open here as soon as GalaxySMP moves from the Realm.</p>
+      </section>
+
+      <!-- Ready to join -->
+      <section id="v-join" class="panel" hidden>
+        <h2 style="font-size:1.2rem">Join voice as <span id="v-name"></span></h2>
+        <p class="text-2">Your browser will ask to use your microphone. You join <strong>muted</strong>; unmute when you're ready to talk.</p>
+        <p class="note small" style="margin:0 0 18px"><strong>Playing on a phone or console?</strong> Keep this page open on a second device (another phone, tablet or computer). Phones pause the microphone when you switch to Minecraft.</p>
+        <button class="btn btn-primary btn-lg" type="button" id="v-join-btn">Join voice</button>
+        <p class="form-error" id="v-join-error" role="alert"></p>
+      </section>
+
+      <!-- In voice -->
+      <div id="v-app" hidden>
+        <section class="panel voice-controls">
+          <div class="voice-status">
+            <span class="status-line" id="v-conn"><span class="dot"></span><span>Connecting…</span></span>
+            <span class="text-3 small" id="v-where"></span>
+          </div>
+          <p class="composer-note" id="v-notice" hidden></p>
+          <div class="voice-buttons">
+            <button class="vbtn" type="button" id="v-mic" aria-pressed="false"><span class="vico" data-vicon="mic-off"></span><span class="vlabel">Unmute</span></button>
+            <button class="vbtn" type="button" id="v-deafen" aria-pressed="false"><span class="vico" data-vicon="headphones"></span><span class="vlabel">Deafen</span></button>
+            <button class="vbtn" type="button" id="v-global" aria-pressed="false" hidden><span class="vico" data-vicon="broadcast"></span><span class="vlabel">Global Mic</span></button>
+            <button class="vbtn danger" type="button" id="v-leave"><span class="vico" data-vicon="leave"></span><span class="vlabel">Leave</span></button>
+          </div>
+          <div class="voice-options">
+            <label class="check"><input type="checkbox" id="v-ptt"> Push to talk <span class="text-3 small">(hold the button below, or <span class="kbd-inline">V</span> on a keyboard)</span></label>
+            <button class="btn btn-secondary ptt-btn" type="button" id="v-ptt-btn" hidden>Hold to talk</button>
+            <div class="meter" aria-hidden="true"><span id="v-meter"></span></div>
+          </div>
+        </section>
+
+        <div class="voice-grid">
+          <section class="panel">
+            <div class="voice-head">
+              <h2>In voice <span class="text-3" id="v-count"></span></h2>
+            </div>
+            <div id="v-roster" class="vroster"></div>
+          </section>
+
+          <section class="panel">
+            <div class="voice-head">
+              <h2>Groups</h2>
+              <button class="btn btn-secondary btn-sm" type="button" id="v-group-new">New group</button>
+            </div>
+            <p class="text-3 small" style="margin:0 0 12px">People in the same group hear each other anywhere, even far apart or not in game.</p>
+            <div id="v-groups" class="vgroups"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="site-footer"></div>
+</body>
+</html>

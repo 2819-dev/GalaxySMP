@@ -36,6 +36,7 @@ const NAV = [
   ["/rules", "Rules"],
   ["/status", "Status"],
   ["/store", "Store"],
+  ["/voice", "Voice"],
 ];
 
 export const serverAddress = config.bedrockAddress;
