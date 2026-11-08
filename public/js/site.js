@@ -38,7 +38,7 @@ const NAV = [
   ["/store", "Store"],
 ];
 
-export const javaFull = Number(config.javaPort) === 25565 ? config.javaAddress : `${config.javaAddress}:${config.javaPort}`;
+export const serverAddress = config.bedrockAddress;
 
 function currentPath() {
   const p = location.pathname.replace(/\.html$/, "").replace(/\/index$/, "/");
@@ -60,7 +60,7 @@ function renderHeader() {
       <nav class="nav" id="site-nav" aria-label="Main">
         <div class="nav-links">${links}</div>
         <div class="nav-actions">
-          ${config.hosting === "realm" ? "" : `<button class="ip-chip" type="button" data-copy="${javaFull}" title="Copy server address">${icon("copy")}<span>${javaFull}</span></button>`}
+          ${config.hosting === "realm" ? "" : `<button class="ip-chip" type="button" data-copy="${serverAddress}" title="Copy server address (port ${config.bedrockPort})">${icon("copy")}<span>${serverAddress}</span></button>`}
           <a class="btn btn-primary btn-sm" href="/community">Community</a>
         </div>
       </nav>
@@ -85,7 +85,7 @@ function renderFooter() {
       <div class="footer-grid">
         <div>
           <a class="brand" href="/" aria-label="${config.serverName} home"><img src="/img/wordmark.png" alt="${config.serverName}" width="150" height="26"></a>
-          <p>A family-friendly Minecraft server for Java and Bedrock players.</p>
+          <p>A family-friendly Minecraft Bedrock server.</p>
         </div>
         <div><h4>Play</h4><ul><li><a href="/join">How to Join</a></li><li><a href="/status">Server Status</a></li><li><a href="/store">Store</a></li></ul></div>
         <div><h4>Community</h4><ul><li><a href="/community">Community Chat</a></li><li><a href="/rules">Rules</a></li></ul></div>
@@ -146,12 +146,9 @@ function applyHosting() {
 function fillConfig() {
   const values = {
     serverName: config.serverName,
-    javaAddress: config.javaAddress,
-    javaPort: String(config.javaPort),
     bedrockAddress: config.bedrockAddress,
     bedrockPort: String(config.bedrockPort),
     minecraftVersion: config.minecraftVersion,
-    javaFull,
   };
   document.querySelectorAll("[data-config]").forEach((el) => {
     const v = values[el.getAttribute("data-config")];

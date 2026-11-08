@@ -4,12 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>How to Join · GalaxySMP</title>
-  <meta name="description" content="How to join GalaxySMP on Minecraft Java and Bedrock.">
+  <meta name="description" content="How to join GalaxySMP on Minecraft Bedrock Edition.">
   <link rel="icon" href="/favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta name="theme-color" content="#0a0c1b">
   <link rel="stylesheet" href="/css/style.css">
-  <script type="module" src="/js/join.js"></script>
   <script type="module" src="/js/join-status.js"></script>
 </head>
 <body>
@@ -20,31 +19,11 @@
     <div class="container narrow">
       <header class="page-head">
         <h1>How to Join</h1>
-        <p>GalaxySMP supports both editions of Minecraft. Java Edition runs on Windows, Mac and Linux. Bedrock Edition runs on phones, tablets, consoles and Windows (Microsoft Store).</p>
+        <p>GalaxySMP is a Bedrock Edition server. Bedrock is the version of Minecraft on phones, tablets, Xbox, PlayStation, Nintendo Switch and Windows (Microsoft Store). Java Edition can't connect.</p>
       </header>
 
       <div data-hosting="server">
-      <div class="tabs" role="tablist" aria-label="Minecraft version">
-        <button class="tab" role="tab" id="tab-java" aria-controls="panel-java" aria-selected="true">Java</button>
-        <button class="tab" role="tab" id="tab-bedrock" aria-controls="panel-bedrock" aria-selected="false" tabindex="-1">Bedrock</button>
-      </div>
-
-      <section class="panel" role="tabpanel" id="panel-java" aria-labelledby="tab-java">
-        <span class="field-label">Server address</span>
-        <div class="field-copy">
-          <code data-config="javaFull"></code>
-          <button class="btn btn-primary btn-sm" type="button" data-copy-config="javaFull">Copy</button>
-        </div>
-        <hr class="divider" style="margin:24px 0">
-        <ol class="steps">
-          <li>Launch Minecraft: Java Edition, version <strong data-config="minecraftVersion"></strong> or newer.</li>
-          <li>Select <span class="ui">Multiplayer</span>, then <span class="ui">Add Server</span>.</li>
-          <li>Enter <code>GalaxySMP</code> as the server name and paste the server address.</li>
-          <li>Select <span class="ui">Done</span>, then double-click GalaxySMP in your server list.</li>
-        </ol>
-      </section>
-
-      <section class="panel" role="tabpanel" id="panel-bedrock" aria-labelledby="tab-bedrock" hidden>
+      <section class="panel">
         <div class="grid grid-2" style="gap:12px">
           <div>
             <span class="field-label">Server address</span>
@@ -70,8 +49,8 @@
         </ol>
         <p class="note warn small" style="margin:24px 0 0">Xbox, PlayStation and Nintendo Switch don't support adding custom servers directly. Our staff can help you connect. Ask in the <a href="/community">#help</a> channel.</p>
       </section>
-
       </div>
+
       <div data-hosting="realm" hidden>
         <section class="panel">
           <p class="status-line" data-status style="margin:0 0 6px"><span class="dot"></span><span data-status-text>Checking</span></p>
@@ -80,11 +59,8 @@
           <p class="text-2">We're currently running on a private Minecraft Realm while we move to our own server. The Realm is invite only, and we aren't accepting invite requests at this time.</p>
           <hr class="divider" style="margin:20px 0">
           <h3>Already have an invite?</h3>
-          <ol class="steps">
-            <li><strong>Java:</strong> open Minecraft: Java Edition, select <span class="ui">Minecraft Realms</span>, accept the GalaxySMP invite, then choose <span class="ui">Play</span>.</li>
-            <li><strong>Bedrock:</strong> open Minecraft, select <span class="ui">Play</span>, then accept the invite from your notifications or the <span class="ui">Realms</span> tab.</li>
-          </ol>
-          <p class="note small" style="margin:24px 0 0"><strong>Coming soon:</strong> when GalaxySMP opens to everyone on our own server, you'll be able to join with a server address on any device. This page will update automatically.</p>
+          <p class="text-2" style="margin:0">Open Minecraft, select <span class="ui">Play</span>, then accept the invite from your notifications or the <span class="ui">Realms</span> tab.</p>
+          <p class="note small" style="margin:24px 0 0"><strong>Coming soon:</strong> when GalaxySMP opens to everyone on our own server, you'll be able to join with a server address on any Bedrock device. This page will update automatically.</p>
         </section>
       </div>
 

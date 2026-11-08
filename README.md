@@ -1,6 +1,6 @@
 # GalaxySMP website
 
-Website and community chat for the GalaxySMP Minecraft server (Java + Bedrock).
+Website and community chat for the GalaxySMP Minecraft Bedrock server.
 
 - **Hosting:** Cloudflare Workers (free plan) at https://galaxymc.us (www and the old workers.dev address redirect there). Pages in `public/` (packed into the Worker by `scripts/build-assets.mjs`), back-end code in `src/`.
 - **Database:** Neon Postgres. Schema in `migrations/`.
@@ -10,7 +10,7 @@ Website and community chat for the GalaxySMP Minecraft server (Java + Bedrock).
 
 | What | File |
 |---|---|
-| Server IP, ports, Realm/server mode, manual status message, game modes | `public/config.js` |
+| Server address and port, Realm/server mode, manual status message, game modes | `public/config.js` |
 | Rules (short + full) | `public/rules.html` |
 | Store ranks | `src/store/catalog.js` |
 | Who becomes Admin automatically | `wrangler.jsonc` → `OWNER_USERNAMES` |
@@ -23,3 +23,11 @@ Website and community chat for the GalaxySMP Minecraft server (Java + Bedrock).
 | `PLUGIN_SECRET` | Shared password between the Minecraft plugin and the website (stage b) |
 
 Check that they reached the site: open `/api/health` on the website.
+
+## GalaxyLink plugin (Endstone)
+
+The `/link` command for the Bedrock server lives in `endstone-plugin/` (Python, for
+[Endstone](https://github.com/EndstoneMC/endstone) on Bedrock Dedicated Server).
+
+Build: `PLUGIN_SECRET=... endstone-plugin/build.sh out/` produces `endstone_galaxylink-*.whl`.
+Install: upload the `.whl` file into the server's `plugins` folder and restart.

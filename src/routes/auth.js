@@ -46,7 +46,7 @@ export async function linkStart(request, env) {
       if (Math.random() < 0.1) await sql`DELETE FROM link_codes WHERE expires_at < now() - interval '1 day'`;
       return json({
         ok: true,
-        username: parsed.name,
+        username: parsed.platform === "bedrock" ? String(body.username).trim().replace(/^[.*]+/, "") : parsed.name,
         code: formatCode(code),
         expiresAt: rows[0].expires_at,
         pollToken,
@@ -94,7 +94,10 @@ export async function login(request, env) {
   if (!name || !password || name.length > 32 || password.length > 200) {
     throw new HttpError(400, "Please enter your username and password.");
   }
-  const candidates = name.startsWith(".") ? [name] : [name, "." + name];
+  // Bedrock gamertags may be typed with spaces or underscores, with or without a leading dot.
+  const base = name.replace(/^[.*]+/, "");
+  const forms = new Set([base, base.replace(/_/g, " "), base.replace(/ /g, "_")]);
+  const candidates = [...forms].flatMap((f) => [f, "." + f]);
   const sql = getDb(env);
   const rows = await sql`
     SELECT id, username_lower, banned, ban_reason,

@@ -24,7 +24,7 @@
       <!-- Signed out -->
       <section id="view-auth" class="auth-card" hidden>
         <h1 style="font-size:1.9rem">Community</h1>
-        <p class="text-2">Join the conversation with other GalaxySMP players. Accounts are verified through Minecraft and never require an email address.</p>
+        <p class="text-2">Join the conversation with other GalaxySMP players. Accounts are verified in game and never require an email address.</p>
 
         <div class="seg" role="group" aria-label="Choose" style="margin:22px 0 18px">
           <button type="button" data-mode="signup" aria-pressed="true">Create account</button>
@@ -33,16 +33,9 @@
 
         <form id="form-signup" class="panel form" novalidate>
           <div>
-            <span class="field-label" id="plat-label">I play on</span>
-            <div class="seg" role="group" aria-labelledby="plat-label">
-              <button type="button" data-platform="java" aria-pressed="true">Java</button>
-              <button type="button" data-platform="bedrock" aria-pressed="false">Bedrock</button>
-            </div>
-          </div>
-          <div>
-            <label class="field-label" for="su-name">Minecraft username</label>
+            <label class="field-label" for="su-name">Xbox gamertag</label>
             <input class="input" id="su-name" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="20" required>
-            <p class="hint" id="su-name-hint">Enter it exactly as it appears in game.</p>
+            <p class="hint" id="su-name-hint">The name you play Minecraft with, exactly as it appears in game.</p>
           </div>
           <div>
             <label class="field-label" for="su-pass">Choose a password</label>
@@ -60,7 +53,7 @@
 
         <form id="form-signin" class="panel form" novalidate hidden>
           <div>
-            <label class="field-label" for="si-name">Minecraft username</label>
+            <label class="field-label" for="si-name">Xbox gamertag</label>
             <input class="input" id="si-name" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="20" required>
           </div>
           <div>

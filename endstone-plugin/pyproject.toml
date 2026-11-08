@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "endstone-galaxylink"
+version = "2.0.0"
+description = "Links Bedrock players to their GalaxySMP website account with /link."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.entry-points."endstone"]
+galaxylink = "endstone_galaxylink:GalaxyLink"
+
+[tool.setuptools.packages.find]
+where = ["src"]

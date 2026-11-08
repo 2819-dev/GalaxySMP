@@ -40,7 +40,7 @@ $("sign-out").addEventListener("click", async () => {
 
 // ---------- Create account / sign in toggles ----------
 let mode = "signup";
-let platform = "java";
+const platform = "bedrock";
 
 document.querySelectorAll("[data-mode]").forEach((b) =>
   b.addEventListener("click", () => {
@@ -48,16 +48,6 @@ document.querySelectorAll("[data-mode]").forEach((b) =>
     document.querySelectorAll("[data-mode]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     $("form-signup").hidden = mode !== "signup";
     $("form-signin").hidden = mode !== "signin";
-  })
-);
-
-document.querySelectorAll("[data-platform]").forEach((b) =>
-  b.addEventListener("click", () => {
-    platform = b.dataset.platform;
-    document.querySelectorAll("[data-platform]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    $("su-name-hint").textContent = platform === "bedrock"
-      ? "Your Xbox gamertag. The leading dot is added automatically."
-      : "Enter it exactly as it appears in game.";
   })
 );
 

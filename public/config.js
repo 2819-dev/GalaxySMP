@@ -21,12 +21,8 @@ const config = {
     message: "We're moving GalaxySMP from our Realm to our own server. Check back soon.",
   },
 
-  // Java players type this in Multiplayer > Add Server.
+  // GalaxySMP is Bedrock only. Players need the address AND the port.
   // Replace "your.server.ip" with the real address from the BisectHosting panel.
-  javaAddress: "your.server.ip",
-  javaPort: 25565,
-
-  // Bedrock players (phone, tablet, console, Windows) need the address AND the port.
   bedrockAddress: "your.server.ip",
   bedrockPort: 19132,
 

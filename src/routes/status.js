@@ -36,40 +36,27 @@ export async function buildStatus() {
       checkedAt: new Date().toISOString(),
     };
   }
-  const configured = config.hosting !== "realm" && config.javaAddress && config.javaAddress !== PLACEHOLDER;
+  const configured = config.hosting !== "realm" && config.bedrockAddress && config.bedrockAddress !== PLACEHOLDER;
   const base = {
     configured,
-    javaAddress: config.javaAddress,
-    javaPort: config.javaPort,
     bedrockAddress: config.bedrockAddress,
     bedrockPort: config.bedrockPort,
     checkedAt: new Date().toISOString(),
   };
   if (!configured) return { ...base, online: false, reason: "not_configured" };
 
-  const javaTarget =
-    Number(config.javaPort) === 25565 ? config.javaAddress : `${config.javaAddress}:${config.javaPort}`;
-  const bedrockTarget = `${config.bedrockAddress}:${config.bedrockPort}`;
-
-  const [java, bedrock] = await Promise.allSettled([
-    lookup(`https://api.mcsrvstat.us/3/${encodeURIComponent(javaTarget)}`),
-    lookup(`https://api.mcsrvstat.us/bedrock/3/${encodeURIComponent(bedrockTarget)}`),
-  ]);
-
-  const j = java.status === "fulfilled" ? java.value : null;
-  const b = bedrock.status === "fulfilled" ? bedrock.value : null;
-  if (!j && !b) return { ...base, online: false, reason: "lookup_failed" };
-
-  const online = Boolean(j?.online || b?.online);
-  const players = j?.online ? j.players : b?.online ? b.players : null;
+  let b;
+  try {
+    b = await lookup(`https://api.mcsrvstat.us/bedrock/3/${encodeURIComponent(`${config.bedrockAddress}:${config.bedrockPort}`)}`);
+  } catch {
+    return { ...base, online: false, reason: "lookup_failed" };
+  }
   return {
     ...base,
-    online,
-    java: { online: Boolean(j?.online) },
-    bedrock: { online: Boolean(b?.online) },
-    players: { online: Number(players?.online ?? 0), max: Number(players?.max ?? 0) },
-    version: String(j?.version ?? b?.version ?? "").slice(0, 60),
-    motd: cleanMotd(j?.motd ?? b?.motd),
+    online: Boolean(b.online),
+    players: { online: Number(b.players?.online ?? 0), max: Number(b.players?.max ?? 0) },
+    version: String(b.version ?? "").slice(0, 60),
+    motd: cleanMotd(b.motd),
   };
 }
 

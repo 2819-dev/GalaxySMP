@@ -22,7 +22,6 @@ function render(s) {
     $("st-players").textContent = "–";
     $("st-version").textContent = "–";
     const state = s.online ? "Open" : s.color === "amber" ? "Paused" : "Closed";
-    $("st-java").textContent = state;
     $("st-bedrock").textContent = state;
     $("st-checked").textContent = new Date(s.checkedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     return;
@@ -43,8 +42,7 @@ function render(s) {
   const updown = (v) => (v ? "Up" : "Down");
   $("st-players").textContent = s.online ? `${s.players.online} / ${s.players.max}` : "0";
   $("st-version").textContent = s.online && s.version ? s.version : "–";
-  $("st-java").textContent = s.configured && s.java ? updown(s.java.online) : "–";
-  $("st-bedrock").textContent = s.configured && s.bedrock ? updown(s.bedrock.online) : "–";
+  $("st-bedrock").textContent = s.configured ? updown(s.online) : "–";
   $("st-checked").textContent = new Date(s.checkedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 

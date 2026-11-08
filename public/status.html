@@ -31,23 +31,22 @@
       </section>
 
       <section class="panel" style="padding:0;margin-top:16px">
-        <div class="grid grid-4" style="gap:0">
+        <div class="grid" style="gap:0;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
           <div class="stat"><div class="k">Players</div><div class="v" id="st-players">–</div></div>
           <div class="stat"><div class="k">Version</div><div class="v" id="st-version">–</div></div>
-          <div class="stat"><div class="k">Java</div><div class="v" id="st-java">–</div></div>
-          <div class="stat"><div class="k">Bedrock</div><div class="v" id="st-bedrock">–</div></div>
+          <div class="stat"><div class="k">Server</div><div class="v" id="st-bedrock">–</div></div>
         </div>
       </section>
 
 <div data-hosting="server">
       <section class="grid grid-2" style="margin-top:16px">
         <div>
-          <span class="field-label">Java address</span>
-          <div class="field-copy"><code data-config="javaFull"></code><button class="btn btn-secondary btn-sm" type="button" data-copy-config="javaFull">Copy</button></div>
+          <span class="field-label">Server address</span>
+          <div class="field-copy"><code data-config="bedrockAddress"></code><button class="btn btn-secondary btn-sm" type="button" data-copy-config="bedrockAddress">Copy</button></div>
         </div>
         <div>
-          <span class="field-label">Bedrock address (port <span data-config="bedrockPort"></span>)</span>
-          <div class="field-copy"><code data-config="bedrockAddress"></code><button class="btn btn-secondary btn-sm" type="button" data-copy-config="bedrockAddress">Copy</button></div>
+          <span class="field-label">Port</span>
+          <div class="field-copy"><code data-config="bedrockPort"></code><button class="btn btn-secondary btn-sm" type="button" data-copy-config="bedrockPort">Copy</button></div>
         </div>
       </section>
       </div>
