@@ -16,7 +16,7 @@ const config = {
     enabled: true,
     open: false,
     title: "Temporarily Closed",
-    message: "Closed due to technical difficulties. Reopening at around 7:00 AM.",
+    message: "Closed due to technical difficulties.",
   },
 
   // Java players type this in Multiplayer > Add Server.
