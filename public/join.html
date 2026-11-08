@@ -10,6 +10,7 @@
   <meta name="theme-color" content="#0a0c1b">
   <link rel="stylesheet" href="/css/style.css">
   <script type="module" src="/js/join.js"></script>
+  <script type="module" src="/js/join-status.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -22,6 +23,7 @@
         <p>GalaxySMP supports both editions of Minecraft. Java Edition runs on Windows, Mac and Linux. Bedrock Edition runs on phones, tablets, consoles and Windows (Microsoft Store).</p>
       </header>
 
+      <div data-hosting="server">
       <div class="tabs" role="tablist" aria-label="Minecraft version">
         <button class="tab" role="tab" id="tab-java" aria-controls="panel-java" aria-selected="true">Java</button>
         <button class="tab" role="tab" id="tab-bedrock" aria-controls="panel-bedrock" aria-selected="false" tabindex="-1">Bedrock</button>
@@ -69,6 +71,32 @@
         <p class="note warn small" style="margin:24px 0 0">Xbox, PlayStation and Nintendo Switch don't support adding custom servers directly. Our staff can help you connect. Ask in the <a href="/community">#help</a> channel.</p>
       </section>
 
+      </div>
+      <div data-hosting="realm" hidden>
+        <section class="panel">
+          <p class="status-line" data-status style="margin:0 0 6px"><span class="dot"></span><span data-status-text>Checking</span></p>
+          <p class="text-2" data-status-message style="margin:0 0 18px"></p>
+          <h2 style="font-size:1.25rem">We're on Minecraft Realms for now</h2>
+          <p class="text-2">GalaxySMP is currently hosted on a Realm while we move to our own server. Realms are invite only, so you'll need an invite from our staff before you can join.</p>
+          <hr class="divider" style="margin:20px 0">
+          <h3>Java Edition</h3>
+          <ol class="steps" style="margin-bottom:24px">
+            <li>Ask a staff member for an invite in the <a href="/community">#help</a> channel. Include your exact Minecraft username.</li>
+            <li>Open Minecraft: Java Edition and select <span class="ui">Minecraft Realms</span>.</li>
+            <li>Select the invitation icon at the top, then <span class="ui">Accept</span> the GalaxySMP invite.</li>
+            <li>Select GalaxySMP in your Realms list and choose <span class="ui">Play</span>.</li>
+          </ol>
+          <h3>Bedrock Edition</h3>
+          <ol class="steps">
+            <li>Ask a staff member for an invite in the <a href="/community">#help</a> channel. Include your exact Xbox gamertag.</li>
+            <li>Open Minecraft and select <span class="ui">Play</span>.</li>
+            <li>Accept the invite from your notifications, or open the <span class="ui">Realms</span> tab, choose <span class="ui">Join Realm</span> and enter the invite code staff give you.</li>
+            <li>Select GalaxySMP and join.</li>
+          </ol>
+          <p class="note small" style="margin:24px 0 0"><strong>Coming soon:</strong> once we move to our own server, you'll be able to join with a server address on any device, with no invite needed. This page will update automatically.</p>
+        </section>
+      </div>
+
       <section class="section" style="padding-bottom:0">
         <h2>Getting started</h2>
         <div class="grid grid-2" style="margin-top:18px">
@@ -76,12 +104,16 @@
             <span class="ico" data-icon="users"></span>
             <div><h3>Choose a game mode</h3><p>You will arrive in the hub. Select any NPC to travel to Survival, Minigames, Skyblock or Creative.</p></div>
           </div>
-          <div class="feature">
+          <div class="feature" data-hosting="realm" hidden>
+            <span class="ico" data-icon="link"></span>
+            <div><h3>Community chat</h3><p>Website accounts are confirmed with an in-game command, which Realms don't support. Sign-up opens as soon as we move to our own server.</p></div>
+          </div>
+          <div class="feature" data-hosting="server">
             <span class="ico" data-icon="link"></span>
             <div><h3>Join the community</h3><p>Create an account on the <a href="/community">Community</a> page, then confirm it in game with <code>/link</code> and your code.</p></div>
           </div>
         </div>
-        <p class="note small" style="margin-top:28px"><strong>Having trouble connecting?</strong> Confirm the server is online on the <a href="/status">Status</a> page, check that the address is entered exactly as shown, and make sure Minecraft is up to date.</p>
+        <p class="note small" data-hosting="server" style="margin-top:28px"><strong>Having trouble connecting?</strong> Confirm the server is online on the <a href="/status">Status</a> page, check that the address is entered exactly as shown, and make sure Minecraft is up to date.</p>
       </section>
     </div>
   </main>

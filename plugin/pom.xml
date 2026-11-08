@@ -15,7 +15,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- Filled in at build time: mvn package -Dgalaxylink.secret=... -->
     <galaxylink.secret>PASTE_PLUGIN_SECRET_HERE</galaxylink.secret>
-    <galaxylink.api>https://galaxysmp.access-b.workers.dev</galaxylink.api>
+    <galaxylink.api>https://galaxymc.us</galaxylink.api>
   </properties>
 
   <repositories>

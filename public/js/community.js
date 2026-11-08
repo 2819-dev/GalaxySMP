@@ -1,4 +1,4 @@
-import { toast } from "/js/site.js";
+import { toast, config } from "/js/site.js";
 import { startChat, stopChat } from "/js/chat.js";
 import "/js/mod.js";
 
@@ -188,3 +188,14 @@ async function loadMe() {
 }
 
 loadMe();
+
+// On a Realm there's no plugin to confirm /link codes, so sign-up waits for our own server.
+if (config.hosting === "realm") {
+  const form = $("form-signup");
+  form.replaceChildren();
+  const p = document.createElement("p");
+  p.className = "text-2";
+  p.style.margin = "0";
+  p.textContent = "New accounts open when GalaxySMP moves from Minecraft Realms to our own server. Accounts are confirmed with an in-game command, which Realms don't support. Check back soon!";
+  form.append(p);
+}

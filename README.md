@@ -2,7 +2,7 @@
 
 Website and community chat for the GalaxySMP Minecraft server (Java + Bedrock).
 
-- **Hosting:** Cloudflare Workers (free plan) at https://galaxysmp.access-b.workers.dev. Pages in `public/` (packed into the Worker by `scripts/build-assets.mjs`), back-end code in `src/`.
+- **Hosting:** Cloudflare Workers (free plan) at https://galaxymc.us (www and the old workers.dev address redirect there). Pages in `public/` (packed into the Worker by `scripts/build-assets.mjs`), back-end code in `src/`.
 - **Database:** Neon Postgres. Schema in `migrations/`.
 - **Deploy:** `CLOUDFLARE_API_TOKEN=... npx wrangler deploy` (Claude does this after each change).
 
@@ -10,7 +10,7 @@ Website and community chat for the GalaxySMP Minecraft server (Java + Bedrock).
 
 | What | File |
 |---|---|
-| Server IP, ports, description, game modes | `public/config.js` |
+| Server IP, ports, Realm/server mode, manual status message, game modes | `public/config.js` |
 | Rules (short + full) | `public/rules.html` |
 | Store ranks | `src/store/catalog.js` |
 | Who becomes Admin automatically | `wrangler.jsonc` → `OWNER_USERNAMES` |

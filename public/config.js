@@ -3,6 +3,21 @@
 // ============================================================
 const config = {
   serverName: "GalaxySMP",
+  website: "https://galaxymc.us",
+
+  // Where GalaxySMP is hosted right now:
+  //   "realm"  = Minecraft Realms (invite only, no server address yet)
+  //   "server" = our own server (shows the address and live player count)
+  hosting: "realm",
+
+  // Manual status. While enabled, the website shows this instead of a live check.
+  // Use it for Realm closures or maintenance. Set enabled: false to go back to automatic.
+  manualStatus: {
+    enabled: true,
+    open: false,
+    title: "Temporarily Closed",
+    message: "Closed due to technical difficulties. Reopening at around 7:00 AM.",
+  },
 
   // Java players type this in Multiplayer > Add Server.
   // Replace "your.server.ip" with the real address from the BisectHosting panel.

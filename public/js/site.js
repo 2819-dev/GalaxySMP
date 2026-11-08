@@ -60,7 +60,7 @@ function renderHeader() {
       <nav class="nav" id="site-nav" aria-label="Main">
         <div class="nav-links">${links}</div>
         <div class="nav-actions">
-          <button class="ip-chip" type="button" data-copy="${javaFull}" title="Copy server address">${icon("copy")}<span>${javaFull}</span></button>
+          ${config.hosting === "realm" ? "" : `<button class="ip-chip" type="button" data-copy="${javaFull}" title="Copy server address">${icon("copy")}<span>${javaFull}</span></button>`}
           <a class="btn btn-primary btn-sm" href="/community">Community</a>
         </div>
       </nav>
@@ -136,6 +136,13 @@ document.addEventListener("click", (e) => {
 });
 
 // ---------- Fill in server info from config.js ----------
+// Show only the parts of a page that match where we're hosted (data-hosting="realm" or "server").
+function applyHosting() {
+  document.querySelectorAll("[data-hosting]").forEach((el) => {
+    el.hidden = el.getAttribute("data-hosting") !== config.hosting;
+  });
+}
+
 function fillConfig() {
   const values = {
     serverName: config.serverName,
@@ -167,6 +174,7 @@ export async function fetchStatus() {
 }
 
 export function statusText(s) {
+  if (s && s.manual) return { cls: s.online ? "is-online" : "is-offline", text: s.title };
   if (!s || !s.configured) return { cls: "", text: "Launching soon" };
   if (s.reason === "lookup_failed") return { cls: "", text: "Status unavailable" };
   if (!s.online) return { cls: "is-offline", text: "Offline" };
@@ -187,6 +195,9 @@ export function startStatus(onData) {
       const label = el.querySelector("[data-status-text]");
       if (label) label.textContent = text;
     });
+    document.querySelectorAll("[data-status-message]").forEach((el) => {
+      el.textContent = s && s.manual ? (s.message || s.title) : text;
+    });
     if (onData) onData(s);
   };
   update();
@@ -196,5 +207,6 @@ export function startStatus(onData) {
 renderHeader();
 renderFooter();
 fillConfig();
+applyHosting();
 
 export { config };

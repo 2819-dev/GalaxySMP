@@ -23,7 +23,19 @@ function cleanMotd(motd) {
 }
 
 export async function buildStatus() {
-  const configured = config.javaAddress && config.javaAddress !== PLACEHOLDER;
+  const manual = config.manualStatus;
+  if (manual && manual.enabled) {
+    return {
+      configured: true,
+      manual: true,
+      hosting: config.hosting,
+      online: Boolean(manual.open),
+      title: String(manual.title || (manual.open ? "Open" : "Closed")),
+      message: String(manual.message || ""),
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  const configured = config.hosting !== "realm" && config.javaAddress && config.javaAddress !== PLACEHOLDER;
   const base = {
     configured,
     javaAddress: config.javaAddress,

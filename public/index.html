@@ -36,24 +36,45 @@
             <span class="title">Server details</span>
             <span class="badge" data-status><span class="dot"></span><span data-status-text>Checking</span></span>
           </div>
-          <div class="server-row">
-            <span class="k">Java</span>
-            <span class="v" data-config="javaFull"></span>
-            <button class="btn btn-secondary btn-sm" type="button" data-copy-config="javaFull">Copy</button>
+          <div data-hosting="server">
+            <div class="server-row">
+              <span class="k">Java</span>
+              <span class="v" data-config="javaFull"></span>
+              <button class="btn btn-secondary btn-sm" type="button" data-copy-config="javaFull">Copy</button>
+            </div>
+            <div class="server-row">
+              <span class="k">Bedrock</span>
+              <span class="v" data-config="bedrockAddress"></span>
+              <button class="btn btn-secondary btn-sm" type="button" data-copy-config="bedrockAddress">Copy</button>
+            </div>
+            <div class="server-row">
+              <span class="k">Port</span>
+              <span class="v" data-config="bedrockPort"></span>
+              <span class="text-3 small">Bedrock only</span>
+            </div>
+            <div class="server-row">
+              <span class="k">Version</span>
+              <span class="v plain"><span data-config="minecraftVersion"></span> or newer</span>
+            </div>
           </div>
-          <div class="server-row">
-            <span class="k">Bedrock</span>
-            <span class="v" data-config="bedrockAddress"></span>
-            <button class="btn btn-secondary btn-sm" type="button" data-copy-config="bedrockAddress">Copy</button>
-          </div>
-          <div class="server-row">
-            <span class="k">Port</span>
-            <span class="v" data-config="bedrockPort"></span>
-            <span class="text-3 small">Bedrock only</span>
-          </div>
-          <div class="server-row">
-            <span class="k">Version</span>
-            <span class="v plain"><span data-config="minecraftVersion"></span> or newer</span>
+          <div data-hosting="realm" hidden>
+            <div class="server-row">
+              <span class="k">Status</span>
+              <span class="v plain" data-status-message>Checking…</span>
+            </div>
+            <div class="server-row">
+              <span class="k">Hosting</span>
+              <span class="v plain">Minecraft Realms</span>
+            </div>
+            <div class="server-row">
+              <span class="k">Access</span>
+              <span class="v plain">Invite only</span>
+              <a class="btn btn-secondary btn-sm" href="/join">How to join</a>
+            </div>
+            <div class="server-row">
+              <span class="k">Coming</span>
+              <span class="v plain">Our own Java + Bedrock server</span>
+            </div>
           </div>
         </aside>
       </div>

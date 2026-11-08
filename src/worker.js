@@ -86,6 +86,11 @@ async function health(env) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    // One public address: send www.galaxymc.us and the old workers.dev pages to galaxymc.us.
+    // (The Minecraft plugin's /api/ calls keep working on any address.)
+    if (url.hostname === "www.galaxymc.us" || (url.hostname.endsWith(".workers.dev") && !url.pathname.startsWith("/api/"))) {
+      return Response.redirect(`https://galaxymc.us${url.pathname}${url.search}`, 301);
+    }
     if (!url.pathname.startsWith("/api/")) return serveStatic(request);
     try {
       let pathFound = false;

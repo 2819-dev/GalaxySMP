@@ -14,6 +14,17 @@ function render(s) {
     motd.textContent = "Status information is temporarily unavailable. Retrying shortly.";
     return;
   }
+  if (s.manual) {
+    if (s.online) hero.classList.add("is-online"); else hero.classList.add("is-offline");
+    word.textContent = s.title;
+    motd.textContent = s.message;
+    $("st-players").textContent = "–";
+    $("st-version").textContent = "–";
+    $("st-java").textContent = s.online ? "Open" : "Closed";
+    $("st-bedrock").textContent = s.online ? "Open" : "Closed";
+    $("st-checked").textContent = new Date(s.checkedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return;
+  }
   if (!s.configured) {
     word.textContent = "Launching soon";
     motd.textContent = "The server address will be published here soon.";
