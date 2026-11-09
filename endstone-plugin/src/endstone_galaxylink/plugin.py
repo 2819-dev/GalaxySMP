@@ -12,7 +12,7 @@ import urllib.request
 
 from endstone import ColorFormat, Player
 from endstone.command import Command, CommandSender
-from endstone.event import (ActorDamageEvent, ActorExplodeEvent, BlockBreakEvent, BlockExplodeEvent,
+from endstone.event import (ActorDamageEvent, ActorDeathEvent, ActorExplodeEvent, BlockBreakEvent, BlockExplodeEvent,
                             BlockFromToEvent, BlockPlaceEvent, PlayerChatEvent, PlayerCommandEvent, PlayerDeathEvent,
                             PlayerInteractActorEvent, PlayerInteractEvent, PlayerJoinEvent, PlayerQuitEvent,
                             event_handler)
@@ -23,7 +23,9 @@ from endstone_galaxylink.auction import AuctionHouse
 from endstone_galaxylink.chatfilter import ChatFilter
 from endstone_galaxylink.announcements import Announcements
 from endstone_galaxylink.moderation import Moderation
-from endstone_galaxylink.blocklog import BlockLog
+from endstone_galaxylink.blocklog import BlockLog, states_of
+from endstone_galaxylink.progress import Progress
+from endstone_galaxylink.leaderboards import Leaderboards
 from endstone_galaxylink.economy import HUD_TICKS, Economy
 from endstone_galaxylink.helpmenu import HelpMenu
 from endstone_galaxylink.npc import HOLD_TICKS, NpcManager
@@ -35,7 +37,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.13.0"
+VERSION = "2.14.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -88,6 +90,11 @@ class GalaxyLink(Plugin):
         "back": _cmd("Go back to where you died or last teleported from.", "/back", "galaxylink.command.back"),
         "plan": _cmd("See your subscription plan.", "/plan", "galaxylink.command.plan"),
         "plot": _cmd("Manage your plot. /plot shovel gets a claiming shovel.", "/plot [action: message]", "galaxylink.command.plot", ["plots"]),
+        "daily": _cmd("Claim your daily reward.", "/daily", "galaxylink.command.daily", ["reward"]),
+        "quests": _cmd("See today's quests.", "/quests", "galaxylink.command.quests", ["quest"]),
+        "achievements": _cmd("See your achievements.", "/achievements", "galaxylink.command.achievements", ["ach"]),
+        "stats": _cmd("See your stats, or another player's.", "/stats [player: message]", "galaxylink.command.stats"),
+        "leaderboard": _cmd("Place or remove floating leaderboards (staff).", "/leaderboard", "galaxylink.command.leaderboard", ["lb"]),
         "report": _cmd("Report a player who is breaking the rules.", "/report [player: message]", "galaxylink.command.report"),
         "mod": _cmd("Staff moderation panel: warn, mute, kick, ban, reports and block logs.", "/mod", "galaxylink.command.mod"),
         "modban": _cmd("Ban a player (staff).", "/modban <player: message>", "galaxylink.command.modban"),
@@ -129,6 +136,11 @@ class GalaxyLink(Plugin):
         "galaxylink.command.plotaxe": _perm("Allows /plotaxe (server operators).", "op"),
         "galaxylink.command.minigames": _perm("Allows /minigames.", True),
         "galaxylink.command.report": _perm("Allows /report.", True),
+        "galaxylink.command.leaderboard": _perm("Allows /leaderboard (operators, or give it with a rank).", "op"),
+        "galaxylink.command.daily": _perm("Allows /daily.", True),
+        "galaxylink.command.quests": _perm("Allows /quests.", True),
+        "galaxylink.command.achievements": _perm("Allows /achievements.", True),
+        "galaxylink.command.stats": _perm("Allows /stats.", True),
         "galaxylink.command.mod": _perm("Allows /mod: warn, mute, kick, reports (operators, or give it with a rank).", "op"),
         "galaxylink.command.modban": _perm("Allows banning and unbanning in /mod (operators, or give it with a rank).", "op"),
         "galaxylink.command.inspect": _perm("Allows /inspect (operators, or give it with a rank).", "op"),
@@ -156,6 +168,10 @@ class GalaxyLink(Plugin):
         self.announcements = Announcements(self)
         self.moderation = Moderation(self)
         self.blocklog = BlockLog(self)
+        self.progress = Progress(self)
+        self.server.scheduler.run_task(self, self.progress.tick, delay=1200, period=1200)
+        self.leaderboards = Leaderboards(self)
+        self.server.scheduler.run_task(self, self.leaderboards.update, delay=1300, period=1200)
         self.server.scheduler.run_task(self, self.moderation.tick, delay=600, period=600)
         self.server.scheduler.run_task(self, self.blocklog.tick, delay=20, period=20)
         self.server.scheduler.run_task(self, self.announcements.tick, delay=20, period=20)
@@ -206,6 +222,7 @@ class GalaxyLink(Plugin):
         self.minigames.on_join(player)
         self.announcements.on_join(player)
         self.moderation.on_join(player)
+        self.progress.on_join(player)
         player.send_message("§7Need help? Type §e/guide§7 for server info, rules and commands.")
         self.refresh_tags()
         if self._voice:
@@ -215,10 +232,25 @@ class GalaxyLink(Plugin):
     def on_player_quit(self, event: PlayerQuitEvent):
         self.ranks.forget(event.player)
         self.teleports.on_quit(event.player)
+        self.progress.on_quit(event.player)
 
     @event_handler
     def on_player_death(self, event: PlayerDeathEvent):
         self.teleports.on_death(event.player)
+        self.progress.on_death(event.player)
+
+    @event_handler
+    def on_actor_death(self, event: ActorDeathEvent):
+        """A player defeated a mob: counts for stats, quests and achievements."""
+        try:
+            killer = event.damage_source.actor
+        except Exception:
+            return
+        if killer is None or not hasattr(killer, "xuid") or hasattr(event.actor, "xuid"):
+            return
+        player = self.server.get_player(killer.unique_id) if hasattr(killer, "unique_id") else None
+        if player is not None:
+            self.progress.on_kill(player, event.actor.type)
 
     @event_handler
     def on_interact_actor(self, event: PlayerInteractActorEvent):
@@ -236,6 +268,8 @@ class GalaxyLink(Plugin):
             return
         self.plots.on_break(event)
         self.blocklog.log_break(event)
+        if not event.cancelled:
+            self.progress.on_break(event.player, event.block.type, states_of(event.block))
 
     @event_handler
     def on_block_place(self, event: BlockPlaceEvent):
@@ -243,6 +277,8 @@ class GalaxyLink(Plugin):
             return
         self.plots.on_place(event)
         self.blocklog.log_place(event)
+        if not event.cancelled:
+            self.progress.on_place(event.player)
 
     @event_handler
     def on_interact(self, event: PlayerInteractEvent):
@@ -278,6 +314,8 @@ class GalaxyLink(Plugin):
     def on_disable(self) -> None:
         if getattr(self, "blocklog", None):
             self.blocklog.flush()
+        if getattr(self, "progress", None):
+            self.progress.save()
         if getattr(self, "_voice", None):
             self.economy.sync()
             self._voice.stop()
@@ -322,7 +360,7 @@ class GalaxyLink(Plugin):
         name = command.name
         player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "guide", "tpa", "tpahere", "tpaccept",
                        "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd",
-                       "report", "mod", "inspect", "rollback"}
+                       "report", "mod", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard"}
         if name in player_only and not isinstance(sender, Player):
             sender.send_message(f"/{name} can only be used in game.")
             return True
@@ -368,6 +406,11 @@ class GalaxyLink(Plugin):
             "chatfilter": lambda: self.chatfilter.command(sender, args),
             "announce": lambda: self.announcements.command(sender, args),
             "report": lambda: self.moderation.report_command(sender, args),
+            "daily": lambda: self.progress.daily_menu(sender),
+            "quests": lambda: self.progress.quests_menu(sender),
+            "achievements": lambda: self.progress.achievements_menu(sender),
+            "stats": lambda: self.progress.stats_command(sender, args),
+            "leaderboard": lambda: self.leaderboards.menu(sender),
             "mod": lambda: self.moderation.panel(sender),
             "modban": lambda: self.moderation.ban_command(sender, args),
             "inspect": lambda: self.blocklog.toggle(sender),

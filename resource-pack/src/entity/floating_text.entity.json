@@ -1,0 +1,12 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "galaxysmp:floating_text",
+      "materials": { "default": "entity_alphatest" },
+      "textures": { "default": "textures/ui/gsmp_stars" },
+      "geometry": { "default": "geometry.galaxysmp_empty" },
+      "render_controllers": [ "controller.render.default" ]
+    }
+  }
+}

@@ -130,6 +130,7 @@ class Shop:
         removed = self.remove(player, item, count)
         earned = removed * price
         self.eco.credit(player, earned)
+        self._count_sale(player, earned)
         player.send_message(f"§aSold §f{removed}x {self.names.get(item, money.pretty_id(item))}§a for §e{money.exact(earned)}§a.")
         return earned
 
@@ -144,7 +145,13 @@ class Shop:
             total += removed * self.sell_prices[item]
             items += removed
         self.eco.credit(player, total)
+        self._count_sale(player, total)
         player.send_message(f"§aSold §f{items} items§a for §e{money.exact(total)}§a.")
+
+    def _count_sale(self, player, cents):
+        progress = getattr(self.plugin, "progress", None)
+        if progress and cents:
+            progress.on_sold(player, cents)
 
     def sell_hand(self, player):
         s = player.inventory.item_in_main_hand

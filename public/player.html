@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Player · GalaxySMP</title>
+  <meta name="description" content="A GalaxySMP player's profile: rank, plan, money, playtime, stats and badges.">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#0a0c1b">
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/player.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header" class="site-header-slot"></div>
+  <main id="main">
+    <div class="container narrow">
+      <form class="player-search" id="player-search" role="search" autocomplete="off" style="margin-top:8px">
+        <label class="sr-only" for="player-q">Find a player</label>
+        <input id="player-q" type="search" placeholder="Find another player…" maxlength="32" spellcheck="false" autocapitalize="off">
+        <div class="player-suggest" id="player-suggest" hidden></div>
+      </form>
+      <div id="profile"><div class="panel empty">Loading…</div></div>
+    </div>
+  </main>
+  <div id="site-footer"></div>
+</body>
+</html>

@@ -8,6 +8,7 @@
 //   - anyone using the Global Mic
 // The GalaxyLink Endstone plugin connects here too, sending player positions and
 // receiving the voice icons shown before players' names in game.
+import { recordStats, recordAchievementDefs } from "../routes/progress.js";
 import { DurableObject } from "cloudflare:workers";
 import { getDb } from "../lib/db.js";
 import { checkMessage, compileWordList } from "../lib/filter.js";
@@ -312,6 +313,12 @@ export class VoiceHub extends DurableObject {
     }
     if (msg.type === "seen") {
       return recordPlayers(this.env, msg.players).catch((e) => console.error("record players failed", e));
+    }
+    if (msg.type === "stats") {
+      return recordStats(this.env, msg.players, msg.online).catch((e) => console.error("record stats failed", e));
+    }
+    if (msg.type === "achievement_defs") {
+      return recordAchievementDefs(this.env, msg.list).catch((e) => console.error("record achievements failed", e));
     }
     if (msg.type === "balances") {
       return recordBalances(this.env, msg.players).catch((e) => console.error("record balances failed", e));

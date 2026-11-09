@@ -191,6 +191,26 @@
    "staff": false
   },
   {
+   "command": "/daily",
+   "description": "Claim your daily reward: $100 on day 1 up to $700 on day 7 (plus a crate key). Don't miss a day!",
+   "example": "/daily"
+  },
+  {
+   "command": "/quests",
+   "description": "See today's 3 quests (easy, medium, hard) and your progress. New quests every day.",
+   "example": "/quests"
+  },
+  {
+   "command": "/achievements",
+   "description": "See your achievements. Badges show on your galaxymc.us profile.",
+   "example": "/achievements"
+  },
+  {
+   "command": "/stats [player]",
+   "description": "See your stats (playtime, blocks, mobs...) or another player's.",
+   "example": "/stats Steve123"
+  },
+  {
    "command": "/report [player]",
    "description": "Report a player who is breaking the rules. Staff get an alert right away.",
    "example": "/report Steve123"
@@ -271,6 +291,12 @@
    "command": "/rollback [player]",
    "description": "Undo a player's block changes (griefing) from a chosen time and area.",
    "example": "/rollback Griefer123",
+   "staff": true
+  },
+  {
+   "command": "/leaderboard",
+   "description": "Place a floating leaderboard where you stand (money, playtime, miners...), or remove the nearest one.",
+   "example": "/leaderboard",
    "staff": true
   }
  ]

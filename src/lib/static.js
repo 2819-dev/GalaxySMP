@@ -22,6 +22,7 @@ function findAsset(pathname) {
   if (p.endsWith("/")) p += "index.html";
   if (assets[p]) return { path: p, asset: assets[p] };
   if (assets[p + ".html"]) return { path: p + ".html", asset: assets[p + ".html"] };
+  if (/^\/player\/[^/]{1,40}$/.test(p) && assets["/player.html"]) return { path: "/player.html", asset: assets["/player.html"] };  // public profiles
   return null;
 }
 
