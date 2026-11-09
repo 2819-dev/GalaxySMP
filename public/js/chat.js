@@ -2,11 +2,13 @@
 // All text is inserted with textContent, never as HTML, so nothing a user types can run as code.
 import { icon, toast } from "/js/site.js";
 import { paint, rankTag } from "/js/rank-paint.js";
+import { showPanel, hidePanel } from "/js/community-panels.js";
 
 // A member's current rank (live updates win over what an older message recorded).
 const rankFor = (id, fallback) => (state.members.has(id) ? state.members.get(id).rank : fallback) || null;
 
 const $ = (id) => document.getElementById(id);
+const MIC_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>';
 
 const state = {
   me: null,
@@ -86,6 +88,7 @@ function renderChannels() {
   const list = $("channel-list");
   list.replaceChildren();
   for (const cat of state.categories) {
+    if (!state.channels.some((c) => c.categoryId === cat.id)) continue; // e.g. categories whose channels are hidden
     list.append(el("div", "channel-cat", cat.name));
     for (const ch of state.channels.filter((c) => c.categoryId === cat.id)) {
       const b = el("button", "channel");
@@ -93,8 +96,11 @@ function renderChannels() {
       b.dataset.id = ch.id;
       if (ch.id === state.channelId) b.setAttribute("aria-current", "true");
       if (state.unread.has(ch.id)) b.classList.add("unread");
-      b.append(el("span", "hash", "#"), el("span", "", ch.name));
-      if (!ch.canPost) {
+      const mark = el("span", "hash");
+      if (ch.kind === "voice") mark.innerHTML = MIC_SVG;
+      else mark.textContent = "#";
+      b.append(mark, el("span", "", ch.name));
+      if (!ch.canPost && ch.kind === "text") {
         const ro = el("span", "ro");
         ro.innerHTML = icon("megaphone");
         ro.title = "Staff only";
@@ -117,8 +123,19 @@ async function selectChannel(id) {
   const ch = currentChannel();
   $("channel-name").textContent = ch.name;
   $("channel-topic").textContent = ch.topic || "";
+  document.querySelector(".chat-top .hash").textContent = ch.kind === "voice" ? "" : "#";
   try { history.replaceState(null, "", "#" + ch.slug); } catch { /* ignore */ }
   renderChannels();
+  // Special channels (Information, Auction House, Suggestions, Voice Chat, Events) have their own views.
+  const special = ch.kind && ch.kind !== "text";
+  $("messages").hidden = special;
+  document.querySelector(".composer-wrap").hidden = special;
+  $("jump-latest").hidden = true;
+  if (special) {
+    showPanel(ch, { me: state.me, toast });
+    return;
+  }
+  hidePanel();
   renderComposer();
   await loadMessages();
 }
@@ -605,8 +622,13 @@ export async function startChat({ onSignedOut }) {
 
   wireUi();
   renderMembers();
+  // Links like /community#suggestions switch channels, even while the page is open.
+  window.addEventListener("hashchange", () => {
+    const ch = state.channels.find((c) => c.slug === location.hash.slice(1));
+    if (ch && ch.id !== state.channelId) selectChannel(ch.id);
+  });
   const wanted = location.hash.slice(1);
-  const first = state.channels.find((c) => c.slug === wanted) || state.channels.find((c) => c.slug === "general") || state.channels[0];
+  const first = state.channels.find((c) => c.slug === wanted) || state.channels.find((c) => c.slug === "chat") || state.channels[0];
   await selectChannel(first.id);
   connect();
   return state;

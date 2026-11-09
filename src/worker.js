@@ -14,6 +14,7 @@ import * as ranks from "./routes/ranks.js";
 import * as economy from "./routes/economy.js";
 import * as help from "./routes/help.js";
 import * as plans from "./routes/plans.js";
+import * as community from "./routes/community.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -63,6 +64,12 @@ const routes = [
   ["POST", "/api/mod/economy/plan", (req, env) => plans.adminSetPlan(req, env)],
   ["POST", "/api/mod/economy/:action", economy.adminEconomyAction],
   ["GET", "/api/help", help.getHelp],
+  ["GET", "/api/community/auction", (req, env) => community.auctionList(req, env)],
+  ["POST", "/api/community/auction/:id/buy", community.auctionBuy],
+  ["GET", "/api/community/suggestions", community.suggestionsList],
+  ["POST", "/api/community/suggestions", (req, env) => community.suggestionCreate(req, env)],
+  ["POST", "/api/community/suggestions/:id/vote", community.suggestionVote],
+  ["POST", "/api/community/suggestions/:id/:action", community.suggestionAction],
   ["GET", "/api/store/plans", () => plans.storePlans()],
   ["GET", "/api/mod/help", help.adminGetHelp],
   ["POST", "/api/mod/help/:action", help.adminHelpAction],

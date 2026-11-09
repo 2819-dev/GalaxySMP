@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.8.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.9.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -203,6 +203,8 @@ class VoiceLink:
             self._on_main(lambda: self.plugin.help.update_from_website(msg))
         elif msg.get("type") == "plans":
             self._on_main(lambda: self.plugin.plans.update_from_website(msg))
+        elif msg.get("type") == "ah_buy":
+            self._on_main(lambda: self.plugin.auction.from_website(msg))
         elif msg.get("type") == "eco":
             self._on_main(lambda: self.plugin.economy.from_website(msg))
         elif msg.get("type") == "icons":
@@ -258,6 +260,10 @@ class VoiceLink:
     def announce_online(self):
         """Tell the website which players are here (so ranks can be given on the website) and everyone's money."""
         self.send_seen(list(self.plugin.server.online_players))
+        try:
+            self.plugin.auction.push()
+        except Exception as e:
+            self.plugin.logger.warning(f"Couldn't send Auction House listings to the website: {e}")
         try:
             self.plugin.economy.sync(everything=True)
         except Exception as e:

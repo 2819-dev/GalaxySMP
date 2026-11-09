@@ -241,8 +241,13 @@ export function startStatus(onData) {
   setInterval(() => { if (document.visibilityState === "visible") update(); }, 60_000);
 }
 
-renderHeader();
-renderFooter();
+// Pages shown inside the community (e.g. Voice Chat) hide the site header and footer.
+const EMBED = new URLSearchParams(location.search).has("embed") && window.top !== window;
+if (EMBED) document.documentElement.classList.add("embedded");
+else {
+  renderHeader();
+  renderFooter();
+}
 fillConfig();
 applyHosting();
 

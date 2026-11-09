@@ -19,7 +19,7 @@ export async function bootstrap(request, env) {
   const sql = getDb(env);
   const [categories, channels, roles, members] = await Promise.all([
     sql`SELECT id, name FROM categories ORDER BY position, id`,
-    sql`SELECT id, category_id, slug, name, topic, min_post_power FROM channels ORDER BY position, id`,
+    sql`SELECT id, category_id, slug, name, topic, min_post_power, kind FROM channels WHERE NOT hidden ORDER BY position, id`,
     sql`SELECT key, name, color, power FROM roles ORDER BY power DESC`,
     sql`SELECT u.id, u.username, r.key AS role,
                rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon,
@@ -44,7 +44,8 @@ export async function bootstrap(request, env) {
       slug: c.slug,
       name: c.name,
       topic: c.topic,
-      canPost: me.role.power >= c.min_post_power,
+      kind: c.kind,
+      canPost: c.kind === "text" && me.role.power >= c.min_post_power,
     })),
     roles: roles.map((r) => ({ key: r.key, name: r.name, color: r.color, power: r.power })),
     members: members.map((m) => ({ id: Number(m.id), username: m.username, role: m.role, rank: rankOf(m) })),

@@ -30,7 +30,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.8.0"
+VERSION = "2.9.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -128,6 +128,7 @@ class GalaxyLink(Plugin):
         self.teleports = Teleports(self)
         self.plots = Plots(self)
         self.server.scheduler.run_task(self, self.plots.tick, delay=1, period=1)
+        self.server.scheduler.run_task(self, self.auction.tick, delay=600, period=600)
         self.register_events(self)
         self.server.scheduler.run_task(self, self.economy.tick, delay=HUD_TICKS, period=HUD_TICKS)
         self.server.scheduler.run_task(self, self.npcs.tick, delay=HOLD_TICKS, period=HOLD_TICKS)

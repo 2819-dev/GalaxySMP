@@ -190,6 +190,23 @@ export class VoiceHub extends DurableObject {
       }
       return Response.json(null);
     }
+    if (url.pathname === "/internal/ah") {
+      return Response.json((await this.ctx.storage.get("ah")) || { listings: [], at: null });
+    }
+    if (url.pathname === "/internal/ask") {
+      // Ask the server something and wait for its answer (e.g. buy an Auction House item).
+      const plugin = this.pluginSocket();
+      if (!plugin) return Response.json({ ok: false, message: "The Minecraft server isn't connected right now." });
+      const body = await request.json();
+      const req = crypto.randomUUID();
+      this.waiting = this.waiting || new Map();
+      const answer = new Promise((resolve) => {
+        const timer = setTimeout(() => { this.waiting.delete(req); resolve({ ok: false, message: "The server didn't answer. Please try again." }); }, 8000);
+        this.waiting.set(req, (msg) => { clearTimeout(timer); this.waiting.delete(req); resolve(msg); });
+      });
+      this.send(plugin, { ...body, req });
+      return Response.json(await answer);
+    }
     if (url.pathname === "/internal/plugin") {
       const plugin = this.pluginSocket();
       if (!plugin) return Response.json({ sent: false });
@@ -271,6 +288,15 @@ export class VoiceHub extends DurableObject {
   }
 
   onPlugin(msg) {
+    if (msg.type === "answer" && msg.req) {
+      const done = this.waiting?.get(msg.req);
+      if (done) done(msg);
+      return;
+    }
+    if (msg.type === "ah") {
+      const listings = (Array.isArray(msg.listings) ? msg.listings : []).slice(0, 300);
+      return this.ctx.storage.put("ah", { listings, at: Date.now() });
+    }
     if (msg.type === "seen") {
       return recordPlayers(this.env, msg.players).catch((e) => console.error("record players failed", e));
     }

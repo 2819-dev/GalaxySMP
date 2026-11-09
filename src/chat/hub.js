@@ -174,7 +174,7 @@ export class CommunityHub extends DurableObject {
         SELECT u.id, u.banned, u.muted_until, r.power
           FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ${user.id}
       ), ch AS (
-        SELECT id, min_post_power FROM channels WHERE id = ${channelId}
+        SELECT id, min_post_power FROM channels WHERE id = ${channelId} AND kind = 'text' AND NOT hidden
       ), ins AS (
         INSERT INTO messages (channel_id, user_id, content, reply_to)
         SELECT ch.id, who.id, ${check.text},

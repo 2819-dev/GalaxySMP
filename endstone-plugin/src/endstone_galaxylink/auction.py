@@ -31,8 +31,9 @@ class AuctionHouse:
 
     # ---------- data ----------
     def expire(self):
-        self.db.execute("UPDATE ah SET status = 'expired' WHERE status = 'active' AND expires < ?", (time.time(),))
+        cur = self.db.execute("UPDATE ah SET status = 'expired' WHERE status = 'active' AND expires < ?", (time.time(),))
         self.db.commit()
+        return cur.rowcount
 
     def active(self, search="", page=0):
         self.expire()
@@ -79,35 +80,84 @@ class AuctionHouse:
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')",
             (str(player.xuid), player.name, json.dumps(snap), label, snap["id"], stack.amount, cents, now, now + DURATION))
         self.db.commit()
+        self.push()
         player.send_message(f"§aListed §f{stack.amount}x {label}§a for §e{money.exact(cents)}§a on the Auction House "
                             f"for 48 hours. §7({FEE_PERCENT}% fee when it sells)")
 
-    def buy(self, player, lid):
+    def buy(self, player, lid, from_website=False):
+        """Returns (ok, message). The player always gets the message in game too."""
         row = self.get(lid)
         if not row or row[9] != "active" or row[8] < time.time():
-            player.send_message("§cSorry, that item is no longer for sale.")
-            return
+            return self._tell(player, False, "Sorry, that item is no longer for sale.")
         _, seller, seller_name, item, label, item_id, amount, price, _, _ = row
         if seller == str(player.xuid):
-            player.send_message("§cThat's your own listing. Cancel it in My listings instead.")
-            return
+            return self._tell(player, False, "That's your own listing. Cancel it in My listings instead.")
         if not self.eco.charge(player, price):
-            player.send_message(f"§cYou need §e{money.exact(price)}§c but have §e{self.eco.balance_text(player)}§c.")
-            return
+            return self._tell(player, False, f"You need {money.exact(price)} but have {self.eco.balance_text(player)}.")
         self.db.execute("UPDATE ah SET status = 'sold', buyer = ? WHERE id = ? AND status = 'active'", (str(player.xuid), lid))
         self.db.commit()
         payout = price - price * FEE_PERCENT // 100
         self.eco.add(seller, seller_name, payout)
-        money.give(player, money.rebuild(json.loads(item)))
-        player.send_message(f"§aYou bought §f{amount}x {label}§a for §e{money.exact(price)}§a.")
+        dropped = money.give(player, money.rebuild(json.loads(item)))
+        where = " (your inventory was full, so it dropped at your feet)" if dropped else ""
         seller_p = next((p for p in self.plugin.server.online_players if str(p.xuid) == seller), None)
         if seller_p:
             seller_p.send_message(f"§a{player.name} bought your §f{amount}x {label}§a. You got §e{money.exact(payout)}§a.")
+        self.push()
+        return self._tell(player, True, f"You bought {amount}x {label} for {money.exact(price)}"
+                          + (" on the website" if from_website else "") + f".{where}")
+
+    @staticmethod
+    def _tell(player, ok, text):
+        player.send_message(("§a" if ok else "§c") + text)
+        return ok, text
+
+    # ---------- the website's Auction House channel ----------
+    def payload(self):
+        self.expire()
+        rows = self.db.execute(
+            "SELECT id, seller_name, item, label, item_id, amount, price, expires FROM ah WHERE status = 'active' "
+            "ORDER BY created DESC LIMIT 300").fetchall()
+        out = []
+        for lid, seller_name, item, label, item_id, amount, price, expires in rows:
+            meta = (json.loads(item).get("meta") or {})
+            out.append({
+                "id": lid, "label": label, "item": item_id, "amount": amount, "price": price,
+                "seller": seller_name, "expires": int(expires),
+                "enchants": [f"{money.pretty_id(k)} {v}" for k, v in (meta.get("enchants") or {}).items()],
+            })
+        return out
+
+    def push(self):
+        voice = getattr(self.plugin, "_voice", None)
+        if voice and voice.ws:
+            voice.send_json({"type": "ah", "listings": self.payload()})
+
+    def from_website(self, msg):
+        """A website member pressed Buy. Items go straight to their inventory, so they must be online."""
+        voice = self.plugin._voice
+        player = next((p for p in self.plugin.server.online_players if str(p.xuid) == str(msg.get("xuid"))), None)
+        if player is None:
+            ok, text = False, "You need to be online in Minecraft to buy: the item goes straight into your inventory."
+        else:
+            try:
+                ok, text = self.buy(player, int(msg.get("listing")), from_website=True)
+            except Exception as e:
+                self.plugin.logger.warning(f"Website auction buy failed: {e}")
+                ok, text = False, "Something went wrong. Please try again in game with /ah."
+        if voice:
+            voice.send_json({"type": "answer", "req": msg.get("req"), "ok": ok, "message": text})
 
     def cancel(self, player, lid):
         self.db.execute("UPDATE ah SET status = 'cancelled' WHERE id = ? AND seller = ? AND status = 'active'", (lid, str(player.xuid)))
         self.db.commit()
         self.collect(player, lid)
+        self.push()
+
+    def tick(self):
+        """Every 30 seconds: tell the website when listings expire."""
+        if self.expire():
+            self.push()
 
     def collect(self, player, lid):
         row = self.get(lid)
