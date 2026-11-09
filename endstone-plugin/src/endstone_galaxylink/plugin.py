@@ -20,11 +20,11 @@ from endstone_galaxylink import settings
 from endstone_galaxylink.auction import AuctionHouse
 from endstone_galaxylink.economy import HUD_TICKS, Economy
 from endstone_galaxylink.npc import HOLD_TICKS, NpcManager
-from endstone_galaxylink.ranks import RankManager, tag_text
+from endstone_galaxylink.ranks import RankManager, name_color, tag_text
 from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.5.0"
+VERSION = "2.5.1"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -101,15 +101,15 @@ class GalaxyLink(Plugin):
 
     # ---------- Name tags and chat ----------
     def compose_tag(self, player, icon):
-        """Voice icon, rank prefix, then the player's name."""
-        parts = []
-        if icon:
-            parts.append(icon)
+        """Above the head:
+            [👑 OWNER]        rank (in the rank's color), only if they have one
+            🎤 player1        voice icon, then the name in the rank's color
+        The money line under it is the score tag (economy.py)."""
         rank = self.ranks.rank_for(player)
-        if rank:
-            parts.append(tag_text(rank))
-        parts.append("§r" + player.name)
-        return " ".join(parts)
+        name = f"§{name_color(rank)}{player.name}§r"
+        if icon:
+            name = f"§r{icon} {name}"
+        return f"{tag_text(rank)}§r\n{name}" if rank else name
 
     def refresh_tags(self):
         if self._voice:
@@ -141,9 +141,7 @@ class GalaxyLink(Plugin):
 
     @event_handler
     def on_player_chat(self, event: PlayerChatEvent):
-        fmt = self.ranks.chat_format(event.player)
-        if fmt:
-            event.format = fmt
+        event.format = self.ranks.chat_format(event.player)
 
     def on_disable(self) -> None:
         if getattr(self, "_voice", None):

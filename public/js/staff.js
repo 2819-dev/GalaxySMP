@@ -263,11 +263,14 @@ let rankSearchTimer;
 
 const iconImg = (icon) => (icon ? h("img", { class: "rank-icon", src: `/img/ranks/rank_${icon}.png`, alt: "", width: 18, height: 18 }) : null);
 
-function rankPreview(prefix, color, name, icon) {
+// Looks like chat in game: [👑 OWNER] **name** → message (rank color on the tag and name).
+function rankPreview(prefix, color, name, icon, message) {
   const span = h("span", { class: "rank-preview" });
-  const tag = h("span", { text: `[${prefix}]` });
-  tag.style.color = hexOf(color);
-  span.append(...[iconImg(icon), tag, " ", h("span", { text: name })].filter(Boolean));
+  const tag = h("span", {}, "[", ...[iconImg(icon), prefix].filter(Boolean), "]");
+  const who = h("b", { text: name });
+  tag.style.color = who.style.color = hexOf(color);
+  span.append(tag, " ", who);
+  if (message) span.append(h("span", { class: "text-3", text: " → " }), h("span", { text: message }));
   return span;
 }
 
@@ -384,7 +387,7 @@ function rankDialog(rank) {
   const advanced = h("input", { class: "input", id: "rank-other", placeholder: "someplugin.permission, another.one", value: other.join(", ") });
   const preview = h("div", { class: "rank-preview-box" });
   const update = () => {
-    preview.replaceChildren(rankPreview(prefix.value || "PREFIX", color.value(), "VisionDevs", icon.value()), h("span", { class: "text-3", text: ": hello!" }));
+    preview.replaceChildren(rankPreview(prefix.value || "PREFIX", color.value(), "VisionDevs", icon.value(), "hello!"));
   };
   [name, prefix, color.el, icon.el].forEach((el) => el.addEventListener("input", update));
   update();

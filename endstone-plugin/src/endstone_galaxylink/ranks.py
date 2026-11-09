@@ -56,9 +56,14 @@ def split_permissions(perms):
 
 
 def tag_text(rank):
+    """[👑 OWNER] in the rank's color (the icon goes inside the brackets)."""
     glyph = GLYPHS.get(rank.get("icon") or "")
-    text = f"§{rank['color']}[{rank['prefix']}]"
-    return f"§r{glyph} {text}" if glyph else text
+    inside = f"{glyph} {rank['prefix']}" if glyph else rank["prefix"]
+    return f"§{rank['color']}[{inside}]"
+
+
+def name_color(rank):
+    return rank["color"] if rank else "f"
 
 
 class RankManager:
@@ -110,11 +115,10 @@ class RankManager:
         self.attachments.pop(str(player.unique_id), None)
 
     def chat_format(self, player):
+        """[👑 OWNER] **player1** → message  (rank color on the tag and name, never on the message)"""
         rank = self.rank_for(player)
-        if not rank:
-            return None
-        prefix = tag_text(rank).replace("{", "{{").replace("}", "}}")
-        return prefix + "§r <{0}> {1}"
+        prefix = (tag_text(rank).replace("{", "{{").replace("}", "}}") + "§r ") if rank else ""
+        return prefix + f"§l§{name_color(rank)}{{0}}§r §7→§r {{1}}"
 
     # ---------- /ranks menu ----------
     def open_menu(self, player):
