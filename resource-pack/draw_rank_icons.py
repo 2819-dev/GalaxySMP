@@ -4,7 +4,33 @@ import os, sys
 OUT = sys.argv[1]
 K = (24, 24, 32, 255)
 
+def _mix(c, t, k):
+    return tuple(round(a + (b - a) * k) for a, b in zip(c[:3], t)) + (c[3],)
+
+
+def shade(img):
+    """Light from the top-left: brighten pixels facing up-left, darken pixels facing down-right.
+    Thin 1-pixel lines are left alone so they stay crisp."""
+    px = img.load(); out = img.copy(); po = out.load()
+    clear = lambda x, y: not (0 <= x < 16 and 0 <= y < 16) or px[x, y][3] == 0
+    for y in range(16):
+        for x in range(16):
+            c = px[x, y]
+            if not c[3]:
+                continue
+            lit = clear(x, y - 1) or clear(x - 1, y)
+            dark = clear(x, y + 1) or clear(x + 1, y)
+            if lit and dark:
+                continue
+            if lit:
+                po[x, y] = _mix(c, (255, 255, 255), 0.35)
+            elif dark:
+                po[x, y] = _mix(c, (0, 0, 0), 0.30)
+    return out
+
+
 def outline(img):
+    img = shade(img)
     px = img.load(); out = img.copy(); po = out.load()
     for y in range(16):
         for x in range(16):
@@ -29,8 +55,10 @@ def star():
     return im
 def shield():
     im, d = new()
-    d.polygon([(2,2),(14,2),(14,8),(8,14),(2,8)], fill=(70,130,255,255))
-    d.line((8,4,8,11), fill=(255,255,255,255)); d.line((5,6,11,6), fill=(255,255,255,255))
+    d.polygon([(2,2),(14,2),(14,8),(8,14),(2,8)], fill=(255,200,40,255))      # gold rim
+    d.polygon([(4,4),(12,4),(12,8),(8,12),(4,8)], fill=(70,130,255,255))      # blue face
+    d.polygon([(8,4),(12,4),(12,8),(8,12)], fill=(45,95,215,255))             # right half in shadow
+    d.ellipse((6,6,10,10), fill=(255,200,40,255))                             # gold boss
     return im
 def sword():
     im, d = new(); blade = (215,225,240,255)
