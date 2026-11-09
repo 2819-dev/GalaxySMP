@@ -40,7 +40,8 @@ export function compileWordList(rows) {
 }
 
 function hasProfanity(text, compiled) {
-  const norm = normalize(text);
+  // "!" and "|" count as an "i" (sh!t) only inside a word, not as punctuation at its ends (shit!!)
+  const norm = normalize(String(text).replace(/[A-Za-z0-9@$!|€]+/g, (w) => w.replace(/^[!|]+|[!|]+$/g, " ")));
   const tokens = norm.split(/[^a-z]+/).filter(Boolean);
   // Also join runs of single letters: "f u c k" / "f.u.c.k" -> "fuck"
   const joined = [];

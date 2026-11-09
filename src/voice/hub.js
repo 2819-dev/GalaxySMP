@@ -190,6 +190,9 @@ export class VoiceHub extends DurableObject {
       }
       return Response.json(null);
     }
+    if (url.pathname === "/internal/chatfilter") {
+      return Response.json((await this.ctx.storage.get("chatfilter")) || { enabled: null, at: null });
+    }
     if (url.pathname === "/internal/events") {
       return Response.json((await this.ctx.storage.get("events")) || { events: [], at: null });
     }
@@ -295,6 +298,9 @@ export class VoiceHub extends DurableObject {
       const done = this.waiting?.get(msg.req);
       if (done) done(msg);
       return;
+    }
+    if (msg.type === "chatfilter_state") {
+      return this.ctx.storage.put("chatfilter", { enabled: Boolean(msg.enabled), at: Date.now() });
     }
     if (msg.type === "events") {
       const events = (Array.isArray(msg.events) ? msg.events : []).slice(0, 50);
@@ -476,9 +482,18 @@ export class VoiceHub extends DurableObject {
       this.send(plugin, { type: "shop", shop: await loadShop(sql) });
       this.send(plugin, { type: "help", help: (await loadHelp(sql)).help });
       this.send(plugin, await planMessage(sql));
+      await this.sendWords();
     } catch (e) {
       console.error("shop load failed", e);
     }
+  }
+
+  // The in-game chat filter uses the same word list as the website.
+  async sendWords() {
+    const plugin = this.pluginSocket();
+    if (!plugin) return;
+    const rows = await getDb(this.env)`SELECT word, match FROM filter_words`;
+    this.send(plugin, { type: "words", words: rows.map((r) => ({ word: r.word, match: r.match })) });
   }
 
   // ---------- staff actions (from the website's moderation API) ----------
@@ -519,6 +534,7 @@ export class VoiceHub extends DurableObject {
       this.sendRoster();
     } else if (event.type === "words_changed") {
       this.words = null;
+      await this.sendWords();
     } else if (event.type === "ranks_changed") {
       await this.sendRanks();
     }

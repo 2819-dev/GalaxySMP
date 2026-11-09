@@ -12,7 +12,7 @@ import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
 import { isOwner } from "../lib/names.js";
 import { hubBroadcast } from "./chat.js";
-import { voiceEvent } from "./voice.js";
+import { voiceEvent, voiceStub } from "./voice.js";
 import { rankOf } from "../chat/messages.js";
 
 const MOD = 50;
@@ -454,4 +454,26 @@ export async function staffSummary(request, env) {
   const user = await requireStaff(request, env);
   const sql = getDb(env);
   return json({ ok: true, power: Number(user.role_power), openReports: await openReportCount(sql), muteOptions: MUTE_OPTIONS });
+}
+
+// ---------- In-game chat filter (on/off for the whole server) ----------
+export async function chatFilterState(request, env) {
+  await requireStaff(request, env);
+  const state = await voiceStub(env).fetch("https://voice/internal/chatfilter").then((r) => r.json());
+  const online = await voiceStub(env).fetch("https://voice/internal/server").then((r) => r.json()).catch(() => null);
+  return json({ ok: true, enabled: state.enabled, updated: state.at, serverOnline: Boolean(online) });
+}
+
+export async function chatFilterSet(request, env) {
+  const actor = await requireStaff(request, env);
+  const body = await readJson(request);
+  const enabled = Boolean(body.enabled);
+  const res = await voiceStub(env).fetch("https://voice/internal/plugin", {
+    method: "POST",
+    body: JSON.stringify({ type: "chatfilter", enabled, by: `${actor.username} (website)` }),
+  }).then((r) => r.json());
+  if (!res.sent) throw new HttpError(409, "The Minecraft server isn't connected right now. Try again when it's online.");
+  const sql = getDb(env);
+  await audit(sql, actor.id, enabled ? "chatfilter.on" : "chatfilter.off", {});
+  return json({ ok: true, enabled });
 }

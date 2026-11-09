@@ -70,3 +70,11 @@ test("spam", () => {
   no("", "empty");
   no("x".repeat(501), "length");
 });
+
+test("punctuation next to bad words", () => {
+  no("damn!!", "profanity");
+  no("!damn", "profanity");
+  no("d4mn|", "profanity");
+  ok("wow!! nice build!");
+  ok("class!");
+});

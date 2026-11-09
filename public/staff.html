@@ -58,6 +58,13 @@
         </section>
 
         <section data-panel="words" hidden>
+          <div class="panel cf-panel" style="margin-bottom:16px">
+            <div>
+              <h2 style="font-size:1.05rem;margin:0 0 4px">In-game chat filter</h2>
+              <p class="text-3 small" style="margin:0" id="cf-status">Checking…</p>
+            </div>
+            <button class="btn btn-secondary" type="button" id="cf-toggle" disabled>…</button>
+          </div>
           <div class="panel" style="margin-bottom:16px">
             <form class="toolbar" id="word-form" style="margin:0">
               <input class="input" id="word-input" maxlength="40" placeholder="Add a word or phrase" autocomplete="off" autocapitalize="off" spellcheck="false" required>

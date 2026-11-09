@@ -174,6 +174,7 @@ let reveal = false;
 const mask = (w) => (reveal ? w : w[0] + "•".repeat(Math.max(1, w.length - 1)));
 
 loaders.words = async () => {
+  loadChatFilter();
   words = (await getJson("/api/mod/words")).words;
   renderWords();
 };
@@ -215,6 +216,30 @@ $("word-form").addEventListener("submit", async (e) => {
   }
 });
 
+// ---------- In-game chat filter switch ----------
+let cfEnabled = null;
+async function loadChatFilter() {
+  const btn = $("cf-toggle");
+  try {
+    const data = await getJson("/api/mod/chatfilter");
+    cfEnabled = data.enabled;
+    const state = data.enabled == null ? "unknown (the server hasn't reported yet)" : data.enabled ? "ON" : "OFF";
+    $("cf-status").textContent = `The filter is ${state}. When it's on, words from the list below are scrambled in Minecraft chat (§k).` +
+      (data.serverOnline ? "" : " The server is offline, so it can't be changed right now.");
+    btn.textContent = data.enabled ? "Turn off" : "Turn on";
+    btn.className = `btn ${data.enabled ? "btn-secondary" : "btn-primary"}`;
+    btn.disabled = !data.serverOnline;
+  } catch (e) { $("cf-status").textContent = e.message; }
+}
+$("cf-toggle").addEventListener("click", async () => {
+  $("cf-toggle").disabled = true;
+  try {
+    await postJson("/api/mod/chatfilter", { enabled: !cfEnabled });
+    toast(!cfEnabled ? "Chat filter turned on." : "Chat filter turned off.");
+    setTimeout(loadChatFilter, 800);
+  } catch (e) { toast(e.message); $("cf-toggle").disabled = false; }
+});
+
 // ---------- Audit log ----------
 let auditBefore = null;
 const DESCRIBE = {
@@ -244,6 +269,8 @@ const DESCRIBE = {
   "plan.remove": (e) => [`removed ${e.details.player}'s plan`],
   "help.reset": () => ["reset the in-game Help menu"],
   "filter.add": () => ["added a word to the filter"],
+  "chatfilter.on": () => ["turned the in-game chat filter on"],
+  "chatfilter.off": () => ["turned the in-game chat filter off"],
   "filter.remove": () => ["removed a word from the filter"],
 };
 

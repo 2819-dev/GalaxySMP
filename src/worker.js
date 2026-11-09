@@ -49,6 +49,8 @@ const routes = [
   ["GET", "/api/mod/words", (req, env) => mod.listWords(req, env)],
   ["POST", "/api/mod/words", (req, env) => mod.addWord(req, env)],
   ["POST", "/api/mod/words/:id/delete", mod.removeWord],
+  ["GET", "/api/mod/chatfilter", (req, env) => mod.chatFilterState(req, env)],
+  ["POST", "/api/mod/chatfilter", (req, env) => mod.chatFilterSet(req, env)],
   ["GET", "/api/mod/audit", mod.listAudit],
   ["GET", "/api/voice/connect", (req, env) => voiceConnect(req, env)],
   ["GET", "/api/voice/server", (req, env) => voiceServer(req, env)],

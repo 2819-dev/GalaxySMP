@@ -237,6 +237,12 @@
    "description": "List every plot and protected area.",
    "example": "/plot list",
    "staff": true
+  },
+  {
+   "command": "/chatfilter [on|off]",
+   "description": "Turn the chat filter on or off for everyone (bad words are scrambled).",
+   "example": "/chatfilter off",
+   "staff": true
   }
  ]
 }

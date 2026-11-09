@@ -20,6 +20,7 @@ from endstone.plugin import Plugin
 
 from endstone_galaxylink import settings
 from endstone_galaxylink.auction import AuctionHouse
+from endstone_galaxylink.chatfilter import ChatFilter
 from endstone_galaxylink.economy import HUD_TICKS, Economy
 from endstone_galaxylink.helpmenu import HelpMenu
 from endstone_galaxylink.npc import HOLD_TICKS, NpcManager
@@ -31,7 +32,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.10.1"
+VERSION = "2.11.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -84,6 +85,7 @@ class GalaxyLink(Plugin):
         "back": _cmd("Go back to where you died or last teleported from.", "/back", "galaxylink.command.back"),
         "plan": _cmd("See your subscription plan.", "/plan", "galaxylink.command.plan"),
         "plot": _cmd("Manage your plot. /plot shovel gets a claiming shovel.", "/plot [action: message]", "galaxylink.command.plot", ["plots"]),
+        "chatfilter": _cmd("Turn the chat filter on or off for everyone.", "/chatfilter [state: message]", "galaxylink.command.chatfilter"),
         "minigames": _cmd("The Minigame Center: host, join or watch minigames.", "/minigames", "galaxylink.command.minigames", ["minigame", "mg"]),
         "tpd": _cmd("Teleport where you've been sent (e.g. to the staff member who accepted your minigame).", "/tpd", "galaxylink.command.tpd"),
         "plotaxe": _cmd("Get the Plot Axe to make plots and protected areas.", "/plotaxe", "galaxylink.command.plotaxe"),
@@ -117,6 +119,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.plot": _perm("Allows /plot.", True),
         "galaxylink.command.plotaxe": _perm("Allows /plotaxe (server operators).", "op"),
         "galaxylink.command.minigames": _perm("Allows /minigames.", True),
+        "galaxylink.command.chatfilter": _perm("Allows /chatfilter (server operators, or give it with a rank).", "op"),
         "galaxylink.command.tpd": _perm("Allows /tpd.", True),
         STAFF_PERMISSION: _perm("Minigame Staff: accept or decline minigame host requests. Give it with a rank.", "op"),
     }
@@ -134,6 +137,7 @@ class GalaxyLink(Plugin):
         self.teleports = Teleports(self)
         self.plots = Plots(self)
         self.minigames = Minigames(self)
+        self.chatfilter = ChatFilter(self)
         self.server.scheduler.run_task(self, self.minigames.tick, delay=600, period=600)
         self.server.scheduler.run_task(self, self.plots.tick, delay=1, period=1)
         self.server.scheduler.run_task(self, self.auction.tick, delay=600, period=600)
@@ -231,6 +235,7 @@ class GalaxyLink(Plugin):
 
     @event_handler
     def on_player_chat(self, event: PlayerChatEvent):
+        self.chatfilter.on_chat(event)  # scrambles bad words with §k (when it's on)
         event.format = self.ranks.chat_format(event.player)
 
     def on_disable(self) -> None:
@@ -320,6 +325,7 @@ class GalaxyLink(Plugin):
             "plot": lambda: self.plots.command(sender, args),
             "plotaxe": lambda: self.plots.give_axe(sender),
             "minigames": lambda: self.minigames.open(sender),
+            "chatfilter": lambda: self.chatfilter.command(sender, args),
             "tpd": lambda: self.minigames.tpd_command(sender),
         }
         if name in simple:
