@@ -101,7 +101,7 @@ class Leaderboards:
         """Tags the entity we just summoned."""
         for actor in self.plugin.server.level.actors:
             try:
-                if actor.type != ENTITY or any(t.startswith(TAG) for t in actor.scoreboard_tags):
+                if actor.type != ENTITY or any(t.startswith("gsmp_") for t in actor.scoreboard_tags):
                     continue
                 l = actor.location
                 if actor.dimension.name == board["dim"] and math.dist((l.x, l.y, l.z), (board["x"], board["y"], board["z"])) < 1.5:

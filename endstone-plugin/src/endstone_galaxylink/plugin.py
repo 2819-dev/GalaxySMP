@@ -26,6 +26,11 @@ from endstone_galaxylink.moderation import Moderation
 from endstone_galaxylink.blocklog import BlockLog, states_of
 from endstone_galaxylink.progress import Progress
 from endstone_galaxylink.leaderboards import Leaderboards
+from endstone_galaxylink.floating import FloatingTexts
+from endstone_galaxylink.jobs import Jobs
+from endstone_galaxylink.shopchests import ShopChests
+from endstone_galaxylink.crates import Crates
+from endstone_galaxylink.progress import HOSTILE, short as short_id
 from endstone_galaxylink.economy import HUD_TICKS, Economy
 from endstone_galaxylink.helpmenu import HelpMenu
 from endstone_galaxylink.npc import HOLD_TICKS, NpcManager
@@ -37,7 +42,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.14.0"
+VERSION = "2.15.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -95,6 +100,9 @@ class GalaxyLink(Plugin):
         "achievements": _cmd("See your achievements.", "/achievements", "galaxylink.command.achievements", ["ach"]),
         "stats": _cmd("See your stats, or another player's.", "/stats [player: message]", "galaxylink.command.stats"),
         "leaderboard": _cmd("Place or remove floating leaderboards (staff).", "/leaderboard", "galaxylink.command.leaderboard", ["lb"]),
+        "jobs": _cmd("Pick a job and earn money while you play.", "/jobs", "galaxylink.command.jobs", ["job"]),
+        "crates": _cmd("Crates: place them, edit prizes, give keys (staff).", "/crates", "galaxylink.command.crates"),
+        "givekey": _cmd("Give crate keys (staff).", "/givekey <player: message>", "galaxylink.command.givekey"),
         "report": _cmd("Report a player who is breaking the rules.", "/report [player: message]", "galaxylink.command.report"),
         "mod": _cmd("Staff moderation panel: warn, mute, kick, ban, reports and block logs.", "/mod", "galaxylink.command.mod"),
         "modban": _cmd("Ban a player (staff).", "/modban <player: message>", "galaxylink.command.modban"),
@@ -136,6 +144,9 @@ class GalaxyLink(Plugin):
         "galaxylink.command.plotaxe": _perm("Allows /plotaxe (server operators).", "op"),
         "galaxylink.command.minigames": _perm("Allows /minigames.", True),
         "galaxylink.command.report": _perm("Allows /report.", True),
+        "galaxylink.command.jobs": _perm("Allows /jobs.", True),
+        "galaxylink.command.crates": _perm("Allows /crates (operators, or give it with a rank).", "op"),
+        "galaxylink.command.givekey": _perm("Allows /givekey (operators, or give it with a rank).", "op"),
         "galaxylink.command.leaderboard": _perm("Allows /leaderboard (operators, or give it with a rank).", "op"),
         "galaxylink.command.daily": _perm("Allows /daily.", True),
         "galaxylink.command.quests": _perm("Allows /quests.", True),
@@ -171,6 +182,12 @@ class GalaxyLink(Plugin):
         self.progress = Progress(self)
         self.server.scheduler.run_task(self, self.progress.tick, delay=1200, period=1200)
         self.leaderboards = Leaderboards(self)
+        self.floating = FloatingTexts(self)
+        self.jobs = Jobs(self)
+        self.shopchests = ShopChests(self)
+        self.crates = Crates(self)
+        self.server.scheduler.run_task(self, self.jobs.tick, delay=100, period=100)
+        self.server.scheduler.run_task(self, self.floating.update, delay=1400, period=1200)
         self.server.scheduler.run_task(self, self.leaderboards.update, delay=1300, period=1200)
         self.server.scheduler.run_task(self, self.moderation.tick, delay=600, period=600)
         self.server.scheduler.run_task(self, self.blocklog.tick, delay=20, period=20)
@@ -223,6 +240,7 @@ class GalaxyLink(Plugin):
         self.announcements.on_join(player)
         self.moderation.on_join(player)
         self.progress.on_join(player)
+        self.shopchests.on_join(player)
         player.send_message("§7Need help? Type §e/guide§7 for server info, rules and commands.")
         self.refresh_tags()
         if self._voice:
@@ -251,6 +269,7 @@ class GalaxyLink(Plugin):
         player = self.server.get_player(killer.unique_id) if hasattr(killer, "unique_id") else None
         if player is not None:
             self.progress.on_kill(player, event.actor.type)
+            self.jobs.on_kill(player, event.actor.type, short_id(event.actor.type) in HOSTILE)
 
     @event_handler
     def on_interact_actor(self, event: PlayerInteractActorEvent):
@@ -266,10 +285,16 @@ class GalaxyLink(Plugin):
     def on_block_break(self, event: BlockBreakEvent):
         if self.blocklog.on_break(event):  # block inspector
             return
+        if self.crates.on_break(event):  # crates can't be broken
+            return
+        self.shopchests.on_break(event)
+        if event.cancelled:
+            return
         self.plots.on_break(event)
         self.blocklog.log_break(event)
         if not event.cancelled:
             self.progress.on_break(event.player, event.block.type, states_of(event.block))
+            self.jobs.on_break(event.player, event.block)
 
     @event_handler
     def on_block_place(self, event: BlockPlaceEvent):
@@ -279,10 +304,13 @@ class GalaxyLink(Plugin):
         self.blocklog.log_place(event)
         if not event.cancelled:
             self.progress.on_place(event.player)
+            self.jobs.on_place(event.player, event.block)
 
     @event_handler
     def on_interact(self, event: PlayerInteractEvent):
         if self.blocklog.on_interact(event):  # block inspector
+            return
+        if self.crates.on_interact(event) or self.shopchests.on_interact(event):  # crates and shop chests
             return
         if self.minigames.on_interact(event):  # Minigame Computer
             return
@@ -360,7 +388,7 @@ class GalaxyLink(Plugin):
         name = command.name
         player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "guide", "tpa", "tpahere", "tpaccept",
                        "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd",
-                       "report", "mod", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard"}
+                       "report", "mod", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates"}
         if name in player_only and not isinstance(sender, Player):
             sender.send_message(f"/{name} can only be used in game.")
             return True
@@ -411,6 +439,9 @@ class GalaxyLink(Plugin):
             "achievements": lambda: self.progress.achievements_menu(sender),
             "stats": lambda: self.progress.stats_command(sender, args),
             "leaderboard": lambda: self.leaderboards.menu(sender),
+            "jobs": lambda: self.jobs.menu(sender),
+            "crates": lambda: self.crates.admin_menu(sender),
+            "givekey": lambda: self.crates.givekey_command(sender, args),
             "mod": lambda: self.moderation.panel(sender),
             "modban": lambda: self.moderation.ban_command(sender, args),
             "inspect": lambda: self.blocklog.toggle(sender),

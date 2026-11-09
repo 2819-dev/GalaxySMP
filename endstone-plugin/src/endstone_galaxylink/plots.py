@@ -3,6 +3,9 @@
 Admins:  /plotaxe gives the Plot Axe. Left-click the ground for point 1, right-click for
          point 2, then a Save menu opens: a claimable Plot or a Protected area (like spawn).
          Sneak + right-click inside an existing plot or area with the axe to edit or delete it.
+Shop plots: the third Save option. Staff make a row of them (the Shop District). Players claim them the
+         same way; each plan has its own number of shop plots (Free 1, Galaxy+ 2, Galaxy Pro+ 3). Owners
+         put shop chests in them (shopchests.py) and can name their shop.
 Players: right-click inside a plot (white concrete edge) with the Plot Claiming Shovel to claim
          it. The shovel breaks; they get a Plot Manager (a clock) to add members, highlight the
          border, teleport there or unclaim (which resets the plot to how it was when it was made).
@@ -72,6 +75,8 @@ class Plots:
         self.db.commit()
 
     def label(self, plot):
+        if plot.get("shop"):
+            return plot.get("shop_name") or f"Shop {plot['id']}"
         return plot.get("name") or f"Plot {plot['id']}"
 
     # ---------- items ----------
@@ -134,13 +139,22 @@ class Plots:
         l = player.location
         return self.at(player.dimension.name, math.floor(l.x), math.floor(l.y), math.floor(l.z))
 
-    def owned(self, xuid):
-        return [p for p in self.plots.values() if p.get("owner") == str(xuid)]
+    def owned(self, xuid, shop=None):
+        """A player's plots: all of them, or only shop plots (shop=True) or only home plots (shop=False)."""
+        return [p for p in self.plots.values() if p.get("owner") == str(xuid) and (shop is None or bool(p.get("shop")) == shop)]
 
-    def allowance(self, player):
+    def allowance(self, player, shop=False):
         plans = getattr(self.plugin, "plans", None)
+        if shop:
+            return plans.plan_for(player).get("shopPlots", 1) if plans else 1
         base = plans.plan_for(player).get("plots", 1) if plans else 1
         return base + int(self.extra.get(str(player.xuid), 0))
+
+    def room(self, player, shop):
+        return len(self.owned(player.xuid, shop)) < self.allowance(player, shop)
+
+    def kind_word(self, plot):
+        return "shop plot" if plot.get("shop") else "plot"
 
     def role(self, player, plot):
         if player.is_op:
@@ -308,7 +322,7 @@ class Plots:
             return
         w, l = abs(x2 - x1) + 1, abs(z2 - z1) + 1
         controls = [
-            Dropdown("Type", ["Plot (players can claim it)", "Protected area (like spawn)"], 0),
+            Dropdown("Type", ["Plot (players can claim it)", "Protected area (like spawn)", "Shop plot (Shop District)"], 0),
             TextInput("Name (protected areas only; plots are numbered)", "e.g. Spawn", ""),
             TextInput("Height: blocks above the ground (it always goes all the way down)", "64", "64"),
             Dropdown("Who can claim it (plots only)", [n for _, n in CLAIM_LEVELS], 0),
@@ -327,6 +341,7 @@ class Plots:
 
     def create(self, player, dim, a, b, v):
         kind = "area" if int(v[0]) == 1 else "plot"
+        shop = int(v[0]) == 2
         name = str(v[1]).strip()[:32]
         try:
             height = int(str(v[2]).strip() or "64")
@@ -351,7 +366,7 @@ class Plots:
                 player.send_message(f"§cThat overlaps {self.label(p)}. Sneak + right-click it with the Plot Axe to edit or delete it.")
                 return
         plot = {
-            "kind": kind, "name": name if kind == "area" else "", "dim": dim,
+            "kind": kind, "name": name if kind == "area" else "", "dim": dim, "shop": shop,
             "x1": x1, "z1": z1, "x2": x2, "z2": z2, "y0": y0, "top": y0 + height, "bottom": BOTTOM.get(dim, -64),
             "claim": CLAIM_LEVELS[int(v[3])][0] if kind == "plot" else "all",
             "flags": {key: bool(on) for (key, _), on in zip(AREA_FLAGS, v[4:4 + len(AREA_FLAGS)])} if kind == "area" else {},
@@ -498,17 +513,22 @@ class Plots:
         if level < need and not player.is_op:
             player.send_message(f"§cOnly {'Galaxy+ and Pro+' if need == 1 else 'Galaxy Pro+'} players can claim this plot. §7galaxymc.us/store")
             return
-        have, limit = len(self.owned(player.xuid)), self.allowance(player)
+        shop = bool(plot.get("shop"))
+        have, limit = len(self.owned(player.xuid, shop)), self.allowance(player, shop)
+        word = self.kind_word(plot)
         if have >= limit and not player.is_op:
-            player.send_message(f"§cYou already have {have} plot{'s' if have != 1 else ''}, your limit. "
-                                "§7Get more with an extra plot or Galaxy+/Pro+ (galaxymc.us/store).")
+            player.send_message(f"§cYou already have {have} {word}{'s' if have != 1 else ''}, your limit. "
+                                + ("§7Galaxy+ and Pro+ get more shop plots (galaxymc.us/store)." if shop else
+                                   "§7Get more with an extra plot or Galaxy+/Pro+ (galaxymc.us/store)."))
             return
         w, l = plot["x2"] - plot["x1"] + 1, plot["z2"] - plot["z1"] + 1
         form = ActionForm(title=f"Claim {self.label(plot)}?",
                           content=f"Size: §f{w} x {l}§r blocks, {plot['top'] - plot['y0']} up from the ground.\n\n"
+                                  + ("§6This is a shop plot.§r Put shop chests here to sell to other players (sneak + tap a chest).\n"
+                                     if shop else "") +
                                   f"It becomes yours: only you and players you add can build here.\n"
-                                  f"§7Your plots: {have}/{limit}. Your shovel breaks when you claim.")
-        form.add_button("§2§lClaim this plot", on_click=lambda p: self.claim(p, plot["id"]))
+                                  f"§7Your {word}s: {have}/{limit}. Your shovel breaks when you claim.")
+        form.add_button(f"§2§lClaim this {word}", on_click=lambda p: self.claim(p, plot["id"]))
         form.add_button("Cancel")
         player.send_form(form)
 
@@ -517,8 +537,8 @@ class Plots:
         if not plot or plot.get("owner") or plot.get("status") != "ready":
             player.send_message("§cThis plot is already claimed.")
             return
-        if len(self.owned(player.xuid)) >= self.allowance(player) and not player.is_op:
-            player.send_message("§cYou've reached your plot limit.")
+        if not self.room(player, bool(plot.get("shop"))) and not player.is_op:
+            player.send_message(f"§cYou've reached your {self.kind_word(plot)} limit.")
             return
         if not self.take_tool(player, "shovel"):
             player.send_message("§cYou need a Plot Claiming Shovel to claim a plot.")
@@ -527,11 +547,14 @@ class Plots:
         self.save(pid)
         self.restore_edge(plot)
         player.send_message(f"§a§lYou claimed {self.label(plot)}! §r§7Your shovel broke. Use your §aPlot Manager§7 (clock) to manage it.")
+        if plot.get("shop"):
+            player.send_message("§6Shop tip: §7sneak + tap a chest in your shop plot to make it a shop chest. "
+                                "Name your shop and place its sign with the Plot Manager.")
         if not self.has_tool(player, "manager"):
             self.give_tool(player, "manager")
-        if len(self.owned(player.xuid)) < self.allowance(player):
+        if self.room(player, False) or self.room(player, True):
             self.give_tool(player, "shovel")
-            player.send_message("§7You can claim another plot, so you got a new shovel.")
+            player.send_message("§7You can claim another plot or shop plot, so you got a new shovel.")
 
     # ---------- the Plot Manager ----------
     def open_manager(self, player):
@@ -565,9 +588,49 @@ class Plots:
         form.add_button("§lTeleport to plot§r\n§8Go to the middle of your plot", icon="textures/ui/realmsIcon",
                         on_click=lambda p: self.plugin.teleports.go(p, lambda: {"dim": plot["dim"], "x": center[0] + 0.5, "y": center[1], "z": center[2] + 0.5}, self.label(plot))
                         if getattr(self.plugin, "teleports", None) else None)
+        if plot.get("shop"):
+            form.add_button("§6§lShop name and sign§r\n§8Name your shop, put its sign where you stand", icon="textures/ui/store_home_icon",
+                            on_click=lambda p: self.shop_sign_form(p, pid))
         form.add_button("§c§lUnclaim plot§r\n§8Deletes everything and frees the plot", icon="textures/ui/trash",
                         on_click=lambda p: self.confirm_unclaim(p, pid))
         player.send_form(form)
+
+    def shop_sign_form(self, player, pid):
+        plot = self.plots.get(pid)
+        if not plot or plot.get("owner") != str(player.xuid):
+            return
+
+        def submit(p, data):
+            try:
+                v = json.loads(data)
+            except ValueError:
+                return
+            name = " ".join(str(v[0]).split())[:24]
+            f = getattr(self.plugin, "chatfilter", None)
+            if name and f and f.bad_spans(name):
+                return p.send_message("§cPlease pick a different shop name.")
+            plot["shop_name"] = name or None
+            self.save(pid)
+            here = self.at_player(p)
+            ft = getattr(self.plugin, "floating", None)
+            if ft:
+                if v[1] and here and here["id"] == pid:
+                    l = p.location
+                    plot["sign"] = [round(l.x, 2), round(l.y + 1.6, 2), round(l.z, 2)]
+                    self.save(pid)
+                if plot.get("sign"):
+                    x, y, z = plot["sign"]
+                    ft.set(f"shopsign:{pid}", plot["dim"], x, y, z, self.shop_sign_text(plot))
+                elif v[1]:
+                    p.send_message("§cStand inside your shop plot to place the sign.")
+            p.send_message(f"§aSaved. §7Your shop is called §f{self.label(plot)}§7.")
+        player.send_form(ModalForm(title="Shop name and sign", controls=[
+            TextInput("Shop name (shown to shoppers)", "e.g. Steve's Diamonds", plot.get("shop_name") or ""),
+            Toggle("Put the floating sign where I'm standing", not plot.get("sign")),
+        ], submit_button="Save", on_submit=submit))
+
+    def shop_sign_text(self, plot):
+        return f"§6§l{self.label(plot)}\n§r§7by {plot.get('owner_name') or '?'} · tap a chest to shop"
 
     def toggle_highlight(self, player, pid):
         key = str(player.unique_id)
@@ -647,6 +710,15 @@ class Plots:
         if not plot:
             return
         owner = plot.get("owner")
+        if plot.get("shop"):
+            sc = getattr(self.plugin, "shopchests", None)
+            if sc:
+                sc.close_plot(pid, owner)
+            ft = getattr(self.plugin, "floating", None)
+            if ft:
+                ft.remove(f"shopsign:{pid}")
+            plot.pop("shop_name", None)
+            plot.pop("sign", None)
         # "resetting" right away, so nobody can claim it before the reset has finished.
         plot.update({"owner": None, "owner_name": None, "members": {}, "status": "resetting"})
         self.save(pid)
@@ -667,7 +739,7 @@ class Plots:
     def admin_menu(self, player, pid):
         plot = self.plots[pid]
         owner = plot.get("owner_name") or "nobody"
-        info = (f"§l{self.label(plot)}§r ({'Protected area' if plot['kind'] == 'area' else 'Plot'})\n"
+        info = (f"§l{self.label(plot)}§r ({'Protected area' if plot['kind'] == 'area' else 'Shop plot' if plot.get('shop') else 'Plot'})\n"
                 f"{plot['x2'] - plot['x1'] + 1} x {plot['z2'] - plot['z1'] + 1}, height {plot['top'] - plot['y0']}, status {plot.get('status')}\n")
         if plot["kind"] == "plot":
             info += f"Owner: {owner} · Claim: {dict(CLAIM_LEVELS)[plot.get('claim', 'all')]}"
@@ -708,6 +780,13 @@ class Plots:
                           content="The plot stops existing. Blocks inside are left as they are" +
                                   (f"; {plot.get('owner_name')} loses it." if plot.get("owner") else "."))
         def delete(p):
+            if plot.get("shop"):
+                sc = getattr(self.plugin, "shopchests", None)
+                if sc:
+                    sc.close_plot(pid, plot.get("owner"))
+                ft = getattr(self.plugin, "floating", None)
+                if ft:
+                    ft.remove(f"shopsign:{pid}")
             plot["status"] = "deleting"  # nobody can claim it while it's being deleted
             self.save(pid)
             self.run(self._job_delete(pid))
@@ -756,6 +835,8 @@ class Plots:
                     continue
                 if plot["kind"] == "area":
                     p.send_message(f"§7Entering §f{self.label(plot)}§7 (protected area)")
+                elif plot.get("owner") and plot.get("shop"):
+                    p.send_message(f"§6Welcome to §l{self.label(plot)}§r§6, {plot.get('owner_name')}'s shop! §7Tap a shop chest to buy or sell.")
                 elif plot.get("owner"):
                     p.send_message(f"§7Entering §f{self.label(plot)}§7, owned by §f{plot.get('owner_name')}")
                 else:
@@ -770,11 +851,12 @@ class Plots:
     def command(self, player, args):
         what = " ".join(args).strip().lower()
         if what in ("shovel", "claim"):
-            have, limit = len(self.owned(player.xuid)), self.allowance(player)
             if self.has_tool(player, "shovel"):
                 player.send_message("§eYou already have a Plot Claiming Shovel.")
-            elif have >= limit:
-                player.send_message(f"§cYou have {have}/{limit} plots. §7Get more with an extra plot or Galaxy+/Pro+ (galaxymc.us/store).")
+            elif not self.room(player, False) and not self.room(player, True):
+                player.send_message(f"§cYou have {len(self.owned(player.xuid, False))}/{self.allowance(player)} plots and "
+                                    f"{len(self.owned(player.xuid, True))}/{self.allowance(player, True)} shop plots. "
+                                    "§7Get more with an extra plot or Galaxy+/Pro+ (galaxymc.us/store).")
             else:
                 self.give_tool(player, "shovel")
                 player.send_message("§aHere's a Plot Claiming Shovel.")

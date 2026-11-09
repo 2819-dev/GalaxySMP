@@ -170,6 +170,10 @@ class Shop:
             form.add_button(f"§l{c['name']}§r\n§8{len(c['items'])} items", icon=c["icon"] or None,
                             on_click=lambda p, c=c: self.open_category(p, c))
         form.add_button("§l§6Sell items§r\n§8Sell what you have", icon="textures/ui/MCoin", on_click=self.open_sell)
+        crates = getattr(self.plugin, "crates", None)
+        if crates:
+            form.add_button(f"§l§dCrate Keys§r\n§8Common key {money.exact(crates.key_price)}", icon="textures/ui/gift_square",
+                            on_click=lambda p: crates.crate_menu(p, "common"))
         player.send_form(form)
 
     def open_category(self, player, cat):

@@ -211,6 +211,21 @@
    "example": "/stats Steve123"
   },
   {
+   "command": "/jobs",
+   "description": "Pick a job (Miner, Lumberjack, Farmer, Hunter, Digger, Builder) and earn money while you play. Level up for up to 2x pay.",
+   "example": "/jobs"
+  },
+  {
+   "command": "Shop plots",
+   "description": "Claim a shop plot in the Shop District with your Plot Claiming Shovel. Hold an item and sneak + tap a chest there to make a shop chest.",
+   "example": "/plot shovel"
+  },
+  {
+   "command": "Crates",
+   "description": "Tap a crate at spawn to see the prizes and open it with a key. Keys: finish all /quests (Common), /shop (Common), day 7 of /daily (Rare).",
+   "example": "/shop"
+  },
+  {
    "command": "/report [player]",
    "description": "Report a player who is breaking the rules. Staff get an alert right away.",
    "example": "/report Steve123"
@@ -297,6 +312,18 @@
    "command": "/leaderboard",
    "description": "Place a floating leaderboard where you stand (money, playtime, miners...), or remove the nearest one.",
    "example": "/leaderboard",
+   "staff": true
+  },
+  {
+   "command": "/crates",
+   "description": "Place or remove crates, edit prizes and chances, give keys, set the Common key price.",
+   "example": "/crates",
+   "staff": true
+  },
+  {
+   "command": "/givekey <player> <common|rare|galaxy> [amount]",
+   "description": "Give crate keys (works from the console too, e.g. for event prizes).",
+   "example": "/givekey Steve123 galaxy 1",
    "staff": true
   }
  ]

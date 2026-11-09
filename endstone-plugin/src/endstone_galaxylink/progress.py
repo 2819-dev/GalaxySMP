@@ -1,10 +1,10 @@
 """Player progress: stats, daily rewards, daily quests and achievements.
 
 Stats      playtime, blocks mined and placed, mobs killed, deaths, money earned by selling.
-/daily     log in every day for a reward: day 1 $100, day 2 $200 ... day 7 $700 + a crate key,
+/daily     log in every day for a reward: day 1 $100, day 2 $200 ... day 7 $700 + a Rare crate key,
            then it starts over at day 1. Missing a day restarts the streak.
            Galaxy+ gets 25% more, Galaxy Pro+ 50% more. Days start at midnight (US Eastern).
-/quests    3 new quests every day: one easy, one medium, one hard.
+/quests    3 new quests every day: one easy, one medium, one hard. Finishing all 3 gives a Common crate key.
 /achievements  milestones with badges (shown on galaxymc.us profiles) and small money rewards.
 /stats [player]  someone's stats.
 
@@ -112,7 +112,9 @@ ACHIEVEMENTS = [
 ACH_BY_ID = {a[0]: a for a in ACHIEVEMENTS}
 
 NEW_STATS = {"playtime": 0, "mined": 0, "placed": 0, "kills": 0, "deaths": 0, "sold": 0, "diamonds": 0, "quests": 0,
-             "streak": 0, "best_streak": 0, "last_daily": None, "keys": 0, "achievements": {}, "daily": None}
+             "streak": 0, "best_streak": 0, "last_daily": None, "keys": 0, "achievements": {}, "daily": None,
+             "crate_keys": {"common": 0, "rare": 0, "galaxy": 0}}
+KEY_NAMES = {"common": "Common", "rare": "Rare", "galaxy": "Galaxy"}
 
 
 def dollars(cents):
@@ -147,6 +149,9 @@ class Progress:
             s = self.load(x) or {**json.loads(json.dumps(NEW_STATS))}
             for k, v in NEW_STATS.items():
                 s.setdefault(k, json.loads(json.dumps(v)))
+            if s.get("keys"):  # keys from before there were 3 crates count as Rare keys (the day-7 reward)
+                s["crate_keys"]["rare"] = s["crate_keys"].get("rare", 0) + s["keys"]
+                s["keys"] = 0
             s["name"] = player.name
             self.cache[x] = s
         return s
@@ -252,8 +257,8 @@ class Progress:
         self.eco.credit(player, cents)
         extra = ""
         if day == 7:
-            s["keys"] = s.get("keys", 0) + 1
-            extra = " §d+ 1 crate key!"
+            s["crate_keys"]["rare"] = s["crate_keys"].get("rare", 0) + 1
+            extra = " §d+ 1 Rare crate key!"
         self.touch(player)
         player.send_message(f"§6§lDaily reward: §r§aDay {day}: {dollars(cents)}{extra} §7(streak: {s['streak']} day{'s' if s['streak'] != 1 else ''})")
         try:
@@ -267,7 +272,7 @@ class Progress:
         can, day, streak = self.daily_state(player)
         lines = []
         for d in range(1, 8):
-            amount = dollars(self.daily_amount(player, d)) + (" + crate key" if d == 7 else "")
+            amount = dollars(self.daily_amount(player, d)) + (" + Rare crate key" if d == 7 else "")
             if d < day or (d == day and not can):
                 lines.append(f"§a✔ Day {d}: {amount}")
             elif d == day:
@@ -320,7 +325,8 @@ class Progress:
                 except Exception:
                     pass
                 if all(x["done"] for x in self.quests_for(player)):
-                    player.send_message("§6You finished all of today's quests! §7New ones tomorrow.")
+                    s["crate_keys"]["common"] = s["crate_keys"].get("common", 0) + 1
+                    player.send_message("§6You finished all of today's quests! §d+1 Common crate key. §7New quests tomorrow.")
                 self.check_achievements(player)
 
     def quests_menu(self, player):
@@ -395,7 +401,8 @@ class Progress:
         text = (f"§lPlaytime:§r {h}h {m}m\n§lMoney:§r {dollars(self.eco.get(target.xuid))}\n§lBlocks mined:§r {s['mined']:,}\n"
                 f"§lBlocks placed:§r {s['placed']:,}\n§lMobs defeated:§r {s['kills']:,}\n§lDeaths:§r {s['deaths']:,}\n"
                 f"§lQuests completed:§r {s['quests']:,}\n§lDaily streak:§r {s['streak']} (best {s['best_streak']})\n"
-                f"§lAchievements:§r {len(s['achievements'])}/{len(ACHIEVEMENTS)}\n§lCrate keys:§r {s.get('keys', 0)}\n\n"
+                f"§lAchievements:§r {len(s['achievements'])}/{len(ACHIEVEMENTS)}\n"
+                f"§lCrate keys:§r {', '.join(f'{n} {KEY_NAMES[k]}' for k, n in s['crate_keys'].items() if n) or 'none'}\n\n"
                 f"§7Full profile: galaxymc.us/player/{target.name.replace(' ', '%20')}")
         form = ActionForm(title=f"§l{target.name}", content=text)
         form.add_button("Close")
@@ -410,6 +417,28 @@ class Progress:
             if target is None:
                 return sender.send_message(f"§7{name} isn't online. See everyone's stats on galaxymc.us/leaderboard.")
         self.stats_menu(sender, target)
+
+    # ---------- crate keys ----------
+    def keys(self, player):
+        return self.stats(player)["crate_keys"]
+
+    def add_keys(self, xuid, name, kind, n):
+        """Gives crate keys to any player, online or not. Returns their new count."""
+        x = str(xuid)
+        if x in self.cache:
+            s = self.cache[x]
+        else:
+            s = self.load(x) or json.loads(json.dumps(NEW_STATS))
+            for k, v in NEW_STATS.items():
+                s.setdefault(k, json.loads(json.dumps(v)))
+            s.setdefault("name", name)
+        s["crate_keys"][kind] = max(0, s["crate_keys"].get(kind, 0) + n)
+        if x in self.cache:
+            self.dirty.add(x)
+        else:
+            self.db.execute("INSERT OR REPLACE INTO player_stats (xuid, name, data) VALUES (?,?,?)", (x, s.get("name") or name, json.dumps(s)))
+            self.db.commit()
+        return s["crate_keys"][kind]
 
     # ---------- website ----------
     def row(self, xuid, s):
