@@ -24,7 +24,7 @@ from endstone_galaxylink.ranks import RankManager, name_color, tag_text
 from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.5.1"
+VERSION = "2.5.2"
 
 
 def _cmd(description, usage, perm, aliases=None):
