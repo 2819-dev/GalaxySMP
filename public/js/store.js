@@ -1,21 +1,23 @@
+// Store page: shows the subscription plans. Checkout answers "coming soon" until payments open.
 import { toast } from "/js/site.js";
 
-// Asks our server to start checkout. Today it answers "coming soon"; once Stripe is
-// set up it returns a payment page URL and we go there. No page changes needed.
-async function startCheckout(rankId, button) {
+const HEX = { 6: "#FFAA00", b: "#55FFFF", 9: "#5555FF", e: "#FFFF55", g: "#DDD605", p: "#DEB12D" };
+const GRADIENT_STOPS = { gold: "egp6", galaxy: "bb99" };
+
+async function startCheckout(planId, button) {
   button.disabled = true;
   try {
     const res = await fetch("/api/store/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rankId }),
+      body: JSON.stringify({ rankId: planId }),
     });
     const data = await res.json();
     if (data.ok && data.url) {
       location.href = data.url;
       return;
     }
-    toast(data.message || data.error || "The store is opening soon.");
+    toast(data.message || data.error || "Payments open soon.");
   } catch {
     toast("The store is unavailable right now. Please try again later.");
   } finally {
@@ -28,41 +30,73 @@ document.addEventListener("click", (e) => {
   if (btn) startCheckout(btn.getAttribute("data-checkout"), btn);
 });
 
-async function loadRanks() {
-  let data;
-  try {
-    data = await (await fetch("/api/store/ranks")).json();
-  } catch {
-    return;
-  }
-  if (!data.ranks || !data.ranks.length) return;
-  const wrap = document.getElementById("ranks");
-  for (const r of data.ranks) {
-    const card = document.createElement("div");
-    card.className = "panel";
-    const h = document.createElement("h3");
-    h.textContent = r.name;
-    h.style.color = r.color;
-    const price = document.createElement("div");
-    price.style.cssText = "font-size:1.6rem;font-weight:800;margin-bottom:10px";
-    price.textContent = "$" + r.price;
-    const ul = document.createElement("ul");
-    ul.className = "text-2";
-    for (const p of r.perks) {
-      const li = document.createElement("li");
-      li.textContent = p;
-      ul.appendChild(li);
+const el = (tag, cls, text) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+};
+
+// [⭐ GALAXY+] painted one color per letter, like in game.
+function tagPreview(tag) {
+  const span = el("span", "plan-tag");
+  const stops = GRADIENT_STOPS[tag.gradient] || tag.color;
+  const text = `[${tag.prefix}]`;
+  const n = text.length;
+  [...text].forEach((ch, i) => {
+    if (i === 1 && tag.icon) {
+      const img = el("img", "rank-icon");
+      img.src = `/img/ranks/rank_${tag.icon}.png`;
+      img.alt = "";
+      span.append(img);
     }
-    const btn = document.createElement("button");
-    btn.className = "btn btn-primary";
-    btn.type = "button";
-    btn.setAttribute("data-checkout", r.id);
-    btn.textContent = data.checkoutEnabled ? "Buy" : "Coming soon";
-    card.append(h, price, ul, btn);
-    wrap.appendChild(card);
-  }
-  wrap.hidden = false;
-  document.getElementById("coming-soon").hidden = true;
+    const c = el("span", null, ch);
+    c.style.color = HEX[stops[Math.round((i * (stops.length - 1)) / (n - 1))]] || "#fff";
+    span.append(c);
+  });
+  return span;
 }
 
-loadRanks();
+async function loadPlans() {
+  const wrap = document.getElementById("plans");
+  let data;
+  try {
+    data = await (await fetch("/api/store/plans")).json();
+  } catch {
+    wrap.replaceChildren(el("p", "text-3", "Plans couldn't be loaded. Please try again later."));
+    return;
+  }
+  wrap.replaceChildren();
+  for (const plan of data.plans) {
+    const card = el("article", `panel plan-card plan-${plan.id}`);
+    if (plan.id === "pro") card.append(el("span", "plan-badge", "Best value"));
+    card.append(el("h2", "plan-name", plan.name));
+    if (plan.tag) card.append(tagPreview(plan.tag));
+    const price = el("div", "plan-price");
+    if (plan.price) {
+      price.append(el("span", "plan-amount", `$${plan.price.toFixed(2)}`), el("span", "plan-per", "/month"));
+      card.append(price, el("p", "plan-game", `+ $${plan.gameCost.toLocaleString("en-US")} in-game money / month`));
+    } else {
+      price.append(el("span", "plan-amount", "Free"));
+      card.append(price, el("p", "plan-game", "For everyone, always"));
+    }
+    const ul = el("ul", "plan-perks");
+    for (const p of plan.perks) {
+      ul.append(el("li", null, p));
+    }
+    card.append(ul);
+    if (plan.price) {
+      const btn = el("button", "btn btn-primary", data.checkoutEnabled ? "Subscribe" : "Coming soon");
+      btn.type = "button";
+      btn.setAttribute("data-checkout", plan.id);
+      card.append(btn);
+    } else {
+      const a = el("a", "btn btn-secondary", "How to join");
+      a.href = "/join";
+      card.append(a);
+    }
+    wrap.append(card);
+  }
+}
+
+loadPlans();

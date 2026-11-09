@@ -219,6 +219,8 @@ const DESCRIBE = {
   "economy.shop": (e) => [`changed the shop prices (${e.details.categories} categories, ${e.details.items} items)`],
   "economy.shop_reset": () => ["reset the shop to the built-in prices"],
   "help.save": () => ["edited the in-game Help menu"],
+  "plan.give": (e) => [`gave ${e.details.player} ${e.details.plan}${e.details.days ? ` for ${e.details.days} days` : ""}`],
+  "plan.remove": (e) => [`removed ${e.details.player}'s plan`],
   "help.reset": () => ["reset the in-game Help menu"],
   "filter.add": () => ["added a word to the filter"],
   "filter.remove": () => ["removed a word from the filter"],
@@ -499,11 +501,35 @@ function renderEcoPlayers() {
   for (const p of ecoData.players) {
     box.append(h("div", { class: "member-row" },
       h("div", { class: "info" },
-        h("strong", {}, p.gamertag, p.op ? h("span", { class: "pill-status owner", text: "Operator · ∞" }) : null),
+        h("strong", {}, p.gamertag, p.op ? h("span", { class: "pill-status owner", text: "Operator · ∞" }) : null,
+          p.plan ? h("span", { class: `pill-status plan-pill-${p.plan}`, text: `${PLAN_NAMES[p.plan]}${p.planExpires ? " until " + new Date(p.planExpires).toLocaleDateString() : ""}` }) : null),
         h("span", {}, h("span", { class: "money-cell", text: p.cents == null ? "No balance yet" : money(p.cents) }), ` · last seen ${fmt(p.lastSeen)}`)),
       h("div", { class: "row-actions" },
-        h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Change money", onclick: () => moneyDialog(p) }))));
+        h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Change money", onclick: () => moneyDialog(p) }),
+        h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Plan", onclick: () => planDialog(p) }))));
   }
+}
+
+const PLAN_NAMES = { plus: "Galaxy+", pro: "Galaxy Pro+" };
+
+function planDialog(p) {
+  const plan = select("plan-choice", [["", "Galaxy Free (no plan)"], ["plus", "Galaxy+"], ["pro", "Galaxy Pro+"]], p.plan || "");
+  const days = select("plan-days", [["7", "7 days"], ["30", "30 days"], ["90", "90 days"], ["365", "1 year"], ["0", "No end date"]], "30");
+  openDialog({
+    title: `Plan for ${p.gamertag}`,
+    body: h("div", { class: "form" },
+      field("Plan", plan),
+      field("How long", days, "Paid plans also cost $1,000 of in-game money every 30 days, taken automatically in game. Perks pause if they can't pay. Operators never pay."),
+      p.plan ? h("p", { class: "text-3 small", style: "margin:0", text: `Now: ${PLAN_NAMES[p.plan]}${p.planExpires ? " until " + fmt(p.planExpires) : " (no end date)"}` }) : null),
+    actions: [{ label: "Cancel" }, {
+      label: "Save", kind: "primary",
+      onClick: async () => {
+        const res = await postJson("/api/mod/economy/plan", { xuid: p.xuid, plan: plan.value || null, days: Number(days.value) });
+        toast(plan.value ? `${p.gamertag} now has ${PLAN_NAMES[plan.value]}.${res.sent ? "" : " It applies when the server is online."}` : `Plan removed from ${p.gamertag}.`);
+        loaders.economy();
+      },
+    }],
+  });
 }
 
 function moneyDialog(p) {

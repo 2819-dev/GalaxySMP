@@ -13,6 +13,7 @@ import { voiceConnect, voiceServer } from "./routes/voice.js";
 import * as ranks from "./routes/ranks.js";
 import * as economy from "./routes/economy.js";
 import * as help from "./routes/help.js";
+import * as plans from "./routes/plans.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -59,8 +60,10 @@ const routes = [
   ["POST", "/api/plugin/ranks", (req, env) => ranks.pluginAction(req, env)],
   ["GET", "/api/economy/top", economy.leaderboard],
   ["GET", "/api/mod/economy", economy.adminEconomy],
+  ["POST", "/api/mod/economy/plan", (req, env) => plans.adminSetPlan(req, env)],
   ["POST", "/api/mod/economy/:action", economy.adminEconomyAction],
   ["GET", "/api/help", help.getHelp],
+  ["GET", "/api/store/plans", () => plans.storePlans()],
   ["GET", "/api/mod/help", help.adminGetHelp],
   ["POST", "/api/mod/help/:action", help.adminHelpAction],
 ];

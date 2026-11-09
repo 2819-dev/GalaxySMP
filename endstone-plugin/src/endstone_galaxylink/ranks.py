@@ -34,7 +34,7 @@ GLYPHS = {name: chr(0xE210 + i) for i, name in enumerate(ICONS)}
 # Typed command names -> permission nodes. Same rules as the website (src/routes/ranks.js).
 ENDSTONE_COMMANDS = {"ban", "banip", "banlist", "plugins", "reload", "seed", "status", "unban", "unbanip", "version"}
 PLUGIN_COMMANDS = {"link", "ranks", "money", "pay", "baltop", "setmoney", "addmoney", "takemoney", "shop", "sell", "ah", "shopnpc",
-                   "guide", "tpa", "tpahere", "tpaccept", "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back"}
+                   "guide", "tpa", "tpahere", "tpaccept", "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan"}
 ALIASES = {"tp": "teleport", "msg": "tell", "w": "tell", "bal": "money", "balance": "money", "auction": "ah", "menu": "guide", "tpyes": "tpaccept", "tpno": "tpdeny",
            "ban-ip": "banip", "unban-ip": "unbanip", "pardon": "unban"}
 PREFIXES = ("minecraft.command.", "endstone.command.", "galaxylink.command.")
@@ -165,11 +165,15 @@ class RankManager:
     def chat_format(self, player):
         """[👑 OWNER] **player1** → message  (rank color on the tag and name, never on the message)"""
         rank = self.rank_for(player)
-        prefix = (tag_text(rank) + "§r ") if rank else ""
-        if rank and rank.get("gradient") in GRADIENTS:
-            name = name_text(player.name, rank, bold=True)  # each letter its own color
+        plans = getattr(self.plugin, "plans", None)
+        plan_tag = plans.tag_for(player) if plans else None
+        tags = [tag_text(t) for t in (rank, plan_tag) if t]
+        prefix = "§r ".join(tags) + "§r " if tags else ""
+        style = rank or plan_tag  # the name takes the rank's color, or the plan's
+        if style and style.get("gradient") in GRADIENTS:
+            name = name_text(player.name, style, bold=True)  # each letter its own color
         else:
-            name = name_text("\x00", rank, bold=True)  # placeholder for {0}
+            name = name_text("\x00", style, bold=True)  # placeholder for {0}
         fmt = (prefix + name).replace("{", "{{").replace("}", "}}").replace("\x00", "{0}")
         return fmt + "§r §7→§r {1}"
 

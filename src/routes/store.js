@@ -37,6 +37,6 @@ export async function checkout(request, env) {
   const rank = RANKS.find((r) => r.id === body.rankId);
   if (RANKS.length && !rank) throw new HttpError(404, "That rank doesn't exist.");
   const result = await createCheckout(env, rank);
-  if (result.comingSoon) return json({ ok: false, comingSoon: true, message: "The store is coming soon!" });
+  if (result.comingSoon) return json({ ok: false, comingSoon: true, message: "Paid plans are coming soon!" });
   return json({ ok: true, url: result.url });
 }

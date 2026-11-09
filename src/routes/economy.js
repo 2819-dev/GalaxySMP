@@ -78,9 +78,11 @@ export async function adminEconomy(request, env, ctx, url) {
   const q = String(url.searchParams.get("q") || "").trim().toLowerCase().slice(0, 32);
   const [shop, players, cfg] = await Promise.all([
     loadShop(sql),
-    sql`SELECT xuid, gamertag, balance_cents, is_op, last_seen FROM players
-         WHERE (${q} = '' OR lower(gamertag) LIKE '%' || ${q} || '%')
-         ORDER BY balance_cents DESC NULLS LAST, last_seen DESC LIMIT 100`,
+    sql`SELECT p.xuid, p.gamertag, p.balance_cents, p.is_op, p.last_seen, s.plan, s.expires_at
+          FROM players p
+          LEFT JOIN subscriptions s ON s.xuid = p.xuid AND (s.expires_at IS NULL OR s.expires_at > now())
+         WHERE (${q} = '' OR lower(p.gamertag) LIKE '%' || ${q} || '%')
+         ORDER BY (s.plan IS NULL), p.balance_cents DESC NULLS LAST, p.last_seen DESC LIMIT 100`,
     sql`SELECT updated_at, updated_by FROM economy_config WHERE key = 'shop'`,
   ]);
   const online = await voiceStub(env).fetch("https://voice/internal/server").then((r) => r.json()).catch(() => null);
@@ -92,6 +94,7 @@ export async function adminEconomy(request, env, ctx, url) {
     serverOnline: Boolean(online),
     players: players.map((p) => ({
       xuid: p.xuid, gamertag: p.gamertag, cents: p.balance_cents == null ? null : Number(p.balance_cents), op: p.is_op, lastSeen: p.last_seen,
+      plan: p.plan || null, planExpires: p.expires_at || null,
     })),
   });
 }

@@ -14,7 +14,6 @@ from endstone_galaxylink import money
 
 DURATION = 48 * 3600
 FEE_PERCENT = 5
-MAX_LISTINGS = 10
 PAGE = 20
 
 
@@ -65,8 +64,11 @@ class AuctionHouse:
             return
         self.expire()
         count = self.db.execute("SELECT count(*) FROM ah WHERE seller = ? AND status = 'active'", (str(player.xuid),)).fetchone()[0]
-        if count >= MAX_LISTINGS:
-            player.send_message(f"§cYou can have up to {MAX_LISTINGS} items listed at once.")
+        plans = getattr(self.plugin, "plans", None)
+        limit = plans.plan_for(player)["ahSlots"] if plans else 10
+        if count >= limit and not player.is_op:
+            player.send_message(f"§cYou can have up to {limit} items listed at once."
+                                + ("" if limit >= 30 else " §7More slots come with Galaxy+ and Pro+ (galaxymc.us/store)."))
             return
         snap = money.snapshot(stack)
         label = money.item_label(stack)

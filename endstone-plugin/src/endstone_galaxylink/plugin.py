@@ -21,12 +21,13 @@ from endstone_galaxylink.auction import AuctionHouse
 from endstone_galaxylink.economy import HUD_TICKS, Economy
 from endstone_galaxylink.helpmenu import HelpMenu
 from endstone_galaxylink.npc import HOLD_TICKS, NpcManager
+from endstone_galaxylink.plans import CHECK_TICKS, Plans
 from endstone_galaxylink.ranks import RankManager, name_text, tag_text
 from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.6.2"
+VERSION = "2.7.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -77,6 +78,7 @@ class GalaxyLink(Plugin):
         "delhome": _cmd("Delete a home.", "/delhome <name: message>", "galaxylink.command.delhome"),
         "homes": _cmd("List your homes.", "/homes", "galaxylink.command.homes"),
         "back": _cmd("Go back to where you died or last teleported from.", "/back", "galaxylink.command.back"),
+        "plan": _cmd("See your subscription plan.", "/plan", "galaxylink.command.plan"),
     }
     permissions = {
         "galaxylink.command.link": _perm("Allows players to use /link.", True),
@@ -103,6 +105,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.delhome": _perm("Allows /delhome.", True),
         "galaxylink.command.homes": _perm("Allows /homes.", True),
         "galaxylink.command.back": _perm("Allows /back.", True),
+        "galaxylink.command.plan": _perm("Allows /plan.", True),
     }
 
     def on_enable(self) -> None:
@@ -110,6 +113,7 @@ class GalaxyLink(Plugin):
         self._voice = None
         self.ranks = RankManager(self)
         self.economy = Economy(self)
+        self.plans = Plans(self)
         self.shop = Shop(self)
         self.auction = AuctionHouse(self)
         self.npcs = NpcManager(self)
@@ -118,6 +122,7 @@ class GalaxyLink(Plugin):
         self.register_events(self)
         self.server.scheduler.run_task(self, self.economy.tick, delay=HUD_TICKS, period=HUD_TICKS)
         self.server.scheduler.run_task(self, self.npcs.tick, delay=HOLD_TICKS, period=HOLD_TICKS)
+        self.server.scheduler.run_task(self, self.plans.tick, delay=CHECK_TICKS, period=CHECK_TICKS)
         self._base = settings.WEBSITE.rstrip("/")
         if not settings.SECRET or settings.SECRET.startswith("PASTE_"):
             self.logger.warning("GalaxyLink is missing its secret. Download a fresh build from the website team.")
@@ -134,10 +139,12 @@ class GalaxyLink(Plugin):
             🎤 player1        voice icon, then the name in the rank's color
         The money line under it is the score tag (economy.py)."""
         rank = self.ranks.rank_for(player)
-        name = f"{name_text(player.name, rank)}§r"
+        plan_tag = self.plans.tag_for(player) if getattr(self, "plans", None) else None
+        tags = [tag_text(t) for t in (rank, plan_tag) if t]  # e.g. [👑 OWNER] [⭐ GALAXY+]
+        name = f"{name_text(player.name, rank or plan_tag)}§r"
         if icon:
             name = f"§r{icon} {name}"
-        return f"{tag_text(rank)}§r\n{name}" if rank else name
+        return "§r ".join(tags) + "§r\n" + name if tags else name
 
     def refresh_tags(self):
         if self._voice:
@@ -151,6 +158,7 @@ class GalaxyLink(Plugin):
         player = event.player
         self.ranks.apply_permissions(player)
         self.economy.on_join(player)
+        self.plans.bill(player)
         player.send_message("§7Need help? Type §e/guide§7 for server info, rules and commands.")
         self.refresh_tags()
         if self._voice:
@@ -221,7 +229,7 @@ class GalaxyLink(Plugin):
     def on_command(self, sender: CommandSender, command: Command, args: list[str]) -> bool:
         name = command.name
         player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "guide", "tpa", "tpahere", "tpaccept",
-                       "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back"}
+                       "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan"}
         if name in player_only and not isinstance(sender, Player):
             sender.send_message(f"/{name} can only be used in game.")
             return True
@@ -260,6 +268,7 @@ class GalaxyLink(Plugin):
             "delhome": lambda: tp.del_home(sender, args),
             "homes": lambda: tp.list_homes(sender),
             "back": lambda: tp.go_back(sender),
+            "plan": lambda: sender.send_message(self.plans.describe(sender)),
         }
         if name in simple:
             simple[name]()

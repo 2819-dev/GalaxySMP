@@ -704,3 +704,23 @@ textarea.input { height: auto; padding: 10px 12px; line-height: 1.45; resize: ve
 
 .choice-grid button:has(.swatch-wide) { width: 64px; }
 .swatch-wide { width: 48px; }
+
+/* ---------- Store plans ---------- */
+.plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+.plan-card { position: relative; display: flex; flex-direction: column; gap: 10px; }
+.plan-card .btn { margin-top: auto; justify-content: center; }
+.plan-name { font-size: 1.25rem; margin: 0; }
+.plan-tag { font: 600 .95rem var(--mono); background: #2b2b2b; border-radius: 7px; padding: 6px 10px; align-self: flex-start; }
+.plan-price { display: flex; align-items: baseline; gap: 4px; }
+.plan-amount { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; }
+.plan-per { color: var(--text-3); }
+.plan-game { margin: -6px 0 0; color: var(--warn); font-size: .9rem; font-weight: 600; }
+.plan-perks { list-style: none; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 8px; color: var(--text-2); font-size: .95rem; }
+.plan-perks li { padding-left: 24px; position: relative; }
+.plan-perks li::before { content: ""; position: absolute; left: 2px; top: .45em; width: 12px; height: 7px; border-left: 2px solid var(--ok); border-bottom: 2px solid var(--ok); transform: rotate(-45deg); }
+.plan-plus { border-color: #b8891d; }
+.plan-pro { border-color: var(--accent-text); box-shadow: 0 0 0 1px var(--accent-text), 0 10px 40px rgba(111, 211, 251, .12); }
+.plan-badge { position: absolute; top: -11px; right: 16px; background: var(--accent); color: #fff; font-size: .75rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+@media (max-width: 860px) { .plan-grid { grid-template-columns: 1fr; } }
+.plan-pill-plus { background: rgba(222, 177, 45, .16); color: #f0c94d; }
+.plan-pill-pro { background: rgba(111, 211, 251, .16); color: var(--accent-text); }

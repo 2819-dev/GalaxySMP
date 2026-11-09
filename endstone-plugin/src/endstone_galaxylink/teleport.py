@@ -11,7 +11,6 @@ import uuid
 
 REQUEST_SECONDS = 60
 WARMUP_TICKS = 60  # 3 seconds
-MAX_HOMES = 3
 
 
 def where(player):
@@ -157,6 +156,10 @@ class Teleports:
         player.send_message("§aSpawn set to where you're standing.")
 
     # ---------- homes ----------
+    def max_homes(self, player):
+        plans = getattr(self.plugin, "plans", None)
+        return plans.plan_for(player)["homes"] if plans else 1
+
     def homes(self, player):
         rows = self.db.execute("SELECT name FROM homes WHERE xuid = ? ORDER BY name", (str(player.xuid),)).fetchall()
         return [r[0] for r in rows]
@@ -169,8 +172,10 @@ class Teleports:
     def set_home(self, player, args):
         name = self.home_name(args)
         existing = self.homes(player)
-        if name not in existing and len(existing) >= MAX_HOMES and not player.is_op:
-            player.send_message(f"§cYou can have up to {MAX_HOMES} homes. §7Delete one with /delhome <name>.")
+        limit = self.max_homes(player)
+        if name not in existing and len(existing) >= limit and not player.is_op:
+            more = "" if limit >= 10 else " §7More homes come with Galaxy+ and Pro+ (galaxymc.us/store)."
+            player.send_message(f"§cYou can have up to {limit} home{'s' if limit != 1 else ''}. §7Delete one with /delhome <name>.{more}")
             return
         self.db.execute("INSERT OR REPLACE INTO homes (xuid, name, data) VALUES (?, ?, ?)",
                         (str(player.xuid), name, json.dumps(where(player))))
@@ -198,7 +203,7 @@ class Teleports:
 
     def list_homes(self, player):
         existing = self.homes(player)
-        player.send_message(f"§7Your homes ({len(existing)}/{MAX_HOMES}): §f{', '.join(existing)}" if existing
+        player.send_message(f"§7Your homes ({len(existing)}/{self.max_homes(player)}): §f{', '.join(existing)}" if existing
                             else "§7You have no homes. Stand somewhere and type /sethome.")
 
     # ---------- back ----------

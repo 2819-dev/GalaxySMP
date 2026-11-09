@@ -90,7 +90,7 @@
   },
   {
    "command": "/sethome [name]",
-   "description": "Save where you're standing as a home (up to 3).",
+   "description": "Save where you're standing as a home (1 home, or more with Galaxy+ and Pro+).",
    "example": "/sethome base",
    "staff": false
   },
@@ -116,6 +116,12 @@
    "command": "/back",
    "description": "Go back to where you died or last teleported from.",
    "example": "/back",
+   "staff": false
+  },
+  {
+   "command": "/plan",
+   "description": "See your subscription plan (Galaxy Free, Galaxy+ or Pro+).",
+   "example": "/plan",
    "staff": false
   },
   {

@@ -1,0 +1,54 @@
+{
+ "free": {
+  "name": "Galaxy Free",
+  "price": 0,
+  "gameCost": 0,
+  "homes": 1,
+  "ahSlots": 10,
+  "tag": null,
+  "perks": [
+   "1 home (/sethome)",
+   "10 Auction House listings",
+   "$1,000 starting money",
+   "Shop, /sell and the Auction House",
+   "Teleport requests, /spawn and /back",
+   "Proximity voice chat and community chat on galaxymc.us",
+   "Standard support",
+   "Event access"
+  ]
+ },
+ "plus": {
+  "name": "Galaxy+",
+  "price": 3,
+  "gameCost": 1000,
+  "homes": 5,
+  "ahSlots": 20,
+  "tag": {"prefix": "GALAXY+", "icon": "star", "gradient": "gold", "color": "6"},
+  "perks": [
+   "Everything in Galaxy Free",
+   "[⭐ GALAXY+] tag in gold above your head and in chat",
+   "5 homes",
+   "20 Auction House listings",
+   "Level 2 support",
+   "Level 2 event access",
+   "Host your own events"
+  ]
+ },
+ "pro": {
+  "name": "Galaxy Pro+",
+  "price": 5,
+  "gameCost": 1000,
+  "homes": 10,
+  "ahSlots": 30,
+  "tag": {"prefix": "PRO+", "icon": "wingeddiamond", "gradient": "galaxy", "color": "b"},
+  "perks": [
+   "Everything in Galaxy+",
+   "[PRO+] tag with a winged diamond in the Galaxy logo colors",
+   "10 homes",
+   "30 Auction House listings",
+   "Priority support",
+   "Priority event access",
+   "Host your own events"
+  ]
+ }
+}
