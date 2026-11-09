@@ -243,6 +243,12 @@
    "description": "Turn the chat filter on or off for everyone (bad words are scrambled).",
    "example": "/chatfilter off",
    "staff": true
+  },
+  {
+   "command": "/announce [message]",
+   "description": "Open the announcement panel: announce to everyone, or set up auto announcements.",
+   "example": "/announce Event at spawn in 10 minutes!",
+   "staff": true
   }
  ]
 }

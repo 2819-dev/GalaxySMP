@@ -1,0 +1,292 @@
+// GalaxySMP announcements: a title that contains the hidden marker (colour codes a n n o u n c e)
+// shows in a galaxy box at the top of the screen. Every other title looks exactly like Minecraft's
+// (Mojang's hud_title_text, wrapped). Built by resource-pack/make_hud.py notes in the repo history.
+{
+  "namespace": "hud",
+  "hud_title_text": {
+    "type": "panel",
+    "size": [
+      "100%",
+      "100%"
+    ],
+    "layer": 1,
+    "alpha": "@hud.anim_title_text_alpha_in",
+    "propagate_alpha": true,
+    "controls": [
+      {
+        "vanilla_title": {
+          "type": "stack_panel",
+          "orientation": "vertical",
+          "offset": [
+            0,
+            -19
+          ],
+          "layer": 1,
+          "controls": [
+            {
+              "title_frame": {
+                "type": "panel",
+                "size": [
+                  "100%",
+                  "100%cm"
+                ],
+                "controls": [
+                  {
+                    "title_background": {
+                      "type": "image",
+                      "size": [
+                        "100%sm + 30px",
+                        "100%sm + 6px"
+                      ],
+                      "texture": "textures/ui/hud_tip_text_background",
+                      "alpha": "@hud.anim_title_background_alpha_in"
+                    }
+                  },
+                  {
+                    "title": {
+                      "type": "label",
+                      "anchor_from": "top_middle",
+                      "anchor_to": "top_middle",
+                      "color": "$title_command_text_color",
+                      "enable_profanity_filter": true,
+                      "text": "#text",
+                      "layer": 31,
+                      "localize": false,
+                      "font_size": "extra_large",
+                      "variables": [
+                        {
+                          "requires": "(not $title_shadow)",
+                          "$show_shadow": false
+                        },
+                        {
+                          "requires": "$title_shadow",
+                          "$show_shadow": true
+                        }
+                      ],
+                      "shadow": "$show_shadow",
+                      "text_alignment": "center",
+                      "offset": [
+                        0,
+                        6
+                      ],
+                      "bindings": [
+                        {
+                          "binding_name": "#hud_title_text_string",
+                          "binding_name_override": "#text",
+                          "binding_type": "global"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "subtitle_frame": {
+                "type": "panel",
+                "size": [
+                  "100%",
+                  "100%cm"
+                ],
+                "controls": [
+                  {
+                    "subtitle_background": {
+                      "type": "image",
+                      "size": [
+                        "100%sm + 20px",
+                        "100%sm + 5px"
+                      ],
+                      "offset": [
+                        0,
+                        16
+                      ],
+                      "texture": "textures/ui/hud_tip_text_background",
+                      "variables": [
+                        {
+                          "requires": "$subtitle_initially_visible",
+                          "$subtitle_bg": "@hud.anim_title_background_alpha_in"
+                        },
+                        {
+                          "requires": "(not $subtitle_initially_visible)",
+                          "$subtitle_bg": "@hud.anim_subtitle_background_alpha_in"
+                        }
+                      ],
+                      "alpha": "$subtitle_bg"
+                    }
+                  },
+                  {
+                    "subtitle": {
+                      "type": "label",
+                      "anchor_from": "top_middle",
+                      "anchor_to": "top_middle",
+                      "color": "$title_command_text_color",
+                      "enable_profanity_filter": true,
+                      "text": "#text",
+                      "layer": 31,
+                      "localize": false,
+                      "font_size": "large",
+                      "variables": [
+                        {
+                          "requires": "$subtitle_initially_visible",
+                          "$anim_type": 1.0
+                        },
+                        {
+                          "requires": "(not $subtitle_initially_visible)",
+                          "$anim_type": "@hud.anim_subtitle_text_alpha_in"
+                        },
+                        {
+                          "requires": "(not $title_shadow)",
+                          "$show_shadow": false
+                        },
+                        {
+                          "requires": "$title_shadow",
+                          "$show_shadow": true
+                        }
+                      ],
+                      "shadow": "$show_shadow",
+                      "alpha": "$anim_type",
+                      "text_alignment": "center",
+                      "offset": [
+                        1,
+                        19
+                      ],
+                      "bindings": [
+                        {
+                          "binding_name": "#hud_subtitle_text_string",
+                          "binding_name_override": "#text",
+                          "binding_type": "global"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "bindings": [
+            {
+              "binding_name": "#hud_title_text_string",
+              "binding_type": "global"
+            },
+            {
+              "binding_type": "view",
+              "source_property_name": "(not (not ((#hud_title_text_string - '§a§n§n§o§u§n§c§e') = #hud_title_text_string)))",
+              "target_property_name": "#visible"
+            }
+          ]
+        }
+      },
+      {
+        "gsmp_announcement": {
+          "type": "panel",
+          "anchor_from": "top_middle",
+          "anchor_to": "top_middle",
+          "offset": [
+            0,
+            6
+          ],
+          "size": [
+            "70%",
+            "100%c"
+          ],
+          "bindings": [
+            {
+              "binding_name": "#hud_title_text_string",
+              "binding_type": "global"
+            },
+            {
+              "binding_type": "view",
+              "source_property_name": "(not ((#hud_title_text_string - '§a§n§n§o§u§n§c§e') = #hud_title_text_string))",
+              "target_property_name": "#visible"
+            }
+          ],
+          "controls": [
+            {
+              "box": {
+                "type": "image",
+                "texture": "textures/ui/gsmp_box",
+                "size": [
+                  "100%",
+                  "100%c + 14px"
+                ],
+                "alpha": 0.95,
+                "controls": [
+                  {
+                    "lines": {
+                      "type": "stack_panel",
+                      "size": [
+                        "100% - 20px",
+                        "100%c"
+                      ],
+                      "anchor_from": "center",
+                      "anchor_to": "center",
+                      "controls": [
+                        {
+                          "header": {
+                            "type": "label",
+                            "localize": false,
+                            "size": [
+                              "100%",
+                              "default"
+                            ],
+                            "text_alignment": "center",
+                            "shadow": true,
+                            "color": [
+                              1,
+                              1,
+                              1
+                            ],
+                            "text": "§6§l✦ ANNOUNCEMENT ✦"
+                          }
+                        },
+                        {
+                          "gap": {
+                            "type": "panel",
+                            "size": [
+                              "100%",
+                              4
+                            ]
+                          }
+                        },
+                        {
+                          "message": {
+                            "type": "label",
+                            "localize": false,
+                            "size": [
+                              "100%",
+                              "default"
+                            ],
+                            "text_alignment": "center",
+                            "shadow": true,
+                            "color": [
+                              1,
+                              1,
+                              1
+                            ],
+                            "text": "#text",
+                            "enable_profanity_filter": false,
+                            "bindings": [
+                              {
+                                "binding_name": "#hud_title_text_string",
+                                "binding_type": "global"
+                              },
+                              {
+                                "binding_type": "view",
+                                "source_property_name": "(#hud_title_text_string - '§a§n§n§o§u§n§c§e')",
+                                "target_property_name": "#text"
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
