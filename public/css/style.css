@@ -701,3 +701,6 @@ textarea.input { height: auto; padding: 10px 12px; line-height: 1.45; resize: ve
 .help-cmd .check { align-self: center; white-space: nowrap; }
 .help-cmd-actions { display: flex; gap: 4px; }
 @media (max-width: 760px) { .help-cmd { grid-template-columns: minmax(0, 1fr) auto; } .help-cmd > label:not(.check) { grid-column: 1 / -1; } .help-cmd-actions { justify-content: flex-end; } }
+
+.choice-grid button:has(.swatch-wide) { width: 64px; }
+.swatch-wide { width: 48px; }

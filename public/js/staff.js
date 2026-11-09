@@ -269,13 +269,36 @@ let rankSearchTimer;
 
 const iconImg = (icon) => (icon ? h("img", { class: "rank-icon", src: `/img/ranks/rank_${icon}.png`, alt: "", width: 18, height: 18 }) : null);
 
+// Gradients: one Minecraft color per letter. Same list as the plugin (endstone_galaxylink/ranks.py).
+const GRADIENTS = [
+  ["galaxy", "Galaxy (logo)", "bb99"], ["gold", "Gold Rush", "egp6"], ["sunset", "Sunset", "e6vcd"],
+  ["fire", "Fire", "e6vc4"], ["ocean", "Ocean", "bs3t"], ["forest", "Forest", "aq2"], ["royal", "Royal", "du5"],
+  ["ice", "Ice", "fhbs"], ["shadow", "Shadow", "78j"], ["rainbow", "Rainbow", "c6eab9d"],
+];
+const gradientStops = (key) => (GRADIENTS.find((g) => g[0] === key) || [])[2] || null;
+
+// Text in a rank's color, or one gradient color per letter (exactly like in game).
+function paint(text, color, gradient, icon) {
+  const stops = gradientStops(gradient);
+  const span = h("span");
+  const letters = [...text].filter((ch) => ch.trim()).length;
+  let k = 0;
+  [...text].forEach((ch, i) => {
+    if (icon && i === 1) span.append(iconImg(icon));
+    if (!ch.trim()) { span.append(ch); return; }
+    const code = stops ? stops[letters > 1 ? Math.round((k * (stops.length - 1)) / (letters - 1)) : 0] : color;
+    k++;
+    const part = h("span", { text: ch });
+    part.style.color = hexOf(code);
+    span.append(part);
+  });
+  return span;
+}
+
 // Looks like chat in game: [👑 OWNER] **name** → message (rank color on the tag and name).
-function rankPreview(prefix, color, name, icon, message) {
+function rankPreview(prefix, color, name, icon, message, gradient) {
   const span = h("span", { class: "rank-preview" });
-  const tag = h("span", {}, "[", ...[iconImg(icon), prefix].filter(Boolean), "]");
-  const who = h("b", { text: name });
-  tag.style.color = who.style.color = hexOf(color);
-  span.append(tag, " ", who);
+  span.append(paint(`[${prefix}]`, color, gradient, icon), " ", h("b", {}, paint(name, color, gradient)));
   if (message) span.append(h("span", { class: "text-3", text: " → " }), h("span", { text: message }));
   return span;
 }
@@ -301,7 +324,7 @@ loaders.ranks = async () => {
     const { commands } = splitPerms(r.permissions);
     list.append(h("div", { class: "member-row" },
       h("div", { class: "info" },
-        h("strong", {}, rankPreview(r.prefix, r.color, r.name, r.icon)),
+        h("strong", {}, rankPreview(r.prefix, r.color, r.name, r.icon, null, r.gradient)),
         h("span", { text: `${r.players} player${r.players === 1 ? "" : "s"} · ${commands.length ? "Commands: " + commands.map((c) => "/" + c).join(" ") : "No commands"} · Website role: ${role}` })),
       h("div", { class: "row-actions" },
         h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Edit", onclick: () => rankDialog(r) }),
@@ -381,11 +404,17 @@ function commandChips(initial) {
 }
 
 function rankDialog(rank) {
-  const r = rank || { name: "", prefix: "", color: "f", icon: null, permissions: [], websiteRole: null };
+  const r = rank || { name: "", prefix: "", color: "f", icon: null, gradient: null, permissions: [], websiteRole: null };
   const { commands, other } = splitPerms(r.permissions);
   const name = h("input", { class: "input", id: "rank-name", maxlength: 24, value: r.name, placeholder: "e.g. Builder" });
   const prefix = h("input", { class: "input", id: "rank-prefix", maxlength: 16, value: r.prefix, placeholder: "e.g. BUILDER" });
   const color = choiceGrid("Color", MC_COLORS.map(([c, n]) => [c, n]), r.color, (c) => { const s = h("span", { class: "swatch" }); s.style.background = hexOf(c); return s; });
+  const gradient = choiceGrid("Gradient", [["", "No gradient"], ...GRADIENTS.map(([k, label]) => [k, label])], r.gradient || "", (v) => {
+    if (!v) return h("span", { text: "None" });
+    const sw = h("span", { class: "swatch swatch-wide" });
+    sw.style.background = `linear-gradient(90deg, ${[...gradientStops(v)].map(hexOf).join(", ")})`;
+    return sw;
+  });
   const icon = choiceGrid("Icon", [["", "No icon"], ...rankData.icons.map((i) => [i, i[0].toUpperCase() + i.slice(1)])], r.icon || "",
     (v) => (v ? h("img", { src: `/img/ranks/rank_${v}.png`, alt: "" }) : h("span", { text: "None" })));
   const role = select("rank-role", WEB_ROLES, String(r.websiteRole || ""));
@@ -393,9 +422,9 @@ function rankDialog(rank) {
   const advanced = h("input", { class: "input", id: "rank-other", placeholder: "someplugin.permission, another.one", value: other.join(", ") });
   const preview = h("div", { class: "rank-preview-box" });
   const update = () => {
-    preview.replaceChildren(rankPreview(prefix.value || "PREFIX", color.value(), "VisionDevs", icon.value(), "hello!"));
+    preview.replaceChildren(rankPreview(prefix.value || "PREFIX", color.value(), "VisionDevs", icon.value(), "hello!", gradient.value()));
   };
-  [name, prefix, color.el, icon.el].forEach((el) => el.addEventListener("input", update));
+  [name, prefix, color.el, gradient.el, icon.el].forEach((el) => el.addEventListener("input", update));
   update();
   openDialog({
     title: rank ? `Edit ${rank.name}` : "New rank",
@@ -404,6 +433,8 @@ function rankDialog(rank) {
       field("Rank name", name),
       field("Prefix", prefix, "Shown as [PREFIX] in chat and above heads."),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Color" }), color.el),
+      h("div", { class: "field" }, h("span", { class: "field-label", text: "Gradient (optional)" }), gradient.el,
+        h("p", { class: "hint", text: "Gives each letter of the prefix and name its own color. Overrides the color above." })),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Icon" }), icon.el,
         h("p", { class: "hint", text: "Shown before the prefix in game (players need the GalaxySMP Icons pack, which the server sends automatically)." })),
       h("div", { class: "field" }, h("label", { class: "field-label", for: "rank-commands", text: "Commands this rank can use" }), cmds.el,
@@ -415,7 +446,7 @@ function rankDialog(rank) {
       label: rank ? "Save" : "Create", kind: "primary",
       onClick: async () => {
         await postJson(`/api/mod/ranks/${rank ? "update" : "create"}`, {
-          id: rank?.id, name: name.value, prefix: prefix.value, color: color.value(), icon: icon.value() || null,
+          id: rank?.id, name: name.value, prefix: prefix.value, color: color.value(), gradient: gradient.value() || null, icon: icon.value() || null,
           websiteRole: role.value || null, commands: cmds.value(),
           permissions: advanced.value.split(",").map((s) => s.trim()).filter(Boolean),
         });

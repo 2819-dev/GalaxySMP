@@ -23,6 +23,9 @@ export const ICONS = ["crown", "star", "shield", "sword", "gem", "heart", "hamme
                        "tree", "cactus", "cloud", "rainbow", "cat", "slime", "dice", "gamepad", "redstone", "diamond", "emerald", "netherite",
                        "goldingot", "ironingot", "amethyst", "lapis", "shootingstar", "wingeddiamond"];
 
+// Gradients (one color per letter). Same keys as the plugin (endstone_galaxylink/ranks.py).
+export const GRADIENTS = ["galaxy", "gold", "sunset", "fire", "ocean", "forest", "royal", "ice", "shadow", "rainbow"];
+
 // Admins type command names (like "time" or "/gamemode"); each becomes the permission
 // that allows the whole command, so "time" also allows "/time set day".
 // Same rules as the plugin (endstone_galaxylink/ranks.py).
@@ -48,6 +51,7 @@ function formatRank(r) {
     prefix: r.prefix,
     color: r.color,
     icon: r.icon || null,
+    gradient: r.gradient || null,
     permissions: r.permissions || [],
     websiteRole: r.website_role ? Number(r.website_role) : null,
     position: r.position,
@@ -84,10 +88,12 @@ async function validRank(env, sql, body) {
     .concat(commands.map(commandPermission)).filter(Boolean))];
   const icon = body.icon ? String(body.icon) : null;
   if (icon && !ICONS.includes(icon)) throw new HttpError(400, "Unknown icon.");
+  const gradient = body.gradient ? String(body.gradient) : null;
+  if (gradient && !GRADIENTS.includes(gradient)) throw new HttpError(400, "Unknown gradient.");
   if (perms.length > 40 || perms.some((p) => !/^[a-z0-9_.-]{3,60}$/.test(p))) throw new HttpError(400, "One of the permissions isn't valid.");
   const role = body.websiteRole == null || body.websiteRole === "" ? null : Number(body.websiteRole);
   if (role !== null && !ROLE_POWER[role]) throw new HttpError(400, "Unknown website role.");
-  return { name, prefix, color, icon, permissions: perms, websiteRole: role };
+  return { name, prefix, color, icon, gradient, permissions: perms, websiteRole: role };
 }
 
 // Gives or removes the website role that comes with a player's rank (if they linked an account).
@@ -132,13 +138,13 @@ async function applyAction(env, sql, action, body, actor) {
     try {
       if (action === "create") {
         [rank] = await sql`
-          INSERT INTO ranks (name, prefix, color, icon, permissions, website_role, position)
-          VALUES (${r.name}, ${r.prefix}, ${r.color}, ${r.icon}, ${r.permissions}, ${r.websiteRole},
+          INSERT INTO ranks (name, prefix, color, icon, gradient, permissions, website_role, position)
+          VALUES (${r.name}, ${r.prefix}, ${r.color}, ${r.icon}, ${r.gradient}, ${r.permissions}, ${r.websiteRole},
                   (SELECT coalesce(max(position), 0) + 1 FROM ranks))
           RETURNING *`;
       } else {
         [rank] = await sql`
-          UPDATE ranks SET name = ${r.name}, prefix = ${r.prefix}, color = ${r.color}, icon = ${r.icon}, permissions = ${r.permissions},
+          UPDATE ranks SET name = ${r.name}, prefix = ${r.prefix}, color = ${r.color}, icon = ${r.icon}, gradient = ${r.gradient}, permissions = ${r.permissions},
                  website_role = ${r.websiteRole}, updated_at = now()
            WHERE id = ${Number(body.id)} RETURNING *`;
         if (!rank) throw new HttpError(404, "That rank no longer exists.");
@@ -213,6 +219,7 @@ export async function listRanks(request, env, ctx, url) {
     ok: true,
     ranks: state.ranks.map((r) => ({ ...r, players: counts[r.id] || 0 })),
     icons: ICONS,
+    gradients: GRADIENTS,
     players: players.map((p) => ({ xuid: p.xuid, gamertag: p.gamertag, lastSeen: p.last_seen, rankId: p.rank_id, linked: Boolean(p.linked) })),
   });
 }

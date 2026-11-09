@@ -65,15 +65,53 @@ def split_permissions(perms):
     return cmds, other
 
 
+# Gradients: one color per letter, stretched across the text. Same list as the website.
+GRADIENTS = {
+    "galaxy": ("Galaxy (logo)", "bb99"),
+    "gold": ("Gold Rush", "egp6"),
+    "sunset": ("Sunset", "e6vcd"),
+    "fire": ("Fire", "e6vc4"),
+    "ocean": ("Ocean", "bs3t"),
+    "forest": ("Forest", "aq2"),
+    "royal": ("Royal", "du5"),
+    "ice": ("Ice", "fhbs"),
+    "shadow": ("Shadow", "78j"),
+    "rainbow": ("Rainbow", "c6eab9d"),
+}
+
+
+def paint(text, rank, bold=False):
+    """Colors text with the rank's color, or one gradient color per letter."""
+    b = "§l" if bold else ""
+    grad = GRADIENTS.get((rank or {}).get("gradient") or "")
+    if not grad:
+        return f"§{rank['color'] if rank else 'f'}{b}{text}"
+    stops = grad[1]
+    icon = lambda ch: 0xE000 <= ord(ch) <= 0xF8FF
+    letters = [i for i, ch in enumerate(text) if not ch.isspace() and not icon(ch)]
+    n = len(letters)
+    out = []
+    for pos, ch in enumerate(text):
+        if ch.isspace() or icon(ch):  # spaces and icons keep their own look
+            out.append(ch)
+            continue
+        k = letters.index(pos)
+        code = stops[int(k * (len(stops) - 1) / (n - 1) + 0.5)] if n > 1 else stops[0]  # rounds like the website
+        out.append(f"§{code}{b}{ch}")
+    return "".join(out)
+
+
 def tag_text(rank):
-    """[👑 OWNER] in the rank's color (the icon goes inside the brackets)."""
+    """[👑 OWNER] in the rank's color or gradient (the icon goes inside the brackets)."""
     glyph = GLYPHS.get(rank.get("icon") or "")
-    inside = f"{glyph} {rank['prefix']}" if glyph else rank["prefix"]
-    return f"§{rank['color']}[{inside}]"
+    if glyph:
+        text = paint(f"[{glyph} {rank['prefix']}]", rank)
+        return text
+    return paint(f"[{rank['prefix']}]", rank)
 
 
-def name_color(rank):
-    return rank["color"] if rank else "f"
+def name_text(player_name, rank, bold=False):
+    return paint(player_name, rank, bold)
 
 
 class RankManager:
@@ -127,8 +165,13 @@ class RankManager:
     def chat_format(self, player):
         """[👑 OWNER] **player1** → message  (rank color on the tag and name, never on the message)"""
         rank = self.rank_for(player)
-        prefix = (tag_text(rank).replace("{", "{{").replace("}", "}}") + "§r ") if rank else ""
-        return prefix + f"§l§{name_color(rank)}{{0}}§r §7→§r {{1}}"
+        prefix = (tag_text(rank) + "§r ") if rank else ""
+        if rank and rank.get("gradient") in GRADIENTS:
+            name = name_text(player.name, rank, bold=True)  # each letter its own color
+        else:
+            name = name_text("\x00", rank, bold=True)  # placeholder for {0}
+        fmt = (prefix + name).replace("{", "{{").replace("}", "}}").replace("\x00", "{0}")
+        return fmt + "§r §7→§r {1}"
 
     # ---------- /ranks menu ----------
     def open_menu(self, player):
@@ -189,11 +232,15 @@ class RankManager:
         color_index = next((i for i, (c, _) in enumerate(COLORS) if c == r["color"]), 0)
         role_index = next((i for i, (v, _) in enumerate(WEB_ROLES) if v == r.get("websiteRole")), 0)
         icon_index = ICONS.index(r["icon"]) + 1 if r.get("icon") in ICONS else 0
+        grad_keys = list(GRADIENTS)
+        gradient_index = grad_keys.index(r["gradient"]) + 1 if r.get("gradient") in GRADIENTS else 0
         cmds, other = split_permissions(r["permissions"])
         controls = [
             TextInput("Rank name", "e.g. Builder", r["name"]),
             TextInput("Prefix (shown as [PREFIX])", "e.g. BUILDER", r["prefix"]),
             Dropdown("Color", [f"§{c}{n}" for c, n in COLORS], color_index),
+            Dropdown("Gradient (overrides the color)", ["None"] + [paint(label, {"gradient": key}) for key, (label, _) in GRADIENTS.items()],
+                     gradient_index),
             Dropdown("Icon", ["None"] + [f"{GLYPHS[n]} {n.title()}" for n in ICONS], icon_index),
             Dropdown("Website role", [n for _, n in WEB_ROLES], role_index),
             TextInput("Commands this rank can use, separated by spaces. /time also allows /time set day.",
@@ -211,16 +258,17 @@ class RankManager:
             if rank and values[-1]:
                 self.send(p, {"action": "delete", "id": rank["id"]}, f"Deleted the rank {rank['name']}.")
                 return
-            perms = [command_permission(c) for c in str(values[5]).replace(",", " ").split()]
-            perms = [x for x in perms if x] + [x.lower() for x in str(values[6]).replace(",", " ").split()]
+            perms = [command_permission(c) for c in str(values[6]).replace(",", " ").split()]
+            perms = [x for x in perms if x] + [x.lower() for x in str(values[7]).replace(",", " ").split()]
             body = {
                 "action": "update" if rank else "create",
                 "id": rank["id"] if rank else None,
                 "name": values[0],
                 "prefix": values[1],
                 "color": COLORS[int(values[2])][0],
-                "icon": ICONS[int(values[3]) - 1] if int(values[3]) > 0 else None,
-                "websiteRole": WEB_ROLES[int(values[4])][0],
+                "gradient": grad_keys[int(values[3]) - 1] if int(values[3]) > 0 else None,
+                "icon": ICONS[int(values[4]) - 1] if int(values[4]) > 0 else None,
+                "websiteRole": WEB_ROLES[int(values[5])][0],
                 "permissions": list(dict.fromkeys(perms)),
             }
             self.send(p, body, "Rank saved." if rank else "Rank created.")

@@ -21,12 +21,12 @@ from endstone_galaxylink.auction import AuctionHouse
 from endstone_galaxylink.economy import HUD_TICKS, Economy
 from endstone_galaxylink.helpmenu import HelpMenu
 from endstone_galaxylink.npc import HOLD_TICKS, NpcManager
-from endstone_galaxylink.ranks import RankManager, name_color, tag_text
+from endstone_galaxylink.ranks import RankManager, name_text, tag_text
 from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.6.1"
+VERSION = "2.6.2"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -134,7 +134,7 @@ class GalaxyLink(Plugin):
             🎤 player1        voice icon, then the name in the rank's color
         The money line under it is the score tag (economy.py)."""
         rank = self.ranks.rank_for(player)
-        name = f"§{name_color(rank)}{player.name}§r"
+        name = f"{name_text(player.name, rank)}§r"
         if icon:
             name = f"§r{icon} {name}"
         return f"{tag_text(rank)}§r\n{name}" if rank else name
