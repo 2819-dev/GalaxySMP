@@ -10,6 +10,7 @@ import { pluginPing, pluginLink } from "./routes/plugin.js";
 import { bootstrap, history, connect } from "./routes/chat.js";
 import * as mod from "./routes/mod.js";
 import { voiceConnect, voiceServer } from "./routes/voice.js";
+import * as ranks from "./routes/ranks.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -51,6 +52,9 @@ const routes = [
   ["POST", "/api/mod/members/:id/voice-unmute", mod.voiceUnmute],
   ["POST", "/api/mod/members/:id/voice-kick", mod.voiceKick],
   ["POST", "/api/mod/members/:id/global-mic", mod.setGlobalMic],
+  ["GET", "/api/mod/ranks", ranks.listRanks],
+  ["POST", "/api/mod/ranks/:action", ranks.websiteAction],
+  ["POST", "/api/plugin/ranks", (req, env) => ranks.pluginAction(req, env)],
 ];
 
 function matchPath(pattern, pathname) {

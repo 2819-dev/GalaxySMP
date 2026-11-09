@@ -12,6 +12,7 @@ import { DurableObject } from "cloudflare:workers";
 import { getDb } from "../lib/db.js";
 import { checkMessage, compileWordList } from "../lib/filter.js";
 import { sha256 } from "../lib/crypto.js";
+import { loadRanksState, recordPlayers } from "../routes/ranks.js";
 
 export const RANGE = 48; // blocks
 const PULL_RANGE = RANGE * 1.3; // a little slack so walking to the edge doesn't cut out
@@ -200,6 +201,7 @@ export class VoiceHub extends DurableObject {
       server.serializeAttachment({ kind: "plugin" });
       this.send(server, { type: "active", on: this.voiceSockets().length > 0 });
       this.sendIcons();
+      this.ctx.waitUntil(this.sendRanks());
       return new Response(null, { status: 101, webSocket: client });
     }
 
@@ -259,6 +261,9 @@ export class VoiceHub extends DurableObject {
   }
 
   onPlugin(msg) {
+    if (msg.type === "seen") {
+      return recordPlayers(this.env, msg.players).catch((e) => console.error("record players failed", e));
+    }
     if (msg.type === "server") {
       const info = {
         at: Date.now(),
@@ -406,6 +411,17 @@ export class VoiceHub extends DurableObject {
     }
   }
 
+  async sendRanks() {
+    const plugin = this.pluginSocket();
+    if (!plugin) return;
+    try {
+      const state = await loadRanksState(getDb(this.env));
+      this.send(plugin, { type: "ranks", ...state });
+    } catch (e) {
+      console.error("ranks load failed", e);
+    }
+  }
+
   // ---------- staff actions (from the website's moderation API) ----------
   async handleInternal(event) {
     const targets = this.ctx.getWebSockets(`user:${event.userId}`);
@@ -444,6 +460,8 @@ export class VoiceHub extends DurableObject {
       this.sendRoster();
     } else if (event.type === "words_changed") {
       this.words = null;
+    } else if (event.type === "ranks_changed") {
+      await this.sendRanks();
     }
   }
 }

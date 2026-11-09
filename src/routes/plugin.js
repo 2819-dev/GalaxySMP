@@ -4,6 +4,7 @@ import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { safeEqual, normalizeCode } from "../lib/crypto.js";
 import { namesMatch, isOwner } from "../lib/names.js";
+import { recordPlayers, syncRoleForUuid } from "./ranks.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ADMIN_ROLE = 4;
@@ -69,6 +70,12 @@ export async function pluginLink(request, env) {
     sql`DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE mc_uuid = ${uuid}::uuid)`,
   ]);
   const user = results[2][0];
+  if (body.xuid) {
+    try {
+      await recordPlayers(env, [{ xuid: body.xuid, uuid, name }]);
+      await syncRoleForUuid(env, uuid);
+    } catch (e) { console.error("rank role sync failed", e); }
+  }
   if (user.banned) return reply(true, "Account linked, but this account is banned from the community.");
   if (user.created) {
     return reply(true, owner

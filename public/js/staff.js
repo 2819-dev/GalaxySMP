@@ -1,6 +1,6 @@
 // Staff Tools page: reports, members, word filter and audit log.
 import { toast } from "/js/site.js";
-import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, roleDialog, voiceMuteDialog } from "/js/dialog.js";
+import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, roleDialog, voiceMuteDialog, select, field } from "/js/dialog.js";
 
 const $ = (id) => document.getElementById(id);
 const ROLE_NAMES = { member: "Member", vip: "VIP", moderator: "Moderator", admin: "Admin" };
@@ -210,13 +210,20 @@ const DESCRIBE = {
   "voice.kick": (e) => ["removed ", e.target, " from voice"],
   "voice.global_grant": (e) => ["gave the Global Mic to ", e.target],
   "voice.global_revoke": (e) => ["took the Global Mic from ", e.target],
+  "rank.create": (e) => [`created the rank ${e.details.rank} [${e.details.prefix}]`],
+  "rank.update": (e) => [`edited the rank ${e.details.rank}`],
+  "rank.delete": (e) => [`deleted the rank ${e.details.rank}`],
+  "rank.assign": (e) => [`gave ${e.details.player} the rank ${e.details.rank}`],
+  "rank.remove": (e) => [`removed the rank from ${e.details.player}`],
   "filter.add": () => ["added a word to the filter"],
   "filter.remove": () => ["removed a word from the filter"],
 };
 
 function auditRow(e) {
   const parts = (DESCRIBE[e.action] || (() => [e.action]))(e);
-  const line = h("div", {}, h("b", { text: e.actor || "Someone" }), " ");
+  const by = e.details && e.details.by;
+  const who = by && /\(in game\)$/.test(by) ? by : e.actor || by || "Someone";
+  const line = h("div", {}, h("b", { text: who }), " ");
   parts.forEach((p, i) => line.append(i % 2 === 1 ? h("b", { text: p || "a removed member" }) : p));
   const extra = [];
   if (e.details?.reason) extra.push(`Reason: ${e.details.reason}`);
@@ -238,6 +245,121 @@ async function loadAudit(more) {
 loaders.audit = () => loadAudit(false);
 $("audit-more").addEventListener("click", () => loadAudit(true));
 
+// ---------- Ranks (Admins) ----------
+const MC_COLORS = [
+  ["0", "Black", "#000000"], ["1", "Dark Blue", "#0000AA"], ["2", "Dark Green", "#00AA00"], ["3", "Dark Aqua", "#00AAAA"],
+  ["4", "Dark Red", "#AA0000"], ["5", "Dark Purple", "#AA00AA"], ["6", "Gold", "#FFAA00"], ["7", "Gray", "#AAAAAA"],
+  ["8", "Dark Gray", "#555555"], ["9", "Blue", "#5555FF"], ["a", "Green", "#55FF55"], ["b", "Aqua", "#55FFFF"],
+  ["c", "Red", "#FF5555"], ["d", "Light Purple", "#FF55FF"], ["e", "Yellow", "#FFFF55"], ["f", "White", "#FFFFFF"],
+];
+const hexOf = (c) => (MC_COLORS.find((x) => x[0] === c) || MC_COLORS[15])[2];
+const WEB_ROLES = [["", "None"], ["2", "VIP"], ["3", "Moderator"], ["4", "Admin"]];
+let rankData = null;
+let rankSearchTimer;
+
+function rankPreview(prefix, color, name) {
+  const span = h("span", { class: "rank-preview" });
+  const tag = h("span", { text: `[${prefix}]` });
+  tag.style.color = hexOf(color);
+  span.append(tag, " ", h("span", { text: name }));
+  return span;
+}
+
+loaders.ranks = async () => {
+  const q = $("rank-player-search").value.trim();
+  rankData = await getJson(`/api/mod/ranks?q=${encodeURIComponent(q)}`);
+  const list = $("rank-list");
+  list.replaceChildren();
+  if (!rankData.ranks.length) list.append(h("div", { class: "empty", text: "No ranks yet. Select New rank to create one." }));
+  for (const r of rankData.ranks) {
+    const role = WEB_ROLES.find((x) => x[0] === String(r.websiteRole || ""))[1];
+    list.append(h("div", { class: "member-row" },
+      h("div", { class: "info" },
+        h("strong", {}, rankPreview(r.prefix, r.color, r.name)),
+        h("span", { text: `${r.players} player${r.players === 1 ? "" : "s"} · ${r.permissions.length} permission${r.permissions.length === 1 ? "" : "s"} · Website role: ${role}` })),
+      h("div", { class: "row-actions" },
+        h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Edit", onclick: () => rankDialog(r) }),
+        h("button", { class: "btn btn-danger btn-sm", type: "button", text: "Delete", onclick: () => deleteRank(r) }))));
+  }
+  renderRankPlayers();
+};
+
+function renderRankPlayers() {
+  const box = $("rank-players");
+  box.replaceChildren();
+  if (!rankData.players.length) { box.append(h("div", { class: "empty", text: "No players found." })); return; }
+  for (const p of rankData.players) {
+    const sel = h("select", { class: "input", "aria-label": `Rank for ${p.gamertag}`, style: "width:auto;min-width:170px" });
+    sel.append(h("option", { value: "", text: "No rank" }));
+    for (const r of rankData.ranks) sel.append(h("option", { value: r.id, text: `[${r.prefix}] ${r.name}`, selected: r.id === p.rankId }));
+    sel.addEventListener("change", async () => {
+      sel.disabled = true;
+      try {
+        await postJson("/api/mod/ranks/assign", { xuid: p.xuid, rankId: sel.value || null });
+        toast(sel.value ? `Rank given to ${p.gamertag}.` : `Rank removed from ${p.gamertag}.`);
+        loaders.ranks();
+      } catch (e) { toast(e.message); sel.disabled = false; }
+    });
+    box.append(h("div", { class: "member-row" },
+      h("div", { class: "info" }, h("strong", {}, p.gamertag, p.linked ? h("span", { class: "pill-status owner", text: "Website account" }) : null),
+        h("span", { text: `Last seen ${new Date(p.lastSeen).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` })),
+      sel));
+  }
+}
+
+$("rank-player-search").addEventListener("input", () => { clearTimeout(rankSearchTimer); rankSearchTimer = setTimeout(loaders.ranks, 300); });
+$("rank-new").addEventListener("click", () => rankDialog(null));
+
+function rankDialog(rank) {
+  const r = rank || { name: "", prefix: "", color: "f", permissions: [], websiteRole: null };
+  const name = h("input", { class: "input", id: "rank-name", maxlength: 24, value: r.name, placeholder: "e.g. Builder" });
+  const prefix = h("input", { class: "input", id: "rank-prefix", maxlength: 16, value: r.prefix, placeholder: "e.g. BUILDER" });
+  const color = select("rank-color", MC_COLORS.map(([c, n]) => [c, n]), r.color);
+  const role = select("rank-role", WEB_ROLES, String(r.websiteRole || ""));
+  const preview = h("div", { class: "rank-preview-box" });
+  const update = () => {
+    preview.replaceChildren(rankPreview(prefix.value || "PREFIX", color.value, "VisionDevs"), h("span", { class: "text-3", text: ": hello!" }));
+  };
+  [name, prefix, color].forEach((el) => el.addEventListener("input", update));
+  update();
+  const known = new Set(rankData.permissions.map((p) => p[0]));
+  const boxes = rankData.permissions.map(([perm, label]) =>
+    h("label", { class: "check" }, h("input", { type: "checkbox", value: perm, checked: r.permissions.includes(perm) }), label));
+  const other = h("input", { class: "input", id: "rank-other", placeholder: "other.permission, another.one", value: r.permissions.filter((p) => !known.has(p)).join(", ") });
+  openDialog({
+    title: rank ? `Edit ${rank.name}` : "New rank",
+    body: h("div", { class: "form" },
+      preview,
+      field("Rank name", name),
+      field("Prefix", prefix, "Shown as [PREFIX] in chat and above heads."),
+      field("Color", color),
+      field("Website role", role, "Players with this rank who linked a website account also get this role in chat and voice. Roles set by hand are never lowered."),
+      h("div", {}, h("span", { class: "field-label", text: "Command permissions" }), h("div", { class: "perm-grid" }, boxes)),
+      field("Other permissions (advanced)", other, "Extra permission names, separated by commas.")),
+    actions: [{ label: "Cancel" }, {
+      label: rank ? "Save" : "Create", kind: "primary",
+      onClick: async () => {
+        const permissions = boxes.map((b) => b.querySelector("input")).filter((i) => i.checked).map((i) => i.value)
+          .concat(other.value.split(",").map((s) => s.trim()).filter(Boolean));
+        await postJson(`/api/mod/ranks/${rank ? "update" : "create"}`, { id: rank?.id, name: name.value, prefix: prefix.value, color: color.value, websiteRole: role.value || null, permissions });
+        toast(rank ? "Rank saved." : "Rank created.");
+        loaders.ranks();
+      },
+    }],
+  });
+}
+
+function deleteRank(r) {
+  openDialog({
+    title: `Delete ${r.name}?`,
+    body: h("p", { class: "text-2", text: `${r.players} player${r.players === 1 ? "" : "s"} will lose this rank, its prefix and its permissions.` }),
+    actions: [{ label: "Cancel" }, {
+      label: "Delete rank", kind: "danger",
+      onClick: async () => { await postJson("/api/mod/ranks/delete", { id: r.id }); toast("Rank deleted."); loaders.ranks(); },
+    }],
+  });
+}
+
 // ---------- Start ----------
 (async () => {
   let user = null;
@@ -252,5 +374,6 @@ $("audit-more").addEventListener("click", () => loadAudit(true));
   $("staff-intro").textContent = `Signed in as ${user.username} (${user.role.name}). ${power >= 100 ? "You can use every tool on this page." : "Banning and role changes are reserved for Admins."}`;
   $("staff-app").hidden = false;
   const start = location.hash.slice(1);
-  selectTab(["reports", "members", "words", "audit"].includes(start) ? start : "reports");
+  if (power >= 100) document.querySelector('[data-tab="ranks"]').hidden = false;
+  selectTab(["reports", "members", "words", "audit", ...(power >= 100 ? ["ranks"] : [])].includes(start) ? start : "reports");
 })();

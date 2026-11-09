@@ -158,9 +158,10 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.3.1",
+                    "User-Agent": "GalaxyLink-Endstone/2.4.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
+                self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
                 delay = 2
                 threading.Thread(target=self._keepalive, args=(self.ws,), daemon=True).start()
                 while not self.stopped:
@@ -194,6 +195,8 @@ class VoiceLink:
             return
         if msg.get("type") == "active":
             self.active = bool(msg.get("on"))
+        elif msg.get("type") == "ranks":
+            self.plugin.ranks.update(msg)
         elif msg.get("type") == "icons":
             self.wanted = {k.lower(): v for k, v in (msg.get("icons") or {}).items()}
             self.plugin.server.scheduler.run_task(self.plugin, self._apply_icons)
@@ -236,6 +239,18 @@ class VoiceLink:
             return
         threading.Thread(target=self._safe_send, args=(ws, json.dumps(info)), daemon=True).start()
 
+    def announce_online(self):
+        """Tell the website which players are here (so ranks can be given on the website)."""
+        self.send_seen(list(self.plugin.server.online_players))
+
+    def send_seen(self, players):
+        ws = self.ws
+        if not ws or not players:
+            return
+        payload = json.dumps({"type": "seen", "players": [
+            {"xuid": str(p.xuid), "uuid": str(p.unique_id), "name": p.name} for p in players]})
+        threading.Thread(target=self._safe_send, args=(ws, payload), daemon=True).start()
+
     def _safe_send(self, ws, payload):
         try:
             ws.send_text(payload)
@@ -246,11 +261,12 @@ class VoiceLink:
         for p in self.plugin.server.online_players:
             key = str(p.unique_id).lower()
             icon = self.wanted.get(key, "disconnected")
-            if self.applied.get(key) == icon:
+            tag = self.plugin.compose_tag(p, ICONS.get(icon))
+            if self.applied.get(key) == tag:
                 continue
             try:
-                p.name_tag = f"{ICONS[icon]} §r{p.name}" if icon in ICONS else p.name
-                self.applied[key] = icon
+                p.name_tag = tag
+                self.applied[key] = tag
             except Exception:
                 pass
         online = {str(p.unique_id).lower() for p in self.plugin.server.online_players}

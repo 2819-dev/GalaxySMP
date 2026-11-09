@@ -12,9 +12,11 @@ import urllib.request
 
 from endstone import ColorFormat, Player
 from endstone.command import Command, CommandSender
+from endstone.event import PlayerChatEvent, PlayerJoinEvent, PlayerQuitEvent, event_handler
 from endstone.plugin import Plugin
 
 from endstone_galaxylink import settings
+from endstone_galaxylink.ranks import RankManager, tag_text
 from endstone_galaxylink.voice import VoiceLink
 
 COOLDOWN_SECONDS = 5
@@ -23,7 +25,7 @@ TIMEOUT_SECONDS = 15
 
 class GalaxyLink(Plugin):
     api_version = "0.5"
-    description = "Links Bedrock players to their GalaxySMP website account."
+    description = "GalaxySMP: account linking (/link), website voice chat and ranks (/ranks)."
     website = "https://galaxymc.us"
 
     commands = {
@@ -31,18 +33,29 @@ class GalaxyLink(Plugin):
             "description": "Link your account to the GalaxySMP website.",
             "usages": ["/link <code: message>"],
             "permissions": ["galaxylink.command.link"],
-        }
+        },
+        "ranks": {
+            "description": "Manage GalaxySMP ranks.",
+            "usages": ["/ranks"],
+            "permissions": ["galaxylink.command.ranks"],
+        },
     }
     permissions = {
         "galaxylink.command.link": {
             "description": "Allows players to use /link.",
             "default": True,
-        }
+        },
+        "galaxylink.command.ranks": {
+            "description": "Allows managing ranks with /ranks (server operators).",
+            "default": "op",
+        },
     }
 
     def on_enable(self) -> None:
         self._last_use = {}
         self._voice = None
+        self.ranks = RankManager(self)
+        self.register_events(self)
         self._base = settings.WEBSITE.rstrip("/")
         if not settings.SECRET or settings.SECRET.startswith("PASTE_"):
             self.logger.warning("GalaxyLink is missing its secret. Download a fresh build from the website team.")
@@ -51,6 +64,43 @@ class GalaxyLink(Plugin):
         # Voice chat: positions out, name-tag icons in.
         self._voice = VoiceLink(self, self._base, settings.SECRET)
         self._voice.start()
+
+    # ---------- Name tags and chat ----------
+    def compose_tag(self, player, icon):
+        """Voice icon, rank prefix, then the player's name."""
+        parts = []
+        if icon:
+            parts.append(icon)
+        rank = self.ranks.rank_for(player)
+        if rank:
+            parts.append(tag_text(rank))
+        parts.append("§r" + player.name)
+        return " ".join(parts)
+
+    def refresh_tags(self):
+        if self._voice:
+            self._voice._apply_icons()
+        else:
+            for p in self.server.online_players:
+                p.name_tag = self.compose_tag(p, None)
+
+    @event_handler
+    def on_player_join(self, event: PlayerJoinEvent):
+        player = event.player
+        self.ranks.apply_permissions(player)
+        self.refresh_tags()
+        if self._voice:
+            self._voice.send_seen([player])
+
+    @event_handler
+    def on_player_quit(self, event: PlayerQuitEvent):
+        self.ranks.forget(event.player)
+
+    @event_handler
+    def on_player_chat(self, event: PlayerChatEvent):
+        fmt = self.ranks.chat_format(event.player)
+        if fmt:
+            event.format = fmt
 
     def on_disable(self) -> None:
         if getattr(self, "_voice", None):
@@ -66,7 +116,7 @@ class GalaxyLink(Plugin):
             headers={
                 "Authorization": "Bearer " + settings.SECRET,
                 "Content-Type": "application/json",
-                "User-Agent": "GalaxyLink-Endstone/2.3.1",
+                "User-Agent": "GalaxyLink-Endstone/2.4.0",
             },
         )
         try:
@@ -91,6 +141,12 @@ class GalaxyLink(Plugin):
 
     # ---------- /link ----------
     def on_command(self, sender: CommandSender, command: Command, args: list[str]) -> bool:
+        if command.name == "ranks":
+            if not isinstance(sender, Player):
+                sender.send_message("Open /ranks in game, or use galaxymc.us (Staff Tools > Ranks).")
+                return True
+            self.ranks.open_menu(sender)
+            return True
         if command.name != "link":
             return False
         if not isinstance(sender, Player):
