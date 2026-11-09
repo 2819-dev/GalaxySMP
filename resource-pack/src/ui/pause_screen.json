@@ -1,10 +1,24 @@
 {
   "namespace": "pause",
 
-  // GalaxySMP pause menu. Replaces the button list in Minecraft's pause screen with:
-  //   GalaxySMP logo, Continue Playing, Help & Support, Shop, Settings, Exit Game.
-  // Help & Support and Exit Game open small panels under their buttons (toggles).
-  // Everything else on the pause screen (player list etc.) stays as Minecraft made it.
+  // GalaxySMP pause menu: a starfield card with the GalaxySMP logo and galaxy-style buttons:
+  //   Continue Playing, Help & Support, Shop, Settings, Exit Game.
+  // Help & Support and Exit Game open small panels under their buttons.
+  // Textures: textures/ui/gsmp_* (drawn by resource-pack/draw_menu.py).
+
+  // Every pause-menu button uses the galaxy style.
+  "pause_button_template@common_buttons.light_text_button": {
+    "size": [ "100%", 28 ],
+    "focus_identifier": "$pressed_button_name",
+    "focus_change_right": "$focus_override_right",
+    "focus_change_left": "$pressed_button_name",
+    "$default_button_texture": "textures/ui/gsmp_button",
+    "$hover_button_texture": "textures/ui/gsmp_button_hover",
+    "$pressed_button_texture": "textures/ui/gsmp_button_pressed",
+    "$default_text_color": [ 0.93, 0.95, 1.0 ],
+    "$hover_text_color": [ 0.75, 0.96, 1.0 ],
+    "$pressed_text_color": [ 0.6, 0.78, 1.0 ]
+  },
 
   "gsmp_logo": {
     "type": "panel",
@@ -16,7 +30,7 @@
           "texture": "textures/ui/galaxysmp_logo",
           "bilinear": false,
           "keep_ratio": true,
-          "size": [ "100%", "100%" ],
+          "size": [ "92%", "92%" ],
           "anchor_from": "center",
           "anchor_to": "center"
         }
@@ -24,9 +38,15 @@
     ]
   },
 
+  "gsmp_divider": {
+    "type": "image",
+    "texture": "textures/ui/gsmp_divider",
+    "size": [ "100%", 3 ]
+  },
+
   "gsmp_text": {
     "type": "label",
-    "color": [ 1, 1, 1 ],
+    "color": [ 0.92, 0.94, 1.0 ],
     "shadow": true,
     "text_alignment": "center",
     "size": [ "100% - 12px", "default" ],
@@ -36,15 +56,23 @@
 
   "gsmp_info_box": {
     "type": "image",
-    "texture": "textures/ui/white_background",
-    "color": [ 0.04, 0.05, 0.11 ],
-    "alpha": 0.85,
-    "size": [ "100%", "100%c + 12px" ]
+    "texture": "textures/ui/gsmp_box",
+    "size": [ "100%", "100%c + 14px" ]
   },
 
   "gsmp_toggle@common_toggles.light_text_toggle": {
     "size": [ "100%", 28 ],
-    "$toggle_binding_type": "none"
+    "$toggle_binding_type": "none",
+    "$default_texture": "textures/ui/gsmp_button",
+    "$hover_texture": "textures/ui/gsmp_button_hover",
+    "$pressed_texture": "textures/ui/gsmp_button_on",
+    "$pressed_no_hover_texture": "textures/ui/gsmp_button_on",
+    "$default_border_visible": false,
+    "$hover_border_visible": false,
+    "$default_text_color": [ 0.93, 0.95, 1.0 ],
+    "$hover_text_color": [ 0.75, 0.96, 1.0 ],
+    "$default_checked_text_color": [ 1.0, 0.86, 0.45 ],
+    "$hover_checked_text_color": [ 1.0, 0.92, 0.65 ]
   },
 
   "menu_background@pause.transparent_background": {
@@ -56,100 +84,156 @@
     "offset": [ "13%", "0%" ],
     "controls": [
       {
-        "button_panel": {
-          "type": "stack_panel",
-          "size": [ "100% - 8px", "100%c" ],
+        "galaxy_card": {
+          "type": "image",
+          "texture": "textures/ui/gsmp_panel",
+          "size": [ "100%", "100%c + 20px" ],
           "anchor_from": "center",
           "anchor_to": "center",
           "controls": [
-            { "gsmp_logo@pause.gsmp_logo": {} },
-            { "logo_gap@pause.vertical_padding": { "size": [ 0, 6 ] } },
-
-            { "return_to_game_button@pause.return_to_game_button": { "$button_text": "Continue Playing" } },
-            { "gap_1@pause.vertical_padding": { "size": [ 0, 3 ] } },
-
             {
-              "help_toggle@pause.gsmp_toggle": {
-                "$button_text": "Help & Support",
-                "$toggle_name": "gsmp_help",
-                "$toggle_view_binding_name": "gsmp_help_toggle"
+              "nebula": {
+                "type": "image",
+                "texture": "textures/ui/gsmp_nebula",
+                "bilinear": true,
+                "layer": 1,
+                "size": [ "100% - 6px", "100% - 6px" ],
+                "anchor_from": "center",
+                "anchor_to": "center"
               }
             },
             {
-              "help_panel@pause.gsmp_info_box": {
-                "visible": false,
-                "bindings": [
-                  {
-                    "binding_type": "view",
-                    "source_control_name": "gsmp_help_toggle",
-                    "source_property_name": "#toggle_state",
-                    "target_property_name": "#visible"
-                  }
-                ],
+              "stars": {
+                "type": "image",
+                "texture": "textures/ui/gsmp_stars",
+                "tiled": true,
+                "bilinear": false,
+                "layer": 2,
+                "size": [ "100% - 6px", "100% - 6px" ],
+                "anchor_from": "center",
+                "anchor_to": "center"
+              }
+            },
+            {
+              "button_panel": {
+                "type": "stack_panel",
+                "layer": 5,
+                "size": [ "100% - 22px", "100%c" ],
+                "anchor_from": "center",
+                "anchor_to": "center",
                 "controls": [
+                  { "gsmp_logo@pause.gsmp_logo": {} },
+                  { "divider@pause.gsmp_divider": {} },
+                  { "logo_gap@pause.vertical_padding": { "size": [ 0, 8 ] } },
+
+                  { "return_to_game_button@pause.return_to_game_button": { "$button_text": "Continue Playing" } },
+                  { "gap_1@pause.vertical_padding": { "size": [ 0, 4 ] } },
+
                   {
-                    "text@pause.gsmp_text": {
-                      "text": "§lNeed help?§r\nClose this menu, open chat and type §e/guide§r\nfor server info, the rules and every command.\n\n§7More help on galaxymc.us"
+                    "help_toggle@pause.gsmp_toggle": {
+                      "$button_text": "Help & Support",
+                      "$toggle_name": "gsmp_help",
+                      "$toggle_view_binding_name": "gsmp_help_toggle"
                     }
-                  }
-                ]
-              }
-            },
-            { "gap_2@pause.vertical_padding": { "size": [ 0, 3 ] } },
-
-            {
-              "shop_button@common_buttons.hyperlink_button": {
-                "size": [ "100%", 28 ],
-                "$button_text": "Shop",
-                "property_bag": { "#hyperlink": "https://galaxymc.us/store" }
-              }
-            },
-            {
-              "shop_hint@pause.gsmp_text": {
-                "text": "§7galaxymc.us/store",
-                "size": [ "100%", 12 ]
-              }
-            },
-            { "gap_3@pause.vertical_padding": { "size": [ 0, 2 ] } },
-
-            { "settings_button@pause.settings_button": { "$button_text": "Settings" } },
-            { "gap_4@pause.vertical_padding": { "size": [ 0, 3 ] } },
-
-            {
-              "exit_toggle@pause.gsmp_toggle": {
-                "$button_text": "Exit Game",
-                "$toggle_name": "gsmp_exit",
-                "$toggle_view_binding_name": "gsmp_exit_toggle"
-              }
-            },
-            {
-              "exit_panel@pause.gsmp_info_box": {
-                "visible": false,
-                "bindings": [
+                  },
                   {
-                    "binding_type": "view",
-                    "source_control_name": "gsmp_exit_toggle",
-                    "source_property_name": "#toggle_state",
-                    "target_property_name": "#visible"
-                  }
-                ],
-                "controls": [
-                  {
-                    "exit_stack": {
-                      "type": "stack_panel",
-                      "size": [ "100% - 12px", "100%c" ],
-                      "anchor_from": "center",
-                      "anchor_to": "center",
+                    "help_panel@pause.gsmp_info_box": {
+                      "visible": false,
+                      "bindings": [
+                        {
+                          "binding_type": "view",
+                          "source_control_name": "gsmp_help_toggle",
+                          "source_property_name": "#toggle_state",
+                          "target_property_name": "#visible"
+                        }
+                      ],
                       "controls": [
                         {
-                          "thanks@pause.gsmp_text": {
-                            "text": "§lThanks for playing GalaxySMP!§r\nCome back soon.",
-                            "size": [ "100%", "default" ]
+                          "text@pause.gsmp_text": {
+                            "text": "§l§bNeed help?§r\nClose this menu, open chat and type §e/guide§r\nfor server info, the rules and every command.\n\n§7More help on §bgalaxymc.us"
                           }
-                        },
-                        { "thanks_gap@pause.vertical_padding": { "size": [ 0, 6 ] } },
-                        { "quit_button@pause.quit_button": { "$button_text": "Exit Game" } }
+                        }
                       ]
+                    }
+                  },
+                  { "gap_2@pause.vertical_padding": { "size": [ 0, 4 ] } },
+
+                  {
+                    "shop_button@common_buttons.hyperlink_button": {
+                      "size": [ "100%", 28 ],
+                      "$button_text": "Shop",
+                      "$default_button_texture": "textures/ui/gsmp_button",
+                      "$hover_button_texture": "textures/ui/gsmp_button_hover",
+                      "$pressed_button_texture": "textures/ui/gsmp_button_pressed",
+                      "$default_text_color": [ 0.93, 0.95, 1.0 ],
+                      "$hover_text_color": [ 0.75, 0.96, 1.0 ],
+                      "$pressed_text_color": [ 0.6, 0.78, 1.0 ],
+                      "property_bag": { "#hyperlink": "https://galaxymc.us/store" }
+                    }
+                  },
+                  {
+                    "shop_hint@pause.gsmp_text": {
+                      "text": "§bgalaxymc.us/store",
+                      "size": [ "100%", 12 ]
+                    }
+                  },
+                  { "gap_3@pause.vertical_padding": { "size": [ 0, 2 ] } },
+
+                  { "settings_button@pause.settings_button": { "$button_text": "Settings" } },
+                  { "gap_4@pause.vertical_padding": { "size": [ 0, 4 ] } },
+
+                  {
+                    "exit_toggle@pause.gsmp_toggle": {
+                      "$button_text": "Exit Game",
+                      "$toggle_name": "gsmp_exit",
+                      "$toggle_view_binding_name": "gsmp_exit_toggle"
+                    }
+                  },
+                  {
+                    "exit_panel@pause.gsmp_info_box": {
+                      "visible": false,
+                      "bindings": [
+                        {
+                          "binding_type": "view",
+                          "source_control_name": "gsmp_exit_toggle",
+                          "source_property_name": "#toggle_state",
+                          "target_property_name": "#visible"
+                        }
+                      ],
+                      "controls": [
+                        {
+                          "exit_stack": {
+                            "type": "stack_panel",
+                            "size": [ "100% - 14px", "100%c" ],
+                            "anchor_from": "center",
+                            "anchor_to": "center",
+                            "controls": [
+                              {
+                                "thanks@pause.gsmp_text": {
+                                  "text": "§l§bThanks for playing GalaxySMP!§r\nCome back soon.",
+                                  "size": [ "100%", "default" ]
+                                }
+                              },
+                              { "thanks_gap@pause.vertical_padding": { "size": [ 0, 6 ] } },
+                              {
+                                "quit_button@pause.quit_button": {
+                                  "$button_text": "Exit Game",
+                                  "$default_button_texture": "textures/ui/gsmp_button_exit",
+                                  "$hover_button_texture": "textures/ui/gsmp_button_exit_hover",
+                                  "$pressed_button_texture": "textures/ui/gsmp_button_exit"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  { "footer_gap@pause.vertical_padding": { "size": [ 0, 6 ] } },
+                  {
+                    "footer@pause.gsmp_text": {
+                      "text": "§bgalaxymc.us",
+                      "size": [ "100%", 10 ]
                     }
                   }
                 ]
