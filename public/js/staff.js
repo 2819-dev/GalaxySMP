@@ -390,7 +390,10 @@ function commandChips(initial) {
 
 function rankDialog(rank) {
   const r = rank || { name: "", prefix: "", color: "f", icon: null, gradient: null, permissions: [], websiteRole: null };
-  const { commands, other } = splitPerms(r.permissions);
+  const { commands, other: allOther } = splitPerms(r.permissions);
+  const MG = "galaxylink.minigames.staff";
+  const other = allOther.filter((x) => x !== MG);
+  const mgStaff = h("input", { type: "checkbox", id: "rank-mg", checked: allOther.includes(MG) });
   const name = h("input", { class: "input", id: "rank-name", maxlength: 24, value: r.name, placeholder: "e.g. Builder" });
   const prefix = h("input", { class: "input", id: "rank-prefix", maxlength: 16, value: r.prefix, placeholder: "e.g. BUILDER" });
   const color = choiceGrid("Color", MC_COLORS.map(([c, n]) => [c, n]), r.color, (c) => { const s = h("span", { class: "swatch" }); s.style.background = hexOf(c); return s; });
@@ -425,6 +428,7 @@ function rankDialog(rank) {
       h("div", { class: "field" }, h("label", { class: "field-label", for: "rank-commands", text: "Commands this rank can use" }), cmds.el,
         h("p", { class: "hint", text: "Type a command name and press Enter, for example time, weather, gamemode or tp. A command includes everything after it: time also allows /time set day. Players don't need to be operators." })),
       field("Staff powers", role, "What players with this rank can do on the website: Moderators can delete messages, mute and handle reports; Admins can also ban and manage ranks, the economy and the Help menu. The rank itself shows the same on the website and in game."),
+      h("label", { class: "check" }, mgStaff, "Minigame Staff ", h("span", { class: "text-3 small", text: "(can accept or decline minigame host requests at the Minigame Computers)" })),
       h("details", {}, h("summary", { class: "text-3 small", text: "Advanced: other permission nodes" }),
         field("Permission nodes", advanced, "For other plugins' permissions, separated by commas."))),
     actions: [{ label: "Cancel" }, {
@@ -433,7 +437,7 @@ function rankDialog(rank) {
         await postJson(`/api/mod/ranks/${rank ? "update" : "create"}`, {
           id: rank?.id, name: name.value, prefix: prefix.value, color: color.value(), gradient: gradient.value() || null, icon: icon.value() || null,
           websiteRole: role.value || null, commands: cmds.value(),
-          permissions: advanced.value.split(",").map((s) => s.trim()).filter(Boolean),
+          permissions: advanced.value.split(",").map((s) => s.trim()).filter((x) => x && x !== MG).concat(mgStaff.checked ? [MG] : []),
         });
         toast(rank ? "Rank saved." : "Rank created.");
         loaders.ranks();

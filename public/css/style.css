@@ -775,3 +775,4 @@ html.embedded .voice-page { padding-top: 16px; }
 .tabs-mini button { background: transparent; border: 0; color: var(--text-2); padding: 7px 14px; cursor: pointer; font-weight: 600; }
 .tabs-mini button[aria-pressed="true"] { background: var(--surface-2); color: var(--text); }
 @media (max-width: 600px) { .channel-panel { padding: 14px 12px 24px; } .sg-card { padding: 12px; gap: 10px; } }
+.ev-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px; }

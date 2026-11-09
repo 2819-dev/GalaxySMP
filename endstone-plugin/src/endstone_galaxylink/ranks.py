@@ -35,8 +35,8 @@ GLYPHS = {name: chr(0xE210 + i) for i, name in enumerate(ICONS)}
 # Typed command names -> permission nodes. Same rules as the website (src/routes/ranks.js).
 ENDSTONE_COMMANDS = {"ban", "banip", "banlist", "plugins", "reload", "seed", "status", "unban", "unbanip", "version"}
 PLUGIN_COMMANDS = {"link", "ranks", "money", "pay", "baltop", "setmoney", "addmoney", "takemoney", "shop", "sell", "ah", "shopnpc",
-                   "guide", "tpa", "tpahere", "tpaccept", "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe"}
-ALIASES = {"tp": "teleport", "msg": "tell", "w": "tell", "bal": "money", "balance": "money", "auction": "ah", "menu": "guide", "tpyes": "tpaccept", "plots": "plot", "tpno": "tpdeny",
+                   "guide", "tpa", "tpahere", "tpaccept", "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd"}
+ALIASES = {"tp": "teleport", "msg": "tell", "w": "tell", "bal": "money", "balance": "money", "auction": "ah", "menu": "guide", "tpyes": "tpaccept", "plots": "plot", "minigame": "minigames", "mg": "minigames", "tpno": "tpdeny",
            "ban-ip": "banip", "unban-ip": "unbanip", "pardon": "unban"}
 PREFIXES = ("minecraft.command.", "endstone.command.", "galaxylink.command.")
 
@@ -133,6 +133,9 @@ def paint(text, rank, bold=False):
         out.append(f"§{gradient_code(grad[1], k, n)}{b}{ch}")
         k += 1
     return "".join(out)
+
+
+MINIGAME_STAFF = "galaxylink.minigames.staff"
 
 
 def tag_text(rank):
@@ -273,6 +276,8 @@ class RankManager:
         grad_keys = list(GRADIENTS)
         gradient_index = grad_keys.index(r["gradient"]) + 1 if r.get("gradient") in GRADIENTS else 0
         cmds, other = split_permissions(r["permissions"])
+        mg_staff = MINIGAME_STAFF in other
+        other = [x for x in other if x != MINIGAME_STAFF]
         controls = [
             TextInput("Rank name", "e.g. Builder", r["name"]),
             TextInput("Prefix (shown as [PREFIX])", "e.g. BUILDER", r["prefix"]),
@@ -284,6 +289,7 @@ class RankManager:
             TextInput("Commands this rank can use, separated by spaces. /time also allows /time set day.",
                       "e.g. time weather gamemode", " ".join(cmds)),
             TextInput("Advanced: other permission nodes (optional)", "e.g. someplugin.fly", " ".join(other)),
+            Toggle("Minigame Staff (accepts minigame host requests)", mg_staff),
         ]
         if rank:
             controls.append(Toggle("§cDelete this rank", False))
@@ -298,6 +304,7 @@ class RankManager:
                 return
             perms = [command_permission(c) for c in str(values[6]).replace(",", " ").split()]
             perms = [x for x in perms if x] + [x.lower() for x in str(values[7]).replace(",", " ").split()]
+            perms = [x for x in perms if x != MINIGAME_STAFF] + ([MINIGAME_STAFF] if len(values) > 8 and values[8] is True else [])
             body = {
                 "action": "update" if rank else "create",
                 "id": rank["id"] if rank else None,

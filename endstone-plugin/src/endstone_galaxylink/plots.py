@@ -39,7 +39,7 @@ AREA_FLAGS = [("doors", "Players can use doors, gates, buttons and levers"),
 DOORS = ("door", "trapdoor", "fence_gate", "button", "lever")
 CONTAINERS = ("chest", "barrel", "shulker_box", "furnace", "smoker", "hopper", "dropper", "dispenser",
               "brewing_stand", "crafter", "decorated_pot", "chiseled_bookshelf", "lectern", "jukebox")
-HARMLESS = ("crafting_table", "enchanting_table", "cartography_table", "smithing_table", "stonecutter",
+HARMLESS = ("computer", "crafting_table", "enchanting_table", "cartography_table", "smithing_table", "stonecutter",
             "grindstone", "loom", "bell", "ender_chest")
 
 

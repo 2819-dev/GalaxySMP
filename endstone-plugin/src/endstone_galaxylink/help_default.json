@@ -137,6 +137,18 @@
    "staff": false
   },
   {
+   "command": "/minigames",
+   "description": "Open the Minigame Center: host (Galaxy+), join or watch minigames. Same as the computers.",
+   "example": "/minigames",
+   "staff": false
+  },
+  {
+   "command": "/tpd",
+   "description": "Teleport where you've been sent, like to the staff member who accepted your minigame.",
+   "example": "/tpd",
+   "staff": false
+  },
+  {
    "command": "/money [player]",
    "description": "See your money, or someone else's. Also /bal.",
    "example": "/money Steve",

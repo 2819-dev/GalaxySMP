@@ -190,6 +190,9 @@ export class VoiceHub extends DurableObject {
       }
       return Response.json(null);
     }
+    if (url.pathname === "/internal/events") {
+      return Response.json((await this.ctx.storage.get("events")) || { events: [], at: null });
+    }
     if (url.pathname === "/internal/ah") {
       return Response.json((await this.ctx.storage.get("ah")) || { listings: [], at: null });
     }
@@ -292,6 +295,10 @@ export class VoiceHub extends DurableObject {
       const done = this.waiting?.get(msg.req);
       if (done) done(msg);
       return;
+    }
+    if (msg.type === "events") {
+      const events = (Array.isArray(msg.events) ? msg.events : []).slice(0, 50);
+      return this.ctx.storage.put("events", { events, at: Date.now() });
     }
     if (msg.type === "ah") {
       const listings = (Array.isArray(msg.listings) ? msg.listings : []).slice(0, 300);

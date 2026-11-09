@@ -33,8 +33,8 @@ export const GRADIENTS = ["galaxy", "gold", "sunset", "fire", "ocean", "forest",
 // Same rules as the plugin (endstone_galaxylink/ranks.py).
 const ENDSTONE_COMMANDS = new Set(["ban", "banip", "banlist", "plugins", "reload", "seed", "status", "unban", "unbanip", "version"]);
 const PLUGIN_COMMANDS = new Set(["link", "ranks", "money", "pay", "baltop", "setmoney", "addmoney", "takemoney", "shop", "sell", "ah", "shopnpc",
-  "guide", "tpa", "tpahere", "tpaccept", "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe"]);
-const ALIASES = { tp: "teleport", msg: "tell", w: "tell", bal: "money", balance: "money", auction: "ah", menu: "guide", tpyes: "tpaccept", plots: "plot", tpno: "tpdeny", "ban-ip": "banip", "unban-ip": "unbanip", pardon: "unban" };
+  "guide", "tpa", "tpahere", "tpaccept", "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd"]);
+const ALIASES = { tp: "teleport", msg: "tell", w: "tell", bal: "money", balance: "money", auction: "ah", menu: "guide", tpyes: "tpaccept", plots: "plot", minigame: "minigames", mg: "minigames", tpno: "tpdeny", "ban-ip": "banip", "unban-ip": "unbanip", pardon: "unban" };
 
 export function commandPermission(text) {
   let name = String(text).trim().replace(/^\/+/, "").split(/\s+/)[0].toLowerCase();

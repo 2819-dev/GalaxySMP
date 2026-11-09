@@ -77,11 +77,37 @@ async function renderInfo(p) {
 }
 
 // ---------- Events ----------
+const ACCESS_NAMES = { all: "Everyone", plus: "Galaxy+ and Pro+", pro: "Galaxy Pro+ only" };
+
 function renderEvents(p) {
+  const list = h("div", { class: "stack", style: "gap:10px" });
+  const status = h("p", { class: "text-3 small", style: "margin:8px 0 0" });
   p.append(h("div", { class: "cp-wrap" },
-    h("section", { class: "panel", style: "text-align:center;padding:40px 20px" },
-      h("h2", { style: "font-size:1.3rem", text: "Events are coming soon" }),
-      h("p", { class: "text-2", style: "margin:0", text: "Server events will show up here, connected to the game. Keep an eye on #Announcements." }))));
+    h("section", { class: "panel", style: "padding:16px" },
+      h("h2", { style: "font-size:1.15rem;margin:0 0 6px", text: "Minigames" }),
+      h("p", { class: "text-2", style: "margin:0" }, "Minigames hosted by players and run by our Minigame Staff. To join or watch, go to a ",
+        h("strong", { text: "Minigame Computer" }), " in the Minigame Center, or type ", h("code", { text: "/minigames" }),
+        " in game. Galaxy+ and Pro+ players can host their own."), status),
+    list));
+  const load = async () => {
+    let data;
+    try { data = await getJson("/api/community/events"); } catch (e) { status.textContent = e.message; return; }
+    list.replaceChildren();
+    const now = Date.now() / 1000;
+    if (!data.events.length) list.append(h("div", { class: "panel empty", text: "No minigames are running right now. Check back soon!" }));
+    for (const e of data.events) {
+      const open = e.signupEnds > now;
+      const left = Math.max(0, e.signupEnds - now);
+      list.append(h("article", { class: "panel ev-card" },
+        h("div", { class: "ev-main" },
+          h("h3", { class: "sg-title", text: e.game }),
+          h("p", { class: "sg-foot", style: "margin:0" }, `Hosted by ${e.host} · ${e.players} player${e.players === 1 ? "" : "s"} · ${ACCESS_NAMES[e.access] || "Everyone"}`)),
+        h("span", { class: `sg-status ${open ? "planned" : "done"}`, text: open ? `Sign-ups open · ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, "0")}` : "In progress" })));
+    }
+    status.textContent = data.updated ? `Updated ${new Date(data.updated).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Waiting for the Minecraft server.";
+  };
+  load();
+  refreshTimer = setInterval(load, 15000);
 }
 
 // ---------- Auction House ----------

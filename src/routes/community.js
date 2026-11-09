@@ -37,6 +37,13 @@ export async function auctionBuy(request, env, ctx, url, params) {
   return json({ ok: true, message: answer.message });
 }
 
+// ---------- Events (minigames running on the server) ----------
+export async function eventsList(request, env) {
+  await requireUser(request, env);
+  const data = await voiceStub(env).fetch("https://voice/internal/events").then((r) => r.json());
+  return json({ ok: true, updated: data.at, events: data.events || [] });
+}
+
 // ---------- Suggestions ----------
 const STATUSES = ["open", "planned", "done", "declined"];
 

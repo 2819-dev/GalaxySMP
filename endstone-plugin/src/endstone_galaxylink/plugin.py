@@ -24,13 +24,14 @@ from endstone_galaxylink.economy import HUD_TICKS, Economy
 from endstone_galaxylink.helpmenu import HelpMenu
 from endstone_galaxylink.npc import HOLD_TICKS, NpcManager
 from endstone_galaxylink.plans import CHECK_TICKS, Plans
+from endstone_galaxylink.minigames import STAFF_PERMISSION, Minigames
 from endstone_galaxylink.plots import Plots
 from endstone_galaxylink.ranks import RankManager, name_text, tag_text
 from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.9.0"
+VERSION = "2.10.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -83,6 +84,8 @@ class GalaxyLink(Plugin):
         "back": _cmd("Go back to where you died or last teleported from.", "/back", "galaxylink.command.back"),
         "plan": _cmd("See your subscription plan.", "/plan", "galaxylink.command.plan"),
         "plot": _cmd("Manage your plot. /plot shovel gets a claiming shovel.", "/plot [action: message]", "galaxylink.command.plot", ["plots"]),
+        "minigames": _cmd("The Minigame Center: host, join or watch minigames.", "/minigames", "galaxylink.command.minigames", ["minigame", "mg"]),
+        "tpd": _cmd("Teleport where you've been sent (e.g. to the staff member who accepted your minigame).", "/tpd", "galaxylink.command.tpd"),
         "plotaxe": _cmd("Get the Plot Axe to make plots and protected areas.", "/plotaxe", "galaxylink.command.plotaxe"),
     }
     permissions = {
@@ -113,6 +116,9 @@ class GalaxyLink(Plugin):
         "galaxylink.command.plan": _perm("Allows /plan.", True),
         "galaxylink.command.plot": _perm("Allows /plot.", True),
         "galaxylink.command.plotaxe": _perm("Allows /plotaxe (server operators).", "op"),
+        "galaxylink.command.minigames": _perm("Allows /minigames.", True),
+        "galaxylink.command.tpd": _perm("Allows /tpd.", True),
+        STAFF_PERMISSION: _perm("Minigame Staff: accept or decline minigame host requests. Give it with a rank.", "op"),
     }
 
     def on_enable(self) -> None:
@@ -127,6 +133,8 @@ class GalaxyLink(Plugin):
         self.help = HelpMenu(self)
         self.teleports = Teleports(self)
         self.plots = Plots(self)
+        self.minigames = Minigames(self)
+        self.server.scheduler.run_task(self, self.minigames.tick, delay=600, period=600)
         self.server.scheduler.run_task(self, self.plots.tick, delay=1, period=1)
         self.server.scheduler.run_task(self, self.auction.tick, delay=600, period=600)
         self.register_events(self)
@@ -170,6 +178,7 @@ class GalaxyLink(Plugin):
         self.economy.on_join(player)
         self.plans.bill(player)
         self.plots.on_join(player)
+        self.minigames.on_join(player)
         player.send_message("§7Need help? Type §e/guide§7 for server info, rules and commands.")
         self.refresh_tags()
         if self._voice:
@@ -204,6 +213,8 @@ class GalaxyLink(Plugin):
 
     @event_handler
     def on_interact(self, event: PlayerInteractEvent):
+        if self.minigames.on_interact(event):  # Minigame Computer
+            return
         self.plots.on_interact(event)
 
     @event_handler
@@ -266,7 +277,7 @@ class GalaxyLink(Plugin):
     def on_command(self, sender: CommandSender, command: Command, args: list[str]) -> bool:
         name = command.name
         player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "guide", "tpa", "tpahere", "tpaccept",
-                       "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe"}
+                       "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd"}
         if name in player_only and not isinstance(sender, Player):
             sender.send_message(f"/{name} can only be used in game.")
             return True
@@ -308,6 +319,8 @@ class GalaxyLink(Plugin):
             "plan": lambda: sender.send_message(self.plans.describe(sender)),
             "plot": lambda: self.plots.command(sender, args),
             "plotaxe": lambda: self.plots.give_axe(sender),
+            "minigames": lambda: self.minigames.open(sender),
+            "tpd": lambda: self.minigames.tpd_command(sender),
         }
         if name in simple:
             simple[name]()

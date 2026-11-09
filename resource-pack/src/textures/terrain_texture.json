@@ -1,0 +1,9 @@
+{
+  "resource_pack_name": "galaxysmp",
+  "texture_name": "atlas.terrain",
+  "texture_data": {
+    "galaxysmp_computer": {
+      "textures": "textures/blocks/galaxysmp_computer"
+    }
+  }
+}

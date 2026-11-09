@@ -65,6 +65,7 @@ const routes = [
   ["POST", "/api/mod/economy/:action", economy.adminEconomyAction],
   ["GET", "/api/help", help.getHelp],
   ["GET", "/api/community/auction", (req, env) => community.auctionList(req, env)],
+  ["GET", "/api/community/events", (req, env) => community.eventsList(req, env)],
   ["POST", "/api/community/auction/:id/buy", community.auctionBuy],
   ["GET", "/api/community/suggestions", community.suggestionsList],
   ["POST", "/api/community/suggestions", (req, env) => community.suggestionCreate(req, env)],
