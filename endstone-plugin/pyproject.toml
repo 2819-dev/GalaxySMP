@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "endstone-galaxylink"
-version = "2.2.0"
+version = "2.3.0"
 description = "Links Bedrock players to GalaxySMP website accounts (/link) and powers website voice chat."
 requires-python = ">=3.10"
 dependencies = []

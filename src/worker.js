@@ -16,7 +16,7 @@ export { VoiceHub } from "./voice/hub.js";
 
 // Each entry: [method, path, handler]. A path segment like ":id" matches any value.
 const routes = [
-  ["GET", "/api/status", (req, env, ctx) => handleStatus(req, ctx)],
+  ["GET", "/api/status", (req, env, ctx) => handleStatus(req, ctx, env)],
   ["GET", "/api/health", (req, env) => health(env)],
   ["GET", "/api/store/ranks", () => listRanks()],
   ["POST", "/api/store/checkout", (req, env) => checkout(req, env)],

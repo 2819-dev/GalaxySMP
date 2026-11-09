@@ -176,6 +176,9 @@ export class VoiceHub extends DurableObject {
   // ---------- connections ----------
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname === "/internal/server") {
+      return Response.json((await this.ctx.storage.get("server")) || null);
+    }
     if (url.pathname === "/internal/event") {
       await this.handleInternal(await request.json());
       return new Response("ok");
@@ -222,7 +225,10 @@ export class VoiceHub extends DurableObject {
     if (a && a.kind === "voice") ws.serializeAttachment({ ...a, gone: true });
     try { ws.close(1000, "bye"); } catch { /* gone */ }
     if (!a || a.kind !== "voice") {
-      if (a && a.kind === "plugin") this.positions.clear();
+      if (a && a.kind === "plugin" && this.ctx.getWebSockets("plugin").every((s) => s === ws)) {
+        this.positions.clear();
+        await this.ctx.storage.delete("server"); // server went away: status shows offline right away
+      }
       return;
     }
     this.broadcast({ type: "left", id: a.id });
@@ -246,6 +252,15 @@ export class VoiceHub extends DurableObject {
   }
 
   onPlugin(msg) {
+    if (msg.type === "server") {
+      const info = {
+        at: Date.now(),
+        online: Math.max(0, Number(msg.online) || 0),
+        max: Math.max(0, Number(msg.max) || 0),
+        version: String(msg.version || "").slice(0, 40),
+      };
+      return this.ctx.storage.put("server", info);
+    }
     if (msg.type !== "positions" || !Array.isArray(msg.players)) return;
     const now = Date.now();
     for (const p of msg.players.slice(0, 500)) {

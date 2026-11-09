@@ -29,6 +29,7 @@ ICONS = {
 # In voice and quiet ("connected") shows no icon, like Simple Voice Chat.
 
 POSITION_TICKS = 6  # 20 ticks = 1 second, so about 3 updates per second
+STATUS_EVERY = 50   # x POSITION_TICKS = every 15 seconds: player count for the website status page
 
 
 class _Socket:
@@ -202,6 +203,9 @@ class VoiceLink:
         self._ticks = getattr(self, "_ticks", 0) + 1
         if self._ticks % 4 == 0:
             self._apply_icons()  # catches players who just joined the server
+        if self.ws and (self._ticks % STATUS_EVERY == 1 or getattr(self, "_status_ws", None) is not self.ws):
+            self._status_ws = self.ws
+            self._send_status(self.ws)
         if not self.active or not self.ws:
             return
         players = []
@@ -219,6 +223,18 @@ class VoiceLink:
         ws = self.ws
         payload = json.dumps({"type": "positions", "players": players})
         threading.Thread(target=self._safe_send, args=(ws, payload), daemon=True).start()
+
+    def _send_status(self, ws):
+        server = self.plugin.server
+        try:
+            info = {"type": "server", "online": len(server.online_players), "max": int(server.max_players)}
+            try:
+                info["version"] = str(server.minecraft_version)
+            except Exception:
+                pass
+        except Exception:
+            return
+        threading.Thread(target=self._safe_send, args=(ws, json.dumps(info)), daemon=True).start()
 
     def _safe_send(self, ws, payload):
         try:

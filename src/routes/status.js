@@ -4,7 +4,7 @@
 import config from "../../public/config.js";
 import { json } from "../lib/http.js";
 
-const CACHE_SECONDS = 60;
+const CACHE_SECONDS = 30;
 const PLACEHOLDER = "your.server.ip";
 let memo = null; // { at: ms, data }
 
@@ -22,7 +22,7 @@ function cleanMotd(motd) {
   return lines.join(" ").replace(/\s+/g, " ").trim().slice(0, 140);
 }
 
-export async function buildStatus() {
+export async function buildStatus(env) {
   const manual = config.manualStatus;
   if (manual && manual.enabled) {
     return {
@@ -45,6 +45,25 @@ export async function buildStatus() {
   };
   if (!configured) return { ...base, online: false, reason: "not_configured" };
 
+  // 1) GalaxyLink reports the player count every 15 seconds (works with any Bedrock network setting).
+  if (env && env.VOICE) {
+    try {
+      const res = await env.VOICE.get(env.VOICE.idFromName("voice")).fetch("https://voice/internal/server");
+      const info = await res.json();
+      if (info && Date.now() - info.at < 45_000) {
+        return {
+          ...base,
+          online: true,
+          source: "plugin",
+          players: { online: info.online, max: info.max },
+          version: info.version,
+          motd: "",
+        };
+      }
+    } catch { /* fall back to the public status service */ }
+  }
+
+  // 2) Fallback: public status service.
   let b;
   try {
     b = await lookup(`https://api.mcsrvstat.us/bedrock/3/${encodeURIComponent(`${config.bedrockAddress}:${config.bedrockPort}`)}`);
@@ -60,7 +79,7 @@ export async function buildStatus() {
   };
 }
 
-export async function handleStatus(request, ctx) {
+export async function handleStatus(request, ctx, env) {
   const now = Date.now();
   if (memo && now - memo.at < CACHE_SECONDS * 1000) {
     return json(memo.data, 200, { "Cache-Control": `public, max-age=${CACHE_SECONDS}` });
@@ -74,7 +93,7 @@ export async function handleStatus(request, ctx) {
     if (hit) return hit;
   }
 
-  const data = await buildStatus();
+  const data = await buildStatus(env);
   memo = { at: now, data };
   const response = json(data, 200, { "Cache-Control": `public, max-age=${CACHE_SECONDS}` });
   if (cache) ctx.waitUntil(cache.put(cacheKey, response.clone()));
