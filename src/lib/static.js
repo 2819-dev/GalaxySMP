@@ -42,7 +42,7 @@ export function serveStatic(request) {
     const notFound = assets["/404.html"];
     return new Response(notFound ? notFound.text : "Not found", {
       status: 404,
-      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...SECURITY_HEADERS },
+      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store, no-transform", ...SECURITY_HEADERS },
     });
   }
 
@@ -54,7 +54,7 @@ export function serveStatic(request) {
     // Pages and unversioned files must be re-checked every time (a quick "not modified" reply).
     "Cache-Control": !isHtml(asset) && url.searchParams.has("v")
       ? "public, max-age=31536000, immutable"
-      : "no-cache",
+      : "no-cache, no-transform", // no-transform: Cloudflare must not inject scripts (no trackers)
     ...SECURITY_HEADERS,
   };
   if (request.headers.get("If-None-Match") === asset.etag) {

@@ -61,7 +61,7 @@ function renderHeader() {
       <nav class="nav" id="site-nav" aria-label="Main">
         <div class="nav-links">${links}</div>
         <div class="nav-actions">
-          ${config.hosting === "realm" ? "" : `<button class="ip-chip" type="button" data-copy="${serverAddress}" title="Copy server address (port ${config.bedrockPort})">${icon("copy")}<span>${serverAddress}</span></button>`}
+          ${config.hosting === "realm" ? "" : `<button class="ip-chip" type="button" data-copy="${serverAddress}" title="Copy server address">${icon("copy")}<span>${serverAddress}</span><span class="ip-port">${config.bedrockPort}</span></button>`}
           <a class="btn btn-primary btn-sm" href="/community">Community</a>
         </div>
       </nav>
@@ -89,7 +89,7 @@ function renderFooter() {
           <p>A family-friendly Minecraft Bedrock server.</p>
         </div>
         <div><h4>Play</h4><ul><li><a href="/join">How to Join</a></li><li><a href="/status">Server Status</a></li><li><a href="/store">Store</a></li></ul></div>
-        <div><h4>Community</h4><ul><li><a href="/community">Community Chat</a></li><li><a href="/rules">Rules</a></li></ul></div>
+        <div><h4>Community</h4><ul><li><a href="/community">Community Chat</a></li><li><a href="/voice">Voice Chat</a></li><li><a href="/rules">Rules</a></li></ul></div>
         <div><h4>Legal</h4><ul><li><a href="/privacy">Privacy Policy</a></li></ul></div>
       </div>
     </div>

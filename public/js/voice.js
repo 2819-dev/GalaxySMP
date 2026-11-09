@@ -84,6 +84,7 @@ try { S.volumes = JSON.parse(localStorage.getItem("gsmp-voice-volumes") || "{}")
 // ---------- Views ----------
 function show(id) {
   for (const v of ["v-loading", "v-signin", "v-realm", "v-join", "v-app"]) $(v).hidden = v !== id;
+  $("v-about").hidden = id === "v-app";
 }
 
 function notice(text, info) {
@@ -654,6 +655,7 @@ const typing = (e) => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
 document.addEventListener("keydown", (e) => { if (S.ptt && e.key.toLowerCase() === "v" && !e.repeat && !typing(e)) pttSet(true); });
 document.addEventListener("keyup", (e) => { if (S.ptt && e.key.toLowerCase() === "v") pttSet(false); });
 document.querySelectorAll("[data-vicon]").forEach((el) => (el.innerHTML = vicon(el.getAttribute("data-vicon"))));
+document.querySelectorAll("[data-check]").forEach((el) => (el.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>'));
 window.addEventListener("pagehide", () => { if (S.ws) leave(); });
 
 // ---------- Start ----------

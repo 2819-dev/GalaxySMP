@@ -19,7 +19,7 @@
     <div class="container narrow">
       <header class="page-head">
         <h1>Server Status</h1>
-        <p>Live server information, refreshed automatically every minute.</p>
+        <p>Live server information, refreshed automatically.</p>
       </header>
 
       <section class="panel" aria-live="polite">
@@ -27,14 +27,13 @@
           <span class="dot"></span>
           <span class="word skeleton" id="status-word">Checking</span>
         </div>
-        <p class="text-2" id="status-motd" style="margin:10px 0 0"></p>
+        <p class="text-2" id="status-motd" style="margin:10px 0 0" hidden></p>
       </section>
 
       <section class="panel" style="padding:0;margin-top:16px">
-        <div class="grid" style="gap:0;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+        <div class="grid" style="gap:0;grid-template-columns:repeat(2,minmax(0,1fr))">
           <div class="stat"><div class="k">Players</div><div class="v" id="st-players">–</div></div>
           <div class="stat"><div class="k">Version</div><div class="v" id="st-version">–</div></div>
-          <div class="stat"><div class="k">Server</div><div class="v" id="st-bedrock">–</div></div>
         </div>
       </section>
 
@@ -52,7 +51,7 @@
       </div>
       <p class="note small" data-hosting="realm" hidden style="margin-top:16px"><strong>GalaxySMP is currently a private, invite-only Minecraft Realm</strong> while we move to our own server. Joining details will be published here when we open to everyone.</p>
 
-      <p class="text-3 small" style="margin-top:20px">Last checked <span id="st-checked">–</span>.<span data-hosting="server"> Status is provided by mcsrvstat.us and retrieved through our own server, so your device never connects to a third party.</span></p>
+      <p class="text-3 small" style="margin-top:20px">Last checked <span id="st-checked">–</span>. <span id="st-source"></span></p>
     </div>
   </main>
 
