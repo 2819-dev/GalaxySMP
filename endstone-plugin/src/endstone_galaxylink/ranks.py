@@ -75,18 +75,23 @@ HEX = {
 }
 PALETTE_ORDER = [c for c, _ in COLORS]  # same order as the website, so ties pick the same color
 
-# Gradients: a smooth line between real colors; each letter gets the closest Bedrock color.
+# Gradients: a hand-picked chain of real Bedrock colors in smooth order (Bedrock has no hex colors,
+# only these 28). Each letter gets its own step along the chain, so a name shows as many different
+# colors as it has letters (up to the chain's length), from the first color to the last.
 GRADIENTS = {
-    "galaxy": ("Galaxy (logo)", ["#4FEBFD", "#3DAAF4", "#2149DD"]),
-    "gold": ("Gold Rush", ["#FFFF55", "#DDD605", "#DEB12D", "#FFAA00"]),
-    "sunset": ("Sunset", ["#FFFF55", "#FFAA00", "#EB7114", "#FF5555", "#FF55FF"]),
-    "fire": ("Fire", ["#FFFF55", "#FFAA00", "#EB7114", "#FF5555", "#AA0000"]),
-    "ocean": ("Ocean", ["#55FFFF", "#2CBAA8", "#00AAAA", "#21497B"]),
-    "forest": ("Forest", ["#55FF55", "#47A036", "#00AA00"]),
-    "royal": ("Royal", ["#FF55FF", "#9A5CC6", "#AA00AA"]),
-    "ice": ("Ice", ["#FFFFFF", "#E3D4D1", "#55FFFF", "#2CBAA8"]),
-    "shadow": ("Shadow", ["#AAAAAA", "#555555", "#443A3B"]),
-    "rainbow": ("Rainbow", ["#FF5555", "#FFAA00", "#FFFF55", "#55FF55", "#55FFFF", "#5555FF", "#FF55FF"]),
+    "galaxy": ("Galaxy (logo)", ["b", "s", "3", "9", "t"]),
+    "gold": ("Gold Rush", ["e", "g", "p", "6", "v", "n"]),
+    "sunset": ("Sunset", ["e", "g", "6", "v", "c", "d", "u"]),
+    "fire": ("Fire", ["e", "g", "6", "v", "c", "m", "4"]),
+    "ocean": ("Ocean", ["f", "b", "s", "3", "9", "t"]),
+    "forest": ("Forest", ["e", "a", "q", "2", "s", "3"]),
+    "royal": ("Royal", ["f", "d", "u", "5", "9"]),
+    "ice": ("Ice", ["f", "h", "i", "b", "s", "3"]),
+    "shadow": ("Shadow", ["f", "h", "i", "7", "8"]),
+    "rainbow": ("Rainbow", ["c", "v", "6", "g", "e", "a", "q", "b", "s", "9", "u", "d"]),
+    "aurora": ("Aurora", ["a", "q", "s", "b", "9", "u", "d"]),
+    "cherry": ("Cherry Blossom", ["f", "h", "d", "u", "5"]),
+    "ember": ("Ember", ["e", "6", "v", "n", "c", "m", "4"]),
 }
 
 
@@ -107,14 +112,15 @@ def _nearest(r, g, b):
     return best
 
 
-def gradient_code(stops, k, n):
-    """The Bedrock color code for letter k of n."""
-    t = k / (n - 1) if n > 1 else 0
-    pos = t * (len(stops) - 1)
-    i = min(int(pos), len(stops) - 2) if len(stops) > 1 else 0
-    f = pos - i if len(stops) > 1 else 0
-    a, b = _rgb(stops[i]), _rgb(stops[min(i + 1, len(stops) - 1)])
-    return _nearest(*[int(v + (b[j] - v) * f + 0.5) for j, v in enumerate(a)])
+def gradient_code(chain, k, n):
+    """The Bedrock color code for letter k of n: spread over the whole chain, every letter a new color
+    while there are colors left, then even blocks of each color for long names."""
+    m = len(chain)
+    if n <= 1 or m == 1:
+        return chain[0]
+    if n <= m:
+        return chain[int(k * (m - 1) / (n - 1) + 0.5)]  # rounds halves up, like the website
+    return chain[min(m - 1, k * m // n)]
 
 
 def paint(text, rank, bold=False):

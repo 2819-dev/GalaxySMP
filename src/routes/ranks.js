@@ -26,7 +26,7 @@ export const ICONS = ["crown", "star", "shield", "sword", "gem", "heart", "hamme
                        "goldingot", "ironingot", "amethyst", "lapis", "shootingstar", "wingeddiamond"];
 
 // Gradients (one color per letter). Same keys as the plugin (endstone_galaxylink/ranks.py).
-export const GRADIENTS = ["galaxy", "gold", "sunset", "fire", "ocean", "forest", "royal", "ice", "shadow", "rainbow"];
+export const GRADIENTS = ["galaxy", "gold", "sunset", "fire", "ocean", "forest", "royal", "ice", "shadow", "rainbow", "aurora", "cherry", "ember"];
 
 // Admins type command names (like "time" or "/gamemode"); each becomes the permission
 // that allows the whole command, so "time" also allows "/time set day".
