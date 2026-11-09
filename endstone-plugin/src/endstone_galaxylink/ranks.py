@@ -18,29 +18,47 @@ COLORS = [
 ]
 WEB_ROLES = [(None, "None"), (2, "VIP"), (3, "Moderator"), (4, "Admin")]
 
-# Same list as the website (src/routes/ranks.js).
-PERMISSIONS = [
-    ("minecraft.command.gamemode", "Change game mode (/gamemode)"),
-    ("minecraft.command.teleport", "Teleport (/tp)"),
-    ("minecraft.command.give", "Give items (/give)"),
-    ("minecraft.command.clear", "Clear inventories (/clear)"),
-    ("minecraft.command.effect", "Give effects (/effect)"),
-    ("minecraft.command.enchant", "Enchant items (/enchant)"),
-    ("minecraft.command.xp", "Give XP (/xp)"),
-    ("minecraft.command.time", "Change time (/time)"),
-    ("minecraft.command.weather", "Change weather (/weather)"),
-    ("minecraft.command.summon", "Summon mobs (/summon)"),
-    ("minecraft.command.fill", "Fill blocks (/fill)"),
-    ("minecraft.command.setblock", "Place blocks (/setblock)"),
-    ("minecraft.command.clone", "Copy blocks (/clone)"),
-    ("minecraft.command.kick", "Kick players (/kick)"),
-    ("endstone.command.ban", "Ban players (/ban)"),
-    ("endstone.command.unban", "Unban players (/unban)"),
-]
+# Rank icons drawn by the GalaxySMP Icons resource pack (row 1 of glyph_E2.png).
+ICONS = ["crown", "star", "shield", "sword", "gem", "heart", "hammer", "flame", "bolt", "rocket", "planet", "leaf"]
+GLYPHS = {name: chr(0xE210 + i) for i, name in enumerate(ICONS)}
+
+# Typed command names -> permission nodes. Same rules as the website (src/routes/ranks.js).
+ENDSTONE_COMMANDS = {"ban", "banip", "banlist", "plugins", "reload", "seed", "status", "unban", "unbanip", "version"}
+PLUGIN_COMMANDS = {"link", "ranks", "money", "pay", "baltop", "setmoney", "addmoney", "takemoney", "shop", "sell", "ah", "shopnpc"}
+ALIASES = {"tp": "teleport", "msg": "tell", "w": "tell", "bal": "money", "balance": "money", "auction": "ah",
+           "ban-ip": "banip", "unban-ip": "unbanip", "pardon": "unban"}
+PREFIXES = ("minecraft.command.", "endstone.command.", "galaxylink.command.")
+
+
+def command_permission(name):
+    name = str(name).strip().lstrip("/").split(" ")[0].lower()
+    name = ALIASES.get(name, name)
+    if not name or not all(c.isalnum() or c in "_-" for c in name):
+        return None
+    if name in ENDSTONE_COMMANDS:
+        return "endstone.command." + name
+    if name in PLUGIN_COMMANDS:
+        return "galaxylink.command." + name
+    return "minecraft.command." + name
+
+
+def split_permissions(perms):
+    """-> (command names, other permission nodes)"""
+    cmds, other = [], []
+    for p in perms:
+        for pre in PREFIXES:
+            if p.startswith(pre):
+                cmds.append(p[len(pre):])
+                break
+        else:
+            other.append(p)
+    return cmds, other
 
 
 def tag_text(rank):
-    return f"§{rank['color']}[{rank['prefix']}]"
+    glyph = GLYPHS.get(rank.get("icon") or "")
+    text = f"§{rank['color']}[{rank['prefix']}]"
+    return f"§r{glyph} {text}" if glyph else text
 
 
 class RankManager:
@@ -153,20 +171,23 @@ class RankManager:
         player.send_form(form)
 
     def rank_form(self, player, rank):
-        r = rank or {"name": "", "prefix": "", "color": "f", "permissions": [], "websiteRole": None}
+        r = rank or {"name": "", "prefix": "", "color": "f", "icon": None, "permissions": [], "websiteRole": None}
         color_index = next((i for i, (c, _) in enumerate(COLORS) if c == r["color"]), 15)
         role_index = next((i for i, (v, _) in enumerate(WEB_ROLES) if v == r.get("websiteRole")), 0)
+        icon_index = ICONS.index(r["icon"]) + 1 if r.get("icon") in ICONS else 0
+        cmds, other = split_permissions(r["permissions"])
         controls = [
             TextInput("Rank name", "e.g. Builder", r["name"]),
             TextInput("Prefix (shown as [PREFIX])", "e.g. BUILDER", r["prefix"]),
-            Dropdown("Color", [n for _, n in COLORS], color_index),
+            Dropdown("Color", [f"§{c}{n}" for c, n in COLORS], color_index),
+            Dropdown("Icon", ["None"] + [f"{GLYPHS[n]} {n.title()}" for n in ICONS], icon_index),
             Dropdown("Website role", [n for _, n in WEB_ROLES], role_index),
+            TextInput("Commands this rank can use, separated by spaces. /time also allows /time set day.",
+                      "e.g. time weather gamemode", " ".join(cmds)),
+            TextInput("Advanced: other permission nodes (optional)", "e.g. someplugin.fly", " ".join(other)),
         ]
-        controls += [Toggle(label, perm in r["permissions"]) for perm, label in PERMISSIONS]
         if rank:
             controls.append(Toggle("§cDelete this rank", False))
-        known = {perm for perm, _ in PERMISSIONS}
-        extra = [p for p in r["permissions"] if p not in known]
 
         def submit(p, data):
             try:
@@ -176,15 +197,17 @@ class RankManager:
             if rank and values[-1]:
                 self.send(p, {"action": "delete", "id": rank["id"]}, f"Deleted the rank {rank['name']}.")
                 return
-            perms = [perm for (perm, _), on in zip(PERMISSIONS, values[4:4 + len(PERMISSIONS)]) if on] + extra
+            perms = [command_permission(c) for c in str(values[5]).replace(",", " ").split()]
+            perms = [x for x in perms if x] + [x.lower() for x in str(values[6]).replace(",", " ").split()]
             body = {
                 "action": "update" if rank else "create",
                 "id": rank["id"] if rank else None,
                 "name": values[0],
                 "prefix": values[1],
                 "color": COLORS[int(values[2])][0],
-                "websiteRole": WEB_ROLES[int(values[3])][0],
-                "permissions": perms,
+                "icon": ICONS[int(values[3]) - 1] if int(values[3]) > 0 else None,
+                "websiteRole": WEB_ROLES[int(values[4])][0],
+                "permissions": list(dict.fromkeys(perms)),
             }
             self.send(p, body, "Rank saved." if rank else "Rank created.")
 

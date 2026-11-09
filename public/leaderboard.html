@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Money Leaderboard · GalaxySMP</title>
+  <meta name="description" content="The richest players on GalaxySMP.">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#0a0c1b">
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/leaderboard.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header" class="site-header-slot"></div>
+
+  <main id="main">
+    <div class="container narrow">
+      <header class="page-head">
+        <h1>Money Leaderboard</h1>
+        <p>The richest players on GalaxySMP. Earn money by selling items with <code>/sell</code> and on the Auction House (<code>/ah</code>).</p>
+      </header>
+
+      <section class="panel" style="padding:0">
+        <div class="grid" style="gap:0;grid-template-columns:repeat(2,minmax(0,1fr))">
+          <div class="stat"><div class="k">Players with money</div><div class="v" id="lb-players">–</div></div>
+          <div class="stat"><div class="k">Money in the economy</div><div class="v" id="lb-total">–</div></div>
+        </div>
+      </section>
+
+      <section class="panel" style="padding:0;margin-top:16px">
+        <ol class="leaderboard" id="lb-list"><li class="empty">Loading…</li></ol>
+      </section>
+      <p class="text-3 small" id="lb-updated" style="margin-top:12px"></p>
+
+      <section class="panel" style="margin-top:24px">
+        <h2 style="font-size:1.1rem;margin:0 0 10px">Money commands</h2>
+        <div class="cmd-grid">
+          <div><code>/money</code><span>Your balance (also <code>/bal</code>)</span></div>
+          <div><code>/pay &lt;player&gt; &lt;amount&gt;</code><span>Send money, like <code>/pay Steve 2.5k</code></span></div>
+          <div><code>/shop</code><span>Buy and sell items by category</span></div>
+          <div><code>/sell</code><span>Sell items. <code>/sell hand</code> or <code>/sell all</code></span></div>
+          <div><code>/ah</code><span>Auction House. <code>/ah sell &lt;price&gt;</code> sells what you hold</span></div>
+          <div><code>/baltop</code><span>This leaderboard, in game</span></div>
+        </div>
+        <p class="text-3 small" style="margin:12px 0 0">Everyone starts with $1,000. Auction House listings last 48 hours, with a 5% fee when an item sells.</p>
+      </section>
+    </div>
+  </main>
+
+  <div id="site-footer"></div>
+</body>
+</html>

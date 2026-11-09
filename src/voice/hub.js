@@ -13,6 +13,7 @@ import { getDb } from "../lib/db.js";
 import { checkMessage, compileWordList } from "../lib/filter.js";
 import { sha256 } from "../lib/crypto.js";
 import { loadRanksState, recordPlayers } from "../routes/ranks.js";
+import { loadShop, recordBalances } from "../routes/economy.js";
 
 export const RANGE = 48; // blocks
 const PULL_RANGE = RANGE * 1.3; // a little slack so walking to the edge doesn't cut out
@@ -187,6 +188,12 @@ export class VoiceHub extends DurableObject {
       }
       return Response.json(null);
     }
+    if (url.pathname === "/internal/plugin") {
+      const plugin = this.pluginSocket();
+      if (!plugin) return Response.json({ sent: false });
+      this.send(plugin, await request.json());
+      return Response.json({ sent: true });
+    }
     if (url.pathname === "/internal/event") {
       await this.handleInternal(await request.json());
       return new Response("ok");
@@ -202,6 +209,7 @@ export class VoiceHub extends DurableObject {
       this.send(server, { type: "active", on: this.voiceSockets().length > 0 });
       this.sendIcons();
       this.ctx.waitUntil(this.sendRanks());
+      this.ctx.waitUntil(this.sendShop());
       return new Response(null, { status: 101, webSocket: client });
     }
 
@@ -263,6 +271,9 @@ export class VoiceHub extends DurableObject {
   onPlugin(msg) {
     if (msg.type === "seen") {
       return recordPlayers(this.env, msg.players).catch((e) => console.error("record players failed", e));
+    }
+    if (msg.type === "balances") {
+      return recordBalances(this.env, msg.players).catch((e) => console.error("record balances failed", e));
     }
     if (msg.type === "server") {
       const info = {
@@ -419,6 +430,16 @@ export class VoiceHub extends DurableObject {
       this.send(plugin, { type: "ranks", ...state });
     } catch (e) {
       console.error("ranks load failed", e);
+    }
+  }
+
+  async sendShop() {
+    const plugin = this.pluginSocket();
+    if (!plugin) return;
+    try {
+      this.send(plugin, { type: "shop", shop: await loadShop(getDb(this.env)) });
+    } catch (e) {
+      console.error("shop load failed", e);
     }
   }
 

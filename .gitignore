@@ -7,3 +7,5 @@ plugin/build/
 src/generated/
 server-files/
 __pycache__/
+endstone-plugin/build/
+*.egg-info/

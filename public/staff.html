@@ -33,6 +33,7 @@
           <button role="tab" data-tab="members" aria-selected="false">Members</button>
           <button role="tab" data-tab="words" aria-selected="false">Word filter</button>
           <button role="tab" data-tab="ranks" aria-selected="false" hidden>Ranks</button>
+          <button role="tab" data-tab="economy" aria-selected="false" hidden>Economy</button>
           <button role="tab" data-tab="audit" aria-selected="false">Audit log</button>
         </div>
 
@@ -80,7 +81,7 @@
               <h2>Ranks</h2>
               <button class="btn btn-primary btn-sm" type="button" id="rank-new">New rank</button>
             </div>
-            <p class="text-3 small" style="margin:0 0 12px">Ranks show a colored prefix in chat and above players' heads, and can give command permissions and a website role. Changes reach the server within seconds. In game, operators can use <code>/ranks</code>.</p>
+            <p class="text-3 small" style="margin:0 0 12px">Ranks show a colored prefix and icon in chat and above players' heads, and can let players use chosen commands without being operators. Changes reach the server within seconds. In game, operators can use <code>/ranks</code>.</p>
             <div id="rank-list" class="stack" style="gap:2px"></div>
           </div>
           <div class="panel">
@@ -88,6 +89,28 @@
             <div class="toolbar"><input class="input" id="rank-player-search" type="search" placeholder="Search by gamertag" autocomplete="off"></div>
             <div id="rank-players"></div>
             <p class="text-3 small" style="margin:12px 0 0">Players appear here after they join the server.</p>
+          </div>
+        </section>
+
+        <section data-panel="economy" hidden>
+          <div class="panel" style="margin-bottom:16px">
+            <div class="voice-head"><h2>Player money</h2></div>
+            <p id="eco-server" class="small text-3" style="margin:0 0 12px"></p>
+            <div class="toolbar"><input class="input" id="eco-search" type="search" placeholder="Search by gamertag" autocomplete="off"></div>
+            <div id="eco-players"></div>
+            <p class="text-3 small" style="margin:12px 0 0">New players get $1,000. Operators have infinite money (∞). Public list: <a href="/leaderboard">Leaderboard</a>.</p>
+          </div>
+          <div class="panel">
+            <div class="voice-head">
+              <h2>Shop prices</h2>
+              <div class="row-actions">
+                <button class="btn btn-ghost btn-sm" type="button" id="eco-reset">Reset to built-in prices</button>
+                <button class="btn btn-secondary btn-sm" type="button" id="eco-add-cat">Add category</button>
+                <button class="btn btn-primary btn-sm" type="button" id="eco-save" disabled>Save prices</button>
+              </div>
+            </div>
+            <p class="text-3 small" style="margin:0 0 6px">Prices are in dollars. Leave Buy or Sell empty to turn it off for that item. Tap a category to edit it. <span id="eco-status"></span></p>
+            <div id="eco-shop"></div>
           </div>
         </section>
 

@@ -1,7 +1,7 @@
 """GalaxyLink for Endstone (Bedrock Dedicated Server).
 
-Adds /link CODE. The code comes from the GalaxySMP website; this plugin sends it,
-with the player's gamertag and ID, to the website to prove they own that account.
+Adds /link CODE (the code comes from the GalaxySMP website), voice chat icons,
+ranks (/ranks) and the economy: money, /pay, /shop, /sell, /ah and shop NPCs.
 """
 
 import json
@@ -12,12 +12,30 @@ import urllib.request
 
 from endstone import ColorFormat, Player
 from endstone.command import Command, CommandSender
-from endstone.event import PlayerChatEvent, PlayerJoinEvent, PlayerQuitEvent, event_handler
+from endstone.event import (ActorDamageEvent, PlayerChatEvent, PlayerInteractActorEvent, PlayerJoinEvent,
+                            PlayerQuitEvent, event_handler)
 from endstone.plugin import Plugin
 
 from endstone_galaxylink import settings
+from endstone_galaxylink.auction import AuctionHouse
+from endstone_galaxylink.economy import HUD_TICKS, Economy
+from endstone_galaxylink.npc import HOLD_TICKS, NpcManager
 from endstone_galaxylink.ranks import RankManager, tag_text
+from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.voice import VoiceLink
+
+VERSION = "2.5.0"
+
+
+def _cmd(description, usage, perm, aliases=None):
+    c = {"description": description, "usages": usage if isinstance(usage, list) else [usage], "permissions": [perm]}
+    if aliases:
+        c["aliases"] = aliases
+    return c
+
+
+def _perm(description, default):
+    return {"description": description, "default": default}
 
 COOLDOWN_SECONDS = 5
 TIMEOUT_SECONDS = 15
@@ -29,33 +47,49 @@ class GalaxyLink(Plugin):
     website = "https://galaxymc.us"
 
     commands = {
-        "link": {
-            "description": "Link your account to the GalaxySMP website.",
-            "usages": ["/link <code: message>"],
-            "permissions": ["galaxylink.command.link"],
-        },
-        "ranks": {
-            "description": "Manage GalaxySMP ranks.",
-            "usages": ["/ranks"],
-            "permissions": ["galaxylink.command.ranks"],
-        },
+        "link": _cmd("Link your account to the GalaxySMP website.", "/link <code: message>", "galaxylink.command.link"),
+        "ranks": _cmd("Manage GalaxySMP ranks.", "/ranks", "galaxylink.command.ranks"),
+        "money": _cmd("See your money (or someone else's).", "/money [player: message]", "galaxylink.command.money",
+                      ["bal", "balance"]),
+        "pay": _cmd("Send money to a player, like /pay Steve 2.5k", "/pay <player: player> <amount: message>",
+                    "galaxylink.command.pay"),
+        "baltop": _cmd("The richest players.", "/baltop", "galaxylink.command.baltop"),
+        "shop": _cmd("Buy and sell items.", "/shop", "galaxylink.command.shop"),
+        "sell": _cmd("Sell items: /sell, /sell hand or /sell all", "/sell [what: message]", "galaxylink.command.sell"),
+        "ah": _cmd("The Auction House. /ah sell <price> sells the item in your hand.", "/ah [action: message]",
+                   "galaxylink.command.ah", ["auction"]),
+        "setmoney": _cmd("Set a player's money.", "/setmoney <player: player> <amount: message>", "galaxylink.command.setmoney"),
+        "addmoney": _cmd("Give a player money.", "/addmoney <player: player> <amount: message>", "galaxylink.command.addmoney"),
+        "takemoney": _cmd("Take money from a player.", "/takemoney <player: player> <amount: message>",
+                          "galaxylink.command.takemoney"),
+        "shopnpc": _cmd("Summon a shop NPC where you stand. Tap it to edit it.", "/shopnpc", "galaxylink.command.shopnpc"),
     }
     permissions = {
-        "galaxylink.command.link": {
-            "description": "Allows players to use /link.",
-            "default": True,
-        },
-        "galaxylink.command.ranks": {
-            "description": "Allows managing ranks with /ranks (server operators).",
-            "default": "op",
-        },
+        "galaxylink.command.link": _perm("Allows players to use /link.", True),
+        "galaxylink.command.ranks": _perm("Allows managing ranks with /ranks (server operators).", "op"),
+        "galaxylink.command.money": _perm("Allows /money.", True),
+        "galaxylink.command.pay": _perm("Allows /pay.", True),
+        "galaxylink.command.baltop": _perm("Allows /baltop.", True),
+        "galaxylink.command.shop": _perm("Allows /shop.", True),
+        "galaxylink.command.sell": _perm("Allows /sell.", True),
+        "galaxylink.command.ah": _perm("Allows the Auction House.", True),
+        "galaxylink.command.setmoney": _perm("Allows /setmoney (server operators).", "op"),
+        "galaxylink.command.addmoney": _perm("Allows /addmoney (server operators).", "op"),
+        "galaxylink.command.takemoney": _perm("Allows /takemoney (server operators).", "op"),
+        "galaxylink.command.shopnpc": _perm("Allows /shopnpc and editing NPCs (server operators).", "op"),
     }
 
     def on_enable(self) -> None:
         self._last_use = {}
         self._voice = None
         self.ranks = RankManager(self)
+        self.economy = Economy(self)
+        self.shop = Shop(self)
+        self.auction = AuctionHouse(self)
+        self.npcs = NpcManager(self)
         self.register_events(self)
+        self.server.scheduler.run_task(self, self.economy.tick, delay=HUD_TICKS, period=HUD_TICKS)
+        self.server.scheduler.run_task(self, self.npcs.tick, delay=HOLD_TICKS, period=HOLD_TICKS)
         self._base = settings.WEBSITE.rstrip("/")
         if not settings.SECRET or settings.SECRET.startswith("PASTE_"):
             self.logger.warning("GalaxyLink is missing its secret. Download a fresh build from the website team.")
@@ -88,6 +122,7 @@ class GalaxyLink(Plugin):
     def on_player_join(self, event: PlayerJoinEvent):
         player = event.player
         self.ranks.apply_permissions(player)
+        self.economy.on_join(player)
         self.refresh_tags()
         if self._voice:
             self._voice.send_seen([player])
@@ -97,6 +132,14 @@ class GalaxyLink(Plugin):
         self.ranks.forget(event.player)
 
     @event_handler
+    def on_interact_actor(self, event: PlayerInteractActorEvent):
+        self.npcs.on_interact(event)
+
+    @event_handler
+    def on_actor_damage(self, event: ActorDamageEvent):
+        self.npcs.on_damage(event)
+
+    @event_handler
     def on_player_chat(self, event: PlayerChatEvent):
         fmt = self.ranks.chat_format(event.player)
         if fmt:
@@ -104,7 +147,10 @@ class GalaxyLink(Plugin):
 
     def on_disable(self) -> None:
         if getattr(self, "_voice", None):
+            self.economy.sync()
             self._voice.stop()
+        if getattr(self, "economy", None):
+            self.economy.db.close()
 
     # ---------- Website requests (run on a background thread) ----------
     def _request(self, path, body=None):
@@ -116,7 +162,7 @@ class GalaxyLink(Plugin):
             headers={
                 "Authorization": "Bearer " + settings.SECRET,
                 "Content-Type": "application/json",
-                "User-Agent": "GalaxyLink-Endstone/2.4.0",
+                "User-Agent": "GalaxyLink-Endstone/" + VERSION,
             },
         )
         try:
@@ -141,6 +187,35 @@ class GalaxyLink(Plugin):
 
     # ---------- /link ----------
     def on_command(self, sender: CommandSender, command: Command, args: list[str]) -> bool:
+        name = command.name
+        player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks"}
+        if name in player_only and not isinstance(sender, Player):
+            sender.send_message(f"/{name} can only be used in game.")
+            return True
+        if name == "money":
+            self.economy.cmd_money(sender, args)
+            return True
+        if name == "pay":
+            self.economy.cmd_pay(sender, args)
+            return True
+        if name in ("setmoney", "addmoney", "takemoney"):
+            self.economy.cmd_admin(sender, name, args)
+            return True
+        if name == "baltop":
+            self.economy.open_top(sender)
+            return True
+        if name == "shop":
+            self.shop.open(sender)
+            return True
+        if name == "sell":
+            self.shop.cmd_sell(sender, args)
+            return True
+        if name == "ah":
+            self.auction.command(sender, args)
+            return True
+        if name == "shopnpc":
+            self.npcs.create(sender)
+            return True
         if command.name == "ranks":
             if not isinstance(sender, Player):
                 sender.send_message("Open /ranks in game, or use galaxymc.us (Staff Tools > Ranks).")

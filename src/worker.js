@@ -11,6 +11,7 @@ import { bootstrap, history, connect } from "./routes/chat.js";
 import * as mod from "./routes/mod.js";
 import { voiceConnect, voiceServer } from "./routes/voice.js";
 import * as ranks from "./routes/ranks.js";
+import * as economy from "./routes/economy.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -55,6 +56,9 @@ const routes = [
   ["GET", "/api/mod/ranks", ranks.listRanks],
   ["POST", "/api/mod/ranks/:action", ranks.websiteAction],
   ["POST", "/api/plugin/ranks", (req, env) => ranks.pluginAction(req, env)],
+  ["GET", "/api/economy/top", economy.leaderboard],
+  ["GET", "/api/mod/economy", economy.adminEconomy],
+  ["POST", "/api/mod/economy/:action", economy.adminEconomyAction],
 ];
 
 function matchPath(pattern, pathname) {

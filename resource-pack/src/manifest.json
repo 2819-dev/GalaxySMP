@@ -1,12 +1,12 @@
 {
   "format_version": 2,
   "header": {
-    "name": "GalaxySMP Voice Icons",
-    "description": "Voice chat icons above players' heads",
+    "name": "GalaxySMP Icons",
+    "description": "Voice chat and rank icons for GalaxySMP",
     "uuid": "6b0f4c3e-2d1a-4a8e-9c5b-1f7e3a9d2c41",
     "version": [
       1,
-      0,
+      1,
       0
     ],
     "min_engine_version": [
@@ -21,7 +21,7 @@
       "uuid": "a3e9d1c7-5b2f-4e6a-8d4c-7f1b2e9a6c35",
       "version": [
         1,
-        0,
+        1,
         0
       ]
     }

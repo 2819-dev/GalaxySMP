@@ -1,4 +1,4 @@
-// Staff Tools page: reports, members, word filter and audit log.
+// Staff Tools page: reports, members, word filter, ranks, economy and audit log.
 import { toast } from "/js/site.js";
 import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, roleDialog, voiceMuteDialog, select, field } from "/js/dialog.js";
 
@@ -215,6 +215,9 @@ const DESCRIBE = {
   "rank.delete": (e) => [`deleted the rank ${e.details.rank}`],
   "rank.assign": (e) => [`gave ${e.details.player} the rank ${e.details.rank}`],
   "rank.remove": (e) => [`removed the rank from ${e.details.player}`],
+  "economy.money": (e) => [e.details.action === "set" ? `set ${e.details.player}'s money to ${money(e.details.cents)}` : e.details.action === "add" ? `gave ${e.details.player} ${money(e.details.cents)}` : `took ${money(e.details.cents)} from ${e.details.player}`],
+  "economy.shop": (e) => [`changed the shop prices (${e.details.categories} categories, ${e.details.items} items)`],
+  "economy.shop_reset": () => ["reset the shop to the built-in prices"],
   "filter.add": () => ["added a word to the filter"],
   "filter.remove": () => ["removed a word from the filter"],
 };
@@ -254,15 +257,28 @@ const MC_COLORS = [
 ];
 const hexOf = (c) => (MC_COLORS.find((x) => x[0] === c) || MC_COLORS[15])[2];
 const WEB_ROLES = [["", "None"], ["2", "VIP"], ["3", "Moderator"], ["4", "Admin"]];
+const PERM_PREFIXES = ["minecraft.command.", "endstone.command.", "galaxylink.command."];
 let rankData = null;
 let rankSearchTimer;
 
-function rankPreview(prefix, color, name) {
+const iconImg = (icon) => (icon ? h("img", { class: "rank-icon", src: `/img/ranks/rank_${icon}.png`, alt: "", width: 18, height: 18 }) : null);
+
+function rankPreview(prefix, color, name, icon) {
   const span = h("span", { class: "rank-preview" });
   const tag = h("span", { text: `[${prefix}]` });
   tag.style.color = hexOf(color);
-  span.append(tag, " ", h("span", { text: name }));
+  span.append(...[iconImg(icon), tag, " ", h("span", { text: name })].filter(Boolean));
   return span;
+}
+
+function splitPerms(perms) {
+  const commands = [];
+  const other = [];
+  for (const p of perms) {
+    const pre = PERM_PREFIXES.find((x) => p.startsWith(x));
+    if (pre) commands.push(p.slice(pre.length)); else other.push(p);
+  }
+  return { commands, other };
 }
 
 loaders.ranks = async () => {
@@ -273,10 +289,11 @@ loaders.ranks = async () => {
   if (!rankData.ranks.length) list.append(h("div", { class: "empty", text: "No ranks yet. Select New rank to create one." }));
   for (const r of rankData.ranks) {
     const role = WEB_ROLES.find((x) => x[0] === String(r.websiteRole || ""))[1];
+    const { commands } = splitPerms(r.permissions);
     list.append(h("div", { class: "member-row" },
       h("div", { class: "info" },
-        h("strong", {}, rankPreview(r.prefix, r.color, r.name)),
-        h("span", { text: `${r.players} player${r.players === 1 ? "" : "s"} · ${r.permissions.length} permission${r.permissions.length === 1 ? "" : "s"} · Website role: ${role}` })),
+        h("strong", {}, rankPreview(r.prefix, r.color, r.name, r.icon)),
+        h("span", { text: `${r.players} player${r.players === 1 ? "" : "s"} · ${commands.length ? "Commands: " + commands.map((c) => "/" + c).join(" ") : "No commands"} · Website role: ${role}` })),
       h("div", { class: "row-actions" },
         h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Edit", onclick: () => rankDialog(r) }),
         h("button", { class: "btn btn-danger btn-sm", type: "button", text: "Delete", onclick: () => deleteRank(r) }))));
@@ -302,7 +319,7 @@ function renderRankPlayers() {
     });
     box.append(h("div", { class: "member-row" },
       h("div", { class: "info" }, h("strong", {}, p.gamertag, p.linked ? h("span", { class: "pill-status owner", text: "Website account" }) : null),
-        h("span", { text: `Last seen ${new Date(p.lastSeen).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` })),
+        h("span", { text: `Last seen ${fmt(p.lastSeen)}` })),
       sel));
   }
 }
@@ -310,38 +327,89 @@ function renderRankPlayers() {
 $("rank-player-search").addEventListener("input", () => { clearTimeout(rankSearchTimer); rankSearchTimer = setTimeout(loaders.ranks, 300); });
 $("rank-new").addEventListener("click", () => rankDialog(null));
 
+// A row of toggle buttons (colors, icons). Returns { el, value() }.
+function choiceGrid(label, options, initial, render) {
+  let value = initial;
+  const el = h("div", { class: "choice-grid", role: "group", "aria-label": label });
+  const buttons = options.map(([v, name]) => {
+    const b = h("button", { type: "button", title: name, "aria-label": name, "aria-pressed": String(v === value) }, render(v, name));
+    b.addEventListener("click", () => {
+      value = v;
+      buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    return b;
+  });
+  el.append(...buttons);
+  return { el, value: () => value };
+}
+
+// Type a command and press Enter (or space / comma) to add it as a chip.
+function commandChips(initial) {
+  const list = [...initial];
+  const input = h("input", { id: "rank-commands", placeholder: list.length ? "Add another…" : "Type a command, like time, then press Enter", autocomplete: "off", autocapitalize: "off", spellcheck: "false" });
+  const box = h("div", { class: "chips", onclick: () => input.focus() });
+  const draw = () => {
+    box.replaceChildren(...list.map((c, i) => h("span", { class: "chip" }, "/" + c,
+      h("button", { type: "button", "aria-label": `Remove /${c}`, text: "×", onclick: (e) => { e.stopPropagation(); list.splice(i, 1); draw(); } }))), input);
+  };
+  const add = () => {
+    for (const part of input.value.split(/[\s,]+/)) {
+      const c = part.trim().replace(/^\/+/, "").toLowerCase();
+      if (c && /^[a-z0-9_-]{1,40}$/.test(c) && !list.includes(c)) list.push(c);
+    }
+    input.value = "";
+    draw();
+    input.focus();
+  };
+  input.addEventListener("keydown", (e) => {
+    if (["Enter", " ", ","].includes(e.key)) { e.preventDefault(); add(); }
+    else if (e.key === "Backspace" && !input.value && list.length) { list.pop(); draw(); input.focus(); }
+  });
+  input.addEventListener("blur", () => { if (input.value.trim()) add(); });
+  draw();
+  return { el: box, value: () => { if (input.value.trim()) add(); return [...list]; } };
+}
+
 function rankDialog(rank) {
-  const r = rank || { name: "", prefix: "", color: "f", permissions: [], websiteRole: null };
+  const r = rank || { name: "", prefix: "", color: "f", icon: null, permissions: [], websiteRole: null };
+  const { commands, other } = splitPerms(r.permissions);
   const name = h("input", { class: "input", id: "rank-name", maxlength: 24, value: r.name, placeholder: "e.g. Builder" });
   const prefix = h("input", { class: "input", id: "rank-prefix", maxlength: 16, value: r.prefix, placeholder: "e.g. BUILDER" });
-  const color = select("rank-color", MC_COLORS.map(([c, n]) => [c, n]), r.color);
+  const color = choiceGrid("Color", MC_COLORS.map(([c, n]) => [c, n]), r.color, (c) => { const s = h("span", { class: "swatch" }); s.style.background = hexOf(c); return s; });
+  const icon = choiceGrid("Icon", [["", "No icon"], ...rankData.icons.map((i) => [i, i[0].toUpperCase() + i.slice(1)])], r.icon || "",
+    (v) => (v ? h("img", { src: `/img/ranks/rank_${v}.png`, alt: "" }) : h("span", { text: "None" })));
   const role = select("rank-role", WEB_ROLES, String(r.websiteRole || ""));
+  const cmds = commandChips(commands);
+  const advanced = h("input", { class: "input", id: "rank-other", placeholder: "someplugin.permission, another.one", value: other.join(", ") });
   const preview = h("div", { class: "rank-preview-box" });
   const update = () => {
-    preview.replaceChildren(rankPreview(prefix.value || "PREFIX", color.value, "VisionDevs"), h("span", { class: "text-3", text: ": hello!" }));
+    preview.replaceChildren(rankPreview(prefix.value || "PREFIX", color.value(), "VisionDevs", icon.value()), h("span", { class: "text-3", text: ": hello!" }));
   };
-  [name, prefix, color].forEach((el) => el.addEventListener("input", update));
+  [name, prefix, color.el, icon.el].forEach((el) => el.addEventListener("input", update));
   update();
-  const known = new Set(rankData.permissions.map((p) => p[0]));
-  const boxes = rankData.permissions.map(([perm, label]) =>
-    h("label", { class: "check" }, h("input", { type: "checkbox", value: perm, checked: r.permissions.includes(perm) }), label));
-  const other = h("input", { class: "input", id: "rank-other", placeholder: "other.permission, another.one", value: r.permissions.filter((p) => !known.has(p)).join(", ") });
   openDialog({
     title: rank ? `Edit ${rank.name}` : "New rank",
     body: h("div", { class: "form" },
       preview,
       field("Rank name", name),
       field("Prefix", prefix, "Shown as [PREFIX] in chat and above heads."),
-      field("Color", color),
+      h("div", { class: "field" }, h("span", { class: "field-label", text: "Color" }), color.el),
+      h("div", { class: "field" }, h("span", { class: "field-label", text: "Icon" }), icon.el,
+        h("p", { class: "hint", text: "Shown before the prefix in game (players need the GalaxySMP Icons pack, which the server sends automatically)." })),
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "rank-commands", text: "Commands this rank can use" }), cmds.el,
+        h("p", { class: "hint", text: "Type a command name and press Enter, for example time, weather, gamemode or tp. A command includes everything after it: time also allows /time set day. Players don't need to be operators." })),
       field("Website role", role, "Players with this rank who linked a website account also get this role in chat and voice. Roles set by hand are never lowered."),
-      h("div", {}, h("span", { class: "field-label", text: "Command permissions" }), h("div", { class: "perm-grid" }, boxes)),
-      field("Other permissions (advanced)", other, "Extra permission names, separated by commas.")),
+      h("details", {}, h("summary", { class: "text-3 small", text: "Advanced: other permission nodes" }),
+        field("Permission nodes", advanced, "For other plugins' permissions, separated by commas."))),
     actions: [{ label: "Cancel" }, {
       label: rank ? "Save" : "Create", kind: "primary",
       onClick: async () => {
-        const permissions = boxes.map((b) => b.querySelector("input")).filter((i) => i.checked).map((i) => i.value)
-          .concat(other.value.split(",").map((s) => s.trim()).filter(Boolean));
-        await postJson(`/api/mod/ranks/${rank ? "update" : "create"}`, { id: rank?.id, name: name.value, prefix: prefix.value, color: color.value, websiteRole: role.value || null, permissions });
+        await postJson(`/api/mod/ranks/${rank ? "update" : "create"}`, {
+          id: rank?.id, name: name.value, prefix: prefix.value, color: color.value(), icon: icon.value() || null,
+          websiteRole: role.value || null, commands: cmds.value(),
+          permissions: advanced.value.split(",").map((s) => s.trim()).filter(Boolean),
+        });
         toast(rank ? "Rank saved." : "Rank created.");
         loaders.ranks();
       },
@@ -352,13 +420,148 @@ function rankDialog(rank) {
 function deleteRank(r) {
   openDialog({
     title: `Delete ${r.name}?`,
-    body: h("p", { class: "text-2", text: `${r.players} player${r.players === 1 ? "" : "s"} will lose this rank, its prefix and its permissions.` }),
+    body: h("p", { class: "text-2", text: `${r.players} player${r.players === 1 ? "" : "s"} will lose this rank, its prefix and its commands.` }),
     actions: [{ label: "Cancel" }, {
       label: "Delete rank", kind: "danger",
       onClick: async () => { await postJson("/api/mod/ranks/delete", { id: r.id }); toast("Rank deleted."); loaders.ranks(); },
     }],
   });
 }
+
+// ---------- Economy (Admins) ----------
+const money = (cents) => {
+  const d = cents / 100;
+  if (Math.abs(d) < 10000) return "$" + d.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  for (const [size, letter] of [[1e15, "Q"], [1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]]) {
+    if (Math.abs(d) >= size) return `$${(d / size).toFixed(2).replace(/\.?0+$/, "")}${letter}`;
+  }
+  return "$" + d;
+};
+let ecoData = null;
+let ecoShop = null;
+let ecoDirty = false;
+let ecoSearchTimer;
+
+loaders.economy = async () => {
+  const q = $("eco-search").value.trim();
+  ecoData = await getJson(`/api/mod/economy?q=${encodeURIComponent(q)}`);
+  $("eco-server").textContent = ecoData.serverOnline ? "The server is connected: changes apply in game within seconds." : "The server isn't connected right now. Price changes are saved and sent when it's back; money can only be changed while it's online.";
+  $("eco-server").className = `small ${ecoData.serverOnline ? "text-3" : "text-warn"}`;
+  renderEcoPlayers();
+  if (!ecoDirty) { ecoShop = structuredClone(ecoData.shop); renderShop(); }
+};
+$("eco-search").addEventListener("input", () => { clearTimeout(ecoSearchTimer); ecoSearchTimer = setTimeout(loaders.economy, 300); });
+
+function renderEcoPlayers() {
+  const box = $("eco-players");
+  box.replaceChildren();
+  if (!ecoData.players.length) { box.append(h("div", { class: "empty", text: "No players found. Players appear after they join the server." })); return; }
+  for (const p of ecoData.players) {
+    box.append(h("div", { class: "member-row" },
+      h("div", { class: "info" },
+        h("strong", {}, p.gamertag, p.op ? h("span", { class: "pill-status owner", text: "Operator · ∞" }) : null),
+        h("span", {}, h("span", { class: "money-cell", text: p.cents == null ? "No balance yet" : money(p.cents) }), ` · last seen ${fmt(p.lastSeen)}`)),
+      h("div", { class: "row-actions" },
+        h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Change money", onclick: () => moneyDialog(p) }))));
+  }
+}
+
+function moneyDialog(p) {
+  const action = select("eco-action", [["add", "Give money"], ["take", "Take money"], ["set", "Set balance to"]], "add");
+  const amount = h("input", { class: "input", id: "eco-amount", inputmode: "decimal", placeholder: "e.g. 1000", autocomplete: "off" });
+  openDialog({
+    title: `Money for ${p.gamertag}`,
+    body: h("div", { class: "form" },
+      h("p", { class: "text-2", style: "margin:0", text: `Current balance: ${p.cents == null ? "none yet" : "$" + (p.cents / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}` }),
+      field("Action", action), field("Amount in dollars", amount, "Works for offline players too, as long as the server is online.")),
+    actions: [{ label: "Cancel" }, {
+      label: "Save", kind: "primary",
+      onClick: async () => {
+        const res = await postJson("/api/mod/economy/money", { xuid: p.xuid, action: action.value, amount: amount.value });
+        toast(`${p.gamertag} now has ${money(res.cents)}.`);
+        loaders.economy();
+      },
+    }],
+  });
+}
+
+function priceInput(label, value, onChange) {
+  const input = h("input", { class: "input", inputmode: "decimal", value: value ?? "", placeholder: "Off", "aria-label": label });
+  input.addEventListener("input", () => onChange(input.value.trim() === "" ? null : input.value.trim()));
+  return h("label", {}, label, input);
+}
+
+function markDirty() {
+  ecoDirty = true;
+  $("eco-save").disabled = false;
+  $("eco-status").textContent = "Unsaved changes";
+}
+
+function renderShop() {
+  const box = $("eco-shop");
+  const open = new Set([...box.querySelectorAll("details[open]")].map((d) => d.dataset.i));
+  box.replaceChildren();
+  ecoShop.categories.forEach((cat, ci) => {
+    const items = h("div", { class: "eco-items" });
+    cat.items.forEach((it, ii) => {
+      const nameIn = h("input", { class: "input", value: it.name, "aria-label": "Item name", placeholder: "Name" });
+      nameIn.addEventListener("input", () => { it.name = nameIn.value; markDirty(); });
+      items.append(h("div", { class: "eco-item" },
+        h("label", {}, it.id.replace("minecraft:", ""), nameIn),
+        priceInput("Buy $", it.buy, (v) => { it.buy = v; markDirty(); }),
+        priceInput("Sell $", it.sell, (v) => { it.sell = v; markDirty(); }),
+        h("button", { class: "btn btn-ghost btn-sm remove", type: "button", "aria-label": `Remove ${it.name}`, text: "×",
+          onclick: () => { cat.items.splice(ii, 1); markDirty(); renderShop(); } })));
+    });
+    const newId = h("input", { class: "input", placeholder: "Item ID, e.g. diamond_block", "aria-label": "New item ID", autocapitalize: "off", spellcheck: "false" });
+    items.append(h("div", { class: "eco-head" }, newId, h("button", {
+      class: "btn btn-secondary btn-sm", type: "button", text: "Add item",
+      onclick: () => {
+        const id = newId.value.trim().toLowerCase().replace(/\s+/g, "_");
+        if (!id) return;
+        const full = id.includes(":") ? id : `minecraft:${id}`;
+        cat.items.push({ id: full, name: full.split(":")[1].replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()), buy: 10, sell: null, icon: "" });
+        markDirty(); renderShop();
+      },
+    })));
+    const catName = h("input", { class: "input", value: cat.name, "aria-label": "Category name" });
+    catName.addEventListener("input", () => { cat.name = catName.value; markDirty(); });
+    items.prepend(h("div", { class: "eco-head" }, h("label", { class: "small text-3" }, "Category name", catName),
+      h("button", { class: "btn btn-danger btn-sm", type: "button", text: "Delete category",
+        onclick: () => { if (confirm(`Delete the category "${cat.name}" and its ${cat.items.length} items?`)) { ecoShop.categories.splice(ci, 1); markDirty(); renderShop(); } } })));
+    const det = h("details", { class: "eco-cat", "data-i": String(ci) },
+      h("summary", {}, cat.name || "Untitled", h("span", { class: "text-3", text: `${cat.items.length} items` })), items);
+    if (open.has(String(ci))) det.open = true;
+    box.append(det);
+  });
+  $("eco-save").disabled = !ecoDirty;
+  $("eco-status").textContent = ecoDirty ? "Unsaved changes" : ecoData.custom ? `Last changed by ${ecoData.shopUpdated.by} on ${fmt(ecoData.shopUpdated.at)}` : "Using the built-in price list";
+}
+
+$("eco-add-cat").addEventListener("click", () => {
+  const name = prompt("Name for the new category:");
+  if (!name) return;
+  ecoShop.categories.push({ id: "", name: name.slice(0, 32), icon: "", items: [] });
+  markDirty(); renderShop();
+  $("eco-shop").lastElementChild.open = true;
+});
+$("eco-save").addEventListener("click", async () => {
+  $("eco-save").disabled = true;
+  try {
+    const res = await postJson("/api/mod/economy/shop", { shop: ecoShop });
+    ecoDirty = false;
+    toast(res.sent ? "Shop saved and sent to the server." : "Shop saved. It will be sent when the server is online.");
+    loaders.economy();
+  } catch (e) { toast(e.message); $("eco-save").disabled = false; }
+});
+$("eco-reset").addEventListener("click", () => openDialog({
+  title: "Go back to the built-in prices?",
+  body: h("p", { class: "text-2", text: "This replaces every category, item and price with the original GalaxySMP price list." }),
+  actions: [{ label: "Cancel" }, {
+    label: "Reset prices", kind: "danger",
+    onClick: async () => { await postJson("/api/mod/economy/reset-shop", {}); ecoDirty = false; toast("Prices reset."); loaders.economy(); },
+  }],
+}));
 
 // ---------- Start ----------
 (async () => {
@@ -374,6 +577,6 @@ function deleteRank(r) {
   $("staff-intro").textContent = `Signed in as ${user.username} (${user.role.name}). ${power >= 100 ? "You can use every tool on this page." : "Banning and role changes are reserved for Admins."}`;
   $("staff-app").hidden = false;
   const start = location.hash.slice(1);
-  if (power >= 100) document.querySelector('[data-tab="ranks"]').hidden = false;
-  selectTab(["reports", "members", "words", "audit", ...(power >= 100 ? ["ranks"] : [])].includes(start) ? start : "reports");
+  if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"]').forEach((t) => (t.hidden = false));
+  selectTab(["reports", "members", "words", "audit", ...(power >= 100 ? ["ranks", "economy"] : [])].includes(start) ? start : "reports");
 })();

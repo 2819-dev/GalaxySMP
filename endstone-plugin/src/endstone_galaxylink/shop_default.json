@@ -1,0 +1,669 @@
+{
+ "categories": [
+  {
+   "id": "blocks",
+   "name": "Building Blocks",
+   "icon": "textures/blocks/brick",
+   "items": [
+    {
+     "id": "minecraft:stone",
+     "name": "Stone",
+     "buy": 3,
+     "sell": 0.5,
+     "icon": "textures/blocks/stone"
+    },
+    {
+     "id": "minecraft:cobblestone",
+     "name": "Cobblestone",
+     "buy": 2,
+     "sell": 0.25,
+     "icon": "textures/blocks/cobblestone"
+    },
+    {
+     "id": "minecraft:dirt",
+     "name": "Dirt",
+     "buy": 2,
+     "sell": 0.1,
+     "icon": "textures/blocks/dirt"
+    },
+    {
+     "id": "minecraft:grass_block",
+     "name": "Grass Block",
+     "buy": 5,
+     "sell": null,
+     "icon": "textures/blocks/grass_side_carried"
+    },
+    {
+     "id": "minecraft:sand",
+     "name": "Sand",
+     "buy": 3,
+     "sell": 0.5,
+     "icon": "textures/blocks/sand"
+    },
+    {
+     "id": "minecraft:gravel",
+     "name": "Gravel",
+     "buy": 3,
+     "sell": 0.5,
+     "icon": "textures/blocks/gravel"
+    },
+    {
+     "id": "minecraft:oak_log",
+     "name": "Oak Log",
+     "buy": 10,
+     "sell": 2,
+     "icon": "textures/blocks/log_oak"
+    },
+    {
+     "id": "minecraft:spruce_log",
+     "name": "Spruce Log",
+     "buy": 10,
+     "sell": 2,
+     "icon": "textures/blocks/log_spruce"
+    },
+    {
+     "id": "minecraft:birch_log",
+     "name": "Birch Log",
+     "buy": 10,
+     "sell": 2,
+     "icon": "textures/blocks/log_birch"
+    },
+    {
+     "id": "minecraft:oak_planks",
+     "name": "Oak Planks",
+     "buy": 3,
+     "sell": 0.5,
+     "icon": "textures/blocks/planks_oak"
+    },
+    {
+     "id": "minecraft:glass",
+     "name": "Glass",
+     "buy": 8,
+     "sell": null,
+     "icon": "textures/blocks/glass"
+    },
+    {
+     "id": "minecraft:stone_bricks",
+     "name": "Stone Bricks",
+     "buy": 6,
+     "sell": null,
+     "icon": "textures/blocks/stonebrick"
+    },
+    {
+     "id": "minecraft:bricks",
+     "name": "Bricks",
+     "buy": 15,
+     "sell": null,
+     "icon": "textures/blocks/brick"
+    },
+    {
+     "id": "minecraft:deepslate",
+     "name": "Deepslate",
+     "buy": 4,
+     "sell": 0.5,
+     "icon": "textures/blocks/deepslate/deepslate"
+    },
+    {
+     "id": "minecraft:cobbled_deepslate",
+     "name": "Cobbled Deepslate",
+     "buy": 3,
+     "sell": 0.25,
+     "icon": "textures/blocks/deepslate/cobbled_deepslate"
+    },
+    {
+     "id": "minecraft:quartz_block",
+     "name": "Quartz Block",
+     "buy": 60,
+     "sell": null,
+     "icon": "textures/blocks/quartz_block_side"
+    },
+    {
+     "id": "minecraft:obsidian",
+     "name": "Obsidian",
+     "buy": 150,
+     "sell": 25,
+     "icon": "textures/blocks/obsidian"
+    },
+    {
+     "id": "minecraft:end_stone",
+     "name": "End Stone",
+     "buy": 20,
+     "sell": 2,
+     "icon": "textures/blocks/end_stone"
+    },
+    {
+     "id": "minecraft:netherrack",
+     "name": "Netherrack",
+     "buy": 2,
+     "sell": 0.1,
+     "icon": "textures/blocks/netherrack"
+    },
+    {
+     "id": "minecraft:glowstone",
+     "name": "Glowstone",
+     "buy": 40,
+     "sell": 8,
+     "icon": "textures/blocks/glowstone"
+    },
+    {
+     "id": "minecraft:sea_lantern",
+     "name": "Sea Lantern",
+     "buy": 80,
+     "sell": null,
+     "icon": "textures/blocks/sea_lantern"
+    },
+    {
+     "id": "minecraft:white_wool",
+     "name": "White Wool",
+     "buy": 20,
+     "sell": 2,
+     "icon": "textures/blocks/wool_colored_white"
+    }
+   ]
+  },
+  {
+   "id": "ores",
+   "name": "Ores & Minerals",
+   "icon": "textures/items/diamond",
+   "items": [
+    {
+     "id": "minecraft:coal",
+     "name": "Coal",
+     "buy": 15,
+     "sell": 3,
+     "icon": "textures/items/coal"
+    },
+    {
+     "id": "minecraft:copper_ingot",
+     "name": "Copper Ingot",
+     "buy": 20,
+     "sell": 3,
+     "icon": "textures/items/copper_ingot"
+    },
+    {
+     "id": "minecraft:iron_ingot",
+     "name": "Iron Ingot",
+     "buy": 60,
+     "sell": 10,
+     "icon": "textures/items/iron_ingot"
+    },
+    {
+     "id": "minecraft:gold_ingot",
+     "name": "Gold Ingot",
+     "buy": 80,
+     "sell": 15,
+     "icon": "textures/items/gold_ingot"
+    },
+    {
+     "id": "minecraft:redstone",
+     "name": "Redstone",
+     "buy": 10,
+     "sell": 2,
+     "icon": "textures/items/redstone_dust"
+    },
+    {
+     "id": "minecraft:lapis_lazuli",
+     "name": "Lapis Lazuli",
+     "buy": 15,
+     "sell": 3,
+     "icon": "textures/items/dye_powder_blue"
+    },
+    {
+     "id": "minecraft:quartz",
+     "name": "Nether Quartz",
+     "buy": 10,
+     "sell": 2,
+     "icon": "textures/items/quartz"
+    },
+    {
+     "id": "minecraft:amethyst_shard",
+     "name": "Amethyst Shard",
+     "buy": 30,
+     "sell": 5,
+     "icon": "textures/items/amethyst_shard"
+    },
+    {
+     "id": "minecraft:emerald",
+     "name": "Emerald",
+     "buy": 300,
+     "sell": 50,
+     "icon": "textures/items/emerald"
+    },
+    {
+     "id": "minecraft:diamond",
+     "name": "Diamond",
+     "buy": 1500,
+     "sell": 250,
+     "icon": "textures/items/diamond"
+    },
+    {
+     "id": "minecraft:ancient_debris",
+     "name": "Ancient Debris",
+     "buy": null,
+     "sell": 2000,
+     "icon": "textures/blocks/ancient_debris_side"
+    },
+    {
+     "id": "minecraft:netherite_scrap",
+     "name": "Netherite Scrap",
+     "buy": 12000,
+     "sell": 2000,
+     "icon": "textures/items/netherite_scrap"
+    },
+    {
+     "id": "minecraft:netherite_ingot",
+     "name": "Netherite Ingot",
+     "buy": 50000,
+     "sell": 8000,
+     "icon": "textures/items/netherite_ingot"
+    }
+   ]
+  },
+  {
+   "id": "farming",
+   "name": "Farming",
+   "icon": "textures/items/wheat",
+   "items": [
+    {
+     "id": "minecraft:wheat",
+     "name": "Wheat",
+     "buy": 5,
+     "sell": 1,
+     "icon": "textures/items/wheat"
+    },
+    {
+     "id": "minecraft:wheat_seeds",
+     "name": "Seeds",
+     "buy": 2,
+     "sell": 0.2,
+     "icon": "textures/items/seeds_wheat"
+    },
+    {
+     "id": "minecraft:carrot",
+     "name": "Carrot",
+     "buy": 5,
+     "sell": 1,
+     "icon": "textures/items/carrot"
+    },
+    {
+     "id": "minecraft:potato",
+     "name": "Potato",
+     "buy": 5,
+     "sell": 1,
+     "icon": "textures/items/potato"
+    },
+    {
+     "id": "minecraft:beetroot",
+     "name": "Beetroot",
+     "buy": 5,
+     "sell": 1,
+     "icon": "textures/items/beetroot"
+    },
+    {
+     "id": "minecraft:melon_slice",
+     "name": "Melon Slice",
+     "buy": 2,
+     "sell": 0.5,
+     "icon": "textures/items/melon"
+    },
+    {
+     "id": "minecraft:pumpkin",
+     "name": "Pumpkin",
+     "buy": 15,
+     "sell": 3,
+     "icon": "textures/blocks/pumpkin_face_off"
+    },
+    {
+     "id": "minecraft:sugar_cane",
+     "name": "Sugar Cane",
+     "buy": 6,
+     "sell": 1.5,
+     "icon": "textures/items/reeds"
+    },
+    {
+     "id": "minecraft:cactus",
+     "name": "Cactus",
+     "buy": 8,
+     "sell": 2,
+     "icon": "textures/blocks/cactus_side"
+    },
+    {
+     "id": "minecraft:bamboo",
+     "name": "Bamboo",
+     "buy": 2,
+     "sell": 0.3,
+     "icon": "textures/items/bamboo"
+    },
+    {
+     "id": "minecraft:cocoa_beans",
+     "name": "Cocoa Beans",
+     "buy": 6,
+     "sell": 1,
+     "icon": "textures/items/dye_powder_brown"
+    },
+    {
+     "id": "minecraft:nether_wart",
+     "name": "Nether Wart",
+     "buy": 15,
+     "sell": 3,
+     "icon": "textures/items/nether_wart"
+    },
+    {
+     "id": "minecraft:sweet_berries",
+     "name": "Sweet Berries",
+     "buy": 4,
+     "sell": 0.8,
+     "icon": "textures/items/sweet_berries"
+    },
+    {
+     "id": "minecraft:kelp",
+     "name": "Kelp",
+     "buy": 2,
+     "sell": 0.3,
+     "icon": "textures/items/kelp"
+    }
+   ]
+  },
+  {
+   "id": "food",
+   "name": "Food",
+   "icon": "textures/items/beef_cooked",
+   "items": [
+    {
+     "id": "minecraft:bread",
+     "name": "Bread",
+     "buy": 15,
+     "sell": 2,
+     "icon": "textures/items/bread"
+    },
+    {
+     "id": "minecraft:cooked_beef",
+     "name": "Steak",
+     "buy": 25,
+     "sell": 3,
+     "icon": "textures/items/beef_cooked"
+    },
+    {
+     "id": "minecraft:cooked_porkchop",
+     "name": "Cooked Porkchop",
+     "buy": 25,
+     "sell": 3,
+     "icon": "textures/items/porkchop_cooked"
+    },
+    {
+     "id": "minecraft:cooked_chicken",
+     "name": "Cooked Chicken",
+     "buy": 20,
+     "sell": 2,
+     "icon": "textures/items/chicken_cooked"
+    },
+    {
+     "id": "minecraft:baked_potato",
+     "name": "Baked Potato",
+     "buy": 12,
+     "sell": 1.5,
+     "icon": "textures/items/potato_baked"
+    },
+    {
+     "id": "minecraft:apple",
+     "name": "Apple",
+     "buy": 20,
+     "sell": 2,
+     "icon": "textures/items/apple"
+    },
+    {
+     "id": "minecraft:golden_carrot",
+     "name": "Golden Carrot",
+     "buy": 120,
+     "sell": 15,
+     "icon": "textures/items/carrot_golden"
+    },
+    {
+     "id": "minecraft:cake",
+     "name": "Cake",
+     "buy": 120,
+     "sell": null,
+     "icon": "textures/items/cake"
+    },
+    {
+     "id": "minecraft:golden_apple",
+     "name": "Golden Apple",
+     "buy": 2500,
+     "sell": 300,
+     "icon": "textures/items/apple_golden"
+    },
+    {
+     "id": "minecraft:enchanted_golden_apple",
+     "name": "Enchanted Golden Apple",
+     "buy": 250000,
+     "sell": null,
+     "icon": "textures/items/apple_golden"
+    }
+   ]
+  },
+  {
+   "id": "mobdrops",
+   "name": "Mob Drops",
+   "icon": "textures/items/rotten_flesh",
+   "items": [
+    {
+     "id": "minecraft:rotten_flesh",
+     "name": "Rotten Flesh",
+     "buy": 2,
+     "sell": 0.5,
+     "icon": "textures/items/rotten_flesh"
+    },
+    {
+     "id": "minecraft:bone",
+     "name": "Bone",
+     "buy": 5,
+     "sell": 1,
+     "icon": "textures/items/bone"
+    },
+    {
+     "id": "minecraft:string",
+     "name": "String",
+     "buy": 5,
+     "sell": 1,
+     "icon": "textures/items/string"
+    },
+    {
+     "id": "minecraft:spider_eye",
+     "name": "Spider Eye",
+     "buy": 8,
+     "sell": 1.5,
+     "icon": "textures/items/spider_eye"
+    },
+    {
+     "id": "minecraft:gunpowder",
+     "name": "Gunpowder",
+     "buy": 20,
+     "sell": 4,
+     "icon": "textures/items/gunpowder"
+    },
+    {
+     "id": "minecraft:feather",
+     "name": "Feather",
+     "buy": 5,
+     "sell": 1,
+     "icon": "textures/items/feather"
+    },
+    {
+     "id": "minecraft:leather",
+     "name": "Leather",
+     "buy": 15,
+     "sell": 3,
+     "icon": "textures/items/leather"
+    },
+    {
+     "id": "minecraft:slime_ball",
+     "name": "Slimeball",
+     "buy": 40,
+     "sell": 8,
+     "icon": "textures/items/slimeball"
+    },
+    {
+     "id": "minecraft:ender_pearl",
+     "name": "Ender Pearl",
+     "buy": 150,
+     "sell": 25,
+     "icon": "textures/items/ender_pearl"
+    },
+    {
+     "id": "minecraft:blaze_rod",
+     "name": "Blaze Rod",
+     "buy": 300,
+     "sell": 40,
+     "icon": "textures/items/blaze_rod"
+    },
+    {
+     "id": "minecraft:phantom_membrane",
+     "name": "Phantom Membrane",
+     "buy": 300,
+     "sell": 50,
+     "icon": "textures/items/phantom_membrane"
+    },
+    {
+     "id": "minecraft:ghast_tear",
+     "name": "Ghast Tear",
+     "buy": 500,
+     "sell": 80,
+     "icon": "textures/items/ghast_tear"
+    },
+    {
+     "id": "minecraft:shulker_shell",
+     "name": "Shulker Shell",
+     "buy": 25000,
+     "sell": 4000,
+     "icon": "textures/items/shulker_shell"
+    }
+   ]
+  },
+  {
+   "id": "gear",
+   "name": "Gear & Rare",
+   "icon": "textures/items/elytra",
+   "items": [
+    {
+     "id": "minecraft:arrow",
+     "name": "Arrow",
+     "buy": 5,
+     "sell": 0.5,
+     "icon": "textures/items/arrow"
+    },
+    {
+     "id": "minecraft:firework_rocket",
+     "name": "Firework Rocket",
+     "buy": 50,
+     "sell": null,
+     "icon": "textures/items/fireworks"
+    },
+    {
+     "id": "minecraft:experience_bottle",
+     "name": "Bottle o' Enchanting",
+     "buy": 100,
+     "sell": null,
+     "icon": "textures/items/experience_bottle"
+    },
+    {
+     "id": "minecraft:shield",
+     "name": "Shield",
+     "buy": 300,
+     "sell": null,
+     "icon": ""
+    },
+    {
+     "id": "minecraft:bow",
+     "name": "Bow",
+     "buy": 400,
+     "sell": null,
+     "icon": "textures/items/bow_standby"
+    },
+    {
+     "id": "minecraft:name_tag",
+     "name": "Name Tag",
+     "buy": 1500,
+     "sell": null,
+     "icon": "textures/items/name_tag"
+    },
+    {
+     "id": "minecraft:saddle",
+     "name": "Saddle",
+     "buy": 2000,
+     "sell": null,
+     "icon": "textures/items/saddle"
+    },
+    {
+     "id": "minecraft:diamond_sword",
+     "name": "Diamond Sword",
+     "buy": 5000,
+     "sell": null,
+     "icon": "textures/items/diamond_sword"
+    },
+    {
+     "id": "minecraft:diamond_pickaxe",
+     "name": "Diamond Pickaxe",
+     "buy": 7500,
+     "sell": null,
+     "icon": "textures/items/diamond_pickaxe"
+    },
+    {
+     "id": "minecraft:ender_chest",
+     "name": "Ender Chest",
+     "buy": 15000,
+     "sell": null,
+     "icon": "textures/blocks/ender_chest_front"
+    },
+    {
+     "id": "minecraft:totem_of_undying",
+     "name": "Totem of Undying",
+     "buy": 75000,
+     "sell": 10000,
+     "icon": "textures/items/totem"
+    },
+    {
+     "id": "minecraft:undyed_shulker_box",
+     "name": "Shulker Box",
+     "buy": 100000,
+     "sell": null,
+     "icon": "textures/blocks/shulker_top_undyed"
+    },
+    {
+     "id": "minecraft:netherite_sword",
+     "name": "Netherite Sword",
+     "buy": 120000,
+     "sell": null,
+     "icon": "textures/items/netherite_sword"
+    },
+    {
+     "id": "minecraft:netherite_pickaxe",
+     "name": "Netherite Pickaxe",
+     "buy": 150000,
+     "sell": null,
+     "icon": "textures/items/netherite_pickaxe"
+    },
+    {
+     "id": "minecraft:trident",
+     "name": "Trident",
+     "buy": 750000,
+     "sell": null,
+     "icon": "textures/items/trident"
+    },
+    {
+     "id": "minecraft:beacon",
+     "name": "Beacon",
+     "buy": 2500000,
+     "sell": null,
+     "icon": "textures/blocks/beacon"
+    },
+    {
+     "id": "minecraft:elytra",
+     "name": "Elytra",
+     "buy": 25000000,
+     "sell": null,
+     "icon": "textures/items/elytra"
+    }
+   ]
+  }
+ ]
+}

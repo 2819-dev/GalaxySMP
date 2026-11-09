@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.4.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.5.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -197,9 +197,21 @@ class VoiceLink:
             self.active = bool(msg.get("on"))
         elif msg.get("type") == "ranks":
             self.plugin.ranks.update(msg)
+        elif msg.get("type") == "shop":
+            self._on_main(lambda: self.plugin.shop.update_from_website(msg))
+        elif msg.get("type") == "eco":
+            self._on_main(lambda: self.plugin.economy.from_website(msg))
         elif msg.get("type") == "icons":
             self.wanted = {k.lower(): v for k, v in (msg.get("icons") or {}).items()}
             self.plugin.server.scheduler.run_task(self.plugin, self._apply_icons)
+
+    def _on_main(self, fn):
+        def run():
+            try:
+                fn()
+            except Exception as e:
+                self.plugin.logger.warning(f"Couldn't apply a change from the website: {e}")
+        self.plugin.server.scheduler.run_task(self.plugin, run)
 
     # ---------- main server thread ----------
     def _tick(self):
@@ -240,8 +252,17 @@ class VoiceLink:
         threading.Thread(target=self._safe_send, args=(ws, json.dumps(info)), daemon=True).start()
 
     def announce_online(self):
-        """Tell the website which players are here (so ranks can be given on the website)."""
+        """Tell the website which players are here (so ranks can be given on the website) and everyone's money."""
         self.send_seen(list(self.plugin.server.online_players))
+        try:
+            self.plugin.economy.sync(everything=True)
+        except Exception as e:
+            self.plugin.logger.warning(f"Couldn't send balances to the website: {e}")
+
+    def send_json(self, obj):
+        ws = self.ws
+        if ws:
+            threading.Thread(target=self._safe_send, args=(ws, json.dumps(obj)), daemon=True).start()
 
     def send_seen(self, players):
         ws = self.ws

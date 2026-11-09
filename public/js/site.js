@@ -24,6 +24,13 @@ const ICONS = {
   reply: '<path d="M9 17 4 12l5-5"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>',
   smile: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/>',
   trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+  home: '<path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+  book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>',
+  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  bag: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>',
+  mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/>',
+  trophy: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+  tools: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',
   megaphone: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
 };
 
@@ -32,11 +39,12 @@ export function icon(name) {
 }
 
 const NAV = [
-  ["/join", "How to Join"],
-  ["/rules", "Rules"],
-  ["/status", "Status"],
-  ["/store", "Store"],
-  ["/voice", "Voice"],
+  ["/join", "How to Join", "book"],
+  ["/rules", "Rules", "shield"],
+  ["/status", "Status", "activity"],
+  ["/leaderboard", "Leaderboard", "trophy"],
+  ["/store", "Store", "bag"],
+  ["/voice", "Voice", "mic"],
 ];
 
 export const serverAddress = config.bedrockAddress;
@@ -50,31 +58,58 @@ function renderHeader() {
   const slot = document.getElementById("site-header");
   if (!slot) return;
   const here = currentPath();
-  const links = NAV.map(
-    ([href, label]) => `<a href="${href}"${href === here ? ' aria-current="page"' : ""}>${label}</a>`
-  ).join("");
+  const cur = (href) => (href === here ? ' aria-current="page"' : "");
+  const links = NAV.map(([href, label]) => `<a href="${href}"${cur(href)}>${label}</a>`).join("");
+  const chip = config.hosting === "realm" ? "" : `<button class="ip-chip" type="button" data-copy="${serverAddress}" title="Copy server address">${icon("copy")}<span>${serverAddress}</span><span class="ip-port">${config.bedrockPort}</span></button>`;
+  const drawerLinks = [["/", "Home", "home"], ...NAV, ["/community", "Community", "chat"]]
+    .map(([href, label, ic]) => `<a href="${href}"${cur(href)}>${icon(ic)}<span>${label}</span></a>`).join("");
   slot.outerHTML = `
   <header class="site-header">
     <div class="container">
+      <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="site-drawer">${icon("menu")}</button>
       <a class="brand" href="/" aria-label="${config.serverName} home"><img src="/img/wordmark.png" alt="${config.serverName}" width="150" height="26"></a>
-      <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="site-nav">${icon("menu")}</button>
-      <nav class="nav" id="site-nav" aria-label="Main">
+      <nav class="nav" aria-label="Main">
         <div class="nav-links">${links}</div>
-        <div class="nav-actions">
-          ${config.hosting === "realm" ? "" : `<button class="ip-chip" type="button" data-copy="${serverAddress}" title="Copy server address">${icon("copy")}<span>${serverAddress}</span><span class="ip-port">${config.bedrockPort}</span></button>`}
-          <a class="btn btn-primary btn-sm" href="/community">Community</a>
-        </div>
+        <div class="nav-actions">${chip}<a class="btn btn-primary btn-sm" href="/community">Community</a></div>
       </nav>
+      <a class="btn btn-primary btn-sm nav-community" href="/community">Community</a>
     </div>
-  </header>`;
+  </header>
+  <div class="drawer-backdrop" hidden></div>
+  <aside class="drawer" id="site-drawer" aria-label="Menu" aria-hidden="true">
+    <div class="drawer-head">
+      <img src="/img/wordmark.png" alt="${config.serverName}" width="132" height="23">
+      <button class="drawer-close" type="button" aria-label="Close menu">${icon("close")}</button>
+    </div>
+    <nav class="drawer-links">${drawerLinks}<a href="/staff" data-staff-link hidden>${icon("tools")}<span>Staff Tools</span></a></nav>
+    ${config.hosting === "realm" ? "" : `<div class="drawer-card"><span class="eyebrow">Server address</span>
+      <button class="ip-chip" type="button" data-copy="${serverAddress}">${icon("copy")}<span>${serverAddress}</span><span class="ip-port">${config.bedrockPort}</span></button>
+      <span class="text-3 small">Bedrock Edition · tap to copy</span></div>`}
+  </aside>`;
   const toggle = document.querySelector(".nav-toggle");
-  const nav = document.getElementById("site-nav");
-  toggle.addEventListener("click", () => {
-    const open = nav.classList.toggle("open");
+  const drawer = document.getElementById("site-drawer");
+  const backdrop = document.querySelector(".drawer-backdrop");
+  let staffChecked = false;
+  const setOpen = (open) => {
+    drawer.classList.toggle("open", open);
+    drawer.setAttribute("aria-hidden", String(!open));
+    backdrop.hidden = !open;
     toggle.setAttribute("aria-expanded", String(open));
-    toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
-    toggle.innerHTML = icon(open ? "close" : "menu");
-  });
+    document.body.classList.toggle("drawer-open", open);
+    if (open) {
+      drawer.querySelector("a")?.focus();
+      if (!staffChecked) {
+        staffChecked = true;
+        fetch("/api/me").then((r) => r.json()).then((d) => {
+          if (d.user?.role?.power >= 50) drawer.querySelector("[data-staff-link]").hidden = false;
+        }).catch(() => {});
+      }
+    }
+  };
+  toggle.addEventListener("click", () => setOpen(true));
+  drawer.querySelector(".drawer-close").addEventListener("click", () => { setOpen(false); toggle.focus(); });
+  backdrop.addEventListener("click", () => setOpen(false));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && drawer.classList.contains("open")) { setOpen(false); toggle.focus(); } });
 }
 
 function renderFooter() {
@@ -88,7 +123,7 @@ function renderFooter() {
           <a class="brand" href="/" aria-label="${config.serverName} home"><img src="/img/wordmark.png" alt="${config.serverName}" width="150" height="26"></a>
           <p>A family-friendly Minecraft Bedrock server.</p>
         </div>
-        <div><h4>Play</h4><ul><li><a href="/join">How to Join</a></li><li><a href="/status">Server Status</a></li><li><a href="/store">Store</a></li></ul></div>
+        <div><h4>Play</h4><ul><li><a href="/join">How to Join</a></li><li><a href="/status">Server Status</a></li><li><a href="/leaderboard">Money Leaderboard</a></li><li><a href="/store">Store</a></li></ul></div>
         <div><h4>Community</h4><ul><li><a href="/community">Community Chat</a></li><li><a href="/voice">Voice Chat</a></li><li><a href="/rules">Rules</a></li></ul></div>
         <div><h4>Legal</h4><ul><li><a href="/privacy">Privacy Policy</a></li></ul></div>
       </div>

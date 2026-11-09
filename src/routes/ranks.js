@@ -14,25 +14,24 @@ const ADMIN = 100;
 const COLORS = "0123456789abcdef";
 const ROLE_POWER = { 2: 20, 3: 50, 4: 100 };
 
-// Permissions offered as checkboxes (website) and toggles (in game).
-export const PERMISSIONS = [
-  ["minecraft.command.gamemode", "Change game mode (/gamemode)"],
-  ["minecraft.command.teleport", "Teleport (/tp)"],
-  ["minecraft.command.give", "Give items (/give)"],
-  ["minecraft.command.clear", "Clear inventories (/clear)"],
-  ["minecraft.command.effect", "Give effects (/effect)"],
-  ["minecraft.command.enchant", "Enchant items (/enchant)"],
-  ["minecraft.command.xp", "Give XP (/xp)"],
-  ["minecraft.command.time", "Change time (/time)"],
-  ["minecraft.command.weather", "Change weather (/weather)"],
-  ["minecraft.command.summon", "Summon mobs (/summon)"],
-  ["minecraft.command.fill", "Fill blocks (/fill)"],
-  ["minecraft.command.setblock", "Place blocks (/setblock)"],
-  ["minecraft.command.clone", "Copy blocks (/clone)"],
-  ["minecraft.command.kick", "Kick players (/kick)"],
-  ["endstone.command.ban", "Ban players (/ban)"],
-  ["endstone.command.unban", "Unban players (/unban)"],
-];
+// Rank icons (drawn by the GalaxySMP Icons resource pack; pictures in /img/ranks/).
+export const ICONS = ["crown", "star", "shield", "sword", "gem", "heart", "hammer", "flame", "bolt", "rocket", "planet", "leaf"];
+
+// Admins type command names (like "time" or "/gamemode"); each becomes the permission
+// that allows the whole command, so "time" also allows "/time set day".
+// Same rules as the plugin (endstone_galaxylink/ranks.py).
+const ENDSTONE_COMMANDS = new Set(["ban", "banip", "banlist", "plugins", "reload", "seed", "status", "unban", "unbanip", "version"]);
+const PLUGIN_COMMANDS = new Set(["link", "ranks", "money", "pay", "baltop", "setmoney", "addmoney", "takemoney", "shop", "sell", "ah", "shopnpc"]);
+const ALIASES = { tp: "teleport", msg: "tell", w: "tell", bal: "money", balance: "money", auction: "ah", "ban-ip": "banip", "unban-ip": "unbanip", pardon: "unban" };
+
+export function commandPermission(text) {
+  let name = String(text).trim().replace(/^\/+/, "").split(/\s+/)[0].toLowerCase();
+  name = ALIASES[name] || name;
+  if (!/^[a-z0-9_-]{1,40}$/.test(name)) return null;
+  if (ENDSTONE_COMMANDS.has(name)) return `endstone.command.${name}`;
+  if (PLUGIN_COMMANDS.has(name)) return `galaxylink.command.${name}`;
+  return `minecraft.command.${name}`;
+}
 
 // ---------- shared ----------
 function formatRank(r) {
@@ -41,6 +40,7 @@ function formatRank(r) {
     name: r.name,
     prefix: r.prefix,
     color: r.color,
+    icon: r.icon || null,
     permissions: r.permissions || [],
     websiteRole: r.website_role ? Number(r.website_role) : null,
     position: r.position,
@@ -70,11 +70,17 @@ async function validRank(env, sql, body) {
   for (const text of [name, prefix]) {
     if (!checkMessage(text, words).ok) throw new HttpError(400, `"${text}" isn't allowed.`);
   }
-  const perms = [...new Set((Array.isArray(body.permissions) ? body.permissions : []).map((p) => String(p).trim().toLowerCase()).filter(Boolean))];
+  const commands = Array.isArray(body.commands) ? body.commands : [];
+  const badCommand = commands.find((c) => String(c).trim() && !commandPermission(c));
+  if (badCommand) throw new HttpError(400, `"${String(badCommand).slice(0, 30)}" isn't a command name.`);
+  const perms = [...new Set((Array.isArray(body.permissions) ? body.permissions : []).map((p) => String(p).trim().toLowerCase())
+    .concat(commands.map(commandPermission)).filter(Boolean))];
+  const icon = body.icon ? String(body.icon) : null;
+  if (icon && !ICONS.includes(icon)) throw new HttpError(400, "Unknown icon.");
   if (perms.length > 40 || perms.some((p) => !/^[a-z0-9_.-]{3,60}$/.test(p))) throw new HttpError(400, "One of the permissions isn't valid.");
   const role = body.websiteRole == null || body.websiteRole === "" ? null : Number(body.websiteRole);
   if (role !== null && !ROLE_POWER[role]) throw new HttpError(400, "Unknown website role.");
-  return { name, prefix, color, permissions: perms, websiteRole: role };
+  return { name, prefix, color, icon, permissions: perms, websiteRole: role };
 }
 
 // Gives or removes the website role that comes with a player's rank (if they linked an account).
@@ -119,13 +125,13 @@ async function applyAction(env, sql, action, body, actor) {
     try {
       if (action === "create") {
         [rank] = await sql`
-          INSERT INTO ranks (name, prefix, color, permissions, website_role, position)
-          VALUES (${r.name}, ${r.prefix}, ${r.color}, ${r.permissions}, ${r.websiteRole},
+          INSERT INTO ranks (name, prefix, color, icon, permissions, website_role, position)
+          VALUES (${r.name}, ${r.prefix}, ${r.color}, ${r.icon}, ${r.permissions}, ${r.websiteRole},
                   (SELECT coalesce(max(position), 0) + 1 FROM ranks))
           RETURNING *`;
       } else {
         [rank] = await sql`
-          UPDATE ranks SET name = ${r.name}, prefix = ${r.prefix}, color = ${r.color}, permissions = ${r.permissions},
+          UPDATE ranks SET name = ${r.name}, prefix = ${r.prefix}, color = ${r.color}, icon = ${r.icon}, permissions = ${r.permissions},
                  website_role = ${r.websiteRole}, updated_at = now()
            WHERE id = ${Number(body.id)} RETURNING *`;
         if (!rank) throw new HttpError(404, "That rank no longer exists.");
@@ -199,7 +205,7 @@ export async function listRanks(request, env, ctx, url) {
   return json({
     ok: true,
     ranks: state.ranks.map((r) => ({ ...r, players: counts[r.id] || 0 })),
-    permissions: PERMISSIONS,
+    icons: ICONS,
     players: players.map((p) => ({ xuid: p.xuid, gamertag: p.gamertag, lastSeen: p.last_seen, rankId: p.rank_id, linked: Boolean(p.linked) })),
   });
 }
