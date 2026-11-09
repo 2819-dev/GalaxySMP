@@ -10,11 +10,15 @@ import threading
 
 from endstone.form import ActionForm, Dropdown, ModalForm, TextInput, Toggle
 
+# Grouped by shade; codes g-v are Bedrock-only colors.
 COLORS = [
-    ("0", "Black"), ("1", "Dark Blue"), ("2", "Dark Green"), ("3", "Dark Aqua"),
-    ("4", "Dark Red"), ("5", "Dark Purple"), ("6", "Gold"), ("7", "Gray"),
-    ("8", "Dark Gray"), ("9", "Blue"), ("a", "Green"), ("b", "Aqua"),
-    ("c", "Red"), ("d", "Light Purple"), ("e", "Yellow"), ("f", "White"),
+    ("f", "White"), ("h", "Quartz"), ("i", "Iron"), ("7", "Gray"),
+    ("8", "Dark Gray"), ("j", "Netherite"), ("0", "Black"), ("c", "Red"),
+    ("4", "Dark Red"), ("m", "Redstone"), ("v", "Resin"), ("n", "Copper"),
+    ("6", "Gold"), ("p", "Deep Gold"), ("g", "Minecoin Gold"), ("e", "Yellow"),
+    ("a", "Green"), ("q", "Emerald"), ("2", "Dark Green"), ("b", "Aqua"),
+    ("s", "Diamond"), ("3", "Dark Aqua"), ("9", "Blue"), ("1", "Dark Blue"),
+    ("t", "Lapis"), ("d", "Light Purple"), ("u", "Amethyst"), ("5", "Dark Purple"),
 ]
 WEB_ROLES = [(None, "None"), (2, "VIP"), (3, "Moderator"), (4, "Admin")]
 
@@ -182,7 +186,7 @@ class RankManager:
 
     def rank_form(self, player, rank):
         r = rank or {"name": "", "prefix": "", "color": "f", "icon": None, "permissions": [], "websiteRole": None}
-        color_index = next((i for i, (c, _) in enumerate(COLORS) if c == r["color"]), 15)
+        color_index = next((i for i, (c, _) in enumerate(COLORS) if c == r["color"]), 0)
         role_index = next((i for i, (v, _) in enumerate(WEB_ROLES) if v == r.get("websiteRole")), 0)
         icon_index = ICONS.index(r["icon"]) + 1 if r.get("icon") in ICONS else 0
         cmds, other = split_permissions(r["permissions"])

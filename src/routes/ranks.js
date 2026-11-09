@@ -11,7 +11,8 @@ import { hubBroadcast } from "./chat.js";
 import { voiceEvent } from "./voice.js";
 
 const ADMIN = 100;
-const COLORS = "0123456789abcdef";
+// Java colors 0-f plus Bedrock-only colors (two extra golds, copper, resin and mineral colors).
+const COLORS = "0123456789abcdefgpnvmqstuhij";
 const ROLE_POWER = { 2: 20, 3: 50, 4: 100 };
 
 // Rank icons (drawn by the GalaxySMP Icons resource pack; pictures in /img/ranks/).

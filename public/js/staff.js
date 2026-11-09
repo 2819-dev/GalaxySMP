@@ -251,13 +251,17 @@ loaders.audit = () => loadAudit(false);
 $("audit-more").addEventListener("click", () => loadAudit(true));
 
 // ---------- Ranks (Admins) ----------
+// Grouped by shade. Codes g-v only exist on Bedrock (Java shows them as white or as formatting).
 const MC_COLORS = [
-  ["0", "Black", "#000000"], ["1", "Dark Blue", "#0000AA"], ["2", "Dark Green", "#00AA00"], ["3", "Dark Aqua", "#00AAAA"],
-  ["4", "Dark Red", "#AA0000"], ["5", "Dark Purple", "#AA00AA"], ["6", "Gold", "#FFAA00"], ["7", "Gray", "#AAAAAA"],
-  ["8", "Dark Gray", "#555555"], ["9", "Blue", "#5555FF"], ["a", "Green", "#55FF55"], ["b", "Aqua", "#55FFFF"],
-  ["c", "Red", "#FF5555"], ["d", "Light Purple", "#FF55FF"], ["e", "Yellow", "#FFFF55"], ["f", "White", "#FFFFFF"],
+  ["f", "White", "#FFFFFF"], ["h", "Quartz", "#E3D4D1"], ["i", "Iron", "#CECACA"], ["7", "Gray", "#AAAAAA"],
+  ["8", "Dark Gray", "#555555"], ["j", "Netherite", "#443A3B"], ["0", "Black", "#000000"], ["c", "Red", "#FF5555"],
+  ["4", "Dark Red", "#AA0000"], ["m", "Redstone", "#971607"], ["v", "Resin", "#EB7114"], ["n", "Copper", "#B4684D"],
+  ["6", "Gold", "#FFAA00"], ["p", "Deep Gold", "#DEB12D"], ["g", "Minecoin Gold", "#DDD605"], ["e", "Yellow", "#FFFF55"],
+  ["a", "Green", "#55FF55"], ["q", "Emerald", "#47A036"], ["2", "Dark Green", "#00AA00"], ["b", "Aqua", "#55FFFF"],
+  ["s", "Diamond", "#2CBAA8"], ["3", "Dark Aqua", "#00AAAA"], ["9", "Blue", "#5555FF"], ["1", "Dark Blue", "#0000AA"],
+  ["t", "Lapis", "#21497B"], ["d", "Light Purple", "#FF55FF"], ["u", "Amethyst", "#9A5CC6"], ["5", "Dark Purple", "#AA00AA"],
 ];
-const hexOf = (c) => (MC_COLORS.find((x) => x[0] === c) || MC_COLORS[15])[2];
+const hexOf = (c) => (MC_COLORS.find((x) => x[0] === c) || MC_COLORS[0])[2];
 const WEB_ROLES = [["", "None"], ["2", "VIP"], ["3", "Moderator"], ["4", "Admin"]];
 const PERM_PREFIXES = ["minecraft.command.", "endstone.command.", "galaxylink.command."];
 let rankData = null;
