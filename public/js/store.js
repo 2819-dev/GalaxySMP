@@ -100,3 +100,26 @@ async function loadPlans() {
 }
 
 loadPlans();
+
+// One-time extras (like an extra plot), shown under the plans.
+async function loadExtras() {
+  let data;
+  try { data = await (await fetch("/api/store/plans")).json(); } catch { return; }
+  const box = document.getElementById("extras");
+  if (!box || !data.extras?.length) return;
+  for (const x of data.extras) {
+    const row = el("article", "panel extra-card");
+    const text = el("div");
+    text.append(el("h3", "plan-name", x.name), el("p", "text-2", x.description));
+    const right = el("div", "extra-buy");
+    right.append(el("span", "plan-amount", `$${x.price.toFixed(2)}`));
+    const btn = el("button", "btn btn-primary", data.checkoutEnabled ? "Buy" : "Coming soon");
+    btn.type = "button";
+    btn.setAttribute("data-checkout", x.id);
+    right.append(btn);
+    row.append(text, right);
+    box.append(row);
+  }
+  box.hidden = false;
+}
+loadExtras();

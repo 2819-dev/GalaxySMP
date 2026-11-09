@@ -7,6 +7,7 @@
   "ahSlots": 10,
   "tag": null,
   "perks": [
+   "1 plot to build on (claim it with your Plot Claiming Shovel)",
    "1 home (/sethome)",
    "10 Auction House listings",
    "$1,000 starting money",
@@ -15,7 +16,8 @@
    "Proximity voice chat and community chat on galaxymc.us",
    "Standard support",
    "Event access"
-  ]
+  ],
+  "plots": 1
  },
  "plus": {
   "name": "Galaxy+",
@@ -23,16 +25,23 @@
   "gameCost": 1000,
   "homes": 5,
   "ahSlots": 20,
-  "tag": {"prefix": "GALAXY+", "icon": "star", "gradient": "gold", "color": "6"},
+  "tag": {
+   "prefix": "GALAXY+",
+   "icon": "star",
+   "gradient": "gold",
+   "color": "6"
+  },
   "perks": [
    "Everything in Galaxy Free",
    "[⭐ GALAXY+] tag in gold above your head and in chat",
+   "3 plots",
    "5 homes",
    "20 Auction House listings",
    "Level 2 support",
    "Level 2 event access",
    "Host your own events"
-  ]
+  ],
+  "plots": 3
  },
  "pro": {
   "name": "Galaxy Pro+",
@@ -40,15 +49,22 @@
   "gameCost": 1000,
   "homes": 10,
   "ahSlots": 30,
-  "tag": {"prefix": "PRO+", "icon": "wingeddiamond", "gradient": "galaxy", "color": "b"},
+  "tag": {
+   "prefix": "PRO+",
+   "icon": "wingeddiamond",
+   "gradient": "galaxy",
+   "color": "b"
+  },
   "perks": [
    "Everything in Galaxy+",
    "[PRO+] tag with a winged diamond in the Galaxy logo colors",
+   "5 plots",
    "10 homes",
    "30 Auction House listings",
    "Priority support",
    "Priority event access",
    "Host your own events"
-  ]
+  ],
+  "plots": 5
  }
 }

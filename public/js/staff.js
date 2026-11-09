@@ -498,16 +498,18 @@ const PLAN_NAMES = { plus: "Galaxy+", pro: "Galaxy Pro+" };
 function planDialog(p) {
   const plan = select("plan-choice", [["", "Galaxy Free (no plan)"], ["plus", "Galaxy+"], ["pro", "Galaxy Pro+"]], p.plan || "");
   const days = select("plan-days", [["7", "7 days"], ["30", "30 days"], ["90", "90 days"], ["365", "1 year"], ["0", "No end date"]], "30");
+  const extra = h("input", { class: "input", id: "plan-extra", type: "number", min: 0, max: 50, value: String(p.extraPlots || 0) });
   openDialog({
     title: `Plan for ${p.gamertag}`,
     body: h("div", { class: "form" },
       field("Plan", plan),
       field("How long", days, "Paid plans also cost $1,000 of in-game money every 30 days, taken automatically in game. Perks pause if they can't pay. Operators never pay."),
+      field("Extra plots", extra, "Plots on top of the plan's (Free 1, Galaxy+ 3, Pro+ 5). Same as buying the $1.00 extra plot."),
       p.plan ? h("p", { class: "text-3 small", style: "margin:0", text: `Now: ${PLAN_NAMES[p.plan]}${p.planExpires ? " until " + fmt(p.planExpires) : " (no end date)"}` }) : null),
     actions: [{ label: "Cancel" }, {
       label: "Save", kind: "primary",
       onClick: async () => {
-        const res = await postJson("/api/mod/economy/plan", { xuid: p.xuid, plan: plan.value || null, days: Number(days.value) });
+        const res = await postJson("/api/mod/economy/plan", { xuid: p.xuid, plan: plan.value || null, days: Number(days.value), extraPlots: Number(extra.value || 0) });
         toast(plan.value ? `${p.gamertag} now has ${PLAN_NAMES[plan.value]}.${res.sent ? "" : " It applies when the server is online."}` : `Plan removed from ${p.gamertag}.`);
         loaders.economy();
       },

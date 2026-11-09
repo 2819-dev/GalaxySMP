@@ -125,6 +125,18 @@
    "staff": false
   },
   {
+   "command": "/plot",
+   "description": "Open your Plot Manager: members, highlight, teleport, unclaim.",
+   "example": "/plot",
+   "staff": false
+  },
+  {
+   "command": "/plot shovel",
+   "description": "Get a Plot Claiming Shovel if you can claim another plot.",
+   "example": "/plot shovel",
+   "staff": false
+  },
+  {
    "command": "/money [player]",
    "description": "See your money, or someone else's. Also /bal.",
    "example": "/money Steve",
@@ -200,6 +212,18 @@
    "command": "/ranks",
    "description": "Give, create and edit ranks.",
    "example": "/ranks",
+   "staff": true
+  },
+  {
+   "command": "/plotaxe",
+   "description": "Get the Plot Axe: make plots and protected areas (left-click, right-click, then Save).",
+   "example": "/plotaxe",
+   "staff": true
+  },
+  {
+   "command": "/plot list",
+   "description": "List every plot and protected area.",
+   "example": "/plot list",
    "staff": true
   }
  ]

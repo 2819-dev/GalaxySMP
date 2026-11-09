@@ -729,3 +729,6 @@ textarea.input { height: auto; padding: 10px 12px; line-height: 1.45; resize: ve
 .rank-tag { font-weight: 700; font-size: .85em; white-space: nowrap; margin-right: 6px; letter-spacing: 0; text-transform: none; }
 .member-group .rank-tag { font-size: .95em; margin-right: 2px; }
 .msg-head .name span, .member .name span { font-weight: inherit; }
+.extra-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.extra-card .text-2 { margin: 4px 0 0; }
+.extra-buy { display: flex; align-items: center; gap: 14px; }

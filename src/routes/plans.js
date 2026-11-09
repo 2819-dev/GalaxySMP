@@ -23,11 +23,22 @@ export function storePlans() {
     ok: true,
     checkoutEnabled: false,
     plans: ["free", "plus", "pro"].map((id) => ({ id, ...PLANS[id] })),
+    extras: [{ id: "extra-plot", name: "Extra plot", price: 1, once: true, description: "One more plot to claim, on top of your plan's plots. Yours to keep." }],
   }, 200, { "Cache-Control": "public, max-age=300" });
 }
 
+// Everything the server needs about plans: who has which plan, and extra plots.
+export async function planMessage(sql) {
+  const extra = await sql`SELECT xuid, extra_plots FROM players WHERE extra_plots > 0`;
+  return {
+    type: "plans",
+    subscriptions: await loadSubscriptions(sql),
+    extraPlots: Object.fromEntries(extra.map((r) => [r.xuid, Number(r.extra_plots)])),
+  };
+}
+
 export async function sendPlans(env, sql) {
-  return toPlugin(env, { type: "plans", subscriptions: await loadSubscriptions(sql) });
+  return toPlugin(env, await planMessage(sql));
 }
 
 // Admins: give, change or remove a player's plan.
@@ -38,6 +49,11 @@ export async function adminSetPlan(request, env) {
   const sql = getDb(env);
   const [player] = await sql`SELECT xuid, gamertag FROM players WHERE xuid = ${String(body.xuid || "")}`;
   if (!player) throw new HttpError(404, "That player hasn't joined the server yet.");
+  if (body.extraPlots !== undefined) {
+    const extra = Number(body.extraPlots);
+    if (!Number.isInteger(extra) || extra < 0 || extra > 50) throw new HttpError(400, "Extra plots must be a number from 0 to 50.");
+    await sql`UPDATE players SET extra_plots = ${extra} WHERE xuid = ${player.xuid}`;
+  }
   const plan = body.plan ? String(body.plan) : null;
   if (plan && !["plus", "pro"].includes(plan)) throw new HttpError(400, "Choose Galaxy+ or Galaxy Pro+.");
   const days = Number(body.days || 0);

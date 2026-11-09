@@ -37,6 +37,9 @@ class Plans:
         if isinstance(subs, dict):
             self.subs = {str(k): v for k, v in subs.items() if isinstance(v, dict) and v.get("plan") in ("plus", "pro")}
             self.eco.set_config("plans", self.subs)
+            plots = getattr(self.plugin, "plots", None)
+            if plots:
+                plots.update_extra(msg.get("extraPlots"))
             for p in self.plugin.server.online_players:
                 self.bill(p)
             self.plugin.refresh_tags()

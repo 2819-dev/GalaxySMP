@@ -12,8 +12,10 @@ import urllib.request
 
 from endstone import ColorFormat, Player
 from endstone.command import Command, CommandSender
-from endstone.event import (ActorDamageEvent, PlayerChatEvent, PlayerDeathEvent, PlayerInteractActorEvent,
-                            PlayerJoinEvent, PlayerQuitEvent, event_handler)
+from endstone.event import (ActorDamageEvent, ActorExplodeEvent, BlockBreakEvent, BlockExplodeEvent,
+                            BlockFromToEvent, BlockPlaceEvent, PlayerChatEvent, PlayerDeathEvent,
+                            PlayerInteractActorEvent, PlayerInteractEvent, PlayerJoinEvent, PlayerQuitEvent,
+                            event_handler)
 from endstone.plugin import Plugin
 
 from endstone_galaxylink import settings
@@ -22,12 +24,13 @@ from endstone_galaxylink.economy import HUD_TICKS, Economy
 from endstone_galaxylink.helpmenu import HelpMenu
 from endstone_galaxylink.npc import HOLD_TICKS, NpcManager
 from endstone_galaxylink.plans import CHECK_TICKS, Plans
+from endstone_galaxylink.plots import Plots
 from endstone_galaxylink.ranks import RankManager, name_text, tag_text
 from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.7.1"
+VERSION = "2.8.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -79,6 +82,8 @@ class GalaxyLink(Plugin):
         "homes": _cmd("List your homes.", "/homes", "galaxylink.command.homes"),
         "back": _cmd("Go back to where you died or last teleported from.", "/back", "galaxylink.command.back"),
         "plan": _cmd("See your subscription plan.", "/plan", "galaxylink.command.plan"),
+        "plot": _cmd("Manage your plot. /plot shovel gets a claiming shovel.", "/plot [action: message]", "galaxylink.command.plot", ["plots"]),
+        "plotaxe": _cmd("Get the Plot Axe to make plots and protected areas.", "/plotaxe", "galaxylink.command.plotaxe"),
     }
     permissions = {
         "galaxylink.command.link": _perm("Allows players to use /link.", True),
@@ -106,6 +111,8 @@ class GalaxyLink(Plugin):
         "galaxylink.command.homes": _perm("Allows /homes.", True),
         "galaxylink.command.back": _perm("Allows /back.", True),
         "galaxylink.command.plan": _perm("Allows /plan.", True),
+        "galaxylink.command.plot": _perm("Allows /plot.", True),
+        "galaxylink.command.plotaxe": _perm("Allows /plotaxe (server operators).", "op"),
     }
 
     def on_enable(self) -> None:
@@ -119,6 +126,8 @@ class GalaxyLink(Plugin):
         self.npcs = NpcManager(self)
         self.help = HelpMenu(self)
         self.teleports = Teleports(self)
+        self.plots = Plots(self)
+        self.server.scheduler.run_task(self, self.plots.tick, delay=1, period=1)
         self.register_events(self)
         self.server.scheduler.run_task(self, self.economy.tick, delay=HUD_TICKS, period=HUD_TICKS)
         self.server.scheduler.run_task(self, self.npcs.tick, delay=HOLD_TICKS, period=HOLD_TICKS)
@@ -159,6 +168,7 @@ class GalaxyLink(Plugin):
         self.ranks.apply_permissions(player)
         self.economy.on_join(player)
         self.plans.bill(player)
+        self.plots.on_join(player)
         player.send_message("§7Need help? Type §e/guide§7 for server info, rules and commands.")
         self.refresh_tags()
         if self._voice:
@@ -180,6 +190,32 @@ class GalaxyLink(Plugin):
     @event_handler
     def on_actor_damage(self, event: ActorDamageEvent):
         self.npcs.on_damage(event)
+        self.plots.on_damage(event)
+
+    # ---------- plot protection ----------
+    @event_handler
+    def on_block_break(self, event: BlockBreakEvent):
+        self.plots.on_break(event)
+
+    @event_handler
+    def on_block_place(self, event: BlockPlaceEvent):
+        self.plots.on_place(event)
+
+    @event_handler
+    def on_interact(self, event: PlayerInteractEvent):
+        self.plots.on_interact(event)
+
+    @event_handler
+    def on_actor_explode(self, event: ActorExplodeEvent):
+        self.plots.on_explode(event)
+
+    @event_handler
+    def on_block_explode(self, event: BlockExplodeEvent):
+        self.plots.on_explode(event)
+
+    @event_handler
+    def on_flow(self, event: BlockFromToEvent):
+        self.plots.on_flow(event)
 
     @event_handler
     def on_player_chat(self, event: PlayerChatEvent):
@@ -229,7 +265,7 @@ class GalaxyLink(Plugin):
     def on_command(self, sender: CommandSender, command: Command, args: list[str]) -> bool:
         name = command.name
         player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "guide", "tpa", "tpahere", "tpaccept",
-                       "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan"}
+                       "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe"}
         if name in player_only and not isinstance(sender, Player):
             sender.send_message(f"/{name} can only be used in game.")
             return True
@@ -269,6 +305,8 @@ class GalaxyLink(Plugin):
             "homes": lambda: tp.list_homes(sender),
             "back": lambda: tp.go_back(sender),
             "plan": lambda: sender.send_message(self.plans.describe(sender)),
+            "plot": lambda: self.plots.command(sender, args),
+            "plotaxe": lambda: self.plots.give_axe(sender),
         }
         if name in simple:
             simple[name]()

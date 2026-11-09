@@ -78,7 +78,7 @@ export async function adminEconomy(request, env, ctx, url) {
   const q = String(url.searchParams.get("q") || "").trim().toLowerCase().slice(0, 32);
   const [shop, players, cfg] = await Promise.all([
     loadShop(sql),
-    sql`SELECT p.xuid, p.gamertag, p.balance_cents, p.is_op, p.last_seen, s.plan, s.expires_at
+    sql`SELECT p.xuid, p.gamertag, p.balance_cents, p.is_op, p.last_seen, p.extra_plots, s.plan, s.expires_at
           FROM players p
           LEFT JOIN subscriptions s ON s.xuid = p.xuid AND (s.expires_at IS NULL OR s.expires_at > now())
          WHERE (${q} = '' OR lower(p.gamertag) LIKE '%' || ${q} || '%')
@@ -94,7 +94,7 @@ export async function adminEconomy(request, env, ctx, url) {
     serverOnline: Boolean(online),
     players: players.map((p) => ({
       xuid: p.xuid, gamertag: p.gamertag, cents: p.balance_cents == null ? null : Number(p.balance_cents), op: p.is_op, lastSeen: p.last_seen,
-      plan: p.plan || null, planExpires: p.expires_at || null,
+      plan: p.plan || null, planExpires: p.expires_at || null, extraPlots: Number(p.extra_plots || 0),
     })),
   });
 }
