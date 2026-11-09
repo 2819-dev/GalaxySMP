@@ -23,7 +23,8 @@ ICONS = ["crown", "star", "shield", "sword", "gem", "heart", "hammer", "flame", 
            "pickaxe", "axe", "bow", "potion", "book", "key", "trophy", "medal", "code", "music", "paw", "fish",
            "mushroom", "flower", "moon", "sun", "snowflake", "skull", "ghost", "eye", "coin", "moneybag", "gift", "cake",
            "cookie", "apple", "bell", "lightbulb", "magnet", "compass", "clock", "hourglass", "flag", "anchor", "feather", "droplet",
-           "tree", "cactus", "cloud", "rainbow", "cat", "slime", "dice", "gamepad"]
+           "tree", "cactus", "cloud", "rainbow", "cat", "slime", "dice", "gamepad", "redstone", "diamond", "emerald", "netherite",
+           "goldingot", "ironingot", "amethyst", "lapis", "shootingstar", "wingeddiamond"]
 GLYPHS = {name: chr(0xE210 + i) for i, name in enumerate(ICONS)}
 
 # Typed command names -> permission nodes. Same rules as the website (src/routes/ranks.js).

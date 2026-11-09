@@ -343,6 +343,65 @@ def gamepad():
     d.point((11,7), fill=(80,200,90,255)); d.point((13,9), fill=(230,60,70,255))
     return im
 
+def _ingot(d, top, front):
+    d.polygon([(4,5),(12,5),(15,9),(1,9)], fill=top)
+    d.rectangle((1,9,15,12), fill=front)
+    d.line((5,6,11,6), fill=tuple(min(255, c + 60) for c in top[:3]) + (255,))
+def redstone():
+    im, d = new()
+    d.polygon([(1,13),(4,9),(7,8),(10,8),(13,10),(15,13),(15,14),(1,14)], fill=(180,20,20,255))   # dust pile
+    d.polygon([(4,10),(7,9),(10,9),(12,11),(5,12)], fill=(235,45,40,255))
+    for x, y in ((6,10),(9,10),(11,12),(3,12)): d.point((x,y), fill=(255,140,120,255))
+    for x, y in ((3,4),(12,3),(8,2),(13,6),(2,7)): d.point((x,y), fill=(255,70,60,255))             # glowing specks
+    return im
+def diamond():
+    im, d = new()
+    d.polygon([(8,1),(15,8),(8,15),(1,8)], fill=(60,215,225,255))
+    d.polygon([(8,1),(8,8),(1,8)], fill=(150,245,250,255)); d.polygon([(8,8),(15,8),(8,15)], fill=(35,160,185,255))
+    d.polygon([(8,4),(12,8),(8,12),(4,8)], fill=(100,235,240,255))
+    d.point((6,5), fill=(255,255,255,255)); d.point((7,4), fill=(255,255,255,255))
+    return im
+def emerald():
+    im, d = new()
+    d.polygon([(8,1),(13,5),(13,11),(8,15),(3,11),(3,5)], fill=(40,200,90,255))
+    d.polygon([(8,4),(10,6),(10,10),(8,12),(6,10),(6,6)], fill=(110,240,140,255))
+    d.point((7,5), fill=(220,255,225,255))
+    return im
+def netherite():
+    im, d = new(); _ingot(d, (95,80,95,255), (60,50,62,255))
+    d.point((9,10), fill=(150,110,170,255)); d.point((4,11), fill=(150,110,170,255))
+    return im
+def goldingot():
+    im, d = new(); _ingot(d, (255,210,50,255), (220,160,30,255)); return im
+def ironingot():
+    im, d = new(); _ingot(d, (225,228,235,255), (175,180,190,255)); return im
+def amethyst():
+    im, d = new()
+    d.polygon([(7,2),(9,1),(10,12),(6,12)], fill=(180,120,250,255))
+    d.polygon([(3,6),(5,5),(7,13),(3,13)], fill=(150,90,230,255))
+    d.polygon([(11,5),(13,6),(13,13),(9,13)], fill=(150,90,230,255))
+    d.line((8,3,8,10), fill=(225,200,255,255)); d.rectangle((2,13,14,14), fill=(110,70,170,255))
+    return im
+def lapis():
+    im, d = new()
+    d.ellipse((2,3,14,14), fill=(40,80,210,255)); d.ellipse((5,5,10,10), fill=(80,130,240,255))
+    d.point((6,6), fill=(200,220,255,255)); d.point((11,11), fill=(230,200,80,255))
+    return im
+def shootingstar():
+    im, d = new(); y = (255,225,70,255)
+    d.line((1,15,7,9), fill=(255,240,170,255)); d.line((2,13,6,9), fill=(255,200,120,255)); d.line((3,15,7,11), fill=(255,200,120,255))
+    d.polygon([(10,1),(11,5),(15,5),(12,8),(13,12),(10,10),(7,12),(8,8),(5,5),(9,5)], fill=y)
+    return im
+def wingeddiamond():
+    im, d = new(); w = (250,250,255,255); f = (195,200,230,255)
+    for side in (1, -1):
+        X = (lambda x: x) if side == 1 else (lambda x: 15 - x)
+        d.polygon([(X(0),2),(X(5),5),(X(5),10),(X(3),11),(X(0),8)], fill=w)
+        d.line((X(1),5,X(4),7), fill=f); d.line((X(1),8,X(4),9), fill=f)
+    d.polygon([(8,4),(11,8),(8,13),(5,8)], fill=(60,215,225,255))
+    d.polygon([(8,4),(8,8),(5,8)], fill=(160,245,250,255)); d.polygon([(8,8),(11,8),(8,13)], fill=(35,160,185,255))
+    d.line((6,1,10,1), fill=(255,215,80,255)); d.point((5,2), fill=(255,215,80,255)); d.point((11,2), fill=(255,215,80,255))
+    return im
 ICONS = [("crown", crown), ("star", star), ("shield", shield), ("sword", sword), ("gem", gem), ("heart", heart),
          ("hammer", hammer), ("flame", flame), ("bolt", bolt), ("rocket", rocket), ("planet", planet), ("leaf", leaf),
          ("pickaxe", pickaxe), ("axe", axe), ("bow", bow), ("potion", potion), ("book", book), ("key", key),
@@ -353,7 +412,10 @@ ICONS = [("crown", crown), ("star", star), ("shield", shield), ("sword", sword),
          ("bell", bell), ("lightbulb", lightbulb), ("magnet", magnet), ("compass", compass), ("clock", clock),
          ("hourglass", hourglass), ("flag", flag), ("anchor", anchor), ("feather", feather), ("droplet", droplet),
          ("tree", tree), ("cactus", cactus), ("cloud", cloud), ("rainbow", rainbow), ("cat", cat), ("slime", slime),
-         ("dice", dice), ("gamepad", gamepad)]
+         ("dice", dice), ("gamepad", gamepad),
+         ("redstone", redstone), ("diamond", diamond), ("emerald", emerald), ("netherite", netherite),
+         ("goldingot", goldingot), ("ironingot", ironingot), ("amethyst", amethyst), ("lapis", lapis),
+         ("shootingstar", shootingstar), ("wingeddiamond", wingeddiamond)]
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     prev = Image.new("RGBA", (len(ICONS) * 72, 72), (60, 60, 60, 255))
