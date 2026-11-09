@@ -8,13 +8,13 @@ const config = {
   // Where GalaxySMP is hosted right now:
   //   "realm"  = Minecraft Realms (invite only, no server address yet)
   //   "server" = our own server (shows the address and live player count)
-  hosting: "realm",
+  hosting: "server",
 
   // Manual status. While enabled, the website shows this instead of a live check.
   // Use it for Realm closures or maintenance. Set enabled: false to go back to automatic.
   // color: "green" (open), "amber" (maintenance / migrating), "red" (closed)
   manualStatus: {
-    enabled: true,
+    enabled: false,
     open: false,
     color: "amber",
     title: "Migrating to Server",
@@ -23,8 +23,8 @@ const config = {
 
   // GalaxySMP is Bedrock only. Players need the address AND the port.
   // Replace "your.server.ip" with the real address from the BisectHosting panel.
-  bedrockAddress: "your.server.ip",
-  bedrockPort: 19132,
+  bedrockAddress: "galaxymc.smp.live",
+  bedrockPort: 9030,
 
   minecraftVersion: "1.21",
 

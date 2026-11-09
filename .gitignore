@@ -5,3 +5,4 @@ plugin/target/
 plugin/build/
 *.log
 src/generated/
+server-files/
