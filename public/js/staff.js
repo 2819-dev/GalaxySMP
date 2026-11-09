@@ -218,6 +218,8 @@ const DESCRIBE = {
   "economy.money": (e) => [e.details.action === "set" ? `set ${e.details.player}'s money to ${money(e.details.cents)}` : e.details.action === "add" ? `gave ${e.details.player} ${money(e.details.cents)}` : `took ${money(e.details.cents)} from ${e.details.player}`],
   "economy.shop": (e) => [`changed the shop prices (${e.details.categories} categories, ${e.details.items} items)`],
   "economy.shop_reset": () => ["reset the shop to the built-in prices"],
+  "help.save": () => ["edited the in-game Help menu"],
+  "help.reset": () => ["reset the in-game Help menu"],
   "filter.add": () => ["added a word to the filter"],
   "filter.remove": () => ["removed a word from the filter"],
 };
@@ -566,6 +568,84 @@ $("eco-reset").addEventListener("click", () => openDialog({
   }],
 }));
 
+// ---------- Help menu (Admins) ----------
+let helpData = null;
+let helpDirty = false;
+
+function helpChanged() {
+  helpDirty = true;
+  $("help-save").disabled = false;
+  $("help-status").textContent = "Unsaved changes";
+}
+
+function textInput(value, attrs, onInput) {
+  const el = h(attrs.rows ? "textarea" : "input", { class: "input", ...attrs });
+  el.value = value ?? "";
+  el.addEventListener("input", () => { onInput(el.value); helpChanged(); });
+  return el;
+}
+
+loaders.help = async () => {
+  if (helpDirty) return;
+  const data = await getJson("/api/mod/help");
+  helpData = structuredClone(data.help);
+  $("help-status").textContent = data.custom ? `Last changed by ${data.updated.by} on ${fmt(data.updated.at)}` : "Using the built-in text";
+  renderHelp();
+};
+
+function renderHelp() {
+  const info = $("help-info");
+  info.replaceChildren(textInput(helpData.info, { rows: 9, "aria-label": "Server Information" }, (v) => { helpData.info = v; }));
+
+  const rules = $("help-rules");
+  rules.replaceChildren();
+  helpData.rules.forEach((sec, i) => {
+    rules.append(h("div", { class: "help-block" },
+      h("div", { class: "eco-head" },
+        h("label", { class: "small text-3" }, "Section title", textInput(sec.title, { maxlength: 60 }, (v) => { sec.title = v; })),
+        h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: () => { helpData.rules.splice(i, 1); helpChanged(); renderHelp(); } })),
+      h("label", { class: "small text-3" }, "Rules, one per line",
+        textInput(sec.items.join("\n"), { rows: Math.min(8, sec.items.length + 2) }, (v) => { sec.items = v.split("\n").map((x) => x.trim()).filter(Boolean); }))));
+  });
+
+  const cmds = $("help-commands");
+  cmds.replaceChildren();
+  helpData.commands.forEach((c, i) => {
+    const staff = h("input", { type: "checkbox", checked: c.staff });
+    staff.addEventListener("change", () => { c.staff = staff.checked; helpChanged(); });
+    cmds.append(h("div", { class: "help-cmd" },
+      h("label", {}, "Command", textInput(c.command, { maxlength: 60, placeholder: "/tpa <player>" }, (v) => { c.command = v; })),
+      h("label", {}, "What it does", textInput(c.description, { maxlength: 160 }, (v) => { c.description = v; })),
+      h("label", {}, "Example", textInput(c.example, { maxlength: 80, placeholder: "/tpa Steve" }, (v) => { c.example = v; })),
+      h("label", { class: "check" }, staff, "Staff only"),
+      h("div", { class: "help-cmd-actions" },
+        h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": "Move up", text: "↑", disabled: i === 0,
+          onclick: () => { [helpData.commands[i - 1], helpData.commands[i]] = [helpData.commands[i], helpData.commands[i - 1]]; helpChanged(); renderHelp(); } }),
+        h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: () => { helpData.commands.splice(i, 1); helpChanged(); renderHelp(); } }))));
+  });
+  $("help-save").disabled = !helpDirty;
+}
+
+$("help-add-rule").addEventListener("click", () => { helpData.rules.push({ title: `${helpData.rules.length + 1}. New section`, items: [] }); helpChanged(); renderHelp(); });
+$("help-add-command").addEventListener("click", () => { helpData.commands.push({ command: "/", description: "", example: "", staff: false }); helpChanged(); renderHelp(); });
+$("help-save").addEventListener("click", async () => {
+  $("help-save").disabled = true;
+  try {
+    const res = await postJson("/api/mod/help/save", { help: helpData });
+    helpDirty = false;
+    toast(res.sent ? "Saved. Players see it in /guide right away." : "Saved. The server gets it when it's online.");
+    loaders.help();
+  } catch (e) { toast(e.message); $("help-save").disabled = false; }
+});
+$("help-reset").addEventListener("click", () => openDialog({
+  title: "Go back to the built-in Help text?",
+  body: h("p", { class: "text-2", text: "This replaces the Server Information, rules and commands with the original text." }),
+  actions: [{ label: "Cancel" }, {
+    label: "Reset", kind: "danger",
+    onClick: async () => { await postJson("/api/mod/help/reset", {}); helpDirty = false; toast("Help menu reset."); loaders.help(); },
+  }],
+}));
+
 // ---------- Start ----------
 (async () => {
   let user = null;
@@ -580,6 +660,6 @@ $("eco-reset").addEventListener("click", () => openDialog({
   $("staff-intro").textContent = `Signed in as ${user.username} (${user.role.name}). ${power >= 100 ? "You can use every tool on this page." : "Banning and role changes are reserved for Admins."}`;
   $("staff-app").hidden = false;
   const start = location.hash.slice(1);
-  if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"]').forEach((t) => (t.hidden = false));
-  selectTab(["reports", "members", "words", "audit", ...(power >= 100 ? ["ranks", "economy"] : [])].includes(start) ? start : "reports");
+  if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"], [data-tab="help"]').forEach((t) => (t.hidden = false));
+  selectTab(["reports", "members", "words", "audit", ...(power >= 100 ? ["ranks", "economy", "help"] : [])].includes(start) ? start : "reports");
 })();

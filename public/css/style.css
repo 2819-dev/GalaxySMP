@@ -690,3 +690,14 @@ textarea.input { height: auto; padding: 10px 14px; resize: vertical; min-height:
 .text-warn { color: var(--warn); }
 
 .voice-head { flex-wrap: wrap; gap: 10px; }
+
+/* ---------- Help menu editor ---------- */
+.help-block { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 9px; }
+.help-block label, .help-cmd label:not(.check) { display: flex; flex-direction: column; gap: 4px; }
+textarea.input { height: auto; padding: 10px 12px; line-height: 1.45; resize: vertical; font: inherit; }
+.help-cmd { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr) auto auto; gap: 8px; align-items: end; padding: 10px; border: 1px solid var(--border); border-radius: 9px; }
+.help-cmd label { font-size: .78rem; color: var(--text-3); }
+.help-cmd .input { height: 38px; padding: 0 10px; }
+.help-cmd .check { align-self: center; white-space: nowrap; }
+.help-cmd-actions { display: flex; gap: 4px; }
+@media (max-width: 760px) { .help-cmd { grid-template-columns: minmax(0, 1fr) auto; } .help-cmd > label:not(.check) { grid-column: 1 / -1; } .help-cmd-actions { justify-content: flex-end; } }

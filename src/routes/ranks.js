@@ -26,8 +26,9 @@ export const ICONS = ["crown", "star", "shield", "sword", "gem", "heart", "hamme
 // that allows the whole command, so "time" also allows "/time set day".
 // Same rules as the plugin (endstone_galaxylink/ranks.py).
 const ENDSTONE_COMMANDS = new Set(["ban", "banip", "banlist", "plugins", "reload", "seed", "status", "unban", "unbanip", "version"]);
-const PLUGIN_COMMANDS = new Set(["link", "ranks", "money", "pay", "baltop", "setmoney", "addmoney", "takemoney", "shop", "sell", "ah", "shopnpc"]);
-const ALIASES = { tp: "teleport", msg: "tell", w: "tell", bal: "money", balance: "money", auction: "ah", "ban-ip": "banip", "unban-ip": "unbanip", pardon: "unban" };
+const PLUGIN_COMMANDS = new Set(["link", "ranks", "money", "pay", "baltop", "setmoney", "addmoney", "takemoney", "shop", "sell", "ah", "shopnpc",
+  "guide", "tpa", "tpahere", "tpaccept", "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back"]);
+const ALIASES = { tp: "teleport", msg: "tell", w: "tell", bal: "money", balance: "money", auction: "ah", menu: "guide", tpyes: "tpaccept", tpno: "tpdeny", "ban-ip": "banip", "unban-ip": "unbanip", pardon: "unban" };
 
 export function commandPermission(text) {
   let name = String(text).trim().replace(/^\/+/, "").split(/\s+/)[0].toLowerCase();

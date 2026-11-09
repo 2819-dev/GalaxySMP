@@ -34,6 +34,7 @@
           <button role="tab" data-tab="words" aria-selected="false">Word filter</button>
           <button role="tab" data-tab="ranks" aria-selected="false" hidden>Ranks</button>
           <button role="tab" data-tab="economy" aria-selected="false" hidden>Economy</button>
+          <button role="tab" data-tab="help" aria-selected="false" hidden>Help menu</button>
           <button role="tab" data-tab="audit" aria-selected="false">Audit log</button>
         </div>
 
@@ -111,6 +112,33 @@
             </div>
             <p class="text-3 small" style="margin:0 0 6px">Prices are in dollars. Leave Buy or Sell empty to turn it off for that item. Tap a category to edit it. <span id="eco-status"></span></p>
             <div id="eco-shop"></div>
+          </div>
+        </section>
+
+        <section data-panel="help" hidden>
+          <div class="panel" style="margin-bottom:16px">
+            <div class="voice-head">
+              <h2>In-game Help menu</h2>
+              <div class="row-actions">
+                <button class="btn btn-ghost btn-sm" type="button" id="help-reset">Reset to built-in text</button>
+                <button class="btn btn-primary btn-sm" type="button" id="help-save" disabled>Save</button>
+              </div>
+            </div>
+            <p class="text-3 small" style="margin:0">Players open it in game with <code>/guide</code>. It has three pages: Server Information, Rules and Commands. Put <code>**two stars**</code> around words to make them bold. The website's Rules page shows the same rules. <span id="help-status"></span></p>
+          </div>
+          <div class="panel" style="margin-bottom:16px">
+            <div class="voice-head"><h2>Server Information</h2></div>
+            <p class="text-3 small" style="margin:0 0 10px">Shown under the GalaxySMP logo.</p>
+            <div id="help-info"></div>
+          </div>
+          <div class="panel" style="margin-bottom:16px">
+            <div class="voice-head"><h2>Rules</h2><button class="btn btn-secondary btn-sm" type="button" id="help-add-rule">Add section</button></div>
+            <div id="help-rules" class="stack"></div>
+          </div>
+          <div class="panel">
+            <div class="voice-head"><h2>Commands</h2><button class="btn btn-secondary btn-sm" type="button" id="help-add-command">Add command</button></div>
+            <p class="text-3 small" style="margin:0 0 10px">Players tap a command to see its example. "Staff only" commands are shown to operators only.</p>
+            <div id="help-commands" class="stack"></div>
           </div>
         </section>
 

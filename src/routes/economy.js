@@ -24,7 +24,7 @@ async function audit(sql, actorId, action, details) {
 }
 
 // Sends a message to the GalaxyLink plugin. Returns false if the server isn't connected.
-async function toPlugin(env, message) {
+export async function toPlugin(env, message) {
   const res = await voiceStub(env).fetch("https://voice/internal/plugin", { method: "POST", body: JSON.stringify(message) });
   const data = await res.json().catch(() => ({}));
   return Boolean(data.sent);

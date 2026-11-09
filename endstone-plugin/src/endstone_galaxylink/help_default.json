@@ -1,0 +1,200 @@
+{
+ "info": "Welcome to GalaxySMP, a friendly Minecraft Bedrock server for everyone.\n\nSurvival, Minigames, Skyblock and Creative, all connected through one hub. Our staff keep things safe and fun, and it's free to play.\n\nWebsite: galaxymc.us\n- Community chat and voice chat (link your account with /link)\n- Server status, the money leaderboard and the full rules\n\nServer address: galaxymc.smp.live (port 9030)",
+ "rules": [
+  {
+   "title": "1. Respect",
+   "items": [
+    "**No bullying or harassment.** This includes name-calling, targeting a player repeatedly, or encouraging others to do so.",
+    "**No hate speech.** Comments about anyone's race, religion, gender, disability or identity are not allowed.",
+    "**Resolve disputes through staff.** If you have a problem with another player, contact a staff member rather than arguing in public."
+   ]
+  },
+  {
+   "title": "2. Chat",
+   "items": [
+    "**No swearing,** including misspellings or symbols used to get around the filter.",
+    "**No mature or frightening content.** Keep all topics suitable for younger players.",
+    "**No spam.** Avoid flooding chat, excessive capital letters or repeated messages.",
+    "**No advertising** of other servers, channels or websites."
+   ]
+  },
+  {
+   "title": "3. Online safety",
+   "items": [
+    "**Keep personal information private:** real names, ages, addresses, schools, phone numbers, photos and social media accounts.",
+    "**Never ask other players** for their personal information.",
+    "**Keep conversations on GalaxySMP.** If someone asks you to move to another app, tell a staff member.",
+    "**Never share your password.** Staff will never ask for it."
+   ]
+  },
+  {
+   "title": "4. Fair play",
+   "items": [
+    "**No griefing.** Do not break, alter or take from builds that aren't yours.",
+    "**No cheating.** Hacked clients, X-ray, auto-clickers and other unfair modifications are prohibited.",
+    "**Report bugs instead of exploiting them.** Players who report exploits may be rewarded.",
+    "**No scamming** or misleading players in trades."
+   ]
+  },
+  {
+   "title": "5. Staff",
+   "items": [
+    "**Follow staff instructions.** If you disagree with a decision, raise it politely with a staff member.",
+    "**Do not impersonate staff.**",
+    "**Report problems** to staff instead of responding yourself."
+   ]
+  }
+ ],
+ "commands": [
+  {
+   "command": "/guide",
+   "description": "Open this menu: server info, rules and commands.",
+   "example": "/guide",
+   "staff": false
+  },
+  {
+   "command": "/link <code>",
+   "description": "Link your account to galaxymc.us for chat and voice. Get the code on the website.",
+   "example": "/link ABC-123",
+   "staff": false
+  },
+  {
+   "command": "/tpa <player>",
+   "description": "Send a teleport request to another player.",
+   "example": "/tpa Steve",
+   "staff": false
+  },
+  {
+   "command": "/tpahere <player>",
+   "description": "Ask another player to teleport to you.",
+   "example": "/tpahere Steve",
+   "staff": false
+  },
+  {
+   "command": "/tpaccept [player]",
+   "description": "Accept a teleport request.",
+   "example": "/tpaccept Steve",
+   "staff": false
+  },
+  {
+   "command": "/tpdeny [player]",
+   "description": "Say no to a teleport request.",
+   "example": "/tpdeny Steve",
+   "staff": false
+  },
+  {
+   "command": "/spawn",
+   "description": "Go back to spawn.",
+   "example": "/spawn",
+   "staff": false
+  },
+  {
+   "command": "/sethome [name]",
+   "description": "Save where you're standing as a home (up to 3).",
+   "example": "/sethome base",
+   "staff": false
+  },
+  {
+   "command": "/home [name]",
+   "description": "Teleport to one of your homes.",
+   "example": "/home base",
+   "staff": false
+  },
+  {
+   "command": "/homes",
+   "description": "List your homes.",
+   "example": "/homes",
+   "staff": false
+  },
+  {
+   "command": "/delhome <name>",
+   "description": "Delete a home.",
+   "example": "/delhome base",
+   "staff": false
+  },
+  {
+   "command": "/back",
+   "description": "Go back to where you died or last teleported from.",
+   "example": "/back",
+   "staff": false
+  },
+  {
+   "command": "/money [player]",
+   "description": "See your money, or someone else's. Also /bal.",
+   "example": "/money Steve",
+   "staff": false
+  },
+  {
+   "command": "/pay <player> <amount>",
+   "description": "Send money to another player. 2.5k means $2,500.",
+   "example": "/pay Steve 2.5k",
+   "staff": false
+  },
+  {
+   "command": "/baltop",
+   "description": "See the richest players.",
+   "example": "/baltop",
+   "staff": false
+  },
+  {
+   "command": "/shop",
+   "description": "Buy and sell items by category.",
+   "example": "/shop",
+   "staff": false
+  },
+  {
+   "command": "/sell [hand|all]",
+   "description": "Sell items: opens a menu, or sell what you hold, or everything.",
+   "example": "/sell all",
+   "staff": false
+  },
+  {
+   "command": "/ah",
+   "description": "Open the Auction House to buy from other players.",
+   "example": "/ah",
+   "staff": false
+  },
+  {
+   "command": "/ah sell <price>",
+   "description": "Sell the item in your hand on the Auction House for 48 hours.",
+   "example": "/ah sell 5k",
+   "staff": false
+  },
+  {
+   "command": "/setspawn",
+   "description": "Set the spawn point to where you're standing.",
+   "example": "/setspawn",
+   "staff": true
+  },
+  {
+   "command": "/setmoney <player> <amount>",
+   "description": "Set a player's money.",
+   "example": "/setmoney Steve 1m",
+   "staff": true
+  },
+  {
+   "command": "/addmoney <player> <amount>",
+   "description": "Give a player money.",
+   "example": "/addmoney Steve 500",
+   "staff": true
+  },
+  {
+   "command": "/takemoney <player> <amount>",
+   "description": "Take money from a player.",
+   "example": "/takemoney Steve 500",
+   "staff": true
+  },
+  {
+   "command": "/shopnpc",
+   "description": "Summon a shop NPC where you stand. Tap it to edit it.",
+   "example": "/shopnpc",
+   "staff": true
+  },
+  {
+   "command": "/ranks",
+   "description": "Give, create and edit ranks.",
+   "example": "/ranks",
+   "staff": true
+  }
+ ]
+}

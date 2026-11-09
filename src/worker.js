@@ -12,6 +12,7 @@ import * as mod from "./routes/mod.js";
 import { voiceConnect, voiceServer } from "./routes/voice.js";
 import * as ranks from "./routes/ranks.js";
 import * as economy from "./routes/economy.js";
+import * as help from "./routes/help.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -59,6 +60,9 @@ const routes = [
   ["GET", "/api/economy/top", economy.leaderboard],
   ["GET", "/api/mod/economy", economy.adminEconomy],
   ["POST", "/api/mod/economy/:action", economy.adminEconomyAction],
+  ["GET", "/api/help", help.getHelp],
+  ["GET", "/api/mod/help", help.adminGetHelp],
+  ["POST", "/api/mod/help/:action", help.adminHelpAction],
 ];
 
 function matchPath(pattern, pathname) {

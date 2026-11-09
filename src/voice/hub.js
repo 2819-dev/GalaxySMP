@@ -14,6 +14,7 @@ import { checkMessage, compileWordList } from "../lib/filter.js";
 import { sha256 } from "../lib/crypto.js";
 import { loadRanksState, recordPlayers } from "../routes/ranks.js";
 import { loadShop, recordBalances } from "../routes/economy.js";
+import { loadHelp } from "../routes/help.js";
 
 export const RANGE = 48; // blocks
 const PULL_RANGE = RANGE * 1.3; // a little slack so walking to the edge doesn't cut out
@@ -437,7 +438,9 @@ export class VoiceHub extends DurableObject {
     const plugin = this.pluginSocket();
     if (!plugin) return;
     try {
-      this.send(plugin, { type: "shop", shop: await loadShop(getDb(this.env)) });
+      const sql = getDb(this.env);
+      this.send(plugin, { type: "shop", shop: await loadShop(sql) });
+      this.send(plugin, { type: "help", help: (await loadHelp(sql)).help });
     } catch (e) {
       console.error("shop load failed", e);
     }

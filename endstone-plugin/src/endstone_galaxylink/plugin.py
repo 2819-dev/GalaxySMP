@@ -12,19 +12,21 @@ import urllib.request
 
 from endstone import ColorFormat, Player
 from endstone.command import Command, CommandSender
-from endstone.event import (ActorDamageEvent, PlayerChatEvent, PlayerInteractActorEvent, PlayerJoinEvent,
-                            PlayerQuitEvent, event_handler)
+from endstone.event import (ActorDamageEvent, PlayerChatEvent, PlayerDeathEvent, PlayerInteractActorEvent,
+                            PlayerJoinEvent, PlayerQuitEvent, event_handler)
 from endstone.plugin import Plugin
 
 from endstone_galaxylink import settings
 from endstone_galaxylink.auction import AuctionHouse
 from endstone_galaxylink.economy import HUD_TICKS, Economy
+from endstone_galaxylink.helpmenu import HelpMenu
 from endstone_galaxylink.npc import HOLD_TICKS, NpcManager
 from endstone_galaxylink.ranks import RankManager, name_color, tag_text
 from endstone_galaxylink.shop import Shop
+from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.5.4"
+VERSION = "2.6.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -63,6 +65,18 @@ class GalaxyLink(Plugin):
         "takemoney": _cmd("Take money from a player.", "/takemoney <player: player> <amount: message>",
                           "galaxylink.command.takemoney"),
         "shopnpc": _cmd("Summon a shop NPC where you stand. Tap it to edit it.", "/shopnpc", "galaxylink.command.shopnpc"),
+        "guide": _cmd("Help: server info, rules and commands.", "/guide", "galaxylink.command.guide", ["menu"]),
+        "tpa": _cmd("Ask to teleport to a player.", "/tpa <player: player>", "galaxylink.command.tpa"),
+        "tpahere": _cmd("Ask a player to teleport to you.", "/tpahere <player: player>", "galaxylink.command.tpahere"),
+        "tpaccept": _cmd("Accept a teleport request.", "/tpaccept [player: message]", "galaxylink.command.tpaccept", ["tpyes"]),
+        "tpdeny": _cmd("Say no to a teleport request.", "/tpdeny [player: message]", "galaxylink.command.tpdeny", ["tpno"]),
+        "spawn": _cmd("Go to spawn.", "/spawn", "galaxylink.command.spawn"),
+        "setspawn": _cmd("Set spawn to where you stand.", "/setspawn", "galaxylink.command.setspawn"),
+        "home": _cmd("Teleport to one of your homes.", "/home [name: message]", "galaxylink.command.home"),
+        "sethome": _cmd("Save a home where you stand.", "/sethome [name: message]", "galaxylink.command.sethome"),
+        "delhome": _cmd("Delete a home.", "/delhome <name: message>", "galaxylink.command.delhome"),
+        "homes": _cmd("List your homes.", "/homes", "galaxylink.command.homes"),
+        "back": _cmd("Go back to where you died or last teleported from.", "/back", "galaxylink.command.back"),
     }
     permissions = {
         "galaxylink.command.link": _perm("Allows players to use /link.", True),
@@ -77,6 +91,18 @@ class GalaxyLink(Plugin):
         "galaxylink.command.addmoney": _perm("Allows /addmoney (server operators).", "op"),
         "galaxylink.command.takemoney": _perm("Allows /takemoney (server operators).", "op"),
         "galaxylink.command.shopnpc": _perm("Allows /shopnpc and editing NPCs (server operators).", "op"),
+        "galaxylink.command.guide": _perm("Allows /guide.", True),
+        "galaxylink.command.tpa": _perm("Allows /tpa.", True),
+        "galaxylink.command.tpahere": _perm("Allows /tpahere.", True),
+        "galaxylink.command.tpaccept": _perm("Allows /tpaccept.", True),
+        "galaxylink.command.tpdeny": _perm("Allows /tpdeny.", True),
+        "galaxylink.command.spawn": _perm("Allows /spawn.", True),
+        "galaxylink.command.setspawn": _perm("Allows /setspawn (server operators).", "op"),
+        "galaxylink.command.home": _perm("Allows /home.", True),
+        "galaxylink.command.sethome": _perm("Allows /sethome.", True),
+        "galaxylink.command.delhome": _perm("Allows /delhome.", True),
+        "galaxylink.command.homes": _perm("Allows /homes.", True),
+        "galaxylink.command.back": _perm("Allows /back.", True),
     }
 
     def on_enable(self) -> None:
@@ -87,6 +113,8 @@ class GalaxyLink(Plugin):
         self.shop = Shop(self)
         self.auction = AuctionHouse(self)
         self.npcs = NpcManager(self)
+        self.help = HelpMenu(self)
+        self.teleports = Teleports(self)
         self.register_events(self)
         self.server.scheduler.run_task(self, self.economy.tick, delay=HUD_TICKS, period=HUD_TICKS)
         self.server.scheduler.run_task(self, self.npcs.tick, delay=HOLD_TICKS, period=HOLD_TICKS)
@@ -123,6 +151,7 @@ class GalaxyLink(Plugin):
         player = event.player
         self.ranks.apply_permissions(player)
         self.economy.on_join(player)
+        player.send_message("§7Need help? Type §e/guide§7 for server info, rules and commands.")
         self.refresh_tags()
         if self._voice:
             self._voice.send_seen([player])
@@ -130,6 +159,11 @@ class GalaxyLink(Plugin):
     @event_handler
     def on_player_quit(self, event: PlayerQuitEvent):
         self.ranks.forget(event.player)
+        self.teleports.on_quit(event.player)
+
+    @event_handler
+    def on_player_death(self, event: PlayerDeathEvent):
+        self.teleports.on_death(event.player)
 
     @event_handler
     def on_interact_actor(self, event: PlayerInteractActorEvent):
@@ -186,7 +220,8 @@ class GalaxyLink(Plugin):
     # ---------- /link ----------
     def on_command(self, sender: CommandSender, command: Command, args: list[str]) -> bool:
         name = command.name
-        player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks"}
+        player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "guide", "tpa", "tpahere", "tpaccept",
+                       "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back"}
         if name in player_only and not isinstance(sender, Player):
             sender.send_message(f"/{name} can only be used in game.")
             return True
@@ -210,6 +245,24 @@ class GalaxyLink(Plugin):
             return True
         if name == "ah":
             self.auction.command(sender, args)
+            return True
+        tp = self.teleports
+        simple = {
+            "guide": lambda: self.help.open(sender),
+            "tpa": lambda: tp.request(sender, args, "to"),
+            "tpahere": lambda: tp.request(sender, args, "here"),
+            "tpaccept": lambda: tp.accept(sender, args),
+            "tpdeny": lambda: tp.deny(sender, args),
+            "spawn": lambda: tp.spawn(sender),
+            "setspawn": lambda: tp.set_spawn(sender),
+            "home": lambda: tp.home(sender, args),
+            "sethome": lambda: tp.set_home(sender, args),
+            "delhome": lambda: tp.del_home(sender, args),
+            "homes": lambda: tp.list_homes(sender),
+            "back": lambda: tp.go_back(sender),
+        }
+        if name in simple:
+            simple[name]()
             return True
         if name == "shopnpc":
             self.npcs.create(sender)
