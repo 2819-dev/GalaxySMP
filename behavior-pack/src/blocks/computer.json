@@ -27,24 +27,24 @@
         "origin": [
           -7,
           0,
-          -2
+          -4
         ],
         "size": [
           14,
           15,
-          4
+          6
         ]
       },
       "minecraft:selection_box": {
         "origin": [
           -7,
           0,
-          -2
+          -4
         ],
         "size": [
           14,
           15,
-          4
+          6
         ]
       },
       "minecraft:destructible_by_mining": {

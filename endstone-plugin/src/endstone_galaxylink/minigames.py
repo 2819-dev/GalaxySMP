@@ -143,13 +143,23 @@ class Minigames:
                         on_click=self.watch_menu)
         if self.is_staff(player):
             p = len(self.pending())
-            form.add_button(f"§d§lHost requests ({p})§r\n§8Accept or decline", icon="textures/ui/mail_icon",
-                            on_click=self.review_menu)
-            form.add_button("§d§lManage minigames§r\n§8Rooms, end a game", icon="textures/ui/settings_glyph_color_2x",
-                            on_click=self.manage_menu)
+            form.add_button(f"§d§lMinigame Staff§r\n§8{p} request{'s' if p != 1 else ''} waiting" if p else "§d§lMinigame Staff§r\n§8Requests and running games",
+                            icon="textures/ui/permissions_op_crown", on_click=self.staff_menu)
+        player.send_form(form)
+
+    def staff_menu(self, player):
+        """Only Minigame Staff see this button."""
+        if not self.is_staff(player):
+            return
+        p = len(self.pending())
+        form = ActionForm(title="§l§dMinigame Staff", content="Accept or decline host requests and manage running games.")
+        form.add_button(f"§lHost requests ({p})§r\n§8Accept or decline", icon="textures/ui/mail_icon", on_click=self.review_menu)
+        form.add_button("§lManage minigames§r\n§8Rooms, close sign-ups, end a game", icon="textures/ui/settings_glyph_color_2x",
+                        on_click=self.manage_menu)
         if player.is_op:
             form.add_button("§6§lSet up minigames§r\n§8Names, backstage rooms, entrances", icon="textures/ui/hammer_l",
                             on_click=self.setup_menu)
+        form.add_button("§l< Back", on_click=self.open)
         player.send_form(form)
 
     # ---------- hosting ----------
@@ -159,8 +169,13 @@ class Minigames:
             return
         mine = [e for e in self.events.values() if e["host"] == str(player.xuid) and e["status"] in ("pending", "accepted")]
         if mine:
-            player.send_message(f"§eYou already have a minigame {'waiting for staff' if mine[0]['status'] == 'pending' else 'running'}. "
-                                "§7Finish it first (Manage minigames).")
+            e = mine[0]
+            if e["status"] == "accepted":
+                return self.manage(player, e["id"])  # your running game: close sign-ups, end it
+            form = ActionForm(title="Your request", content=f"Your {self.game_name(e)} is waiting for Minigame Staff to accept it.")
+            form.add_button("§cCancel my request", on_click=lambda p: self._cancel_request(p, e["id"]))
+            form.add_button("§l< Back", on_click=self.open)
+            player.send_form(form)
             return
         types = sorted(self.types.values(), key=lambda t: t["name"].lower())
         choices = [t["name"] for t in types] + ["Custom (type a name below)"]
@@ -205,6 +220,13 @@ class Minigames:
 
         player.send_form(ModalForm(title="Host a Minigame", controls=controls, submit_button="Send request", on_submit=submit))
 
+    def _cancel_request(self, player, eid):
+        e = self.events.get(eid)
+        if e and e["status"] == "pending" and e["host"] == str(player.xuid):
+            e.update({"status": "declined", "declined_by": player.name, "ended_at": time.time()})
+            self.save(eid)
+            player.send_message("§7Request cancelled.")
+
     # ---------- staff: requests ----------
     def review_menu(self, player):
         if not self.is_staff(player):
@@ -214,7 +236,7 @@ class Minigames:
         for e in reqs:
             form.add_button(f"§l{self.game_name(e)}§r\n§8by {e['host_name']} · {dict(ACCESS)[e['access']]} · {e['signup_minutes']}m sign-up",
                             on_click=lambda p, eid=e["id"]: self.review(p, eid))
-        form.add_button("§l< Back", on_click=self.open)
+        form.add_button("§l< Back", on_click=self.staff_menu)
         player.send_form(form)
 
     def review(self, player, eid):
@@ -366,7 +388,7 @@ class Minigames:
         for e in games:
             form.add_button(f"§l{self.game_name(e)}§r\n§8by {e['host_name']} · {len(e['players'])} players",
                             on_click=lambda p, eid=e["id"]: self.manage(p, eid))
-        form.add_button("§l< Back", on_click=self.open)
+        form.add_button("§l< Back", on_click=lambda p: self.staff_menu(p) if self.is_staff(p) else self.open(p))
         player.send_form(form)
 
     def manage(self, player, eid):
@@ -414,7 +436,7 @@ class Minigames:
         for t in sorted(self.types.values(), key=lambda t: t["name"].lower()):
             ready = "ready" if t.get("backstage") and t.get("entrance") else "§cneeds rooms"
             form.add_button(f"§l{t['name']}§r\n§8{ready}", on_click=lambda p, tid=t["id"]: self.type_menu(p, tid))
-        form.add_button("§l< Back", on_click=self.open)
+        form.add_button("§l< Back", on_click=self.staff_menu)
         player.send_form(form)
 
     def add_type_form(self, player):
