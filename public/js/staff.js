@@ -1,6 +1,7 @@
 // Staff Tools page: reports, members, word filter, ranks, economy and audit log.
 import { toast } from "/js/site.js";
-import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, roleDialog, voiceMuteDialog, select, field } from "/js/dialog.js";
+import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, voiceMuteDialog, select, field } from "/js/dialog.js";
+import { MC_COLORS, hexOf, GRADIENTS, paint, gradientCss, rankTag } from "/js/rank-paint.js";
 
 const $ = (id) => document.getElementById(id);
 const ROLE_NAMES = { member: "Member", vip: "VIP", moderator: "Moderator", admin: "Admin" };
@@ -104,6 +105,26 @@ loaders.members = async () => {
 $("member-search").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(loaders.members, 300); });
 $("member-filter").addEventListener("change", () => loaders.members());
 
+// Admins: give a member a rank (the same ranks as in game).
+async function memberRankDialog(m, done) {
+  let ranks;
+  try { ranks = (await getJson("/api/mod/ranks")).ranks; } catch (e) { toast(e.message); return; }
+  const sel = select("member-rank", [["", "No rank"], ...ranks.map((r) => [String(r.id), `[${r.prefix}] ${r.name}`])], m.rankId ? String(m.rankId) : "");
+  openDialog({
+    title: `Rank for ${m.username}`,
+    body: h("div", { class: "form" },
+      field("Rank", sel, "Ranks are the same on the website and in game: tag, colors, commands and staff powers."),
+      ranks.length ? null : h("p", { class: "text-3 small", style: "margin:0", text: "No ranks yet. Create them in the Ranks tab." })),
+    actions: [{ label: "Cancel" }, {
+      label: "Save", kind: "primary",
+      onClick: async () => {
+        await postJson("/api/mod/ranks/assign", { xuid: m.xuid, rankId: sel.value || null });
+        done(sel.value ? `Rank given to ${m.username}.` : `Rank removed from ${m.username}.`);
+      },
+    }],
+  });
+}
+
 function memberRow(m) {
   const refresh = (msg) => { toast(msg); setTimeout(loaders.members, 300); };
   const status = [];
@@ -114,8 +135,8 @@ function memberRow(m) {
   if (m.globalMic) status.push(h("span", { class: "pill-status owner", text: "Global Mic" }));
   const row = h("div", { class: "member-row" },
     h("div", { class: "info" },
-      h("strong", {}, m.username, ...status),
-      h("span", { text: `${ROLE_NAMES[m.role]} · ${m.platform === "bedrock" ? "Bedrock" : "Java"} · joined ${new Date(m.joined).toLocaleDateString()} · ${m.messages} message${m.messages === 1 ? "" : "s"} · reported ${m.reported}×` }),
+      h("strong", {}, ...[rankTag(m.rank), m.rank ? " " : null].filter(Boolean), m.rank ? paint(m.username, m.rank) : m.username, ...status),
+      h("span", { text: `${m.rank ? m.rank.name : "No rank"} · ${m.platform === "bedrock" ? "Bedrock" : "Java"} · joined ${new Date(m.joined).toLocaleDateString()} · ${m.messages} message${m.messages === 1 ? "" : "s"} · reported ${m.reported}×` }),
       m.banned && m.banReason ? h("span", { style: "display:block", text: `Ban reason: ${m.banReason}` }) : null,
       m.mutedUntil && m.muteReason ? h("span", { style: "display:block", text: `Mute reason: ${m.muteReason}` }) : null));
   const canAct = !m.owner && m.id !== me.id && power > m.power;
@@ -135,7 +156,7 @@ function memberRow(m) {
       if (m.power < 50) {
         actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", text: m.globalMic ? "Take Global Mic" : "Give Global Mic", onclick: async () => { try { await postJson(`/api/mod/members/${m.id}/global-mic`, { allowed: !m.globalMic }); refresh(m.globalMic ? "Global Mic removed." : "Global Mic given."); } catch (e) { toast(e.message); } } }));
       }
-      actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Role", onclick: () => roleDialog(m, refresh) }));
+      if (m.xuid) actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Rank", onclick: () => memberRankDialog(m, refresh) }));
       if (m.banned) {
         actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Unban", onclick: async () => { try { await postJson(`/api/mod/members/${m.id}/unban`); refresh("Member unbanned."); } catch (e) { toast(e.message); } } }));
       } else {
@@ -253,54 +274,16 @@ loaders.audit = () => loadAudit(false);
 $("audit-more").addEventListener("click", () => loadAudit(true));
 
 // ---------- Ranks (Admins) ----------
-// Grouped by shade. Codes g-v only exist on Bedrock (Java shows them as white or as formatting).
-const MC_COLORS = [
-  ["f", "White", "#FFFFFF"], ["h", "Quartz", "#E3D4D1"], ["i", "Iron", "#CECACA"], ["7", "Gray", "#AAAAAA"],
-  ["8", "Dark Gray", "#555555"], ["j", "Netherite", "#443A3B"], ["0", "Black", "#000000"], ["c", "Red", "#FF5555"],
-  ["4", "Dark Red", "#AA0000"], ["m", "Redstone", "#971607"], ["v", "Resin", "#EB7114"], ["n", "Copper", "#B4684D"],
-  ["6", "Gold", "#FFAA00"], ["p", "Deep Gold", "#DEB12D"], ["g", "Minecoin Gold", "#DDD605"], ["e", "Yellow", "#FFFF55"],
-  ["a", "Green", "#55FF55"], ["q", "Emerald", "#47A036"], ["2", "Dark Green", "#00AA00"], ["b", "Aqua", "#55FFFF"],
-  ["s", "Diamond", "#2CBAA8"], ["3", "Dark Aqua", "#00AAAA"], ["9", "Blue", "#5555FF"], ["1", "Dark Blue", "#0000AA"],
-  ["t", "Lapis", "#21497B"], ["d", "Light Purple", "#FF55FF"], ["u", "Amethyst", "#9A5CC6"], ["5", "Dark Purple", "#AA00AA"],
-];
-const hexOf = (c) => (MC_COLORS.find((x) => x[0] === c) || MC_COLORS[0])[2];
-const WEB_ROLES = [["", "None"], ["2", "VIP"], ["3", "Moderator"], ["4", "Admin"]];
-const PERM_PREFIXES = ["minecraft.command.", "endstone.command.", "galaxylink.command."];
-let rankData = null;
+const STAFF_POWERS = [["", "None"], ["3", "Moderator"], ["4", "Admin"]];
 let rankSearchTimer;
-
-const iconImg = (icon) => (icon ? h("img", { class: "rank-icon", src: `/img/ranks/rank_${icon}.png`, alt: "", width: 18, height: 18 }) : null);
-
-// Gradients: one Minecraft color per letter. Same list as the plugin (endstone_galaxylink/ranks.py).
-const GRADIENTS = [
-  ["galaxy", "Galaxy (logo)", "bb99"], ["gold", "Gold Rush", "egp6"], ["sunset", "Sunset", "e6vcd"],
-  ["fire", "Fire", "e6vc4"], ["ocean", "Ocean", "bs3t"], ["forest", "Forest", "aq2"], ["royal", "Royal", "du5"],
-  ["ice", "Ice", "fhbs"], ["shadow", "Shadow", "78j"], ["rainbow", "Rainbow", "c6eab9d"],
-];
-const gradientStops = (key) => (GRADIENTS.find((g) => g[0] === key) || [])[2] || null;
-
-// Text in a rank's color, or one gradient color per letter (exactly like in game).
-function paint(text, color, gradient, icon) {
-  const stops = gradientStops(gradient);
-  const span = h("span");
-  const letters = [...text].filter((ch) => ch.trim()).length;
-  let k = 0;
-  [...text].forEach((ch, i) => {
-    if (icon && i === 1) span.append(iconImg(icon));
-    if (!ch.trim()) { span.append(ch); return; }
-    const code = stops ? stops[letters > 1 ? Math.round((k * (stops.length - 1)) / (letters - 1)) : 0] : color;
-    k++;
-    const part = h("span", { text: ch });
-    part.style.color = hexOf(code);
-    span.append(part);
-  });
-  return span;
-}
+let rankData = null;
+const PERM_PREFIXES = ["minecraft.command.", "endstone.command.", "galaxylink.command."];
 
 // Looks like chat in game: [👑 OWNER] **name** → message (rank color on the tag and name).
 function rankPreview(prefix, color, name, icon, message, gradient) {
+  const style = { color, gradient };
   const span = h("span", { class: "rank-preview" });
-  span.append(paint(`[${prefix}]`, color, gradient, icon), " ", h("b", {}, paint(name, color, gradient)));
+  span.append(paint(`[${prefix}]`, style, icon), " ", h("b", {}, paint(name, style)));
   if (message) span.append(h("span", { class: "text-3", text: " → " }), h("span", { text: message }));
   return span;
 }
@@ -322,12 +305,12 @@ loaders.ranks = async () => {
   list.replaceChildren();
   if (!rankData.ranks.length) list.append(h("div", { class: "empty", text: "No ranks yet. Select New rank to create one." }));
   for (const r of rankData.ranks) {
-    const role = WEB_ROLES.find((x) => x[0] === String(r.websiteRole || ""))[1];
+    const role = STAFF_POWERS.find((x) => x[0] === String(r.websiteRole || ""))?.[1] || "None";
     const { commands } = splitPerms(r.permissions);
     list.append(h("div", { class: "member-row" },
       h("div", { class: "info" },
         h("strong", {}, rankPreview(r.prefix, r.color, r.name, r.icon, null, r.gradient)),
-        h("span", { text: `${r.players} player${r.players === 1 ? "" : "s"} · ${commands.length ? "Commands: " + commands.map((c) => "/" + c).join(" ") : "No commands"} · Website role: ${role}` })),
+        h("span", { text: `${r.players} player${r.players === 1 ? "" : "s"} · ${commands.length ? "Commands: " + commands.map((c) => "/" + c).join(" ") : "No commands"} · Staff powers: ${role}` })),
       h("div", { class: "row-actions" },
         h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Edit", onclick: () => rankDialog(r) }),
         h("button", { class: "btn btn-danger btn-sm", type: "button", text: "Delete", onclick: () => deleteRank(r) }))));
@@ -414,12 +397,12 @@ function rankDialog(rank) {
   const gradient = choiceGrid("Gradient", [["", "No gradient"], ...GRADIENTS.map(([k, label]) => [k, label])], r.gradient || "", (v) => {
     if (!v) return h("span", { text: "None" });
     const sw = h("span", { class: "swatch swatch-wide" });
-    sw.style.background = `linear-gradient(90deg, ${[...gradientStops(v)].map(hexOf).join(", ")})`;
+    sw.style.background = gradientCss(v);
     return sw;
   });
   const icon = choiceGrid("Icon", [["", "No icon"], ...rankData.icons.map((i) => [i, i[0].toUpperCase() + i.slice(1)])], r.icon || "",
     (v) => (v ? h("img", { src: `/img/ranks/rank_${v}.png`, alt: "" }) : h("span", { text: "None" })));
-  const role = select("rank-role", WEB_ROLES, String(r.websiteRole || ""));
+  const role = select("rank-role", STAFF_POWERS, STAFF_POWERS.some((x) => x[0] === String(r.websiteRole || "")) ? String(r.websiteRole || "") : "");
   const cmds = commandChips(commands);
   const advanced = h("input", { class: "input", id: "rank-other", placeholder: "someplugin.permission, another.one", value: other.join(", ") });
   const preview = h("div", { class: "rank-preview-box" });
@@ -441,7 +424,7 @@ function rankDialog(rank) {
         h("p", { class: "hint", text: "Shown before the prefix in game (players need the GalaxySMP Icons pack, which the server sends automatically)." })),
       h("div", { class: "field" }, h("label", { class: "field-label", for: "rank-commands", text: "Commands this rank can use" }), cmds.el,
         h("p", { class: "hint", text: "Type a command name and press Enter, for example time, weather, gamemode or tp. A command includes everything after it: time also allows /time set day. Players don't need to be operators." })),
-      field("Website role", role, "Players with this rank who linked a website account also get this role in chat and voice. Roles set by hand are never lowered."),
+      field("Staff powers", role, "What players with this rank can do on the website: Moderators can delete messages, mute and handle reports; Admins can also ban and manage ranks, the economy and the Help menu. The rank itself shows the same on the website and in game."),
       h("details", {}, h("summary", { class: "text-3 small", text: "Advanced: other permission nodes" }),
         field("Permission nodes", advanced, "For other plugins' permissions, separated by commas."))),
     actions: [{ label: "Cancel" }, {
@@ -718,7 +701,7 @@ $("help-reset").addEventListener("click", () => openDialog({
   }
   me = user;
   power = user.role.power;
-  $("staff-intro").textContent = `Signed in as ${user.username} (${user.role.name}). ${power >= 100 ? "You can use every tool on this page." : "Banning and role changes are reserved for Admins."}`;
+  $("staff-intro").textContent = `Signed in as ${user.username} (${user.role.name}). ${power >= 100 ? "You can use every tool on this page." : "Banning and ranks are reserved for Admins."}`;
   $("staff-app").hidden = false;
   const start = location.hash.slice(1);
   if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"], [data-tab="help"]').forEach((t) => (t.hidden = false));

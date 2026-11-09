@@ -8,12 +8,14 @@ import { safeEqual } from "../lib/crypto.js";
 import { checkMessage, compileWordList } from "../lib/filter.js";
 import { isOwner } from "../lib/names.js";
 import { hubBroadcast } from "./chat.js";
+import { rankOf } from "../chat/messages.js";
 import { voiceEvent } from "./voice.js";
 
 const ADMIN = 100;
 // Java colors 0-f plus Bedrock-only colors (two extra golds, copper, resin and mineral colors).
 const COLORS = "0123456789abcdefgpnvmqstuhij";
-const ROLE_POWER = { 2: 20, 3: 50, 4: 100 };
+// A rank's staff powers on the website (stored in ranks.website_role): 3 = Moderator, 4 = Admin.
+const STAFF_POWERS = { 3: "Moderator", 4: "Admin" };
 
 // Rank icons (drawn by the GalaxySMP Icons resource pack; pictures in /img/ranks/).
 export const ICONS = ["crown", "star", "shield", "sword", "gem", "heart", "hammer", "flame", "bolt", "rocket", "planet", "leaf",
@@ -79,7 +81,8 @@ async function validRank(env, sql, body) {
   if (color.length !== 1 || !COLORS.includes(color)) throw new HttpError(400, "Choose a color.");
   const words = compileWordList(await sql`SELECT word, match FROM filter_words`);
   for (const text of [name, prefix]) {
-    if (!checkMessage(text, words).ok) throw new HttpError(400, `"${text}" isn't allowed.`);
+    // Lowercased first: rank names like "TRUSTED MEMBER" are meant to be in capitals.
+    if (!checkMessage(text.toLowerCase(), words).ok) throw new HttpError(400, `"${text}" isn't allowed by the word filter.`);
   }
   const commands = Array.isArray(body.commands) ? body.commands : [];
   const badCommand = commands.find((c) => String(c).trim() && !commandPermission(c));
@@ -92,34 +95,34 @@ async function validRank(env, sql, body) {
   if (gradient && !GRADIENTS.includes(gradient)) throw new HttpError(400, "Unknown gradient.");
   if (perms.length > 40 || perms.some((p) => !/^[a-z0-9_.-]{3,60}$/.test(p))) throw new HttpError(400, "One of the permissions isn't valid.");
   const role = body.websiteRole == null || body.websiteRole === "" ? null : Number(body.websiteRole);
-  if (role !== null && !ROLE_POWER[role]) throw new HttpError(400, "Unknown website role.");
+  if (role !== null && !STAFF_POWERS[role]) throw new HttpError(400, "Staff powers must be None, Moderator or Admin.");
   return { name, prefix, color, icon, gradient, permissions: perms, websiteRole: role };
 }
 
 // Gives or removes the website role that comes with a player's rank (if they linked an account).
+// Ranks are the only roles: a player's website account follows their rank. The rank's
+// "Staff powers" (None, Moderator or Admin) decide what they can do on the website.
+// The owners are always Admins.
 async function syncWebsiteRole(env, sql, xuid) {
   const rows = await sql`
-    SELECT u.id, u.username, u.platform, u.role_id, u.role_from_rank, ur.power AS current_power, rk.website_role
+    SELECT u.id, u.username, u.platform, u.role_id, u.muted_until, rk.website_role,
+           rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon,
+           rk.gradient AS rank_gradient, rk.position AS rank_position
       FROM players p
       JOIN users u ON u.mc_uuid = p.uuid
-      JOIN roles ur ON ur.id = u.role_id
       LEFT JOIN player_ranks pr ON pr.xuid = p.xuid
       LEFT JOIN ranks rk ON rk.id = pr.rank_id
      WHERE p.xuid = ${xuid}`;
   const u = rows[0];
-  if (!u || isOwner(env, u.username, u.platform === "bedrock")) return;
-  let target = null;
-  if (u.website_role) {
-    // Never lower a role that staff set by hand (e.g. an Admin who also has a VIP rank).
-    if (u.role_from_rank || Number(u.current_power) <= ROLE_POWER[u.website_role]) target = Number(u.website_role);
-  } else if (u.role_from_rank) {
-    target = 1; // rank removed: back to Member
-  }
-  if (target === null || (target === Number(u.role_id) && (target !== 1) === u.role_from_rank)) return;
-  await sql`UPDATE users SET role_id = ${target}, role_from_rank = ${target !== 1} WHERE id = ${u.id}`;
+  if (!u) return;
+  const owner = isOwner(env, u.username, u.platform === "bedrock");
+  const target = owner ? 4 : STAFF_POWERS[u.website_role] ? Number(u.website_role) : 1;
+  const changed = target !== Number(u.role_id);
+  if (changed) await sql`UPDATE users SET role_id = ${target}, role_from_rank = ${target !== 1} WHERE id = ${u.id}`;
   const r = await sql`SELECT key FROM roles WHERE id = ${target}`;
-  await hubBroadcast(env, { type: "member_updated", member: { id: Number(u.id), username: u.username, role: r[0].key }, mutedUntil: null });
-  await voiceEvent(env, { type: "role_changed", userId: Number(u.id) });
+  // Website chat updates the player's tag and name color straight away.
+  await hubBroadcast(env, { type: "member_updated", member: { id: Number(u.id), username: u.username, role: r[0].key, rank: rankOf(u) }, mutedUntil: u.muted_until });
+  if (changed) await voiceEvent(env, { type: "role_changed", userId: Number(u.id) });
 }
 
 async function audit(sql, actorId, action, details) {

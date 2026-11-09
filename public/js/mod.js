@@ -4,7 +4,8 @@ import {
   chatState as state, messageActionHooks, memberHooks, eventHooks,
   renderMembers, renderComposer, removeMessage, roleOf,
 } from "/js/chat.js";
-import { h, openDialog, postJson, getJson, field, select, REPORT_REASONS, MUTE_LABELS, muteDialog, banDialog, roleDialog } from "/js/dialog.js";
+import { h, openDialog, postJson, getJson, field, select, REPORT_REASONS, MUTE_LABELS, muteDialog, banDialog } from "/js/dialog.js";
+import { rankTag } from "/js/rank-paint.js";
 
 const STAFF = 50;
 const ADMIN = 100;
@@ -73,9 +74,8 @@ memberHooks.push((m, row) => {
 async function memberDialog(m) {
   const role = roleOf(m.role);
   const body = h("div", { class: "form" });
-  const roleBadge = h("span", { class: "badge", text: role.name });
-  roleBadge.style.color = role.color;
-  body.append(h("div", { style: "display:flex;align-items:center;gap:10px;flex-wrap:wrap" }, roleBadge));
+  body.append(h("div", { style: "display:flex;align-items:center;gap:10px;flex-wrap:wrap" },
+    m.rank ? rankTag(m.rank) : h("span", { class: "text-3", text: "No rank" })));
 
   const actions = [{ label: "Close" }];
   const canAct = myPower() >= STAFF && myPower() > role.power && m.id !== state.me.id;
@@ -99,12 +99,30 @@ async function memberDialog(m) {
         actions.push({ label: "Mute", onClick: () => { setTimeout(() => muteDialog(m, done)); } });
       }
       if (myPower() >= ADMIN) {
-        actions.push({ label: "Change role", onClick: () => { setTimeout(() => roleDialog(m, done)); } });
+        if (detail?.xuid) actions.push({ label: "Change rank", onClick: () => { setTimeout(() => rankDialog(detail, done)); } });
         actions.push({ label: "Ban", kind: "danger", onClick: () => { setTimeout(() => banDialog(m, done)); } });
       }
     }
   }
   openDialog({ title: m.username, body, actions });
+}
+
+// Admins: give a member a rank (the same ranks as in game).
+async function rankDialog(member, done) {
+  let ranks;
+  try { ranks = (await getJson("/api/mod/ranks")).ranks; } catch (e) { toast(e.message); return; }
+  const sel = select("chat-member-rank", [["", "No rank"], ...ranks.map((r) => [String(r.id), `[${r.prefix}] ${r.name}`])], member.rankId ? String(member.rankId) : "");
+  openDialog({
+    title: `Rank for ${member.username}`,
+    body: h("div", { class: "form" }, field("Rank", sel, "The same rank shows in game and on the website.")),
+    actions: [{ label: "Cancel" }, {
+      label: "Save", kind: "primary",
+      onClick: async () => {
+        await postJson("/api/mod/ranks/assign", { xuid: member.xuid, rankId: sel.value || null });
+        done(sel.value ? `Rank given to ${member.username}.` : `Rank removed from ${member.username}.`);
+      },
+    }],
+  });
 }
 
 // ---------- Live updates from staff actions ----------

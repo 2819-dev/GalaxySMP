@@ -3,6 +3,14 @@
 export const REACTIONS = ["👍", "❤️", "😂", "😮", "🎉", "🔥"];
 export const HISTORY_PAGE = 50;
 
+// The player's in-game rank (the same roles show on the website), from rank_* columns.
+export function rankOf(r) {
+  return r.rank_prefix
+    ? { name: r.rank_name, prefix: r.rank_prefix, color: r.rank_color, icon: r.rank_icon || null, gradient: r.rank_gradient || null, position: r.rank_position }
+    : null;
+}
+
+
 // Turns a database row into what the browser receives.
 export function formatMessage(r) {
   return {
@@ -10,7 +18,7 @@ export function formatMessage(r) {
     channelId: Number(r.channel_id),
     content: r.content,
     createdAt: r.created_at,
-    author: { id: Number(r.author_id), username: r.username, role: r.role_key, color: r.color },
+    author: { id: Number(r.author_id), username: r.username, role: r.role_key, color: r.color, rank: rankOf(r) },
     replyTo: r.reply_to
       ? {
           id: Number(r.reply_to),
@@ -25,6 +33,7 @@ export function formatMessage(r) {
 const SELECT = `
   SELECT m.id, m.channel_id, m.content, m.created_at, m.reply_to,
          u.id AS author_id, u.username, r.key AS role_key, r.color,
+         rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient, rk.position AS rank_position,
          p.content AS reply_content, pu.username AS reply_username,
          (p.id IS NOT NULL AND p.deleted_at IS NOT NULL) AS reply_deleted,
          COALESCE((
@@ -35,6 +44,9 @@ const SELECT = `
     FROM messages m
     JOIN users u ON u.id = m.user_id
     JOIN roles r ON r.id = u.role_id
+    LEFT JOIN players pl ON pl.uuid = u.mc_uuid
+    LEFT JOIN player_ranks prk ON prk.xuid = pl.xuid
+    LEFT JOIN ranks rk ON rk.id = prk.rank_id
     LEFT JOIN messages p ON p.id = m.reply_to
     LEFT JOIN users pu ON pu.id = p.user_id`;
 

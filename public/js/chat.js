@@ -1,6 +1,10 @@
 // GalaxySMP community chat (browser side).
 // All text is inserted with textContent, never as HTML, so nothing a user types can run as code.
 import { icon, toast } from "/js/site.js";
+import { paint, rankTag } from "/js/rank-paint.js";
+
+// A member's current rank (live updates win over what an older message recorded).
+const rankFor = (id, fallback) => (state.members.has(id) ? state.members.get(id).rank : fallback) || null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -185,15 +189,12 @@ function renderMessage(m, prev) {
     body.append(r);
   }
   const head = el("div", "msg-head");
-  const role = roleOf(m.author.role);
-  const name = el("span", "name", m.author.username);
-  name.style.color = m.author.color || role.color;
+  // Same as in game: [👑 OWNER] name, in the rank's color or gradient.
+  const rank = rankFor(m.author.id, m.author.rank);
+  if (rank) head.append(rankTag(rank));
+  const name = el("span", "name");
+  name.append(paint(m.author.username, rank));
   head.append(name);
-  if (role.power >= 20) {
-    const tag = el("span", "role-tag", role.name);
-    tag.style.color = role.color;
-    head.append(tag);
-  }
   const t = el("time", "", timeFmt.format(new Date(m.createdAt)));
   t.dateTime = m.createdAt;
   t.title = new Date(m.createdAt).toLocaleString();
@@ -397,25 +398,33 @@ function renderMembers() {
   const all = [...state.members.values()];
   const online = all.filter((m) => state.online.has(m.id));
   const offline = all.filter((m) => !state.online.has(m.id));
-  const roles = [...state.roles.values()].sort((a, b) => b.power - a.power);
-  for (const role of roles) {
-    const group = online.filter((m) => m.role === role.key);
-    if (!group.length) continue;
-    list.append(el("div", "member-group", `${role.name} — ${group.length}`));
-    for (const m of group) list.append(memberRow(m, role, true));
+  // Online members grouped by rank (in the ranks' order), then everyone without a rank.
+  const groups = new Map();
+  for (const m of online) {
+    const key = m.rank ? `${String(m.rank.position).padStart(6, "0")}:${m.rank.name}` : "~";
+    if (!groups.has(key)) groups.set(key, { rank: m.rank, members: [] });
+    groups.get(key).members.push(m);
+  }
+  for (const key of [...groups.keys()].sort()) {
+    const g = groups.get(key);
+    const head = el("div", "member-group");
+    if (g.rank) head.append(rankTag(g.rank), ` — ${g.members.length}`);
+    else head.textContent = `Players — ${g.members.length}`;
+    list.append(head);
+    for (const m of g.members) list.append(memberRow(m, true));
   }
   if (offline.length) {
     list.append(el("div", "member-group", `Offline — ${offline.length}`));
-    for (const m of offline) list.append(memberRow(m, roleOf(m.role), false));
+    for (const m of offline) list.append(memberRow(m, false));
   }
 }
 
-function memberRow(m, role, isOnline) {
+function memberRow(m, isOnline) {
   const row = el("div", "member" + (isOnline ? "" : " offline"));
   const wrap = el("div", "av-wrap");
   wrap.append(avatar(m.username, true));
-  const name = el("span", "name", m.username);
-  name.style.color = role.color;
+  const name = el("span", "name");
+  name.append(paint(m.username, m.rank));
   row.append(wrap, name);
   row.dataset.id = m.id;
   for (const hook of memberHooks) hook(m, row);
@@ -589,11 +598,10 @@ export async function startChat({ onSignedOut }) {
   state.roles = new Map(data.roles.map((r) => [r.key, r]));
   state.members = new Map(data.members.map((m) => [m.id, m]));
 
-  const role = roleOf(state.me.role.key);
+  const myRank = state.members.get(state.me.id)?.rank || null;
   $("me-avatar").replaceWith(Object.assign(avatar(state.me.username, true), { id: "me-avatar" }));
-  $("me-name").textContent = state.me.username;
-  $("me-role").textContent = role.name;
-  $("me-role").style.color = role.color;
+  $("me-name").replaceChildren(paint(state.me.username, myRank));
+  $("me-role").replaceChildren(myRank ? rankTag(myRank) : document.createTextNode("No rank"));
 
   wireUi();
   renderMembers();

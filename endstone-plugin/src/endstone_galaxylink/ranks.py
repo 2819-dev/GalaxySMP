@@ -20,7 +20,8 @@ COLORS = [
     ("s", "Diamond"), ("3", "Dark Aqua"), ("9", "Blue"), ("1", "Dark Blue"),
     ("t", "Lapis"), ("d", "Light Purple"), ("u", "Amethyst"), ("5", "Dark Purple"),
 ]
-WEB_ROLES = [(None, "None"), (2, "VIP"), (3, "Moderator"), (4, "Admin")]
+# A rank's staff powers on the website (ranks are the roles in game and on the site).
+WEB_ROLES = [(None, "None"), (3, "Moderator"), (4, "Admin")]
 
 # Rank icons drawn by the GalaxySMP Icons resource pack (glyph_E2.png, U+E210 onward).
 ICONS = ["crown", "star", "shield", "sword", "gem", "heart", "hammer", "flame", "bolt", "rocket", "planet", "leaf",
@@ -65,19 +66,55 @@ def split_permissions(perms):
     return cmds, other
 
 
-# Gradients: one color per letter, stretched across the text. Same list as the website.
-GRADIENTS = {
-    "galaxy": ("Galaxy (logo)", "bb99"),
-    "gold": ("Gold Rush", "egp6"),
-    "sunset": ("Sunset", "e6vcd"),
-    "fire": ("Fire", "e6vc4"),
-    "ocean": ("Ocean", "bs3t"),
-    "forest": ("Forest", "aq2"),
-    "royal": ("Royal", "du5"),
-    "ice": ("Ice", "fhbs"),
-    "shadow": ("Shadow", "78j"),
-    "rainbow": ("Rainbow", "c6eab9d"),
+# Hex values of the Bedrock colors (for gradients). Same as the website (public/js/rank-paint.js).
+HEX = {
+    "f": "#FFFFFF", "h": "#E3D4D1", "i": "#CECACA", "7": "#AAAAAA", "8": "#555555", "j": "#443A3B", "0": "#000000",
+    "c": "#FF5555", "4": "#AA0000", "m": "#971607", "v": "#EB7114", "n": "#B4684D", "6": "#FFAA00", "p": "#DEB12D",
+    "g": "#DDD605", "e": "#FFFF55", "a": "#55FF55", "q": "#47A036", "2": "#00AA00", "b": "#55FFFF", "s": "#2CBAA8",
+    "3": "#00AAAA", "9": "#5555FF", "1": "#0000AA", "t": "#21497B", "d": "#FF55FF", "u": "#9A5CC6", "5": "#AA00AA",
 }
+PALETTE_ORDER = [c for c, _ in COLORS]  # same order as the website, so ties pick the same color
+
+# Gradients: a smooth line between real colors; each letter gets the closest Bedrock color.
+GRADIENTS = {
+    "galaxy": ("Galaxy (logo)", ["#4FEBFD", "#3DAAF4", "#2149DD"]),
+    "gold": ("Gold Rush", ["#FFFF55", "#DDD605", "#DEB12D", "#FFAA00"]),
+    "sunset": ("Sunset", ["#FFFF55", "#FFAA00", "#EB7114", "#FF5555", "#FF55FF"]),
+    "fire": ("Fire", ["#FFFF55", "#FFAA00", "#EB7114", "#FF5555", "#AA0000"]),
+    "ocean": ("Ocean", ["#55FFFF", "#2CBAA8", "#00AAAA", "#21497B"]),
+    "forest": ("Forest", ["#55FF55", "#47A036", "#00AA00"]),
+    "royal": ("Royal", ["#FF55FF", "#9A5CC6", "#AA00AA"]),
+    "ice": ("Ice", ["#FFFFFF", "#E3D4D1", "#55FFFF", "#2CBAA8"]),
+    "shadow": ("Shadow", ["#AAAAAA", "#555555", "#443A3B"]),
+    "rainbow": ("Rainbow", ["#FF5555", "#FFAA00", "#FFFF55", "#55FF55", "#55FFFF", "#5555FF", "#FF55FF"]),
+}
+
+
+def _rgb(h):
+    return [int(h[i:i + 2], 16) for i in (1, 3, 5)]
+
+
+_PALETTE = [(c, _rgb(HEX[c])) for c in PALETTE_ORDER]
+
+
+def _nearest(r, g, b):
+    best, best_d = None, float("inf")
+    for code, (R, G, B) in _PALETTE:
+        rm = (r + R) / 2
+        d = (2 + rm / 256) * (r - R) ** 2 + 4 * (g - G) ** 2 + (2 + (255 - rm) / 256) * (b - B) ** 2
+        if d < best_d:
+            best, best_d = code, d
+    return best
+
+
+def gradient_code(stops, k, n):
+    """The Bedrock color code for letter k of n."""
+    t = k / (n - 1) if n > 1 else 0
+    pos = t * (len(stops) - 1)
+    i = min(int(pos), len(stops) - 2) if len(stops) > 1 else 0
+    f = pos - i if len(stops) > 1 else 0
+    a, b = _rgb(stops[i]), _rgb(stops[min(i + 1, len(stops) - 1)])
+    return _nearest(*[int(v + (b[j] - v) * f + 0.5) for j, v in enumerate(a)])
 
 
 def paint(text, rank, bold=False):
@@ -86,18 +123,15 @@ def paint(text, rank, bold=False):
     grad = GRADIENTS.get((rank or {}).get("gradient") or "")
     if not grad:
         return f"§{rank['color'] if rank else 'f'}{b}{text}"
-    stops = grad[1]
     icon = lambda ch: 0xE000 <= ord(ch) <= 0xF8FF
-    letters = [i for i, ch in enumerate(text) if not ch.isspace() and not icon(ch)]
-    n = len(letters)
-    out = []
-    for pos, ch in enumerate(text):
+    n = sum(1 for ch in text if not ch.isspace() and not icon(ch))
+    out, k = [], 0
+    for ch in text:
         if ch.isspace() or icon(ch):  # spaces and icons keep their own look
             out.append(ch)
             continue
-        k = letters.index(pos)
-        code = stops[int(k * (len(stops) - 1) / (n - 1) + 0.5)] if n > 1 else stops[0]  # rounds like the website
-        out.append(f"§{code}{b}{ch}")
+        out.append(f"§{gradient_code(grad[1], k, n)}{b}{ch}")
+        k += 1
     return "".join(out)
 
 
@@ -246,7 +280,7 @@ class RankManager:
             Dropdown("Gradient (overrides the color)", ["None"] + [paint(label, {"gradient": key}) for key, (label, _) in GRADIENTS.items()],
                      gradient_index),
             Dropdown("Icon", ["None"] + [f"{GLYPHS[n]} {n.title()}" for n in ICONS], icon_index),
-            Dropdown("Website role", [n for _, n in WEB_ROLES], role_index),
+            Dropdown("Staff powers on the website", [n for _, n in WEB_ROLES], role_index),
             TextInput("Commands this rank can use, separated by spaces. /time also allows /time set day.",
                       "e.g. time weather gamemode", " ".join(cmds)),
             TextInput("Advanced: other permission nodes (optional)", "e.g. someplugin.fly", " ".join(other)),

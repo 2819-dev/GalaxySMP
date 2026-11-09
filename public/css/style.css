@@ -724,3 +724,8 @@ textarea.input { height: auto; padding: 10px 12px; line-height: 1.45; resize: ve
 @media (max-width: 860px) { .plan-grid { grid-template-columns: 1fr; } }
 .plan-pill-plus { background: rgba(222, 177, 45, .16); color: #f0c94d; }
 .plan-pill-pro { background: rgba(111, 211, 251, .16); color: var(--accent-text); }
+
+/* Rank tags (website chat, members, Staff Tools) */
+.rank-tag { font-weight: 700; font-size: .85em; white-space: nowrap; margin-right: 6px; letter-spacing: 0; text-transform: none; }
+.member-group .rank-tag { font-size: .95em; margin-right: 2px; }
+.msg-head .name span, .member .name span { font-weight: inherit; }

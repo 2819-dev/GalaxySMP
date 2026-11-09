@@ -13,6 +13,7 @@ import { requireUser } from "../lib/auth.js";
 import { isOwner } from "../lib/names.js";
 import { hubBroadcast } from "./chat.js";
 import { voiceEvent } from "./voice.js";
+import { rankOf } from "../chat/messages.js";
 
 const MOD = 50;
 const ADMIN = 100;
@@ -187,22 +188,9 @@ export async function unban(request, env, ctx, url, params) {
   return json({ ok: true });
 }
 
-export async function setRole(request, env, ctx, url, params) {
-  const actor = await requireStaff(request, env, ADMIN);
-  const body = await readJson(request);
-  const roleId = ROLE_IDS[body.role];
-  if (!roleId) throw new HttpError(400, "Unknown role.");
-  const sql = getDb(env);
-  const target = await loadTarget(sql, Number(params.id));
-  assertCanAct(env, actor, target);
-  if (target.role === body.role) return json({ ok: true });
-  await sql.transaction([
-    sql`UPDATE users SET role_id = ${roleId} WHERE id = ${target.id}`,
-    audit(sql, actor.id, "user.role", { userId: target.id, details: { from: target.role, to: body.role } }),
-  ]);
-  await memberUpdated(env, sql, target.id);
-  await voiceEvent(env, { type: "role_changed", userId: Number(target.id) });
-  return json({ ok: true });
+// Roles now come from in-game ranks (Staff Tools > Ranks), so they can't be set here.
+export async function setRole() {
+  throw new HttpError(410, "Roles now come from ranks. Give the player a rank in Staff Tools > Ranks or Members.");
 }
 
 export async function searchMembers(request, env, ctx, url) {
@@ -214,9 +202,14 @@ export async function searchMembers(request, env, ctx, url) {
     SELECT u.id, u.username, u.platform, u.banned, u.ban_reason, u.muted_until, u.mute_reason,
            u.voice_muted_until, u.voice_mute_reason, u.global_mic,
            u.created_at, u.last_seen_at, r.key AS role, r.power,
+           pl.xuid, rk.id AS rank_id, rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color,
+           rk.icon AS rank_icon, rk.gradient AS rank_gradient, rk.position AS rank_position,
            (SELECT count(*)::int FROM messages m WHERE m.user_id = u.id AND m.deleted_at IS NULL) AS messages,
            (SELECT count(*)::int FROM reports rp JOIN messages m ON m.id = rp.message_id WHERE m.user_id = u.id) AS reported
       FROM users u JOIN roles r ON r.id = u.role_id
+      LEFT JOIN players pl ON pl.uuid = u.mc_uuid
+      LEFT JOIN player_ranks prk ON prk.xuid = pl.xuid
+      LEFT JOIN ranks rk ON rk.id = prk.rank_id
      WHERE (${q} = '' OR u.username_lower LIKE '%' || ${q} || '%')
        AND (${filter} = 'all'
             OR (${filter} = 'muted' AND u.muted_until > now())
@@ -233,6 +226,9 @@ export async function searchMembers(request, env, ctx, url) {
       platform: u.platform,
       role: u.role,
       power: Number(u.power),
+      xuid: u.xuid || null,
+      rankId: u.rank_id ? Number(u.rank_id) : null,
+      rank: rankOf(u),
       owner: isOwner(env, u.username, u.platform === "bedrock"),
       banned: u.banned,
       banReason: u.ban_reason,

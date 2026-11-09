@@ -2,7 +2,7 @@
 import { getDb } from "../lib/db.js";
 import { json, HttpError } from "../lib/http.js";
 import { requireUser, publicUser } from "../lib/auth.js";
-import { REACTIONS, loadHistory } from "../chat/messages.js";
+import { REACTIONS, loadHistory, rankOf } from "../chat/messages.js";
 import { MAX_LENGTH } from "../lib/filter.js";
 
 export function hubStub(env) {
@@ -21,10 +21,15 @@ export async function bootstrap(request, env) {
     sql`SELECT id, name FROM categories ORDER BY position, id`,
     sql`SELECT id, category_id, slug, name, topic, min_post_power FROM channels ORDER BY position, id`,
     sql`SELECT key, name, color, power FROM roles ORDER BY power DESC`,
-    sql`SELECT u.id, u.username, r.key AS role
+    sql`SELECT u.id, u.username, r.key AS role,
+               rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon,
+               rk.gradient AS rank_gradient, rk.position AS rank_position
           FROM users u JOIN roles r ON r.id = u.role_id
+          LEFT JOIN players pl ON pl.uuid = u.mc_uuid
+          LEFT JOIN player_ranks prk ON prk.xuid = pl.xuid
+          LEFT JOIN ranks rk ON rk.id = prk.rank_id
          WHERE NOT u.banned
-         ORDER BY r.power DESC, lower(u.username)
+         ORDER BY (rk.id IS NULL), rk.position, lower(u.username)
          LIMIT 500`,
   ]);
   await sql`UPDATE users SET last_seen_at = now() WHERE id = ${user.id}`;
@@ -42,7 +47,7 @@ export async function bootstrap(request, env) {
       canPost: me.role.power >= c.min_post_power,
     })),
     roles: roles.map((r) => ({ key: r.key, name: r.name, color: r.color, power: r.power })),
-    members: members.map((m) => ({ id: Number(m.id), username: m.username, role: m.role })),
+    members: members.map((m) => ({ id: Number(m.id), username: m.username, role: m.role, rank: rankOf(m) })),
     reactions: REACTIONS,
     maxLength: MAX_LENGTH,
   });
