@@ -28,8 +28,12 @@ function setCount(n) {
 
 // ---------- Reports ----------
 loaders.reports = async () => {
-  const data = await getJson("/api/mod/reports");
-  setCount(data.open.length);
+  const [data, game] = await Promise.all([getJson("/api/mod/reports"), getJson("/api/mod/game-reports")]);
+  setCount(data.open.length + game.open.length);
+  const gOpen = $("game-reports-open");
+  gOpen.replaceChildren();
+  if (!game.open.length) gOpen.append(h("div", { class: "panel empty", text: "No open in-game reports." }));
+  for (const r of game.open) gOpen.append(gameReportCard(r));
   const open = $("reports-open");
   open.replaceChildren();
   if (!data.open.length) open.append(h("div", { class: "panel empty", text: "No open reports. Nice and quiet." }));
@@ -38,6 +42,12 @@ loaders.reports = async () => {
   const closed = $("reports-closed");
   closed.replaceChildren();
   if (!data.closed.length) closed.append(h("div", { class: "empty", text: "Nothing handled yet." }));
+  for (const g of game.closed) {
+    closed.append(h("div", { class: "audit-row", "data-at": g.resolvedAt },
+      h("time", { text: fmt(g.resolvedAt) }),
+      h("div", {}, h("b", { text: g.resolvedBy || "Staff" }), ` ${g.status === "dismissed" ? "dismissed" : "resolved"} an in-game report on `, h("b", { text: g.target })),
+      h("div", { class: "detail", text: `${g.reason}${g.details ? `: ${g.details}` : ""} · ${g.resolution || ""}` })));
+  }
   for (const c of data.closed) {
     closed.append(h("div", { class: "audit-row" },
       h("time", { text: fmt(c.resolvedAt) }),
@@ -45,6 +55,38 @@ loaders.reports = async () => {
       h("div", { class: "detail", text: `"${c.content.slice(0, 140)}" · ${c.resolution || ""}` })));
   }
 };
+
+const KIND_WORDS = { warn: "Warned", mute: "Muted", unmute: "Unmuted", kick: "Kicked", ban: "Banned", unban: "Unbanned" };
+const lengthWord = (m) => (m == null ? "permanent" : MUTE_LABELS[m] || (m % 1440 === 0 ? `${m / 1440} days` : `${m} minutes`));
+
+function gameReportCard(r) {
+  const card = h("article", { class: "panel report-card" });
+  const where = r.x != null ? `${r.world || "Overworld"} ${r.x}, ${r.y}, ${r.z}` : null;
+  card.append(
+    h("div", { class: "meta" },
+      h("span", {}, "Reported: ", h("b", { text: r.target })),
+      h("span", {}, "By ", h("b", { text: r.reporter })),
+      h("span", { text: fmt(r.at) }),
+      where ? h("span", { text: `📍 ${where}` }) : null),
+    h("div", { class: "quote", text: `${r.reason}${r.details ? `: ${r.details}` : ""}` }),
+    r.history.length ? h("ul", { class: "report-list" }, r.history.map((x) => h("li", {},
+      h("b", { text: KIND_WORDS[x.kind] || x.kind }),
+      `${["mute", "ban"].includes(x.kind) ? ` (${lengthWord(x.minutes)})` : ""} by ${x.by}, ${fmt(x.at)}${x.reason ? `: ${x.reason}` : ""}`))) :
+      h("p", { class: "text-3 small", style: "margin:0", text: "No warnings, mutes or bans in game yet." }),
+    h("p", { class: "text-3 small", style: "margin:0", text: "To warn, mute, kick or ban, use /mod in game. To check for griefing, use /inspect or /rollback." }),
+  );
+  const done = async (outcome) => {
+    try {
+      await postJson(`/api/mod/game-reports/${r.id}/resolve`, { outcome });
+      toast(outcome === "dismissed" ? "Report dismissed." : "Report resolved.");
+      loaders.reports();
+    } catch (e) { toast(e.message); }
+  };
+  card.append(h("div", { class: "row-actions" },
+    h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Mark resolved", onclick: () => done("resolved") }),
+    h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Dismiss", onclick: () => done("dismissed") })));
+  return card;
+}
 
 function reportCard(r) {
   const card = h("article", { class: "panel report-card" });
@@ -272,6 +314,15 @@ const DESCRIBE = {
   "chatfilter.on": () => ["turned the in-game chat filter on"],
   "chatfilter.off": () => ["turned the in-game chat filter off"],
   "filter.remove": () => ["removed a word from the filter"],
+  "game.warn": (e) => ["warned ", e.details.player, " in game"],
+  "game.mute": (e) => ["muted ", e.details.player, ` in game for ${lengthWord(e.details.minutes)}`],
+  "game.unmute": (e) => ["unmuted ", e.details.player, " in game"],
+  "game.kick": (e) => ["kicked ", e.details.player, " from the server"],
+  "game.ban": (e) => ["banned ", e.details.player, ` from the server (${lengthWord(e.details.minutes)})`],
+  "game.unban": (e) => ["unbanned ", e.details.player, " from the server"],
+  "game_report.resolve": () => ["resolved an in-game report"],
+  "game_report.dismiss": () => ["dismissed an in-game report"],
+  "game.rollback": (e) => ["rolled back ", e.details.player, `'s blocks (${e.details.blocks} blocks, last ${e.details.span})`],
 };
 
 function auditRow(e) {
@@ -283,7 +334,7 @@ function auditRow(e) {
   const extra = [];
   if (e.details?.reason) extra.push(`Reason: ${e.details.reason}`);
   if (e.details?.content) extra.push(`Message: "${e.details.content.slice(0, 160)}"`);
-  if (e.details?.note && e.action.startsWith("report.")) extra.push(`Note: ${e.details.note}`);
+  if (e.details?.note && (e.action.startsWith("report.") || e.action.startsWith("game_report."))) extra.push(`Note: ${e.details.note}`);
   if (e.details?.word) extra.push(`Word: ${mask(e.details.word)} (${e.details.match === "contains" ? "anywhere" : "whole word"})`);
   return h("div", { class: "audit-row" }, h("time", { text: fmt(e.at) }), line, extra.length ? h("div", { class: "detail", text: extra.join(" · ") }) : null);
 }

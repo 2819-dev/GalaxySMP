@@ -160,6 +160,24 @@
         <li>Players <strong>Join</strong> (teleported backstage) while sign-ups are open, or <strong>Watch</strong> (teleported to the entrance). Running games also show in #Events on the website.</li>
       </ul>
 
+      <h3>In-game reports and moderation</h3>
+      <ul>
+        <li>Players type <code>/report</code> (or <code>/report Name</code>) to report someone. Staff in game get an alert straight away, and the report appears in <strong>Staff Tools → Reports</strong> under "In-game reports", with where it happened and the player's past warnings, mutes and bans.</li>
+        <li><strong><code>/mod</code></strong> opens the moderation panel: online players, find any player (even offline), open reports, muted players and block logs.</li>
+        <li>For each player you can <strong>Warn</strong>, <strong>Mute</strong> (10 minutes to 30 days; they can't chat, /msg or /me), <strong>Kick</strong>, <strong>Ban</strong> (1 day, 7 days, 30 days or permanent), see their <strong>History</strong>, teleport to them, or see their block changes.</li>
+        <li>From a report you can moderate the player, teleport to where it was reported, and mark it resolved or dismiss it. Reports can also be resolved on the website.</li>
+        <li><strong>Who can do what:</strong> operators can do everything. Give a rank the <code>mod</code> command for warn/mute/kick/reports/inspector, <code>modban</code> to also ban, and <code>rollback</code> to roll back griefing. Staff can't moderate operators or other staff (operators can).</li>
+        <li>Every action shows in the <strong>Audit log</strong> as "Name (in game)". Mutes and bans still work if the website is down; the log catches up when it's back.</li>
+      </ul>
+
+      <h3>Anti-grief: inspector and rollback</h3>
+      <ul>
+        <li>The server remembers who placed or broke every block for <strong>14 days</strong>.</li>
+        <li><code>/inspect</code> turns the inspector on. Break or tap a block to see who changed it and when (the block isn't changed). Place a block to check an empty spot where something was broken. <code>/inspect</code> again to turn it off.</li>
+        <li><code>/rollback</code> (or <code>/rollback Name</code>): pick the player, how far back (10 minutes to 14 days) and where (20, 50 or 100 blocks around you, or everywhere). You'll see how many blocks will change before you confirm. Broken blocks come back and placed blocks disappear.</li>
+        <li>Spots that another player changed afterwards are left alone. Chest contents and TNT/creeper damage can't be restored. Stand near the damage so the area is loaded.</li>
+      </ul>
+
       <h3>In-game announcements</h3>
       <ul>
         <li>Type <code>/announce</code> in game to open the <strong>announcement panel</strong> (operators, or a rank given the <code>announce</code> command).</li>

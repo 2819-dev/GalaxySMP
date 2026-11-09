@@ -13,7 +13,7 @@ import urllib.request
 from endstone import ColorFormat, Player
 from endstone.command import Command, CommandSender
 from endstone.event import (ActorDamageEvent, ActorExplodeEvent, BlockBreakEvent, BlockExplodeEvent,
-                            BlockFromToEvent, BlockPlaceEvent, PlayerChatEvent, PlayerDeathEvent,
+                            BlockFromToEvent, BlockPlaceEvent, PlayerChatEvent, PlayerCommandEvent, PlayerDeathEvent,
                             PlayerInteractActorEvent, PlayerInteractEvent, PlayerJoinEvent, PlayerQuitEvent,
                             event_handler)
 from endstone.plugin import Plugin
@@ -22,6 +22,8 @@ from endstone_galaxylink import settings
 from endstone_galaxylink.auction import AuctionHouse
 from endstone_galaxylink.chatfilter import ChatFilter
 from endstone_galaxylink.announcements import Announcements
+from endstone_galaxylink.moderation import Moderation
+from endstone_galaxylink.blocklog import BlockLog
 from endstone_galaxylink.economy import HUD_TICKS, Economy
 from endstone_galaxylink.helpmenu import HelpMenu
 from endstone_galaxylink.npc import HOLD_TICKS, NpcManager
@@ -33,7 +35,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.12.0"
+VERSION = "2.13.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -86,6 +88,11 @@ class GalaxyLink(Plugin):
         "back": _cmd("Go back to where you died or last teleported from.", "/back", "galaxylink.command.back"),
         "plan": _cmd("See your subscription plan.", "/plan", "galaxylink.command.plan"),
         "plot": _cmd("Manage your plot. /plot shovel gets a claiming shovel.", "/plot [action: message]", "galaxylink.command.plot", ["plots"]),
+        "report": _cmd("Report a player who is breaking the rules.", "/report [player: message]", "galaxylink.command.report"),
+        "mod": _cmd("Staff moderation panel: warn, mute, kick, ban, reports and block logs.", "/mod", "galaxylink.command.mod"),
+        "modban": _cmd("Ban a player (staff).", "/modban <player: message>", "galaxylink.command.modban"),
+        "inspect": _cmd("Turn the block inspector on or off: see who placed or broke blocks.", "/inspect", "galaxylink.command.inspect"),
+        "rollback": _cmd("Undo a player's block changes (griefing).", "/rollback [player: message]", "galaxylink.command.rollback"),
         "announce": _cmd("Open the announcement panel, or announce a message to everyone.", "/announce [message: message]", "galaxylink.command.announce"),
         "chatfilter": _cmd("Turn the chat filter on or off for everyone.", "/chatfilter [state: message]", "galaxylink.command.chatfilter"),
         "minigames": _cmd("The Minigame Center: host, join or watch minigames.", "/minigames", "galaxylink.command.minigames", ["minigame", "mg"]),
@@ -121,6 +128,11 @@ class GalaxyLink(Plugin):
         "galaxylink.command.plot": _perm("Allows /plot.", True),
         "galaxylink.command.plotaxe": _perm("Allows /plotaxe (server operators).", "op"),
         "galaxylink.command.minigames": _perm("Allows /minigames.", True),
+        "galaxylink.command.report": _perm("Allows /report.", True),
+        "galaxylink.command.mod": _perm("Allows /mod: warn, mute, kick, reports (operators, or give it with a rank).", "op"),
+        "galaxylink.command.modban": _perm("Allows banning and unbanning in /mod (operators, or give it with a rank).", "op"),
+        "galaxylink.command.inspect": _perm("Allows /inspect (operators, or give it with a rank).", "op"),
+        "galaxylink.command.rollback": _perm("Allows /rollback (operators, or give it with a rank).", "op"),
         "galaxylink.command.announce": _perm("Allows /announce (server operators, or give it with a rank).", "op"),
         "galaxylink.command.chatfilter": _perm("Allows /chatfilter (server operators, or give it with a rank).", "op"),
         "galaxylink.command.tpd": _perm("Allows /tpd.", True),
@@ -142,6 +154,10 @@ class GalaxyLink(Plugin):
         self.minigames = Minigames(self)
         self.chatfilter = ChatFilter(self)
         self.announcements = Announcements(self)
+        self.moderation = Moderation(self)
+        self.blocklog = BlockLog(self)
+        self.server.scheduler.run_task(self, self.moderation.tick, delay=600, period=600)
+        self.server.scheduler.run_task(self, self.blocklog.tick, delay=20, period=20)
         self.server.scheduler.run_task(self, self.announcements.tick, delay=20, period=20)
         self.server.scheduler.run_task(self, self.minigames.tick, delay=600, period=600)
         self.server.scheduler.run_task(self, self.plots.tick, delay=1, period=1)
@@ -189,6 +205,7 @@ class GalaxyLink(Plugin):
         self.plots.on_join(player)
         self.minigames.on_join(player)
         self.announcements.on_join(player)
+        self.moderation.on_join(player)
         player.send_message("§7Need help? Type §e/guide§7 for server info, rules and commands.")
         self.refresh_tags()
         if self._voice:
@@ -215,14 +232,22 @@ class GalaxyLink(Plugin):
     # ---------- plot protection ----------
     @event_handler
     def on_block_break(self, event: BlockBreakEvent):
+        if self.blocklog.on_break(event):  # block inspector
+            return
         self.plots.on_break(event)
+        self.blocklog.log_break(event)
 
     @event_handler
     def on_block_place(self, event: BlockPlaceEvent):
+        if self.blocklog.on_place(event):
+            return
         self.plots.on_place(event)
+        self.blocklog.log_place(event)
 
     @event_handler
     def on_interact(self, event: PlayerInteractEvent):
+        if self.blocklog.on_interact(event):  # block inspector
+            return
         if self.minigames.on_interact(event):  # Minigame Computer
             return
         self.plots.on_interact(event)
@@ -241,10 +266,18 @@ class GalaxyLink(Plugin):
 
     @event_handler
     def on_player_chat(self, event: PlayerChatEvent):
+        if self.moderation.on_chat(event):  # muted players can't chat
+            return
         self.chatfilter.on_chat(event)  # scrambles bad words with §k (when it's on)
         event.format = self.ranks.chat_format(event.player)
 
+    @event_handler
+    def on_player_command(self, event: PlayerCommandEvent):
+        self.moderation.on_command(event)  # muted players can't /msg or /me
+
     def on_disable(self) -> None:
+        if getattr(self, "blocklog", None):
+            self.blocklog.flush()
         if getattr(self, "_voice", None):
             self.economy.sync()
             self._voice.stop()
@@ -288,7 +321,8 @@ class GalaxyLink(Plugin):
     def on_command(self, sender: CommandSender, command: Command, args: list[str]) -> bool:
         name = command.name
         player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "guide", "tpa", "tpahere", "tpaccept",
-                       "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd"}
+                       "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd",
+                       "report", "mod", "inspect", "rollback"}
         if name in player_only and not isinstance(sender, Player):
             sender.send_message(f"/{name} can only be used in game.")
             return True
@@ -333,6 +367,11 @@ class GalaxyLink(Plugin):
             "minigames": lambda: self.minigames.open(sender),
             "chatfilter": lambda: self.chatfilter.command(sender, args),
             "announce": lambda: self.announcements.command(sender, args),
+            "report": lambda: self.moderation.report_command(sender, args),
+            "mod": lambda: self.moderation.panel(sender),
+            "modban": lambda: self.moderation.ban_command(sender, args),
+            "inspect": lambda: self.blocklog.toggle(sender),
+            "rollback": lambda: self.blocklog.rollback_command(sender, args),
             "tpd": lambda: self.minigames.tpd_command(sender),
         }
         if name in simple:

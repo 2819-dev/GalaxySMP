@@ -191,6 +191,11 @@
    "staff": false
   },
   {
+   "command": "/report [player]",
+   "description": "Report a player who is breaking the rules. Staff get an alert right away.",
+   "example": "/report Steve123"
+  },
+  {
    "command": "/setspawn",
    "description": "Set the spawn point to where you're standing.",
    "example": "/setspawn",
@@ -248,6 +253,24 @@
    "command": "/announce [message]",
    "description": "Open the announcement panel: announce to everyone, or set up auto announcements.",
    "example": "/announce Event at spawn in 10 minutes!",
+   "staff": true
+  },
+  {
+   "command": "/mod",
+   "description": "Moderation panel: warn, mute, kick or ban players, see their history, and handle reports.",
+   "example": "/mod",
+   "staff": true
+  },
+  {
+   "command": "/inspect",
+   "description": "Block inspector on/off: break or tap a block to see who placed or broke it.",
+   "example": "/inspect",
+   "staff": true
+  },
+  {
+   "command": "/rollback [player]",
+   "description": "Undo a player's block changes (griefing) from a chosen time and area.",
+   "example": "/rollback Griefer123",
    "staff": true
   }
  ]

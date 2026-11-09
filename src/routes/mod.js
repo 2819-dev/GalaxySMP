@@ -14,6 +14,7 @@ import { isOwner } from "../lib/names.js";
 import { hubBroadcast } from "./chat.js";
 import { voiceEvent, voiceStub } from "./voice.js";
 import { rankOf } from "../chat/messages.js";
+import { openGameReportCount } from "./gamemod.js";
 
 const MOD = 50;
 const ADMIN = 100;
@@ -55,7 +56,7 @@ function audit(sql, actorId, action, { userId = null, messageId = null, details 
 
 async function openReportCount(sql) {
   const [{ n }] = await sql`SELECT count(DISTINCT message_id)::int AS n FROM reports WHERE status = 'open'`;
-  return n;
+  return n + (await openGameReportCount(sql));
 }
 
 async function notifyReports(env, sql) {

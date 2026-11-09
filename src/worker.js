@@ -7,6 +7,7 @@ import { listRanks, checkout } from "./routes/store.js";
 import { serveStatic } from "./lib/static.js";
 import { linkStart, linkPoll, login, logout, me } from "./routes/auth.js";
 import { pluginPing, pluginLink } from "./routes/plugin.js";
+import * as gamemod from "./routes/gamemod.js";
 import { bootstrap, history, connect } from "./routes/chat.js";
 import * as mod from "./routes/mod.js";
 import { voiceConnect, voiceServer } from "./routes/voice.js";
@@ -61,6 +62,12 @@ const routes = [
   ["GET", "/api/mod/ranks", ranks.listRanks],
   ["POST", "/api/mod/ranks/:action", ranks.websiteAction],
   ["POST", "/api/plugin/ranks", (req, env) => ranks.pluginAction(req, env)],
+  ["POST", "/api/plugin/report", (req, env) => gamemod.pluginReport(req, env)],
+  ["GET", "/api/plugin/reports", (req, env) => gamemod.pluginReports(req, env)],
+  ["POST", "/api/plugin/reports/resolve", (req, env) => gamemod.pluginResolveReport(req, env)],
+  ["POST", "/api/plugin/punish", (req, env) => gamemod.pluginPunish(req, env)],
+  ["GET", "/api/mod/game-reports", (req, env) => gamemod.staffGameReports(req, env)],
+  ["POST", "/api/mod/game-reports/:id/resolve", gamemod.staffResolveGameReport],
   ["GET", "/api/economy/top", economy.leaderboard],
   ["GET", "/api/mod/economy", economy.adminEconomy],
   ["POST", "/api/mod/economy/plan", (req, env) => plans.adminSetPlan(req, env)],
