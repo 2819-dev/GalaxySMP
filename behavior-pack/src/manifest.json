@@ -2,12 +2,12 @@
   "format_version": 2,
   "header": {
     "name": "GalaxySMP Blocks",
-    "description": "GalaxySMP custom blocks: the Minigame Computer",
+    "description": "GalaxySMP custom blocks: the Minigame Computer (a till with a screen on both sides)",
     "uuid": "27c58f05-2465-44d9-98cc-ff4e5bb2a019",
     "version": [
       1,
       0,
-      0
+      1
     ],
     "min_engine_version": [
       1,
@@ -22,7 +22,7 @@
       "version": [
         1,
         0,
-        0
+        1
       ]
     }
   ],
@@ -32,7 +32,7 @@
       "version": [
         1,
         6,
-        0
+        1
       ]
     }
   ]
