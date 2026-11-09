@@ -179,7 +179,8 @@ export function statusText(s) {
   if (!s || !s.configured) return { cls: "", text: "Launching soon" };
   if (s.reason === "lookup_failed") return { cls: "", text: "Status unavailable" };
   if (!s.online) return { cls: "is-offline", text: "Offline" };
-  const n = s.players.online;
+  const n = s.players && s.players.online;
+  if (n == null) return { cls: "is-online", text: "Online" };
   return { cls: "is-online", text: `Online · ${n} player${n === 1 ? "" : "s"}` };
 }
 

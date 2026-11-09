@@ -177,7 +177,14 @@ export class VoiceHub extends DurableObject {
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname === "/internal/server") {
-      return Response.json((await this.ctx.storage.get("server")) || null);
+      const info = await this.ctx.storage.get("server");
+      if (info && Date.now() - info.at < 45_000) return Response.json(info);
+      // Older plugin versions don't send player counts, but if the plugin is connected the server is up.
+      if (this.ctx.getWebSockets("plugin").some((ws) => !ws.deserializeAttachment()?.gone)) {
+        const counted = [...this.positions.values()].filter((p) => Date.now() - p.at < POSITION_STALE_MS).length;
+        return Response.json({ at: Date.now(), online: counted || null, max: null, version: "" });
+      }
+      return Response.json(null);
     }
     if (url.pathname === "/internal/event") {
       await this.handleInternal(await request.json());

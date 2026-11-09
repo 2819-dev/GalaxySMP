@@ -66,7 +66,7 @@ class GalaxyLink(Plugin):
             headers={
                 "Authorization": "Bearer " + settings.SECRET,
                 "Content-Type": "application/json",
-                "User-Agent": "GalaxyLink-Endstone/2.2",
+                "User-Agent": "GalaxyLink-Endstone/2.3.1",
             },
         )
         try:

@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.2",
+                    "User-Agent": "GalaxyLink-Endstone/2.3.1",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 delay = 2

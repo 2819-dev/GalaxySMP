@@ -40,7 +40,7 @@ function render(s) {
   }
 
   const updown = (v) => (v ? "Up" : "Down");
-  $("st-players").textContent = s.online ? `${s.players.online} / ${s.players.max}` : "0";
+  $("st-players").textContent = !s.online ? "0" : s.players.online == null ? "–" : s.players.max ? `${s.players.online} / ${s.players.max}` : String(s.players.online);
   $("st-version").textContent = s.online && s.version ? s.version : "–";
   $("st-bedrock").textContent = s.configured ? updown(s.online) : "–";
   $("st-checked").textContent = new Date(s.checkedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });

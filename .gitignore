@@ -6,3 +6,4 @@ plugin/build/
 *.log
 src/generated/
 server-files/
+__pycache__/

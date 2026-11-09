@@ -55,7 +55,7 @@ export async function buildStatus(env) {
           ...base,
           online: true,
           source: "plugin",
-          players: { online: info.online, max: info.max },
+          players: { online: info.online, max: info.max }, // null when the plugin hasn't reported a count
           version: info.version,
           motd: "",
         };
