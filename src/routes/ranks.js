@@ -16,8 +16,10 @@ const ROLE_POWER = { 2: 20, 3: 50, 4: 100 };
 
 // Rank icons (drawn by the GalaxySMP Icons resource pack; pictures in /img/ranks/).
 export const ICONS = ["crown", "star", "shield", "sword", "gem", "heart", "hammer", "flame", "bolt", "rocket", "planet", "leaf",
-           "pickaxe", "axe", "bow", "potion", "book", "key", "trophy", "medal", "code", "music", "paw", "fish",
-           "mushroom", "flower", "moon", "sun", "snowflake", "skull", "ghost", "eye"];
+                       "pickaxe", "axe", "bow", "potion", "book", "key", "trophy", "medal", "code", "music", "paw", "fish",
+                       "mushroom", "flower", "moon", "sun", "snowflake", "skull", "ghost", "eye", "coin", "moneybag", "gift", "cake",
+                       "cookie", "apple", "bell", "lightbulb", "magnet", "compass", "clock", "hourglass", "flag", "anchor", "feather", "droplet",
+                       "tree", "cactus", "cloud", "rainbow", "cat", "slime", "dice", "gamepad"];
 
 // Admins type command names (like "time" or "/gamemode"); each becomes the permission
 // that allows the whole command, so "time" also allows "/time set day".
