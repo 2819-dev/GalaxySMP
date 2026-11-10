@@ -1007,3 +1007,16 @@ section.panel, .server-card, .worlds, .voice-band { position: relative; }
 
 @media (max-width: 900px) { .worlds { grid-template-columns: repeat(2, minmax(0,1fr)); } .stats-strip { grid-template-columns: repeat(2, minmax(0,1fr)); } .stats-strip > div:nth-child(2) { border-right: 0; } .stats-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--glass-border); } }
 @media (max-width: 520px) { .worlds { grid-template-columns: 1fr; } .stats-strip .num { font-size: 1.5rem; } .stats-strip > div { padding: 14px 16px; } }
+
+/* iPhone/iPad: full-screen "install the app" page */
+html.install-locked, html.install-locked body { overflow: hidden; height: 100%; }
+html.install-locked .install-banner { display: none; }
+.install-wall { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px 18px;
+  overflow-y: auto; background: radial-gradient(700px 500px at 80% 0%, rgba(61,170,244,.22), transparent 60%),
+  radial-gradient(600px 500px at 0% 100%, rgba(138,92,255,.2), transparent 60%), #070917; }
+.install-wall-card { width: min(440px, 100%); text-align: center; }
+.install-wall-icon { border-radius: 20px; box-shadow: 0 0 40px rgba(79,235,253,.35); }
+.install-wall h1 { font-size: 1.7rem; margin: 18px 0 8px; }
+.install-wall-steps { text-align: left; margin-top: 18px; padding: 18px 18px 14px; border-radius: 16px; background: linear-gradient(180deg, rgba(28,33,74,.8), rgba(16,19,46,.8)); border: 1px solid var(--glass-border); }
+.install-wall-steps ol { margin: 0 0 6px; padding-left: 20px; line-height: 1.7; color: var(--text-2); }
+.install-wall-steps .btn { margin-top: 10px; }

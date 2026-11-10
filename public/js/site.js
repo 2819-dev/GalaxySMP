@@ -321,6 +321,52 @@ window.addEventListener("beforeinstallprompt", (e) => {
   document.dispatchEvent(new Event("gsmp-installable"));
 });
 window.addEventListener("appinstalled", () => { document.querySelector(".install-banner")?.remove(); toast("GalaxySMP app installed!"); });
-if (isIos() && !EMBED) setTimeout(() => installBanner(), 1500);
+// iPhone / iPad: the website only works as the installed GalaxySMP app (Apple doesn't let sites install
+// themselves, so we show the steps full screen until it's opened from the Home Screen).
+const inAppBrowser = () => /FBAN|FBAV|Instagram|Line\/|Discord|Snapchat|TikTok|musical_ly|GSA\/|Twitter|LinkedInApp|Pinterest/i.test(navigator.userAgent);
+function forceInstallScreen() {
+  if (EMBED || isInstalled() || !isIos() || location.pathname.startsWith("/privacy")) return;
+  const ua = navigator.userAgent;
+  const otherBrowser = /CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+  let steps;
+  if (inAppBrowser()) {
+    steps = `<ol>
+      <li>This app's browser can't install GalaxySMP. Tap <b>Copy link</b> below.</li>
+      <li>Open <b>Safari</b>, paste the link and go.</li>
+      <li>Then tap <b>Share</b> <span class="share-glyph" aria-hidden="true">⬆︎</span> → <b>Add to Home Screen</b> → <b>Add</b>.</li></ol>
+      <button class="btn btn-secondary btn-block" type="button" data-copy-link>Copy link</button>`;
+  } else if (otherBrowser) {
+    steps = `<ol>
+      <li>Tap the <b>Share</b> button <span class="share-glyph" aria-hidden="true">⬆︎</span> (in the address bar or the ••• menu).</li>
+      <li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+      <li>Open <b>GalaxySMP</b> from your Home Screen.</li></ol>
+      <p class="text-3 small">Don't see it? Open galaxymc.us in Safari and do it there.</p>`;
+  } else {
+    steps = `<ol>
+      <li>Tap the <b>Share</b> button <span class="share-glyph" aria-hidden="true">⬆︎</span> at the bottom of Safari (top on iPad).</li>
+      <li>Scroll down and tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+      <li>Open <b>GalaxySMP</b> from your Home Screen.</li></ol>`;
+  }
+  const wall = document.createElement("div");
+  wall.className = "install-wall";
+  wall.setAttribute("role", "dialog");
+  wall.setAttribute("aria-modal", "true");
+  wall.setAttribute("aria-label", "Install the GalaxySMP app");
+  wall.innerHTML = `
+    <div class="install-wall-card">
+      <img src="/img/icon-192.png" alt="" width="84" height="84" class="install-wall-icon">
+      <h1>Get the <span class="grad-text">GalaxySMP</span> app</h1>
+      <p class="text-2">On iPhone and iPad, GalaxySMP works as an app on your Home Screen: full screen, faster, and voice chat keeps working while you play Minecraft.</p>
+      <div class="install-wall-steps">${steps}</div>
+      <p class="text-3 small" style="margin-top:14px">Free, no App Store needed. <a href="/privacy">Privacy</a></p>
+    </div>`;
+  wall.querySelector("[data-copy-link]")?.addEventListener("click", async (e) => {
+    try { await navigator.clipboard.writeText("https://galaxymc.us" + location.pathname); e.target.textContent = "Link copied!"; }
+    catch { e.target.textContent = "galaxymc.us"; }
+  });
+  document.documentElement.classList.add("install-locked");
+  document.body.append(wall);
+}
+forceInstallScreen();
 
 export { config };
