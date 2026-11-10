@@ -1,7 +1,7 @@
 // GalaxySMP community chat (browser side).
 // All text is inserted with textContent, never as HTML, so nothing a user types can run as code.
 import { icon, toast } from "/js/site.js";
-import { paint, rankTag } from "/js/rank-paint.js";
+import { paint, rankTag, roleIcon, rankCss } from "/js/rank-paint.js";
 import { showPanel, hidePanel } from "/js/community-panels.js";
 
 // A member's current rank (live updates win over what an older message recorded).
@@ -57,12 +57,99 @@ function hueOf(name) {
   return h;
 }
 
-function avatar(name, small) {
+// Profile picture: the player's Minecraft head (sent by the game server), or their first letter.
+function letterAvatar(name, small) {
   const a = el("div", "avatar" + (small ? " sm" : ""), (name.replace(/^[^A-Za-z0-9]+/, "")[0] || "?").toUpperCase());
   a.style.background = `hsl(${hueOf(name)} 45% 42%)`;
   a.setAttribute("aria-hidden", "true");
   return a;
 }
+function avatar(name, small, member) {
+  const head = member?.head || [...(state.members?.values?.() || [])].find((x) => x.username === name)?.head;
+  if (!head) return letterAvatar(name, small);
+  const img = el("img", "avatar head" + (small ? " sm" : ""));
+  img.src = head;
+  img.alt = "";
+  img.loading = "lazy";
+  img.setAttribute("aria-hidden", "true");
+  img.addEventListener("error", () => img.replaceWith(letterAvatar(name, small)), { once: true });
+  return img;
+}
+
+// ---------- Profile card (click a name or picture, like Discord) ----------
+const PLAN_NAMES = { plus: "Galaxy+", pro: "Galaxy Pro+" };
+export const profileActionHooks = [];  // staff tools add buttons here
+let openCard = null;
+function closeProfile() {
+  openCard?.remove();
+  openCard = null;
+}
+function openProfile(member, anchor) {
+  closeProfile();
+  if (!member) return;
+  const rank = member.rank || null;
+  const online = state.online?.has(member.id);
+  const card = el("div", "profile-card");
+  card.setAttribute("role", "dialog");
+  card.setAttribute("aria-label", `${member.username}'s profile`);
+  const banner = el("div", "pc-banner");
+  banner.style.background = rankCss(rank) || "linear-gradient(90deg, #4FEBFD, #3DAAF4, #2149DD)";
+  const pic = el("div", "pc-avatar" + (online ? " online" : ""));
+  const big = avatar(member.username, false, member);
+  pic.append(big);
+  const name = el("div", "pc-name");
+  name.append(paint(member.username, rank));
+  const ri = roleIcon(rank);
+  if (ri) name.append(ri);
+  const status = el("div", "pc-status", member.inGame ? "Playing on GalaxySMP" : online ? "Online" : "Offline");
+  status.classList.add(member.inGame ? "playing" : online ? "on" : "off");
+  const roles = el("div", "pc-roles");
+  const chip = (label, color, iconRank) => {
+    const c = el("span", "role-chip");
+    const dot = el("span", "dot");
+    dot.style.background = color;
+    c.append(dot);
+    const ic = iconRank ? roleIcon(iconRank) : null;
+    if (ic) c.append(ic);
+    c.append(label);
+    return c;
+  };
+  if (rank) roles.append(chip(rank.name || rank.prefix, rankCss(rank), rank));
+  if (member.plan) roles.append(chip(PLAN_NAMES[member.plan] || member.plan, member.plan === "pro" ? "linear-gradient(90deg,#4FEBFD,#2149DD)" : "linear-gradient(90deg,#FFF27A,#FFAA00)"));
+  const role = roleOf(member.role);
+  if (role.power >= 50) roles.append(chip(role.name, role.color));
+  if (!roles.childNodes.length) roles.append(el("span", "text-3 small", "No roles yet"));
+  const body = el("div", "pc-body");
+  body.append(name, el("div", "pc-user", member.username), status, el("div", "pc-label", "Roles"), roles);
+  if (member.since) {
+    body.append(el("div", "pc-label", "Member since"), el("div", "pc-since", new Date(member.since).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" })));
+  }
+  const actions = el("div", "pc-actions");
+  const view = el("a", "btn btn-secondary btn-sm", "View full profile");
+  view.href = `/player/${encodeURIComponent(member.username)}`;
+  actions.append(view);
+  for (const hook of profileActionHooks) hook(member, actions, closeProfile);
+  body.append(actions);
+  card.append(banner, pic, body);
+  document.body.append(card);
+  // place it next to what was clicked (on phones it's a sheet at the bottom)
+  if (window.innerWidth > 700 && anchor) {
+    const r = anchor.getBoundingClientRect();
+    const w = 300;
+    let left = r.right + 10;
+    if (left + w > window.innerWidth - 10) left = Math.max(10, r.left - w - 10);
+    const top = Math.min(Math.max(10, r.top - 20), window.innerHeight - card.offsetHeight - 10);
+    card.style.left = `${left}px`;
+    card.style.top = `${top}px`;
+  } else {
+    card.classList.add("sheet");
+  }
+  openCard = card;
+  setTimeout(() => document.addEventListener("click", function off(e) {
+    if (!card.contains(e.target)) { closeProfile(); document.removeEventListener("click", off); }
+  }), 0);
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeProfile(); });
 
 function roleOf(key) {
   return state.roles.get(key) || { name: "Member", color: "#c9cdfb", power: 10 };
@@ -194,9 +281,21 @@ function isGrouped(m, prev) {
 }
 
 function renderMessage(m, prev) {
-  const row = el("div", "msg" + (isGrouped(m, prev) ? " grouped" : ""));
+  const grouped = isGrouped(m, prev);
+  const row = el("div", "msg" + (grouped ? " grouped" : ""));
   row.dataset.id = m.id;
-  row.append(avatar(m.author.username));
+  const author = state.members.get(m.author.id) || { id: m.author.id, username: m.author.username, role: m.author.role, rank: m.author.rank };
+  const pic = avatar(m.author.username, false, author);
+  pic.classList.add("clickable");
+  pic.addEventListener("click", (e) => { e.stopPropagation(); openProfile(author, pic); });
+  row.append(pic);
+  if (grouped) {  // the time shows in the left gutter on hover, like Discord
+    const gt = el("time", "gutter-time", timeFmt.format(new Date(m.createdAt)));
+    gt.dateTime = m.createdAt;
+    row.append(gt);
+  }
+  const me = state.me?.username;
+  if (me && new RegExp(`@${me.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(m.content)) row.classList.add("mention");
 
   const body = el("div", "msg-body");
   if (m.replyTo) {
@@ -206,12 +305,14 @@ function renderMessage(m, prev) {
     body.append(r);
   }
   const head = el("div", "msg-head");
-  // Same as in game: [👑 OWNER] name, in the rank's color or gradient.
+  // Like Discord: the name in the rank's color/gradient, then the rank's icon.
   const rank = rankFor(m.author.id, m.author.rank);
-  if (rank) head.append(rankTag(rank));
-  const name = el("span", "name");
+  const name = el("span", "name clickable");
   name.append(paint(m.author.username, rank));
+  name.addEventListener("click", (e) => { e.stopPropagation(); openProfile({ ...author, rank }, name); });
   head.append(name);
+  const ri = roleIcon(rank);
+  if (ri) head.append(ri);
   const t = el("time", "", timeFmt.format(new Date(m.createdAt)));
   t.dateTime = m.createdAt;
   t.title = new Date(m.createdAt).toLocaleString();
@@ -410,6 +511,10 @@ function submit() {
 
 // ---------- Members ----------
 function renderMembers() {
+  const playing = [...state.members.values()].filter((m) => m.inGame).length;
+  const onSite = state.online?.size || 0;
+  const so = document.getElementById("server-online");
+  if (so) so.textContent = `${onSite} online${playing ? ` · ${playing} in game` : ""}`;
   const list = $("member-list");
   list.replaceChildren();
   const all = [...state.members.values()];
@@ -425,8 +530,12 @@ function renderMembers() {
   for (const key of [...groups.keys()].sort()) {
     const g = groups.get(key);
     const head = el("div", "member-group");
-    if (g.rank) head.append(rankTag(g.rank), ` — ${g.members.length}`);
-    else head.textContent = `Players — ${g.members.length}`;
+    if (g.rank) {  // a role header in the role's color, like Discord
+      const label = el("span", "group-name", (g.rank.name || g.rank.prefix).toUpperCase());
+      const css = rankCss(g.rank);
+      if (css.startsWith("linear")) { label.classList.add("smooth"); label.style.backgroundImage = css; } else label.style.color = css;
+      head.append(label, ` — ${g.members.length}`);
+    } else head.textContent = `Players — ${g.members.length}`;
     list.append(head);
     for (const m of g.members) list.append(memberRow(m, true));
   }
@@ -437,13 +546,22 @@ function renderMembers() {
 }
 
 function memberRow(m, isOnline) {
-  const row = el("div", "member" + (isOnline ? "" : " offline"));
+  const row = el("div", "member" + (isOnline ? "" : " offline") + (m.inGame ? " in-game" : ""));
   const wrap = el("div", "av-wrap");
-  wrap.append(avatar(m.username, true));
+  wrap.append(avatar(m.username, true, m));
+  const info = el("div", "member-info");
   const name = el("span", "name");
   name.append(paint(m.username, m.rank));
-  row.append(wrap, name);
+  const ri = roleIcon(m.rank);
+  if (ri) name.append(ri);
+  info.append(name);
+  if (m.inGame) info.append(el("span", "member-activity", "Playing GalaxySMP"));
+  row.append(wrap, info);
   row.dataset.id = m.id;
+  row.tabIndex = 0;
+  row.setAttribute("role", "button");
+  row.addEventListener("click", () => openProfile(m, row));
+  row.addEventListener("keydown", (e) => { if (e.key === "Enter") openProfile(m, row); });
   for (const hook of memberHooks) hook(m, row);
   return row;
 }
@@ -616,7 +734,10 @@ export async function startChat({ onSignedOut }) {
   state.members = new Map(data.members.map((m) => [m.id, m]));
 
   const myRank = state.members.get(state.me.id)?.rank || null;
-  $("me-avatar").replaceWith(Object.assign(avatar(state.me.username, true), { id: "me-avatar" }));
+  const meMember = state.members.get(state.me.id);
+  $("me-avatar").replaceWith(Object.assign(avatar(state.me.username, true, meMember), { id: "me-avatar" }));
+  $("me-avatar").classList.add("clickable");
+  $("me-avatar").addEventListener("click", (e) => { e.stopPropagation(); openProfile(meMember, $("me-avatar")); });
   $("me-name").replaceChildren(paint(state.me.username, myRank));
   $("me-role").replaceChildren(myRank ? rankTag(myRank) : document.createTextNode("No rank"));
 
@@ -641,4 +762,5 @@ export function stopChat() {
   state.ws = null;
 }
 
+export { openProfile };
 export { state as chatState, api as chatApi, note as chatNote, renderMembers, renderMessages, renderComposer, roleOf };

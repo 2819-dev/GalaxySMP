@@ -9,6 +9,7 @@ import { linkStart, linkPoll, login, logout, me } from "./routes/auth.js";
 import { pluginPing, pluginLink } from "./routes/plugin.js";
 import * as gamemod from "./routes/gamemod.js";
 import * as progress from "./routes/progress.js";
+import { headImage } from "./routes/heads.js";
 import { bootstrap, history, connect } from "./routes/chat.js";
 import * as mod from "./routes/mod.js";
 import { voiceConnect, voiceServer } from "./routes/voice.js";
@@ -72,6 +73,7 @@ const routes = [
   ["GET", "/api/economy/top", economy.leaderboard],
   ["GET", "/api/leaderboards", progress.leaderboards],
   ["GET", "/api/players/search", progress.searchPlayers],
+  ["GET", "/api/head/:xuid", headImage],
   ["GET", "/api/players/:name", progress.profile],
   ["GET", "/api/mod/economy", economy.adminEconomy],
   ["POST", "/api/mod/economy/plan", (req, env) => plans.adminSetPlan(req, env)],

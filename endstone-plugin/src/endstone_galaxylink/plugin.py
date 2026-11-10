@@ -45,7 +45,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.17.4"
+VERSION = "2.18.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -268,6 +268,8 @@ class GalaxyLink(Plugin):
         self.refresh_tags()
         if self._voice:
             self._voice.send_seen([player])
+            from endstone_galaxylink.heads import send_head
+            self.server.scheduler.run_task(self, lambda: send_head(self, player), delay=40)  # head for the website
 
     @event_handler
     def on_player_quit(self, event: PlayerQuitEvent):

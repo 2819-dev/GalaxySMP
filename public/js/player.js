@@ -41,7 +41,8 @@ async function load() {
   box.replaceChildren(
     h("section", { class: "panel" },
       h("div", { class: "profile-head" },
-        h("div", { class: "avatar", "aria-hidden": "true", text: [...p.name][0].toUpperCase() }),
+        p.head ? h("img", { class: "avatar head-big", src: p.head, alt: "", "aria-hidden": "true" })
+               : h("div", { class: "avatar", "aria-hidden": "true", text: [...p.name][0].toUpperCase() }),
         h("div", { style: "min-width:0" },
           h("h1", {}, p.name),
           h("div", { class: "profile-tags" },

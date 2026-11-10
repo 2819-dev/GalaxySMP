@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.17.4",
+                    "User-Agent": "GalaxyLink-Endstone/2.18.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -276,6 +276,12 @@ class VoiceLink:
             self.plugin.auction.push()
         except Exception as e:
             self.plugin.logger.warning(f"Couldn't send Auction House listings to the website: {e}")
+        try:
+            from endstone_galaxylink.heads import send_head
+            for p in list(self.plugin.server.online_players):
+                send_head(self.plugin, p)
+        except Exception as e:
+            self.plugin.logger.warning(f"Couldn't send player heads to the website: {e}")
         try:
             self.send_json(self.plugin.progress.definitions())
             self.plugin.progress.push(everything=True)

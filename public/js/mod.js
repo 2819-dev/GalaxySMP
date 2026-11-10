@@ -1,7 +1,7 @@
 // Adds reporting and staff tools to the chat.
 import { toast, icon } from "/js/site.js";
 import {
-  chatState as state, messageActionHooks, memberHooks, eventHooks,
+  chatState as state, messageActionHooks, memberHooks, profileActionHooks, eventHooks,
   renderMembers, renderComposer, removeMessage, roleOf,
 } from "/js/chat.js";
 import { h, openDialog, postJson, getJson, field, select, REPORT_REASONS, MUTE_LABELS, muteDialog, banDialog } from "/js/dialog.js";
@@ -63,12 +63,12 @@ function deleteDialog(m, mine) {
 }
 
 // ---------- Member profiles (click a name in the member list) ----------
-memberHooks.push((m, row) => {
-  row.tabIndex = 0;
-  row.setAttribute("role", "button");
-  const open = () => memberDialog(m);
-  row.addEventListener("click", open);
-  row.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+// Staff: a "Moderate" button on everyone's profile card (click a name, picture or member).
+profileActionHooks.push((m, actions, close) => {
+  if (myPower() < STAFF || m.id === state.me.id) return;
+  const b = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Moderate" });
+  b.addEventListener("click", () => { close(); memberDialog(m); });
+  actions.append(b);
 });
 
 async function memberDialog(m) {

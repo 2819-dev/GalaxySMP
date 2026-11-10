@@ -119,3 +119,20 @@ export function rankTag(rank) {
 
 // CSS gradient for swatches.
 export const gradientCss = (key) => `linear-gradient(90deg, ${gradientStops(key).join(", ")})`;
+
+// Discord-style role icon (the rank's icon), shown after a name.
+export function roleIcon(rank) {
+  if (!rank || !rank.icon) return null;
+  const img = iconImg(rank.icon);
+  img.className = "role-icon";
+  img.title = rank.name || rank.prefix || "";
+  img.alt = rank.name || "";
+  return img;
+}
+
+// The rank's color as CSS: a smooth gradient or a single color (for role dots, headers and banners).
+export function rankCss(rank) {
+  if (!rank) return null;
+  const stops = rank.gradient ? GRADIENT_HEX[rank.gradient] : null;
+  return stops ? `linear-gradient(90deg, ${stops.join(", ")})` : hexOf(rank.color || "f");
+}
