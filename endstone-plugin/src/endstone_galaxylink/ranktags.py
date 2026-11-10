@@ -25,9 +25,10 @@ MODULE_UUID = "d2b6f7a3-8c4e-4fab-9a32-6e7d8c9bae12"
 BASE_PAGES = list(range(0xE4, 0xE9)) + list(range(0xEC, 0xF9))   # E4-E8, EC-F8: 18 pages
 PAGES = [0xE9, 0xEA, 0xEB]                                       # strips
 CELL = 16                          # pixels per picture (256x256 page = the same size as normal text)
-UNIT = 2                           # pixels per Minecraft font pixel
+UNIT = 1                           # 1 image pixel = 1 text pixel (Bedrock draws pictures at that scale: same size as chat)
+TOP = CELL - 8                     # letters sit at the bottom of each picture: Bedrock lines pictures up by their bottom edge
 FILE = "GalaxySMP_RankTags.mcpack"
-FORMAT = 3                         # bump when the drawing changes, so everything is rebuilt
+FORMAT = 4                         # bump when the drawing changes, so everything is rebuilt
 CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789[]+-_.!?&'"
 
 # A 5x7 pixel font in the style of Minecraft's (# = pixel). Width = longest row.
@@ -176,7 +177,7 @@ def render_strip(text, stops):
                     px = (x0 + col) * UNIT + dx
                     color = color_at(stops, px / max(1, width - 1))
                     for dy in range(UNIT):
-                        pixels[(px, row * UNIT + dy)] = (*color, 255)
+                        pixels[(px, TOP + row * UNIT + dy)] = (*color, 255)
     return pixels, width, split
 
 
@@ -371,7 +372,7 @@ def base_pages():
                     if c == "#":
                         for dx in range(UNIT):
                             for dy in range(UNIT):
-                                px[(cx + col * UNIT + dx, cy + row * UNIT + dy)] = (*color, 255)
+                                px[(cx + col * UNIT + dx, cy + TOP + row * UNIT + dy)] = (*color, 255)
     return pages
 
 
