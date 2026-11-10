@@ -4,7 +4,7 @@
     "name": "GalaxySMP Blocks",
     "description": "GalaxySMP custom blocks and entities: the Minigame Computer and floating leaderboards",
     "uuid": "27c58f05-2465-44d9-98cc-ff4e5bb2a019",
-    "version": [ 1, 0, 7 ],
+    "version": [ 1, 0, 8 ],
     "min_engine_version": [
       1,
       21,
@@ -15,7 +15,7 @@
     {
       "type": "data",
       "uuid": "7bd4a110-0ba2-4f5e-9902-89b08d722621",
-      "version": [ 1, 0, 7 ]
+      "version": [ 1, 0, 8 ]
     }
   ],
   "dependencies": [

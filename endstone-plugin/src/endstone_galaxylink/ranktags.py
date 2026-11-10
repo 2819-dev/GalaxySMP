@@ -146,6 +146,54 @@ def png(width, height, pixels):
             + chunk(b"IDAT", zlib.compress(bytes(raw), 9)) + chunk(b"IEND", b""))
 
 
+def level_folder():
+    """worlds/<level-name> from server.properties."""
+    name = "Bedrock level"
+    try:
+        for line in (Path.cwd() / "server.properties").read_text("utf-8", "ignore").splitlines():
+            if line.startswith("level-name="):
+                name = line.split("=", 1)[1].strip() or name
+    except Exception:
+        pass
+    return Path.cwd() / "worlds" / name
+
+
+def world_packs(kind="resource"):
+    """The packs the world loads: [(uuid, version list)] from world_resource_packs.json / world_behavior_packs.json."""
+    try:
+        data = json.loads((level_folder() / f"world_{kind}_packs.json").read_text("utf-8"))
+        return [(str(e.get("pack_id")), list(e.get("version") or [])) for e in data if isinstance(e, dict)]
+    except Exception:
+        return []
+
+
+def installed_version(pack_uuid):
+    for pid, ver in world_packs("resource"):
+        if pid == pack_uuid and len(ver) == 3:
+            return ver[2]
+    return None
+
+
+GALAXY_PACKS = [("resource", "6b0f4c3e-2d1a-4a8e-9c5b-1f7e3a9d2c41", "GalaxySMP Icons"),
+                ("behavior", "27c58f05-2465-44d9-98cc-ff4e5bb2a019", "GalaxySMP Blocks"),
+                ("resource", PACK_UUID, "GalaxySMP Rank Tags")]
+
+
+def pack_report():
+    """One line per GalaxySMP pack: which version the world loads, and duplicates (a common cause of
+    'at least one of your packs failed to load')."""
+    lines = []
+    for kind, pid, name in GALAXY_PACKS:
+        found = [v for p, v in world_packs(kind) if p == pid]
+        if not found:
+            lines.append(f"{name}: NOT in world_{kind}_packs.json")
+        elif len(found) > 1:
+            lines.append(f"{name}: listed {len(found)} times {found} - keep only the newest one")
+        else:
+            lines.append(f"{name}: version {'.'.join(map(str, found[0]))}")
+    return lines
+
+
 def signature(tag):
     """What a tag looks like (prefix + gradient colors): same signature = same pictures."""
     return json.dumps([tag.get("prefix", ""), tag.get("stops")], separators=(",", ":"))
@@ -159,11 +207,15 @@ class RankTags:
         self.enabled = cfg.get("enabled", True)
         self.version = cfg.get("version", 0)
         self.built = cfg.get("built") or {}           # signature -> glyph string, in the pack file on disk
-        # The pack file on disk was installed when this server started, so its pictures are the ones players have.
-        self.active = dict(self.built) if self.pack_path().exists() else {}
+        self.history = cfg.get("history") or {}       # pack version -> its glyphs (the last few builds)
+        # Only use pictures from the pack version the world really loaded (world_resource_packs.json).
+        self.installed = installed_version(PACK_UUID)
+        self.active = dict(self.history.get(str(self.installed), {})) if self.installed else {}
 
     def save(self):
-        self.eco.set_config("ranktags", {"enabled": self.enabled, "version": self.version, "built": self.built})
+        keep = sorted(self.history, key=int)[-3:]
+        self.history = {k: self.history[k] for k in keep}
+        self.eco.set_config("ranktags", {"enabled": self.enabled, "version": self.version, "built": self.built, "history": self.history})
 
     def pack_path(self):
         addons = Path.cwd() / "BDS-Addons"
@@ -213,6 +265,7 @@ class RankTags:
         self.version += 1
         self.write_pack(pages)
         self.built = built
+        self.history[str(self.version)] = built
         self.save()
         self.plugin.logger.info(f"Rank tag pictures updated ({len(built)} tags). They show after the next server restart.")
         for p in self.plugin.server.online_players:
@@ -249,6 +302,9 @@ class RankTags:
             if refresh:
                 refresh()
         state = "§aon" if self.enabled else "§coff"
-        ready = "installed" if self.active else "waiting for a server restart"
+        ready = (f"installed (version {self.installed})" if self.active else
+                 f"waiting for a server restart (built version {self.version}, the world has {self.installed or 'none'})")
         sender.send_message(f"§7Smooth gradient rank tags are {state}§7 (pictures {ready}; file: BDS-Addons/{FILE}). "
                             "Use /ranktags on or /ranktags off.")
+        for line in pack_report():
+            sender.send_message("§8- " + line)
