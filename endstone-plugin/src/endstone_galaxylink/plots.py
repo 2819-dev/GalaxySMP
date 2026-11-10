@@ -841,9 +841,15 @@ class Plots:
                 if plot["kind"] == "area":
                     p.send_message(f"§7Entering §f{self.label(plot)}§7 (protected area)")
                 elif plot.get("owner") and plot.get("shop"):
-                    p.send_message(f"§6Welcome to §l{self.label(plot)}§r§6, {plot.get('owner_name')}'s shop! §7Tap a shop chest to buy or sell.")
+                    if plot["owner"] == str(p.xuid):
+                        p.send_message("§7Entering §fyour shop§7.")
+                    else:
+                        p.send_message(f"§6Entering §f{plot.get('owner_name')}'s§6 shop. §7Tap a shop chest to buy or sell.")
                 elif plot.get("owner"):
-                    p.send_message(f"§7Entering §f{self.label(plot)}§7, owned by §f{plot.get('owner_name')}")
+                    if plot["owner"] == str(p.xuid):
+                        p.send_message("§7Entering §fyour plot§7.")
+                    else:
+                        p.send_message(f"§7Entering §f{plot.get('owner_name')}'s§7 plot.")
                 else:
                     p.send_message(f"§7Entering §f{self.label(plot)}§7: §aavailable to claim")
 

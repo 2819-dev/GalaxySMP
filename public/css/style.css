@@ -718,12 +718,12 @@ textarea.input { height: auto; padding: 10px 12px; line-height: 1.45; resize: ve
 .plan-perks { list-style: none; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 8px; color: var(--text-2); font-size: .95rem; }
 .plan-perks li { padding-left: 24px; position: relative; }
 .plan-perks li::before { content: ""; position: absolute; left: 2px; top: .45em; width: 12px; height: 7px; border-left: 2px solid var(--ok); border-bottom: 2px solid var(--ok); transform: rotate(-45deg); }
-.plan-plus { border-color: #b8891d; }
-.plan-pro { border-color: var(--accent-text); box-shadow: 0 0 0 1px var(--accent-text), 0 10px 40px rgba(111, 211, 251, .12); }
+.plan-plus { border-color: #4DB8C8; box-shadow: 0 10px 40px rgba(77, 200, 180, .1); }
+.plan-pro { border-color: #A86BFF; box-shadow: 0 0 0 1px #A86BFF, 0 10px 40px rgba(168, 107, 255, .16); }
 .plan-badge { position: absolute; top: -11px; right: 16px; background: var(--accent); color: #fff; font-size: .75rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
 @media (max-width: 860px) { .plan-grid { grid-template-columns: 1fr; } }
-.plan-pill-plus { background: rgba(222, 177, 45, .16); color: #f0c94d; }
-.plan-pill-pro { background: rgba(111, 211, 251, .16); color: var(--accent-text); }
+.plan-pill-plus { background: linear-gradient(90deg, rgba(124,255,138,.16), rgba(154,107,255,.18)); color: #8fe0d0; }
+.plan-pill-pro { background: linear-gradient(90deg, rgba(255,138,242,.16), rgba(79,86,255,.18)); color: #d29bff; }
 
 /* Rank tags (website chat, members, Staff Tools) */
 .rank-tag { font-weight: 700; font-size: .85em; white-space: nowrap; margin-right: 6px; letter-spacing: 0; text-transform: none; }
@@ -793,7 +793,7 @@ html.embedded .voice-page { padding-top: 16px; }
 .profile-head h1 { margin: 0; font-size: 1.8rem; overflow-wrap: anywhere; }
 .profile-tags { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 6px; color: var(--text-2); font-size: .92rem; }
 .plan-pill { font-size: .78rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--surface-3); color: var(--text-2); }
-.plan-pill.plus { background: rgba(80, 160, 255, .16); color: #7fb8ff; }
+.plan-pill.plus { background: linear-gradient(90deg, rgba(124,255,138,.16), rgba(154,107,255,.18)); color: #8fe0d0; }
 .plan-pill.pro { background: rgba(190, 110, 255, .18); color: #d29bff; }
 .stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; }
 .stat-grid .stat { border-top: 1px solid var(--border); }
