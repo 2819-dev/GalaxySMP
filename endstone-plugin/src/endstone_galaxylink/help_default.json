@@ -227,7 +227,7 @@
   },
   {
    "command": "Elevators",
-   "description": "Press a button next to an elevator to call it. Inside, tap the cabin floor to pick a floor. Galaxy+ and Pro+ can build them in their plots with /elevator.",
+   "description": "Press a button next to an elevator to call it. Inside, tap the cabin floor to pick a floor. Galaxy+ and Pro+ get an Elevator Tool to build them in their plots (/elevator gives it back).",
    "example": "/elevator"
   },
   {

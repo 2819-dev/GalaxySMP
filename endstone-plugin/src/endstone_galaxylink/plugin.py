@@ -43,7 +43,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.16.0"
+VERSION = "2.16.1"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -104,7 +104,7 @@ class GalaxyLink(Plugin):
         "jobs": _cmd("Pick a job and earn money while you play.", "/jobs", "galaxylink.command.jobs", ["job"]),
         "crates": _cmd("Crates: place them, edit prizes, give keys (staff).", "/crates", "galaxylink.command.crates"),
         "givekey": _cmd("Give crate keys (staff).", "/givekey <player: message>", "galaxylink.command.givekey"),
-        "elevator": _cmd("Build elevators (Galaxy+ and Pro+ in your plots, staff anywhere).", "/elevator", "galaxylink.command.elevator", ["elevators"]),
+        "elevator": _cmd("Get the Elevator Tool back, or open it (Galaxy+, Pro+ and staff).", "/elevator", "galaxylink.command.elevator", ["elevators"]),
         "report": _cmd("Report a player who is breaking the rules.", "/report [player: message]", "galaxylink.command.report"),
         "mod": _cmd("Staff moderation panel: warn, mute, kick, ban, reports and block logs.", "/mod", "galaxylink.command.mod"),
         "modban": _cmd("Ban a player (staff).", "/modban <player: message>", "galaxylink.command.modban"),
@@ -191,6 +191,7 @@ class GalaxyLink(Plugin):
         self.crates = Crates(self)
         self.elevators = Elevators(self)
         self.server.scheduler.run_task(self, self.elevators.tick, delay=2, period=2)
+        self.server.scheduler.run_task(self, self.elevators.check_tools, delay=1200, period=1200)
         self.server.scheduler.run_task(self, self.jobs.tick, delay=100, period=100)
         self.server.scheduler.run_task(self, self.floating.update, delay=1400, period=1200)
         self.server.scheduler.run_task(self, self.leaderboards.update, delay=1300, period=1200)
@@ -246,6 +247,7 @@ class GalaxyLink(Plugin):
         self.moderation.on_join(player)
         self.progress.on_join(player)
         self.shopchests.on_join(player)
+        self.elevators.check_tool(player)
         player.send_message("§7Need help? Type §e/guide§7 for server info, rules and commands.")
         self.refresh_tags()
         if self._voice:
@@ -447,7 +449,7 @@ class GalaxyLink(Plugin):
             "stats": lambda: self.progress.stats_command(sender, args),
             "leaderboard": lambda: self.leaderboards.menu(sender),
             "jobs": lambda: self.jobs.menu(sender),
-            "elevator": lambda: self.elevators.menu(sender),
+            "elevator": lambda: self.elevators.command(sender),
             "crates": lambda: self.crates.admin_menu(sender),
             "givekey": lambda: self.crates.givekey_command(sender, args),
             "mod": lambda: self.moderation.panel(sender),

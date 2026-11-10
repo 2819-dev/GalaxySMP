@@ -28,6 +28,7 @@ TOOLS = {
                                                     "§7Sneak + right-click a plot: edit it"]),
     "shovel": ("minecraft:golden_shovel", "§b§lPlot Claiming Shovel", ["§7Right-click inside a plot", "§7(white concrete edge) to claim it"]),
     "manager": ("minecraft:clock", "§a§lPlot Manager", ["§7Use it to manage your plot"]),
+    "elevator": ("minecraft:nether_star", "§b§lElevator Tool", ["§7Use it to build and manage elevators", "§7(Staff, Galaxy+ and Galaxy Pro+)"]),
 }
 BOTTOM = {"Overworld": -64, "Nether": 0, "TheEnd": 0}
 TOP_LIMIT = {"Overworld": 319, "Nether": 127, "TheEnd": 255}

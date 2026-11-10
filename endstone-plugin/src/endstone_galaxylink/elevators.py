@@ -1,5 +1,8 @@
 """Elevators: a real moving cabin with doors, call buttons and a floor panel.
 
+The Elevator Tool (a nether star) is in the inventory of staff, Galaxy+ and Galaxy Pro+ players: use it to
+build and manage elevators. It's given automatically and taken away if the plan ends. /elevator gives it back.
+
 How one works
   - The cabin is a floor of blocks inside a shaft that players build (up to 5x5 inside).
   - Riding: everyone standing in the cabin moves with its floor, about 2 blocks a second, and sees the
@@ -10,8 +13,8 @@ How one works
 
 Building one (/elevator)
   1. Build the shaft and put the cabin floor at the bottom floor (any blocks, e.g. polished stone).
-  2. /elevator > Create an elevator > tap two opposite corner blocks of the cabin floor.
-  3. Go to every other floor, stand on the landing next to the shaft and use /elevator > Add a floor here.
+  2. Use the Elevator Tool > Create an elevator > tap two opposite corner blocks of the cabin floor.
+  3. Go to every other floor, stand on the landing next to the shaft and use the tool > Add a floor here.
   4. Optional: iron doors right next to the shaft at each floor (they open and close by themselves),
      and buttons next to the shaft (call) and inside the cabin (panel).
   Staff can build elevators anywhere. Galaxy+ (2 elevators) and Galaxy Pro+ (4) players can build them
@@ -135,10 +138,54 @@ class Elevators:
                 and e["z1"] - reach <= block.z <= e["z2"] + reach)
 
     # ---------- taps ----------
+    # ---------- the Elevator Tool ----------
+    def allowed(self, player):
+        return player.is_op or LIMITS.get(self.plan_key(player), 0) > 0
+
+    def is_tool(self, stack):
+        plots = getattr(self.plugin, "plots", None)
+        return bool(plots) and plots.tool_kind(stack) == "elevator"
+
+    def check_tool(self, player):
+        """Staff, Galaxy+ and Galaxy Pro+ always have the tool; everyone else never does."""
+        plots = getattr(self.plugin, "plots", None)
+        if not plots:
+            return
+        has = plots.has_tool(player, "elevator")
+        if self.allowed(player) and not has:
+            plots.give_tool(player, "elevator")
+            player.send_message("§bYou got the Elevator Tool. §7Use it to build elevators" + (" anywhere." if player.is_op else " in your plots."))
+        elif not self.allowed(player) and has:
+            plots.take_tool(player, "elevator", every=True)
+            player.send_message("§7Your Elevator Tool was removed (elevators are a Galaxy+ and Galaxy Pro+ perk).")
+
+    def check_tools(self):
+        for p in self.plugin.server.online_players:
+            self.check_tool(p)
+
+    def command(self, player):
+        if not self.allowed(player):
+            return player.send_message("§eElevators are a Galaxy+ and Galaxy Pro+ perk (in your own plots). §7galaxymc.us/store")
+        plots = getattr(self.plugin, "plots", None)
+        if plots and not plots.has_tool(player, "elevator"):
+            self.check_tool(player)
+        else:
+            self.menu(player)
+
     def on_interact(self, event):
+        p = event.player
+        right = event.action in (PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK, PlayerInteractEvent.Action.RIGHT_CLICK_AIR)
+        tool = right and getattr(event, "has_item", False) and self.is_tool(event.item)
+        if tool and (str(p.unique_id) not in self.pending or not getattr(event, "has_block", False)):
+            event.cancel()
+            if self._debounce(p):
+                if not self.allowed(p):
+                    self.check_tool(p)
+                else:
+                    self.menu(p)
+            return True
         if event.action != PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK or not getattr(event, "has_block", False):
             return False
-        p = event.player
         block = event.block
         job = self.pending.get(str(p.unique_id))
         if job:
@@ -323,7 +370,7 @@ class Elevators:
         if not player.is_op and LIMITS.get(key, 0) == 0:
             return player.send_message("§eElevators are a Galaxy+ and Galaxy Pro+ perk (in your own plots). §7galaxymc.us/store")
         e = self.nearest(player)
-        form = ActionForm(title="§l§bElevators", content=f"Your elevators: {len(self.mine(player))}"
+        form = ActionForm(title="§l§bElevator Tool", content=f"Your elevators: {len(self.mine(player))}"
                           + ("" if player.is_op else f"/{LIMITS.get(key, 0)}")
                           + (f"\nNearest: §l{e.get('name') or 'Elevator'}§r ({len(e['floors'])} floors)" if e else ""))
         form.add_button("§lCreate an elevator§r\n§8Then tap 2 corners of the cabin floor", icon="textures/ui/color_plus", on_click=self.start_create)
