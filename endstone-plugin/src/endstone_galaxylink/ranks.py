@@ -285,19 +285,25 @@ class RankManager:
         self.attachments.pop(str(player.unique_id), None)
 
     def chat_format(self, player):
-        """[👑 OWNER] **player1** → message  (rank color on the tag and name, never on the message)"""
+        """[OWNER] **player1**: message  (rank color on the tag and name, never on the message)
+
+        Bedrock draws a whole chat line in its small fallback font as soon as the line has ANY special
+        character (icon or gradient pictures, arrows, emoji). So by default chat uses only normal
+        characters and color codes: the message always stays in the normal Minecraft font.
+        (Pictures still show above heads. /ranktags chat on puts them in chat too.)"""
         rank = self.rank_for(player)
         plans = getattr(self.plugin, "plans", None)
         plan_tag = plans.tag_for(player) if plans else None
-        tags = [tag_text(t) for t in (rank, plan_tag) if t]
+        pics = PICTURES is not None and getattr(PICTURES, "chat_pictures", False)
+        tags = [tag_text(t) if pics else paint(f"[{t['prefix']}]", t) for t in (rank, plan_tag) if t]
         prefix = "§r ".join(tags) + "§r " if tags else ""
         style = rank or plan_tag  # the name takes the rank's color, or the plan's
         if style and style.get("gradient") in GRADIENTS:
-            name = name_text(player.name, style, bold=True)  # each letter its own color
+            name = name_text(player.name, style, bold=True) if pics else paint(player.name, style, True)
         else:
-            name = name_text("\x00", style, bold=True)  # placeholder for {0}
+            name = paint("\x00", style, True) if style else "§f§l\x00"  # placeholder for {0}
         fmt = (prefix + name).replace("{", "{{").replace("}", "}}").replace("\x00", "{0}")
-        return fmt + "§r §7→§r {1}"
+        return fmt + ("§r §7→§r {1}" if pics else "§r§7:§r {1}")
 
     # ---------- /ranks menu ----------
     def open_menu(self, player):

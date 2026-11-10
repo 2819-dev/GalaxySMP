@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.19.2",
+                    "User-Agent": "GalaxyLink-Endstone/2.19.3",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
