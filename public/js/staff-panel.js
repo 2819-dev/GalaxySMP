@@ -5,6 +5,16 @@ import { ticketChat, chip, when, LABELS, PRIORITIES, ticketEvent } from "/js/tic
 
 const $ = (id) => document.getElementById(id);
 const money = (n) => (n == null ? "–" : `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
+// 1234 -> "1,234", 1234567 -> "1.2M": keeps the stat tiles from overflowing
+const short = (n) => {
+  n = Number(n) || 0;
+  const a = Math.abs(n);
+  const one = (x) => x.toFixed(1).replace(/\.0$/, "");
+  if (a >= 1e9) return `${one(n / 1e9)}B`;
+  if (a >= 1e6) return `${one(n / 1e6)}M`;
+  if (a >= 1e5) return `${Math.round(n / 1e3)}K`;
+  return n.toLocaleString(undefined, { maximumFractionDigits: 1 });
+};
 const fmt = (d) => (d ? new Date(d).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "–");
 const PLAN_NAMES = { plus: "Galaxy+", pro: "Galaxy Pro+" };
 const KIND_WORDS = { warn: "Warned", mute: "Muted", unmute: "Unmuted", kick: "Kicked", ban: "Banned", unban: "Unbanned" };
@@ -229,8 +239,8 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
             p.plan ? h("span", { class: `pl-tag plan ${p.plan}`, text: `${PLAN_NAMES[p.plan]}${p.planExpires ? ` until ${new Date(p.planExpires).toLocaleDateString()}` : ""}` }) : h("span", { class: "pl-tag", text: "Galaxy Free" }),
             p.banned ? h("span", { class: "pl-tag bad", text: "Banned in game" }) : null))),
       h("div", { class: "pc-stats" },
-        statTile("Money", money(p.money)), statTile("Hours", p.stats.playtimeH), statTile("Mined", p.stats.mined.toLocaleString()),
-        statTile("Kills", p.stats.kills), statTile("Deaths", p.stats.deaths), statTile("Achievements", p.stats.achievements), statTile("Warnings", p.warns)),
+        statTile("Money", p.money == null ? "–" : `$${short(p.money)}`), statTile("Hours", short(p.stats.playtimeH)), statTile("Mined", short(p.stats.mined)),
+        statTile("Kills", short(p.stats.kills)), statTile("Deaths", short(p.stats.deaths)), statTile("Achievements", p.stats.achievements), statTile("Warnings", p.warns)),
 
       h("h4", { text: "In game" }),
       h("div", { class: "pc-actions" },
@@ -248,7 +258,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
         act("Change plan", "btn-secondary", () => planDialog(p, xuid, reload)),
         act("Change money", "btn-secondary", () => moneyDialog(p, xuid, reload)),
         act("🛒 Give a Shop item", "btn-secondary", () => shopDialog(p, d.shop, xuid, reload))) : null,
-      h("h4", { text: "WebShop" }),
+      h("h4", { text: "Store items" }),
       h("p", { class: "text-2 small", style: "margin:0", text: [
         `Cosmetics: ${d.shop.cosmetics.length ? d.shop.cosmetics.map((c) => c.replace(/^(trail|join)_/, "").replace(/_/g, " ")).join(", ") : "none"}`,
         `extra plots: ${p.extraPlots || 0}`, `extra shop plots: ${d.shop.extraShopPlots}`,

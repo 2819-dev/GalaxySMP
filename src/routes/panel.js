@@ -232,7 +232,7 @@ export async function playerAction(request, env, ctx, url, params) {
   return json({ ok: true });
 }
 
-// Give a WebShop item (what a payment will do automatically once payments open).
+// Give a Store item (what a payment will do automatically once payments open).
 export async function giveShopItem(env, sql, p, body, user, source = "staff") {
   const item = SHOP_ITEMS[String(body.item || "")];
   if (!item) throw new HttpError(400, "Choose a Shop item.");

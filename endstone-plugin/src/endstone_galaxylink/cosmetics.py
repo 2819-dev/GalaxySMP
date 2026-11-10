@@ -1,8 +1,8 @@
-"""Cosmetics and WebShop effects.
+"""Cosmetics and Store effects.
 
 /cosmetics  pick a particle trail and switch join effects on or off.
-Owned cosmetics come from the website (bought in the WebShop or given by admins) plus the ones a
-plan includes (plans.json "cosmetics"). Night Vision bought in the WebShop is kept on until it ends.
+Owned cosmetics come from the website (bought in the Store or given by admins) plus the ones a
+plan includes (plans.json "cosmetics"). Night Vision bought in the Store is kept on until it ends.
 """
 
 import json

@@ -1,4 +1,4 @@
-// The Shop part of the WebShop: everything that's bought once (not a subscription).
+// The Shop part of the Store: everything that's bought once (not a subscription).
 // Prices are in US cents. "limit" = how many times one player can buy it.
 // Payments aren't open yet: Admins give these from the panel (Players > a player > Give a Shop item).
 export const SHOP = [

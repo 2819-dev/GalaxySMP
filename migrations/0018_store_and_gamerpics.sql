@@ -1,5 +1,5 @@
 -- Xbox profile pictures (shown in the community until a player's Minecraft head arrives),
--- WebShop purchases, extra shop plots, Night Vision and cosmetics.
+-- Store purchases, extra shop plots, Night Vision and cosmetics.
 ALTER TABLE players ADD COLUMN IF NOT EXISTS gamerpic        text;          -- base64 picture
 ALTER TABLE players ADD COLUMN IF NOT EXISTS gamerpic_type   text;
 ALTER TABLE players ADD COLUMN IF NOT EXISTS gamerpic_at     timestamptz;
@@ -20,4 +20,4 @@ CREATE TABLE IF NOT EXISTS shop_orders (
 );
 CREATE INDEX IF NOT EXISTS shop_orders_xuid_idx ON shop_orders (xuid, created_at DESC);
 
-INSERT INTO schema_migrations (version) VALUES ('0018_webshop_and_gamerpics') ON CONFLICT DO NOTHING;
+INSERT INTO schema_migrations (version) VALUES ('0018_store_and_gamerpics') ON CONFLICT DO NOTHING;
