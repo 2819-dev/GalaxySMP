@@ -95,6 +95,30 @@ GRADIENTS = {
 }
 
 
+# Smooth hex colors for each gradient, used for rank tag pictures (ranktags.py) and on the website.
+GRADIENT_HEX = {
+    "galaxy": ["#4FEBFD", "#3DAAF4", "#2149DD"],
+    "gold": ["#FFF27A", "#FFD23F", "#FFAA00", "#E07B00"],
+    "sunset": ["#FFE45C", "#FF9A3D", "#FF5E62", "#D94BFF"],
+    "fire": ["#FFF35C", "#FFB000", "#FF5A00", "#C80000"],
+    "ocean": ["#C9FFFF", "#4FE3F0", "#1FA2C8", "#2463B8"],
+    "forest": ["#C6FF6B", "#5BE35B", "#22A447", "#14806E"],
+    "royal": ["#FF8AF2", "#C36BFF", "#8A3CFF", "#4F56FF"],
+    "ice": ["#FFFFFF", "#D6F6FF", "#8EE3FF", "#4FC3E8"],
+    "shadow": ["#F2F2F2", "#B8B8C8", "#7A7A8C", "#4A4A58"],
+    "rainbow": ["#FF4D4D", "#FFA53D", "#FFF04D", "#5BFF6B", "#4DE8FF", "#5C6BFF", "#D45CFF"],
+    "aurora": ["#7CFF8A", "#3DF0C8", "#4DB8FF", "#9A6BFF", "#FF6BE1"],
+    "cherry": ["#FFFFFF", "#FFC6E3", "#FF7FC4", "#C25CD6"],
+    "ember": ["#FFE45C", "#FF9A1F", "#FF4A1F", "#B31212"],
+}
+PICTURES = None  # set by the plugin: ranktags.RankTags (smooth gradient tags as pictures)
+
+
+def tag_spec(tag):
+    """What the rank tag pictures need: the prefix and the gradient's hex colors."""
+    return {"prefix": tag.get("prefix", ""), "stops": GRADIENT_HEX.get(tag.get("gradient") or "")}
+
+
 def _rgb(h):
     return [int(h[i:i + 2], 16) for i in (1, 3, 5)]
 
@@ -145,8 +169,12 @@ MINIGAME_STAFF = "galaxylink.minigames.staff"
 
 
 def tag_text(rank):
-    """[👑 OWNER] in the rank's color or gradient (the icon goes inside the brackets)."""
+    """[👑 OWNER] in the rank's color or gradient (the icon goes inside the brackets).
+    Gradient tags are smooth hex-gradient pictures once the rank tag pack is installed."""
     glyph = GLYPHS.get(rank.get("icon") or "")
+    pics = PICTURES.glyphs_for(tag_spec(rank)) if PICTURES is not None and rank.get("gradient") else None
+    if pics:  # pics = pictures of "[PREFIX]"; put the icon right after "["
+        return "§f" + (pics[0] + glyph + " " + pics[1:] if glyph else pics)
     if glyph:
         text = paint(f"[{glyph} {rank['prefix']}]", rank)
         return text
@@ -169,6 +197,27 @@ class RankManager:
         self.ranks = {r["id"]: r for r in msg.get("ranks", [])}
         self.assign = {str(k): v for k, v in (msg.get("assignments") or {}).items()}
         self.plugin.server.scheduler.run_task(self.plugin, self.apply_all)
+        self.plugin.server.scheduler.run_task(self.plugin, self.refresh_pictures)
+
+    def all_tags(self):
+        """Every gradient tag on the server: ranks and the Galaxy+ / Pro+ plan tags."""
+        tags = [r for r in self.ranks.values() if r.get("gradient")]
+        plans = getattr(self.plugin, "plans", None)
+        if plans:
+            try:
+                from endstone_galaxylink.plans import plan_defs
+                tags += [p["tag"] for p in plan_defs().values() if p.get("tag") and p["tag"].get("gradient")]
+            except Exception:
+                pass
+        return [tag_spec(t) for t in tags]
+
+    def refresh_pictures(self):
+        pics = getattr(self.plugin, "ranktags", None)
+        if pics:
+            try:
+                pics.refresh(self.all_tags())
+            except Exception as e:
+                self.plugin.logger.warning(f"Couldn't build the rank tag pictures: {e}")
 
     def rank_for(self, player):
         return self.ranks.get(self.assign.get(str(player.xuid)))

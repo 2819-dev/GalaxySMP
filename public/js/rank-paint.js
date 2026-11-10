@@ -70,11 +70,39 @@ export function paint(text, rank, icon) {
   return span;
 }
 
+// Smooth hex colors for rank tags (same as the plugin's GRADIENT_HEX; in game they're pictures).
+export const GRADIENT_HEX = {
+  galaxy: ["#4FEBFD", "#3DAAF4", "#2149DD"],
+  gold: ["#FFF27A", "#FFD23F", "#FFAA00", "#E07B00"],
+  sunset: ["#FFE45C", "#FF9A3D", "#FF5E62", "#D94BFF"],
+  fire: ["#FFF35C", "#FFB000", "#FF5A00", "#C80000"],
+  ocean: ["#C9FFFF", "#4FE3F0", "#1FA2C8", "#2463B8"],
+  forest: ["#C6FF6B", "#5BE35B", "#22A447", "#14806E"],
+  royal: ["#FF8AF2", "#C36BFF", "#8A3CFF", "#4F56FF"],
+  ice: ["#FFFFFF", "#D6F6FF", "#8EE3FF", "#4FC3E8"],
+  shadow: ["#F2F2F2", "#B8B8C8", "#7A7A8C", "#4A4A58"],
+  rainbow: ["#FF4D4D", "#FFA53D", "#FFF04D", "#5BFF6B", "#4DE8FF", "#5C6BFF", "#D45CFF"],
+  aurora: ["#7CFF8A", "#3DF0C8", "#4DB8FF", "#9A6BFF", "#FF6BE1"],
+  cherry: ["#FFFFFF", "#FFC6E3", "#FF7FC4", "#C25CD6"],
+  ember: ["#FFE45C", "#FF9A1F", "#FF4A1F", "#B31212"],
+};
+
 // [👑 OWNER] for a rank (or null).
 export function rankTag(rank) {
   if (!rank) return null;
-  const tag = paint(`[${rank.prefix}]`, rank, rank.icon);
-  tag.className = "rank-tag";
+  const stops = rank.gradient ? GRADIENT_HEX[rank.gradient] : null;
+  if (!stops) {
+    const tag = paint(`[${rank.prefix}]`, rank, rank.icon);
+    tag.className = "rank-tag";
+    return tag;
+  }
+  // A smooth gradient across the whole tag, like the in-game pictures.
+  const tag = document.createElement("span");
+  tag.className = "rank-tag rank-tag-smooth";
+  tag.style.backgroundImage = `linear-gradient(90deg, ${stops.join(", ")})`;
+  tag.append("[");
+  if (rank.icon) tag.append(iconImg(rank.icon), " ");
+  tag.append(`${rank.prefix}]`);
   return tag;
 }
 

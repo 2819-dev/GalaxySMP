@@ -31,6 +31,8 @@ from endstone_galaxylink.jobs import Jobs
 from endstone_galaxylink.shopchests import ShopChests
 from endstone_galaxylink.crates import Crates
 from endstone_galaxylink.elevators import Elevators
+from endstone_galaxylink.ranktags import RankTags
+from endstone_galaxylink import ranks as ranks_module
 from endstone_galaxylink.progress import HOSTILE, short as short_id
 from endstone_galaxylink.economy import HUD_TICKS, Economy
 from endstone_galaxylink.helpmenu import HelpMenu
@@ -43,7 +45,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.16.4"
+VERSION = "2.17.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -105,6 +107,7 @@ class GalaxyLink(Plugin):
         "crates": _cmd("Crates: place them, edit prizes, give keys (staff).", "/crates", "galaxylink.command.crates"),
         "givekey": _cmd("Give crate keys (staff).", "/givekey <player: message>", "galaxylink.command.givekey"),
         "elevator": _cmd("Get the Elevator Tool back, or open it (Galaxy+, Pro+ and staff).", "/elevator", "galaxylink.command.elevator", ["elevators"]),
+        "ranktags": _cmd("Smooth gradient rank tags (pictures) on or off.", "/ranktags [state: message]", "galaxylink.command.ranktags"),
         "report": _cmd("Report a player who is breaking the rules.", "/report [player: message]", "galaxylink.command.report"),
         "mod": _cmd("Staff moderation panel: warn, mute, kick, ban, reports and block logs.", "/mod", "galaxylink.command.mod"),
         "modban": _cmd("Ban a player (staff).", "/modban <player: message>", "galaxylink.command.modban"),
@@ -146,6 +149,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.plotaxe": _perm("Allows /plotaxe (server operators).", "op"),
         "galaxylink.command.minigames": _perm("Allows /minigames.", True),
         "galaxylink.command.report": _perm("Allows /report.", True),
+        "galaxylink.command.ranktags": _perm("Allows /ranktags (operators).", "op"),
         "galaxylink.command.elevator": _perm("Allows /elevator (plans decide who can build).", True),
         "galaxylink.command.jobs": _perm("Allows /jobs.", True),
         "galaxylink.command.crates": _perm("Allows /crates (operators, or give it with a rank).", "op"),
@@ -190,6 +194,9 @@ class GalaxyLink(Plugin):
         self.shopchests = ShopChests(self)
         self.crates = Crates(self)
         self.elevators = Elevators(self)
+        self.ranktags = RankTags(self)
+        ranks_module.PICTURES = self.ranktags
+        self.server.scheduler.run_task(self, self.ranks.refresh_pictures, delay=40)  # plan tags, even before ranks arrive
         self.server.scheduler.run_task(self, self.elevators.tick, delay=2, period=2)
         self.server.scheduler.run_task(self, self.elevators.check_tools, delay=1200, period=1200)
         self.server.scheduler.run_task(self, self.jobs.tick, delay=100, period=100)
@@ -456,6 +463,7 @@ class GalaxyLink(Plugin):
             "leaderboard": lambda: self.leaderboards.menu(sender),
             "jobs": lambda: self.jobs.menu(sender),
             "elevator": lambda: self.elevators.command(sender),
+            "ranktags": lambda: self.ranktags.command(sender, args),
             "crates": lambda: self.crates.admin_menu(sender),
             "givekey": lambda: self.crates.givekey_command(sender, args),
             "mod": lambda: self.moderation.panel(sender),

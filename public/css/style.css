@@ -809,3 +809,6 @@ html.embedded .voice-page { padding-top: 16px; }
 .profile-head .avatar { width: 72px; height: 72px; border-radius: 16px; flex: none; display: grid; place-items: center; font: 800 2rem var(--font); color: #fff;
   background: linear-gradient(135deg, #3b2a8f, #1e6fd9 55%, #18c3c9); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
 .stat-grid .stat .v { font-size: 1.25rem; }
+
+/* Smooth gradient rank tags (match the in-game pictures) */
+.rank-tag-smooth { -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
