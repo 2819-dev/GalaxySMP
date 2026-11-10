@@ -182,6 +182,11 @@ def tag_text(rank):
 
 
 def name_text(player_name, rank, bold=False):
+    """A player's name in their rank's color or gradient (smooth pictures once installed)."""
+    if PICTURES is not None and rank and rank.get("gradient"):
+        pics = PICTURES.glyphs_for_text(player_name, GRADIENT_HEX.get(rank["gradient"]))
+        if pics:
+            return "§f" + pics
     return paint(player_name, rank, bold)
 
 
@@ -209,7 +214,31 @@ class RankManager:
                 tags += [p["tag"] for p in plan_defs().values() if p.get("tag") and p["tag"].get("gradient")]
             except Exception:
                 pass
-        return [tag_spec(t) for t in tags]
+        return [tag_spec(t) for t in tags] + self.all_names()
+
+    def all_names(self):
+        """Names that show in a gradient: players with a gradient rank, or Galaxy+/Pro+ players without a rank."""
+        names = {}
+        db = self.plugin.economy.db
+        lookup = lambda x: (db.execute("SELECT name FROM balances WHERE xuid = ?", (str(x),)).fetchone() or [None])[0]
+        for p in self.plugin.server.online_players:
+            names[str(p.xuid)] = p.name
+        out = []
+        for xuid, rid in self.assign.items():
+            r = self.ranks.get(rid)
+            name = names.get(xuid) or lookup(xuid)
+            if r and r.get("gradient") and name:
+                out.append({"text": name, "stops": GRADIENT_HEX.get(r["gradient"])})
+        plans = getattr(self.plugin, "plans", None)
+        if plans:
+            for xuid, sub in (plans.subs or {}).items():
+                if xuid in self.assign:
+                    continue
+                tag = (plans.defs.get(sub.get("plan")) or {}).get("tag") or {}
+                name = names.get(xuid) or lookup(xuid)
+                if tag.get("gradient") and name:
+                    out.append({"text": name, "stops": GRADIENT_HEX.get(tag["gradient"])})
+        return out
 
     def refresh_pictures(self):
         pics = getattr(self.plugin, "ranktags", None)

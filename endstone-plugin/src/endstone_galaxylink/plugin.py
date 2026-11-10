@@ -45,7 +45,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.17.2"
+VERSION = "2.17.3"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -253,6 +253,7 @@ class GalaxyLink(Plugin):
     def on_player_join(self, event: PlayerJoinEvent):
         player = event.player
         self.ranks.apply_permissions(player)
+        self.server.scheduler.run_task(self, self.ranks.refresh_pictures, delay=40)  # a new gradient name gets its pictures
         self.economy.on_join(player)
         self.plans.bill(player)
         self.plots.on_join(player)

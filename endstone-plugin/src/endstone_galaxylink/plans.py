@@ -43,6 +43,9 @@ class Plans:
             for p in self.plugin.server.online_players:
                 self.bill(p)
             self.plugin.refresh_tags()
+            ranks = getattr(self.plugin, "ranks", None)
+            if ranks:
+                self.plugin.server.scheduler.run_task(self.plugin, ranks.refresh_pictures)  # Galaxy+/Pro+ gradient names
 
     # ---------- who has what ----------
     def subscription(self, player):

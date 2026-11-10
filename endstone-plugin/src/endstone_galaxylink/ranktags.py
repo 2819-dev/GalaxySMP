@@ -18,9 +18,9 @@ from pathlib import Path
 
 PACK_UUID = "c1a5e6f2-7b3d-4e9a-8f21-5d6c7b8a9e01"
 MODULE_UUID = "d2b6f7a3-8c4e-4fab-9a32-6e7d8c9bae12"
-PAGES = [0xE9, 0xEA, 0xEB, 0xEC]   # glyph pages (256 pictures each)
-CELL = 32                          # pixels per picture (512x512 page)
-UNIT = 4                           # pixels per Minecraft font pixel
+PAGES = list(range(0xE9, 0xF8))   # glyph pages E9-F7 (256 pictures each)
+CELL = 16                          # pixels per picture (256x256 page = the same size as normal text)
+UNIT = 2                           # pixels per Minecraft font pixel
 FILE = "GalaxySMP_RankTags.mcpack"
 
 # A 5x7 pixel font in the style of Minecraft's (# = pixel). Width = longest row.
@@ -83,12 +83,44 @@ FONT_ROWS = {
 }
 
 
+# Lowercase (8 rows: the last row is for the tails of g, j, p, q, y).
+FONT_LOWER = {
+    "a": ["     ", "     ", " ### ", "    #", " ####", "#   #", " ####", "     "],
+    "b": ["#    ", "#    ", "# ## ", "##  #", "#   #", "#   #", "#### ", "     "],
+    "c": ["     ", "     ", " ### ", "#   #", "#    ", "#   #", " ### ", "     "],
+    "d": ["    #", "    #", " ## #", "#  ##", "#   #", "#   #", " ####", "     "],
+    "e": ["     ", "     ", " ### ", "#   #", "#####", "#    ", " ####", "     "],
+    "f": ["  ##", " #  ", "####", " #  ", " #  ", " #  ", " #  ", "    "],
+    "g": ["     ", "     ", " ####", "#   #", "#   #", " ####", "    #", "#### "],
+    "h": ["#    ", "#    ", "# ## ", "##  #", "#   #", "#   #", "#   #", "     "],
+    "i": ["#", " ", "#", "#", "#", "#", "#", " "],
+    "j": ["    #", "     ", "    #", "    #", "    #", "    #", "#   #", " ### "],
+    "k": ["#   ", "#   ", "#  #", "# # ", "##  ", "# # ", "#  #", "    "],
+    "l": ["# ", "# ", "# ", "# ", "# ", "# ", " #", "  "],
+    "m": ["     ", "     ", "## # ", "# # #", "# # #", "#   #", "#   #", "     "],
+    "n": ["     ", "     ", "#### ", "#   #", "#   #", "#   #", "#   #", "     "],
+    "o": ["     ", "     ", " ### ", "#   #", "#   #", "#   #", " ### ", "     "],
+    "p": ["     ", "     ", "# ## ", "##  #", "#   #", "#### ", "#    ", "#    "],
+    "q": ["     ", "     ", " ## #", "#  ##", "#   #", " ####", "    #", "    #"],
+    "r": ["     ", "     ", "# ## ", "##  #", "#    ", "#    ", "#    ", "     "],
+    "s": ["     ", "     ", " ####", "#    ", " ### ", "    #", "#### ", "     "],
+    "t": [" #  ", " #  ", "####", " #  ", " #  ", " #  ", "  ##", "    "],
+    "u": ["     ", "     ", "#   #", "#   #", "#   #", "#   #", " ####", "     "],
+    "v": ["     ", "     ", "#   #", "#   #", "#   #", " # # ", "  #  ", "     "],
+    "w": ["     ", "     ", "#   #", "#   #", "# # #", "# # #", " ####", "     "],
+    "x": ["     ", "     ", "#   #", " # # ", "  #  ", " # # ", "#   #", "     "],
+    "y": ["     ", "     ", "#   #", "#   #", "#   #", " ####", "    #", "#### "],
+    "z": ["     ", "     ", "#####", "   # ", "  #  ", " #   ", "#####", "     "],
+}
+
+
 def font_char(ch):
-    rows = FONT_ROWS.get(ch.upper())
+    rows = FONT_ROWS.get(ch) or FONT_LOWER.get(ch) or FONT_ROWS.get(ch.upper())
     if rows is None:
         return None
     width = max(len(r.rstrip()) for r in rows) or 1
-    return [r.ljust(width)[:width] for r in rows]
+    rows = [r.ljust(width)[:width] for r in rows]
+    return rows + [" " * width] * (8 - len(rows))
 
 
 def rgb(h):
@@ -107,7 +139,7 @@ def color_at(stops, t):
 
 
 def render_tag(text, stops):
-    """[OWNER] -> one 32x32 picture per character, with one smooth gradient across the whole tag.
+    """[OWNER] or a name -> one 16x16 picture per character, with one smooth gradient across the whole text.
     Returns a list of (char, pixels or None for a space). pixels[y][x] = (r, g, b, a)."""
     chars = [(ch, font_char(ch)) for ch in text]
     total = sum((len(g[0]) + 1) * UNIT for ch, g in chars if g) or 1
@@ -228,9 +260,9 @@ def pack_report():
     return lines
 
 
-def signature(tag):
-    """What a tag looks like (prefix + gradient colors): same signature = same pictures."""
-    return json.dumps([tag.get("prefix", ""), tag.get("stops")], separators=(",", ":"))
+def signature(item):
+    """What a text looks like (text + gradient colors): same signature = same pictures."""
+    return json.dumps([item.get("text", ""), item.get("stops")], separators=(",", ":"))
 
 
 class RankTags:
@@ -259,19 +291,28 @@ class RankTags:
         folder = addons if addons.is_dir() else Path(self.plugin.data_folder)
         return folder / FILE
 
-    # ---------- used by ranks.tag_text ----------
+    # ---------- used by ranks.tag_text and ranks.name_text ----------
     def glyphs_for(self, tag):
-        """The picture characters for a tag's text (prefix only), or None to use colored text."""
-        if not self.enabled or not tag.get("stops"):
+        """Pictures for a rank tag "[PREFIX]", or None to use colored text."""
+        return self.glyphs_for_text(f"[{tag.get('prefix', '')}]", tag.get("stops"))
+
+    def glyphs_for_text(self, text, stops):
+        """Pictures for any text (a tag or a player's name), or None to use colored text."""
+        if not self.enabled or not stops or not text:
             return None
-        return self.active.get(signature(tag))
+        return self.active.get(signature({"text": text, "stops": stops}))
 
     # ---------- building the pack ----------
-    def wanted(self, tags):
+    def wanted(self, items):
+        """items: rank tags {"prefix", "stops"} and names {"text", "stops"}."""
         out = {}
-        for t in tags:
-            if t and t.get("stops") and t.get("prefix"):
-                out[signature(t)] = t
+        for t in items:
+            if not t or not t.get("stops"):
+                continue
+            text = t.get("text") or (f"[{t['prefix']}]" if t.get("prefix") else "")
+            if text:
+                item = {"text": text, "stops": t["stops"]}
+                out[signature(item)] = item
         return out
 
     def refresh(self, tags):
@@ -281,7 +322,7 @@ class RankTags:
             return False
         built, cp, pages = {}, 0, {}
         for sig, t in sorted(want.items()):
-            text = f"[{t['prefix']}]"
+            text = t["text"]
             glyphs = []
             for ch, px in render_tag(text, t["stops"]):
                 if px is None:
@@ -304,10 +345,10 @@ class RankTags:
         self.built = built
         self.history[str(self.version)] = built
         self.save()
-        self.plugin.logger.info(f"Rank tag pictures updated ({len(built)} tags). They show after the next server restart.")
+        self.plugin.logger.info(f"Gradient pictures updated ({len(built)} tags and names). They show after the next server restart.")
         for p in self.plugin.server.online_players:
             if p.is_op:
-                p.send_message("§7New smooth gradient rank tags are ready. §eThey show after the next server restart.")
+                p.send_message("§7New smooth gradient tags and names are ready. §eThey show after the next server restart.")
         return True
 
     def write_pack(self, pages):
