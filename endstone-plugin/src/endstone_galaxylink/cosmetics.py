@@ -93,6 +93,8 @@ class Cosmetics:
         player.send_form(form)
 
     def pick_trail(self, player, cid):
+        if cid not in self.has(player):
+            return player.send_message("§cYou don't have that trail. Get it at galaxymc.us/store.")
         s = self.settings(player)
         s["trail"] = None if s.get("trail") == cid else cid
         self.save()

@@ -285,6 +285,11 @@ class VoiceLink:
         try:
             info = {"type": "server", "online": len(server.online_players), "max": int(server.max_players)}
             try:
+                from endstone_galaxylink.plugin import VERSION
+                info["plugin"] = VERSION
+            except Exception:
+                pass
+            try:
                 info["version"] = str(server.minecraft_version)
             except Exception:
                 pass

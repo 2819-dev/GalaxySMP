@@ -13,6 +13,8 @@ import { sendPlans } from "./plans.js";
 import { SHOP_ITEMS, SHOP } from "../store/shop.js";
 
 const MOD = 50;
+export const LATEST_PLUGIN = "2.22.0"; // the GalaxyLink version made for this website
+const older = (a, b) => { const x = String(a).split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
 const ADMIN = 100;
 const KEY_KINDS = ["common", "rare", "galaxy"];
 const clean = (v, max) => String(v ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max);
@@ -62,7 +64,8 @@ export async function overview(request, env) {
     owner: user.owner,
     power: Number(user.role_power),
     panel: user.owner ? "Control Panel" : Number(user.role_power) >= ADMIN ? "Admin Panel" : "Staff Panel",
-    server: server ? { online: true, players: server.online ?? online.length, max: server.max ?? null, version: server.version || "" } : { online: false },
+    server: server ? { online: true, players: server.online ?? online.length, max: server.max ?? null, version: server.version || "",
+        plugin: server.plugin || null, latest: LATEST_PLUGIN, outdated: !server.plugin || older(server.plugin, LATEST_PLUGIN) } : { online: false },
     counts: {
       members: counts.members, newMembers: counts.new_members, players: counts.players, newPlayers: counts.new_players,
       activeToday: counts.active_today, openTickets: counts.open_tickets, urgentTickets: counts.urgent_tickets,

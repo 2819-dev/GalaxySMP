@@ -216,6 +216,12 @@
    "example": "/jobs"
   },
   {
+   "command": "/cosmetics",
+   "description": "Pick a particle trail and your join effects (from the Store, Galaxy+ or Pro+).",
+   "example": "/cosmetics",
+   "staff": false
+  },
+  {
    "command": "Shop plots",
    "description": "Claim a shop plot in the Shop District with your Plot Claiming Shovel. Hold an item and sneak + tap a chest there to make a shop chest.",
    "example": "/plot shovel"

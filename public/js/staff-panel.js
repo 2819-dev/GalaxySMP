@@ -97,7 +97,11 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
         r.details?.player ? h("span", { text: ` · ${r.details.player}` }) : null,
         h("time", { class: "text-3 small", text: when(r.at) })))) : h("p", { class: "text-3 small", text: "Nothing yet." }),
       h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Full audit log", onclick: () => selectTab("audit") }));
-    box.replaceChildren(grid, h("div", { class: "ov-cols" }, quick, h("div", { class: "stack", style: "gap:16px" }, online, recent)));
+    const warn = d.server.online && d.server.outdated
+      ? h("div", { class: "panel ov-warn" }, h("b", { text: "⚠️ The server is running an old GalaxyLink plugin" }),
+        h("p", { class: "text-2 small", style: "margin:4px 0 0", text: `It's on ${d.server.plugin || "an older version"}, but the website is made for ${d.server.latest}. New features (cosmetics, Night Vision, website moderation, heads...) won't work in game until you install the newest plugin file and restart the server.` }))
+      : null;
+    box.replaceChildren(...(warn ? [warn] : []), grid, h("div", { class: "ov-cols" }, quick, h("div", { class: "stack", style: "gap:16px" }, online, recent)));
   };
 
   // ---------- Tickets ----------
