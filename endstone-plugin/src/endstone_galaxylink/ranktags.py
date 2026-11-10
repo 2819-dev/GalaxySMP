@@ -26,9 +26,9 @@ BASE_PAGES = list(range(0xE4, 0xE9)) + list(range(0xEC, 0xF9))   # E4-E8, EC-F8:
 PAGES = [0xE9, 0xEA, 0xEB]                                       # strips
 CELL = 16                          # pixels per picture (256x256 page = the same size as normal text)
 UNIT = 1                           # 1 image pixel = 1 text pixel (Bedrock draws pictures at that scale: same size as chat)
-TOP = CELL - 8                     # letters sit at the bottom of each picture: Bedrock lines pictures up by their bottom edge
+TOP = 0                            # letters at the top of each picture (Bedrock lines pictures up by their top, like text)
 FILE = "GalaxySMP_RankTags.mcpack"
-FORMAT = 4                         # bump when the drawing changes, so everything is rebuilt
+FORMAT = 5                         # bump when the drawing changes, so everything is rebuilt
 CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789[]+-_.!?&'"
 
 # A 5x7 pixel font in the style of Minecraft's (# = pixel). Width = longest row.
