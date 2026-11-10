@@ -18,11 +18,17 @@ from pathlib import Path
 
 PACK_UUID = "c1a5e6f2-7b3d-4e9a-8f21-5d6c7b8a9e01"
 MODULE_UUID = "d2b6f7a3-8c4e-4fab-9a32-6e7d8c9bae12"
-PAGES = list(range(0xE9, 0xF8))   # glyph pages E9-F7 (256 pictures each)
+# Glyph pages (256 pictures each):
+#   "instant" letters: every letter/digit/symbol in a range of gradient colors, so any rank or name shows a real
+#   gradient the moment it's given (Bedrock trims each picture's empty right side, so letters keep natural widths).
+#   "strips": whole tags/names drawn perfectly smooth; these need a restart, then replace the instant letters.
+BASE_PAGES = list(range(0xE4, 0xE9)) + list(range(0xEC, 0xF9))   # E4-E8, EC-F8: 18 pages
+PAGES = [0xE9, 0xEA, 0xEB]                                       # strips
 CELL = 16                          # pixels per picture (256x256 page = the same size as normal text)
 UNIT = 2                           # pixels per Minecraft font pixel
 FILE = "GalaxySMP_RankTags.mcpack"
-FORMAT = 2                         # bump when the drawing changes, so everything is rebuilt
+FORMAT = 3                         # bump when the drawing changes, so everything is rebuilt
+CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789[]+-_.!?&'"
 
 # A 5x7 pixel font in the style of Minecraft's (# = pixel). Width = longest row.
 FONT_ROWS = {
@@ -293,6 +299,82 @@ def pack_report():
     return lines
 
 
+def gradient_palette():
+    """The colors the instant letters come in: every gradient sampled at 5 points (start, 1/4, middle, 3/4, end)."""
+    from endstone_galaxylink.ranks import GRADIENT_HEX
+    pal = []
+    for key in GRADIENT_HEX:
+        for t in (0, 0.25, 0.5, 0.75, 1):
+            c = color_at(GRADIENT_HEX[key], t)
+            if c not in pal:
+                pal.append(c)
+    room = len(BASE_PAGES) * 256 // len(CHARSET)
+    while len(pal) > room:  # too many: drop the color closest to another one
+        best = min(((i, j) for i in range(len(pal)) for j in range(i + 1, len(pal))),
+                   key=lambda ij: sum((a - b) ** 2 for a, b in zip(pal[ij[0]], pal[ij[1]])))
+        pal.pop(best[1])
+    return pal
+
+
+PALETTE = None
+
+
+def palette():
+    global PALETTE
+    if PALETTE is None:
+        PALETTE = gradient_palette()
+    return PALETTE
+
+
+def base_id():
+    """Identifies the instant-letter set (changes if the palette, letters or drawing change)."""
+    import hashlib
+    return hashlib.sha1(json.dumps([FORMAT, CHARSET, palette(), UNIT, CELL]).encode()).hexdigest()[:12]
+
+
+def base_char(ch, color_index):
+    i = color_index * len(CHARSET) + CHARSET.index(ch)
+    return chr((BASE_PAGES[i // 256] << 8) + i % 256)
+
+
+def nearest_color(rgb_):
+    pal = palette()
+    return min(range(len(pal)), key=lambda i: sum((a - b) ** 2 for a, b in zip(pal[i], rgb_)))
+
+
+def instant_text(text, stops):
+    """Any text in a real gradient right away, built from the instant letters."""
+    letters = [ch for ch in text if ch in CHARSET]
+    n = len(letters)
+    out, k = [], 0
+    for ch in text:
+        if ch not in CHARSET:
+            out.append(ch)  # spaces etc.
+            continue
+        out.append(base_char(ch, nearest_color(color_at(stops, k / max(1, n - 1)))))
+        k += 1
+    return "".join(out)
+
+
+def base_pages():
+    """Draws all instant letters: {page: pixels}."""
+    pages = {}
+    for ci, color in enumerate(palette()):
+        for li, ch in enumerate(CHARSET):
+            g = font_char(ch)
+            i = ci * len(CHARSET) + li
+            page, idx = BASE_PAGES[i // 256], i % 256
+            cx, cy = (idx % 16) * CELL, (idx // 16) * CELL
+            px = pages.setdefault(page, {})
+            for row, line in enumerate(g):
+                for col, c in enumerate(line):
+                    if c == "#":
+                        for dx in range(UNIT):
+                            for dy in range(UNIT):
+                                px[(cx + col * UNIT + dx, cy + row * UNIT + dy)] = (*color, 255)
+    return pages
+
+
 def signature(item):
     """What a text looks like (text + gradient colors): same signature = same pictures."""
     return json.dumps([FORMAT, item.get("text", ""), item.get("stops")], separators=(",", ":"))
@@ -334,11 +416,16 @@ class RankTags:
         if not self.enabled or not stops or not text:
             return None
         found = self.active.get(signature({"text": text, "stops": stops}))
-        if text.startswith("[") and not isinstance(found, list):
-            return None  # tags are stored as ["[", "PREFIX]"] so the icon can go in between
-        if not text.startswith("[") and not isinstance(found, str):
-            return None
-        return found
+        if text.startswith("[") and isinstance(found, list):
+            return found  # perfectly smooth strip: ["[", "PREFIX]"] so the icon can go in between
+        if not text.startswith("[") and isinstance(found, str):
+            return found
+        if self.active.get("__base__") == base_id():  # instant letters: works for any new rank or name
+            if text.startswith("["):
+                full = instant_text(text, stops)
+                return [full[0], full[1:]]
+            return instant_text(text, stops)
+        return None
 
     # ---------- building the pack ----------
     def wanted(self, items):
@@ -356,9 +443,9 @@ class RankTags:
     def refresh(self, tags):
         """Called when ranks arrive from the website: rebuild the pack if any gradient tag changed."""
         want = self.wanted(tags)
-        if set(want) == set(self.built):
+        if set(want) == {k for k in self.built if k != "__base__"} and self.built.get("__base__") == base_id():
             return False
-        built, pages = {}, {}
+        built, pages = {"__base__": base_id()}, base_pages()
         cp = [0]
 
         def place(tile_list):
@@ -377,6 +464,8 @@ class RankTags:
 
         for sig, t in sorted(want.items()):
             pixels, width, split = render_strip(t["text"], t["stops"])
+            if cp[0] + (width // CELL + 2) > len(PAGES) * 256:
+                continue  # no room left for strips: this one uses the instant letters
             if t["text"].startswith("[") and split:  # tag: "[" and "PREFIX]" separately, the icon goes between
                 built[sig] = [place(tiles(pixels, 0, split)), place(tiles(pixels, split, width))]
             else:
@@ -386,7 +475,8 @@ class RankTags:
         self.built = built
         self.history[str(self.version)] = built
         self.save()
-        self.plugin.logger.info(f"Gradient pictures updated ({len(built)} tags and names). They show after the next server restart.")
+        self.plugin.logger.info(f"Gradient pictures updated ({len(built) - 1} smooth tags/names + instant letters). "
+                                "Smooth versions show after the next restart; new ranks and names use the instant letters right away.")
         for p in self.plugin.server.online_players:
             if p.is_op:
                 p.send_message("§7New smooth gradient tags and names are ready. §eThey show after the next server restart.")
@@ -412,8 +502,9 @@ class RankTags:
         tmp.replace(path)
 
     def status(self):
+        instant = "ready (new ranks and names get gradients instantly)" if self.active.get("__base__") == base_id() else "after the next restart"
         return (f"Gradient pictures: {'on' if self.enabled else 'off'}; the world loads version {self.installed or 'none'}, "
-                f"newest built {self.version}; {len(self.active)} tags/names ready now.")
+                f"newest built {self.version}; {len([k for k in self.active if k != '__base__'])} smooth tags/names; instant letters {instant}.")
 
     # ---------- /ranktags ----------
     def command(self, sender, args):
