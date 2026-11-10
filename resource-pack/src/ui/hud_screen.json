@@ -1,5 +1,5 @@
 // GalaxySMP announcements: a title that contains the hidden marker (colour codes a n n o u n c e)
-// shows in a galaxy box at the top of the screen. Every other title looks exactly like Minecraft's
+// shows in a galaxy box in the upper part of the screen (below the phone buttons). Every other title looks exactly like Minecraft's
 // (Mojang's hud_title_text, wrapped). Built by resource-pack/make_hud.py notes in the repo history.
 {
   "namespace": "hud",
@@ -183,10 +183,10 @@
           "anchor_to": "top_middle",
           "offset": [
             0,
-            6
+            "16%"
           ],
           "size": [
-            "70%",
+            "60%",
             "100%c"
           ],
           "bindings": [
@@ -207,7 +207,7 @@
                 "texture": "textures/ui/gsmp_box",
                 "size": [
                   "100%",
-                  "100%c + 14px"
+                  "100%c + 18px"
                 ],
                 "alpha": 0.95,
                 "controls": [
@@ -215,7 +215,7 @@
                     "lines": {
                       "type": "stack_panel",
                       "size": [
-                        "100% - 20px",
+                        "100% - 24px",
                         "100%c"
                       ],
                       "anchor_from": "center",
@@ -236,7 +236,11 @@
                               1,
                               1
                             ],
-                            "text": "§6§l✦ ANNOUNCEMENT ✦"
+                            "text": "§6§l✦ ANNOUNCEMENT ✦",
+                            "max_size": [
+                              "100%",
+                              "200px"
+                            ]
                           }
                         },
                         {
@@ -275,6 +279,10 @@
                                 "source_property_name": "(#hud_title_text_string - '§a§n§n§o§u§n§c§e')",
                                 "target_property_name": "#text"
                               }
+                            ],
+                            "max_size": [
+                              "100%",
+                              "200px"
                             ]
                           }
                         }

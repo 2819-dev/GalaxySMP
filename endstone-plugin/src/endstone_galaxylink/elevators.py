@@ -9,7 +9,8 @@ How one works
     shaft walls go by. Iron doors next to the cabin close before it leaves and open with a ding when it
     arrives. A display above the hotbar shows the floor while it moves.
   - Call buttons: any button within 3 blocks of the shaft, at a floor's height, calls the elevator there.
-  - Floor panel: tap the cabin floor (or a button on the shaft wall next to you) to pick a floor.
+  - Floor panel: crouch (sneak) in the cabin, tap the cabin floor, or press a button on the shaft wall
+    next to you, to pick a floor.
 
 Building one (/elevator)
   1. Build the shaft and put the cabin floor at the bottom floor (any blocks, e.g. polished stone).
@@ -48,6 +49,8 @@ class Elevators:
         self.pending = {}      # player uuid -> ("corner", first corner or None)
         self.trips = {}        # elevator id -> running trip
         self.callers = {}      # elevator id -> players who called it (told if it can't come)
+        self.crouching = set() # players who were crouching in a cabin last check
+        self.ticks = 0
         self.last_tap = {}
         for e in self.list.values():  # the server stopped mid-trip: put the floor back where it was
             if e.get("row") is not None and e["row"] != e["cur"]:
@@ -304,9 +307,30 @@ class Elevators:
         except Exception:
             pass
 
+    def check_crouch(self):
+        """Crouching in a stopped cabin opens the floor menu (easy on phones)."""
+        now = set()
+        for eid, e in self.list.items():
+            if eid in self.trips:
+                continue
+            for p in self.plugin.server.online_players:
+                try:
+                    if not p.is_sneaking or not self.inside(e, p):
+                        continue
+                except Exception:
+                    continue
+                uid = str(p.unique_id)
+                now.add(uid)
+                if uid not in self.crouching:
+                    self.panel(p, eid)
+        self.crouching = now
+
     def tick(self):
-        """Every 2 ticks: move every elevator that's on a trip."""
+        """Every 2 ticks: move every elevator that's on a trip (and every 1/2 second, check for crouching)."""
         from endstone.level import Location
+        self.ticks += 1
+        if self.ticks % 5 == 0 and self.list:
+            self.check_crouch()
         for eid in list(self.trips):
             t = self.trips[eid]
             e = self.list.get(eid)

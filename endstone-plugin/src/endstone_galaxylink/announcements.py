@@ -1,4 +1,5 @@
-"""In-game announcements: a darkened galaxy box at the top of everyone's screen for 30 seconds, with a chime.
+"""In-game announcements: a darkened galaxy box near the top of everyone's screen for 30 seconds.
+Announcements typed by staff play a chime; auto announcements show quietly.
 
 /announcement (or /ann) opens the panel:
   - Announce now: type a message (colour codes like §3 work).
@@ -71,13 +72,14 @@ class Announcements:
         except Exception:
             pass
 
-    def show(self, text):
+    def show(self, text, chime=True):
         now = time.time()
         self.current = {"text": text, "ends": now + SHOW_SECONDS}
         self.free_at = now + SHOW_SECONDS + GAP_SECONDS
         for p in self.plugin.server.online_players:
             self._send(p, text, SHOW_SECONDS)
-            self._chime(p)
+            if chime:  # only announcements typed by staff chime; auto ones show quietly
+                self._chime(p)
         self.plugin.logger.info(f"[Announcement] {text}")
 
     def busy(self):
@@ -97,7 +99,7 @@ class Announcements:
             if self.plugin.server.online_players:
                 choices = [m for m in self.messages if m != self.last_auto] or self.messages
                 self.last_auto = random.choice(choices)
-                self.show(self.last_auto)
+                self.show(self.last_auto, chime=False)
             self.next_auto = now + self.minutes * 60
 
     def on_join(self, player):
