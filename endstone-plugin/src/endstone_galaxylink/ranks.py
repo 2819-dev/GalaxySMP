@@ -168,6 +168,17 @@ def paint(text, rank, bold=False):
 MINIGAME_STAFF = "galaxylink.minigames.staff"
 
 
+def solid(tag):
+    """A tag without its gradient: one Minecraft color (the middle of the gradient, or the tag's color)."""
+    if not tag:
+        return None
+    grad = GRADIENTS.get(tag.get("gradient") or "")
+    if not grad:
+        return tag
+    chain = grad[1]
+    return {**tag, "gradient": None, "color": chain[len(chain) // 2]}
+
+
 def tag_text(rank):
     """[👑 OWNER] in the rank's color or gradient (the icon goes inside the brackets).
     Gradient tags are smooth hex-gradient pictures once the rank tag pack is installed."""
@@ -196,11 +207,14 @@ class RankManager:
         self.ranks = {}        # id -> rank
         self.assign = {}       # xuid -> rank id
         self.attachments = {}  # player uuid -> PermissionAttachment
+        self.plan_priority = {"pro": 50, "plus": 60}  # Galaxy+ / Pro+ tags on the same 1-255 scale as ranks
 
     # ---------- state from the website ----------
     def update(self, msg):
         self.received = True  # gradient pictures are only built once the real ranks are here
         self.ranks = {r["id"]: r for r in msg.get("ranks", [])}
+        if isinstance(msg.get("planPriority"), dict):
+            self.plan_priority = {k: int(v) for k, v in msg["planPriority"].items()}
         self.assign = {str(k): v for k, v in (msg.get("assignments") or {}).items()}
         self.plugin.server.scheduler.run_task(self.plugin, self.apply_all)
         self.plugin.server.scheduler.run_task(self.plugin, self.refresh_pictures)
@@ -253,7 +267,20 @@ class RankManager:
         return self.ranks.get(self.assign.get(str(player.xuid)))
 
     def ordered(self):
-        return sorted(self.ranks.values(), key=lambda r: (r.get("position", 0), r["name"].lower()))
+        return sorted(self.ranks.values(), key=lambda r: (r.get("priority", 100), r.get("position", 0), r["name"].lower()))
+
+    def display_tag(self, player):
+        """The ONE tag a player shows: their rank or their plan's tag (Galaxy+ / Pro+), whichever has the
+        better priority (1 = highest, 255 = lowest). Owner (1) with Pro+ (50) shows OWNER."""
+        rank = self.rank_for(player)
+        plans = getattr(self.plugin, "plans", None)
+        plan_tag = plans.tag_for(player) if plans else None
+        if not plan_tag:
+            return rank
+        if not rank:
+            return plan_tag
+        plan_pri = self.plan_priority.get(plans.plan_key(player), 100)
+        return plan_tag if plan_pri < int(rank.get("priority", 100)) else rank
 
     # ---------- effects in game ----------
     def apply_all(self):
@@ -289,11 +316,8 @@ class RankManager:
             [👑 OWNER] VisionDevs
         The message itself goes on its own line in plain text, so Bedrock keeps the normal Minecraft font
         (it uses a small fallback font for a whole message as soon as it contains any picture)."""
-        rank = self.rank_for(player)
-        plans = getattr(self.plugin, "plans", None)
-        plan_tag = plans.tag_for(player) if plans else None
-        tags = [tag_text(t) for t in (rank, plan_tag) if t]
-        style = rank or plan_tag
+        style = self.display_tag(player)
+        tags = [tag_text(style)] if style else []
         name = name_text(player.name, style, bold=True) if style else f"§f§l{player.name}"
         return ("§r ".join(tags) + "§r " if tags else "") + name + "§r"
 
@@ -304,19 +328,13 @@ class RankManager:
         character (icon or gradient pictures, arrows, emoji). So by default chat uses only normal
         characters and color codes: the message always stays in the normal Minecraft font.
         (Pictures still show above heads. /ranktags chat on puts them in chat too.)"""
-        rank = self.rank_for(player)
-        plans = getattr(self.plugin, "plans", None)
-        plan_tag = plans.tag_for(player) if plans else None
-        pics = False  # one-line chat never has pictures (pictures go on the separate name line, see chat_header)
-        tags = [tag_text(t) if pics else paint(f"[{t['prefix']}]", t) for t in (rank, plan_tag) if t]
-        prefix = "§r ".join(tags) + "§r " if tags else ""
-        style = rank or plan_tag  # the name takes the rank's color, or the plan's
-        if style and style.get("gradient") in GRADIENTS:
-            name = name_text(player.name, style, bold=True) if pics else paint(player.name, style, True)
-        else:
-            name = paint("\x00", style, True) if style else "§f§l\x00"  # placeholder for {0}
+        # Chat has no gradients (those are only above heads): the tag and name are one solid color,
+        # and only the one tag with the best priority shows.
+        style = solid(self.display_tag(player))
+        prefix = paint(f"[{style['prefix']}]", style) + "§r " if style else ""
+        name = paint("\x00", style, True) if style else "§f§l\x00"  # placeholder for {0}
         fmt = (prefix + name).replace("{", "{{").replace("}", "}}").replace("\x00", "{0}")
-        return fmt + ("§r §7→§r {1}" if pics else "§r§7:§r {1}")
+        return fmt + "§r§7:§r {1}"
 
     # ---------- /ranks menu ----------
     def open_menu(self, player):

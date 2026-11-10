@@ -240,10 +240,9 @@ class GalaxyLink(Plugin):
             [👑 OWNER]        rank (in the rank's color), only if they have one
             🎤 player1        voice icon, then the name in the rank's color
         The money line under it is the score tag (economy.py)."""
-        rank = self.ranks.rank_for(player)
-        plan_tag = self.plans.tag_for(player) if getattr(self, "plans", None) else None
-        tags = [tag_text(t) for t in (rank, plan_tag) if t]  # e.g. [👑 OWNER] [⭐ GALAXY+]
-        name = f"{name_text(player.name, rank or plan_tag)}§r"
+        style = self.ranks.display_tag(player)  # only the tag with the best priority (e.g. OWNER over PRO+)
+        tags = [tag_text(style)] if style else []
+        name = f"{name_text(player.name, style)}§r"
         if icon:
             name = f"§r{icon} {name}"
         return "§r ".join(tags) + "§r\n" + name if tags else name
@@ -367,7 +366,7 @@ class GalaxyLink(Plugin):
             return
         self.chatfilter.on_chat(event)  # scrambles bad words with §k (when it's on)
         pics = getattr(self, "ranktags", None)
-        if pics is not None and pics.enabled and pics.chat_pictures:
+        if False and pics is not None and pics.enabled and pics.chat_pictures:  # gradients are only above heads now
             # Discord style: "[👑 OWNER] Name" line (pictures) once, then each message on its own line in the
             # normal Minecraft font. More messages from the same person within 2 minutes skip the name line.
             p = event.player

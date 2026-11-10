@@ -6,7 +6,7 @@ export const HISTORY_PAGE = 50;
 // The player's in-game rank (the same roles show on the website), from rank_* columns.
 export function rankOf(r) {
   return r.rank_prefix
-    ? { name: r.rank_name, prefix: r.rank_prefix, color: r.rank_color, icon: r.rank_icon || null, gradient: r.rank_gradient || null, position: r.rank_position }
+    ? { name: r.rank_name, prefix: r.rank_prefix, color: r.rank_color, icon: r.rank_icon || null, gradient: r.rank_gradient || null, position: r.rank_position, priority: r.rank_priority ?? 100 }
     : null;
 }
 

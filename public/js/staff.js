@@ -396,13 +396,35 @@ loaders.ranks = async () => {
     list.append(h("div", { class: "member-row" },
       h("div", { class: "info" },
         h("strong", {}, rankPreview(r.prefix, r.color, r.name, r.icon, null, r.gradient)),
-        h("span", { text: `${r.players} player${r.players === 1 ? "" : "s"} · ${commands.length ? "Commands: " + commands.map((c) => "/" + c).join(" ") : "No commands"} · Staff powers: ${role}` })),
+        h("span", { text: `Priority ${r.priority ?? 100} · ${r.players} player${r.players === 1 ? "" : "s"} · ${commands.length ? "Commands: " + commands.map((c) => "/" + c).join(" ") : "No commands"} · Staff powers: ${role}` })),
       h("div", { class: "row-actions" },
         h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Edit", onclick: () => rankDialog(r) }),
         h("button", { class: "btn btn-danger btn-sm", type: "button", text: "Delete", onclick: () => deleteRank(r) }))));
   }
+  renderPlanPriority();
   renderRankPlayers();
 };
+
+// Galaxy+ / Pro+ tags take part in the same priority order as ranks.
+function renderPlanPriority() {
+  let box = $("plan-priority");
+  if (!box) {
+    box = h("div", { id: "plan-priority", class: "plan-priority" });
+    $("rank-list").after(box);
+  }
+  const pp = rankData.planPriority || { pro: 50, plus: 60 };
+  const pro = h("input", { class: "input", id: "pp-pro", type: "number", min: 1, max: 255, value: String(pp.pro) });
+  const plus = h("input", { class: "input", id: "pp-plus", type: "number", min: 1, max: 255, value: String(pp.plus) });
+  const save = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Save", onclick: async () => {
+    try { await postJson("/api/mod/ranks/plan-priority", { pro: Number(pro.value), plus: Number(plus.value) }); toast("Plan tag priorities saved."); loaders.ranks(); }
+    catch (e) { toast(e.message); }
+  } });
+  box.replaceChildren(
+    h("h3", { text: "Plan tag priority" }),
+    h("p", { class: "text-3 small", text: "Every rank has a priority from 1 (highest) to 255 (lowest). A player who has a rank and a Galaxy+ or Pro+ plan shows only one tag: the one with the better (lower) priority. Example: Owner is 1, so an owner with Pro+ still shows OWNER." }),
+    h("div", { class: "plan-priority-row" },
+      h("label", {}, "Galaxy Pro+", pro), h("label", {}, "Galaxy+", plus), save));
+}
 
 function renderRankPlayers() {
   const box = $("rank-players");
@@ -493,6 +515,7 @@ function rankDialog(rank) {
     (v) => (v ? h("img", { src: `/img/ranks/rank_${v}.png`, alt: "" }) : h("span", { text: "None" })));
   const role = select("rank-role", STAFF_POWERS, STAFF_POWERS.some((x) => x[0] === String(r.websiteRole || "")) ? String(r.websiteRole || "") : "");
   const cmds = commandChips(commands);
+  const priority = h("input", { class: "input", id: "rank-priority", type: "number", min: 1, max: 255, step: 1, value: String(r.priority ?? 100) });
   const advanced = h("input", { class: "input", id: "rank-other", placeholder: "someplugin.permission, another.one", value: other.join(", ") });
   const preview = h("div", { class: "rank-preview-box" });
   const update = () => {
@@ -506,9 +529,10 @@ function rankDialog(rank) {
       preview,
       field("Rank name", name),
       field("Prefix", prefix, "Shown as [PREFIX] in chat and above heads."),
+      field("Priority (1 to 255)", priority, `1 is the highest. If a player also has Galaxy+ (${rankData.planPriority?.plus ?? 60}) or Pro+ (${rankData.planPriority?.pro ?? 50}), only the tag with the lower number shows. Ranks are listed in this order too.`),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Color" }), color.el),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Gradient (optional)" }), gradient.el,
-        h("p", { class: "hint", text: "Gives each letter of the prefix and name its own color. Overrides the color above." })),
+        h("p", { class: "hint", text: "A smooth gradient on the tag and name above the player's head in game (and on the website). In game chat the tag uses one solid color from the gradient." })),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Icon" }), icon.el,
         h("p", { class: "hint", text: "Shown before the prefix in game (players need the GalaxySMP Icons pack, which the server sends automatically)." })),
       h("div", { class: "field" }, h("label", { class: "field-label", for: "rank-commands", text: "Commands this rank can use" }), cmds.el,
@@ -522,7 +546,7 @@ function rankDialog(rank) {
       onClick: async () => {
         await postJson(`/api/mod/ranks/${rank ? "update" : "create"}`, {
           id: rank?.id, name: name.value, prefix: prefix.value, color: color.value(), gradient: gradient.value() || null, icon: icon.value() || null,
-          websiteRole: role.value || null, commands: cmds.value(),
+          websiteRole: role.value || null, commands: cmds.value(), priority: Number(priority.value),
           permissions: advanced.value.split(",").map((s) => s.trim()).filter((x) => x && x !== MG).concat(mgStaff.checked ? [MG] : []),
         });
         toast(rank ? "Rank saved." : "Rank created.");

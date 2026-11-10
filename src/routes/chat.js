@@ -5,6 +5,8 @@ import { requireUser, publicUser } from "../lib/auth.js";
 import { REACTIONS, loadHistory, rankOf } from "../chat/messages.js";
 import { MAX_LENGTH } from "../lib/filter.js";
 import { headUrlFor } from "./heads.js";
+import { displayRank, loadPlanPriority } from "./ranks.js";
+import { PLANS } from "./plans.js";
 
 export function hubStub(env) {
   return env.HUB.get(env.HUB.idFromName("community"));
@@ -24,7 +26,7 @@ export async function bootstrap(request, env) {
     sql`SELECT key, name, color, power FROM roles ORDER BY power DESC`,
     sql`SELECT u.id, u.username, r.key AS role,
                rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon,
-               rk.gradient AS rank_gradient, rk.position AS rank_position,
+               rk.gradient AS rank_gradient, rk.position AS rank_position, rk.priority AS rank_priority,
                pl.xuid, pl.head_at, pl.gamerpic_at, (pl.online_at > now() - interval '150 seconds') AS in_game, u.created_at,
                (SELECT s.plan FROM subscriptions s WHERE s.xuid = pl.xuid AND (s.expires_at IS NULL OR s.expires_at > now())) AS plan
           FROM users u JOIN roles r ON r.id = u.role_id
@@ -36,6 +38,7 @@ export async function bootstrap(request, env) {
          LIMIT 500`,
   ]);
   await sql`UPDATE users SET last_seen_at = now() WHERE id = ${user.id}`;
+  const planPriority = await loadPlanPriority(sql);
   // staff replies to your support tickets you haven't read yet (shows a dot on the Support channel)
   const [{ ticket_unread: ticketUnread }] = await sql`SELECT coalesce(sum(user_unread), 0)::int AS ticket_unread FROM tickets WHERE user_id = ${user.id}`;
   const me = publicUser(user);
@@ -54,7 +57,7 @@ export async function bootstrap(request, env) {
     })),
     roles: roles.map((r) => ({ key: r.key, name: r.name, color: r.color, power: r.power })),
     members: members.map((m) => ({
-      id: Number(m.id), username: m.username, role: m.role, rank: rankOf(m),
+      id: Number(m.id), username: m.username, role: m.role, rank: displayRank(rankOf(m), m.plan, planPriority, PLANS),
       // Minecraft head picture (if the server has sent it), plan, and when they joined the community
       head: headUrlFor(m),
       plan: m.plan || null, inGame: Boolean(m.in_game), since: m.created_at,

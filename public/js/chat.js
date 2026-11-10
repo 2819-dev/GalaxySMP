@@ -138,7 +138,7 @@ function openProfile(member, anchor) {
     return c;
   };
   if (rank) roles.append(chip(rank.name || rank.prefix, rankCss(rank), rank));
-  if (member.plan) roles.append(chip(PLAN_NAMES[member.plan] || member.plan, member.plan === "pro" ? "linear-gradient(90deg,#FF8AF2,#8A3CFF,#4F56FF)" : "linear-gradient(90deg,#7CFF8A,#4DB8FF,#9A6BFF)"));
+  if (member.plan && !rank?.plan) roles.append(chip(PLAN_NAMES[member.plan] || member.plan, member.plan === "pro" ? "linear-gradient(90deg,#FF8AF2,#8A3CFF,#4F56FF)" : "linear-gradient(90deg,#7CFF8A,#4DB8FF,#9A6BFF)"));
   // Staff powers (Moderator / Admin) are only permissions: they're never shown, only the rank is.
   if (!roles.childNodes.length) roles.append(el("span", "text-3 small", "No roles yet"));
   const body = el("div", "pc-body");

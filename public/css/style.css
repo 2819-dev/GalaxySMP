@@ -1239,3 +1239,9 @@ img[src*="g=1"] { image-rendering: auto !important; }
 .store-tab { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
 .store-tab .ic svg { width: 16px; height: 16px; }
 .pc-online-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-left: 6px; box-shadow: 0 0 6px var(--ok); }
+
+.plan-priority { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.plan-priority h3 { font-size: .95rem; margin: 0 0 4px; }
+.plan-priority-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 8px; }
+.plan-priority-row label { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; color: var(--text-2); }
+.plan-priority-row .input { width: 110px; }

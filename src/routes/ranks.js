@@ -57,15 +57,35 @@ function formatRank(r) {
     permissions: r.permissions || [],
     websiteRole: r.website_role ? Number(r.website_role) : null,
     position: r.position,
+    priority: r.priority ?? 100,
   };
+}
+
+// The one tag a player shows: their rank or their plan's tag (Galaxy+ / Pro+), whichever has the better
+// (lower) priority. rank = rankOf(row) with .priority; plan = "plus" | "pro" | null.
+export function displayRank(rank, plan, planPriority, planDefs) {
+  const tag = plan && planDefs?.[plan]?.tag;
+  if (!tag) return rank;
+  const planRank = { name: planDefs[plan].name, prefix: tag.prefix, color: tag.color, icon: tag.icon || null, gradient: tag.gradient || null,
+    position: -1, priority: planPriority?.[plan] ?? DEFAULT_PLAN_PRIORITY[plan], plan: true };
+  if (!rank) return planRank;
+  return planRank.priority < (rank.priority ?? 100) ? planRank : rank;
+}
+
+// Galaxy+ / Pro+ tag priorities (same 1-255 scale as ranks; lower shows first).
+export const DEFAULT_PLAN_PRIORITY = { pro: 50, plus: 60 };
+export async function loadPlanPriority(sql) {
+  const [row] = await sql`SELECT value FROM economy_config WHERE key = 'plan_priority'`;
+  return { ...DEFAULT_PLAN_PRIORITY, ...(row?.value || {}) };
 }
 
 export async function loadRanksState(sql) {
   const [ranks, assigned] = await Promise.all([
-    sql`SELECT * FROM ranks ORDER BY position, lower(name)`,
+    sql`SELECT * FROM ranks ORDER BY priority, position, lower(name)`,
     sql`SELECT xuid, rank_id FROM player_ranks`,
   ]);
   return {
+    planPriority: await loadPlanPriority(sql),
     ranks: ranks.map(formatRank),
     assignments: Object.fromEntries(assigned.map((a) => [a.xuid, a.rank_id])),
   };
@@ -96,7 +116,10 @@ async function validRank(env, sql, body) {
   if (perms.length > 40 || perms.some((p) => !/^[a-z0-9_.-]{3,60}$/.test(p))) throw new HttpError(400, "One of the permissions isn't valid.");
   const role = body.websiteRole == null || body.websiteRole === "" ? null : Number(body.websiteRole);
   if (role !== null && !STAFF_POWERS[role]) throw new HttpError(400, "Staff powers must be None, Moderator or Admin.");
-  return { name, prefix, color, icon, gradient, permissions: perms, websiteRole: role };
+  // missing = keep the rank's current priority (the in-game /ranks menu doesn't send one); new ranks get 100
+  const priority = body.priority == null || body.priority === "" ? null : Number(body.priority);
+  if (priority !== null && (!Number.isInteger(priority) || priority < 1 || priority > 255)) throw new HttpError(400, "Priority must be a whole number from 1 (highest) to 255 (lowest).");
+  return { name, prefix, color, icon, gradient, permissions: perms, websiteRole: role, priority };
 }
 
 // Gives or removes the website role that comes with a player's rank (if they linked an account).
@@ -141,14 +164,14 @@ async function applyAction(env, sql, action, body, actor) {
     try {
       if (action === "create") {
         [rank] = await sql`
-          INSERT INTO ranks (name, prefix, color, icon, gradient, permissions, website_role, position)
-          VALUES (${r.name}, ${r.prefix}, ${r.color}, ${r.icon}, ${r.gradient}, ${r.permissions}, ${r.websiteRole},
+          INSERT INTO ranks (name, prefix, color, icon, gradient, permissions, website_role, priority, position)
+          VALUES (${r.name}, ${r.prefix}, ${r.color}, ${r.icon}, ${r.gradient}, ${r.permissions}, ${r.websiteRole}, ${r.priority ?? 100},
                   (SELECT coalesce(max(position), 0) + 1 FROM ranks))
           RETURNING *`;
       } else {
         [rank] = await sql`
           UPDATE ranks SET name = ${r.name}, prefix = ${r.prefix}, color = ${r.color}, icon = ${r.icon}, gradient = ${r.gradient}, permissions = ${r.permissions},
-                 website_role = ${r.websiteRole}, updated_at = now()
+                 website_role = ${r.websiteRole}, priority = coalesce(${r.priority}::smallint, priority), updated_at = now()
            WHERE id = ${Number(body.id)} RETURNING *`;
         if (!rank) throw new HttpError(404, "That rank no longer exists.");
       }
@@ -163,6 +186,19 @@ async function applyAction(env, sql, action, body, actor) {
     }
     await changed(env);
     return { rank: formatRank(rank) };
+  }
+  if (action === "plan-priority") {
+    const next = {};
+    for (const k of ["plus", "pro"]) {
+      const v = Number(body[k]);
+      if (!Number.isInteger(v) || v < 1 || v > 255) throw new HttpError(400, "Priority must be a whole number from 1 (highest) to 255 (lowest).");
+      next[k] = v;
+    }
+    await sql`INSERT INTO economy_config (key, value, updated_by) VALUES ('plan_priority', ${JSON.stringify(next)}::jsonb, ${actor.label})
+              ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = EXCLUDED.updated_by`;
+    await audit(sql, actor.id, "rank.plan_priority", { by: actor.label, ...next });
+    await changed(env);
+    return { planPriority: next };
   }
   if (action === "delete") {
     const holders = await sql`SELECT xuid FROM player_ranks WHERE rank_id = ${Number(body.id)}`;
@@ -221,6 +257,7 @@ export async function listRanks(request, env, ctx, url) {
   return json({
     ok: true,
     ranks: state.ranks.map((r) => ({ ...r, players: counts[r.id] || 0 })),
+    planPriority: state.planPriority,
     icons: ICONS,
     gradients: GRADIENTS,
     players: players.map((p) => ({ xuid: p.xuid, gamertag: p.gamertag, lastSeen: p.last_seen, rankId: p.rank_id, linked: Boolean(p.linked) })),
