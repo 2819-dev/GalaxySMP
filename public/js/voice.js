@@ -2,7 +2,7 @@
 // Your microphone goes to Cloudflare's voice relay; you receive only the voices you're
 // allowed to hear (nearby players, your group, Global Mic). Volume and left/right
 // direction follow positions sent by the server plugin.
-import { toast, config } from "/js/site.js";
+import { toast, config, installApp, isInstalled } from "/js/site.js";
 import { h, openDialog, getJson, postJson, select, field, MUTE_LABELS } from "/js/dialog.js";
 
 const $ = (id) => document.getElementById(id);
@@ -261,7 +261,7 @@ function attachTrack(mid, track) {
   const gain = S.ctx.createGain();
   gain.gain.value = 0;
   const pan = S.ctx.createStereoPanner();
-  source.connect(gain).connect(pan).connect(S.ctx.destination);
+  source.connect(gain).connect(pan).connect(S.out || S.ctx.destination);
   Object.assign(sub, { audio, source, gain, pan });
 }
 
@@ -563,13 +563,77 @@ function voiceMuteDialog(u) {
 }
 
 // ---------- Join / leave ----------
+// ---------- Keep voice running while you're in Minecraft (background) ----------
+// Phones freeze pages in the background unless they're playing media. So while you're in voice:
+//  - all voices play through a real <audio> player (not only Web Audio),
+//  - a near-silent loop keeps playing (started by the Join tap, which browsers require),
+//  - iPhone/iPad (WebKit): the audio session is set to "play-and-record" so the mic and speaker stay on,
+//  - the phone's media controls (lock screen / notification) show "GalaxySMP Voice Chat" with mute and leave.
+function startBackgroundAudio() {
+  try { if (navigator.audioSession) navigator.audioSession.type = "play-and-record"; } catch { /* not supported */ }
+  S.keep = new Audio("/audio/keepalive.wav");
+  S.keep.loop = true;
+  S.keep.volume = 0.05;
+  S.keep.setAttribute("playsinline", "");
+  S.keep.play().catch(() => {});
+  if ("mediaSession" in navigator) {
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: "GalaxySMP Voice Chat", artist: "Connected", album: "GalaxySMP",
+        artwork: [{ src: "/img/icon-192.png", sizes: "192x192", type: "image/png" }, { src: "/img/icon-512.png", sizes: "512x512", type: "image/png" }],
+      });
+      navigator.mediaSession.playbackState = "playing";
+      const handlers = {
+        play: () => { if (S.deafened) $("v-deafen").click(); resumeAudio(); },
+        pause: () => { if (!S.deafened) $("v-deafen").click(); },
+        stop: () => leave(),
+        hangup: () => leave(),
+        togglemicrophone: () => $("v-mic").click(),
+      };
+      for (const [action, fn] of Object.entries(handlers)) {
+        try { navigator.mediaSession.setActionHandler(action, fn); } catch { /* this action isn't supported here */ }
+      }
+    } catch { /* ignore */ }
+  }
+}
+
+function resumeAudio() {
+  try { if (S.ctx && S.ctx.state !== "running" && S.ctx.state !== "closed") S.ctx.resume(); } catch { /* ignore */ }
+  S.keep?.play().catch(() => {});
+  S.outEl?.play().catch(() => {});
+}
+
+function stopBackgroundAudio() {
+  try { S.keep?.pause(); } catch { /* ignore */ }
+  try { S.outEl?.pause(); } catch { /* ignore */ }
+  S.keep = null;
+  S.outEl = null;
+  S.out = null;
+  try { if (navigator.audioSession) navigator.audioSession.type = "auto"; } catch { /* ignore */ }
+  if ("mediaSession" in navigator) {
+    try { navigator.mediaSession.playbackState = "none"; navigator.mediaSession.metadata = null; } catch { /* ignore */ }
+  }
+}
+
+document.addEventListener("visibilitychange", () => { if (S.ctx) resumeAudio(); });
+
 async function join() {
   $("v-join-error").textContent = "";
   $("v-join-btn").disabled = true;
+  startBackgroundAudio();  // must start inside the tap
   try {
     S.leaving = false;
     S.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    S.ctx.addEventListener?.("statechange", () => { if (S.ctx && S.ctx.state !== "running" && S.ctx.state !== "closed") setTimeout(resumeAudio, 300); });
     await S.ctx.resume();
+    // Everyone's voice goes through one <audio> player, so the phone treats it as playing media.
+    try {
+      S.out = S.ctx.createMediaStreamDestination();
+      S.outEl = new Audio();
+      S.outEl.setAttribute("playsinline", "");
+      S.outEl.srcObject = S.out.stream;
+      S.outEl.play().catch(() => {});
+    } catch { S.out = null; }
     S.stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     }).catch(() => { throw new Error("Microphone access was blocked. Allow the microphone for galaxymc.us in your browser settings, then try again."); });
@@ -609,6 +673,7 @@ function cleanup() {
   S.track = null;
   try { S.ctx?.close(); } catch { /* ignore */ }
   S.ctx = null;
+  stopBackgroundAudio();
   S.users.clear();
   S.pos.clear();
   S.talking = false;
@@ -656,7 +721,16 @@ document.addEventListener("keydown", (e) => { if (S.ptt && e.key.toLowerCase() =
 document.addEventListener("keyup", (e) => { if (S.ptt && e.key.toLowerCase() === "v") pttSet(false); });
 document.querySelectorAll("[data-vicon]").forEach((el) => (el.innerHTML = vicon(el.getAttribute("data-vicon"))));
 document.querySelectorAll("[data-check]").forEach((el) => (el.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>'));
-window.addEventListener("pagehide", () => { if (S.ws) leave(); });
+// Only leave when the page is really closed (not when you switch to Minecraft).
+window.addEventListener("pagehide", (e) => { if (S.ws && !e.persisted && document.visibilityState !== "hidden") leave(); });
+window.addEventListener("beforeunload", () => { if (S.ws) leave(); });
+if (!isInstalled() && window.top === window) {  // inside the community page, its own banner handles installing
+  const tip = $("v-install-tip");
+  if (tip) {
+    tip.hidden = false;
+    $("v-install-link").addEventListener("click", (e) => { e.preventDefault(); installApp(); });
+  }
+}
 
 // ---------- Start ----------
 (async () => {

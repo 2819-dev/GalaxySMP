@@ -20,8 +20,10 @@ const TYPES = {
   ".webp": "image/webp",
   ".ico": "image/x-icon",
   ".txt": "text/plain; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
+  ".wav": "audio/wav",
 };
-const TEXT = new Set([".html", ".css", ".js", ".json", ".svg", ".txt"]);
+const TEXT = new Set([".html", ".css", ".js", ".json", ".svg", ".txt", ".webmanifest"]);
 
 function walk(dir) {
   return readdirSync(dir).flatMap((name) => {

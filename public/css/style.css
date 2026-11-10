@@ -887,3 +887,21 @@ img.avatar.head { image-rendering: pixelated; object-fit: cover; background: #1a
 .pc-actions .btn { flex: 1; }
 @media (max-width: 700px) { .msg .avatar { width: 36px; height: 36px; } .msg .gutter-time { left: 10px; width: 36px; } }
 .profile-head img.avatar.head-big { width: 72px; height: 72px; border-radius: 16px; image-rendering: pixelated; background: #1a1f3d; flex: none; }
+
+/* ---------- GalaxySMP app install banner ---------- */
+.install-banner { position: fixed; z-index: 90; left: 50%; transform: translateX(-50%); bottom: 14px; width: min(560px, calc(100% - 24px));
+  display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 12px; border-radius: 14px; background: #141838;
+  border: 1px solid var(--border-strong); box-shadow: 0 14px 40px rgba(0,0,0,.5); animation: pc-in .2s ease-out; }
+.install-banner img { border-radius: 10px; flex: none; }
+.install-text { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.25; }
+.install-text strong { font-size: .95rem; }
+.install-text span { font-size: .8rem; color: var(--text-3); }
+.install-close { background: none; border: 0; color: var(--text-3); font-size: 1.4rem; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; flex: none; }
+.install-close:hover { background: var(--surface); color: var(--text); }
+.install-sheet { position: fixed; inset: 0; z-index: 130; background: rgba(4,6,16,.6); display: flex; align-items: flex-end; justify-content: center; padding: 12px; }
+.install-sheet-card { width: min(440px, 100%); background: #141838; border: 1px solid var(--border-strong); border-radius: 16px; padding: 20px; text-align: left; }
+.install-sheet-card img { border-radius: 12px; }
+.install-sheet-card h3 { margin: 12px 0 8px; font-size: 1.15rem; }
+.install-sheet-card ol { margin: 0 0 10px; padding-left: 20px; color: var(--text-2); line-height: 1.6; }
+.share-glyph { display: inline-block; padding: 0 4px; border: 1px solid var(--border-strong); border-radius: 5px; font-size: .8rem; }
+.chat ~ .install-banner, body:has(#view-chat:not([hidden])) .install-banner { bottom: 86px; }

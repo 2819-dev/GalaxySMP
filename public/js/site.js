@@ -251,4 +251,76 @@ else {
 fillConfig();
 applyHosting();
 
+// ---------- The GalaxySMP app (PWA): install it / Add to Home Screen ----------
+export const isInstalled = () =>
+  window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let installEvent = null;
+const store = {
+  get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
+};
+
+if ("serviceWorker" in navigator && !EMBED) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
+
+export async function installApp() {
+  if (installEvent) {
+    installEvent.prompt();
+    const choice = await installEvent.userChoice.catch(() => null);
+    installEvent = null;
+    document.querySelector(".install-banner")?.remove();
+    return choice?.outcome === "accepted";
+  }
+  showIosSteps();
+  return false;
+}
+
+function showIosSteps() {
+  document.querySelector(".install-sheet")?.remove();
+  const sheet = document.createElement("div");
+  sheet.className = "install-sheet";
+  sheet.innerHTML = `
+    <div class="install-sheet-card" role="dialog" aria-label="Add GalaxySMP to your Home Screen">
+      <img src="/img/icon-192.png" alt="" width="56" height="56">
+      <h3>Add GalaxySMP to your Home Screen</h3>
+      <ol>
+        <li>Tap the <b>Share</b> button <span class="share-glyph" aria-hidden="true">⬆︎</span> at the bottom (or top) of Safari.</li>
+        <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+        <li>Tap <b>Add</b>. Open GalaxySMP from your Home Screen.</li>
+      </ol>
+      <p class="text-3 small">The app opens full screen, and voice chat keeps working while you switch to Minecraft.</p>
+      <button class="btn btn-primary btn-block" type="button">Got it</button>
+    </div>`;
+  sheet.addEventListener("click", (e) => { if (e.target === sheet || e.target.tagName === "BUTTON") sheet.remove(); });
+  document.body.append(sheet);
+}
+
+export function installBanner(force) {
+  if (EMBED || isInstalled() || document.querySelector(".install-banner")) return;
+  const snoozed = Number(store.get("gsmp-install-later") || 0);
+  if (!force && Date.now() - snoozed < 7 * 86400_000) return;
+  if (!installEvent && !isIos()) return;  // nothing to offer on this browser
+  const bar = document.createElement("div");
+  bar.className = "install-banner";
+  bar.innerHTML = `
+    <img src="/img/icon-192.png" alt="" width="40" height="40">
+    <div class="install-text"><strong>Get the GalaxySMP app</strong><span>Chat and voice that keep working while you play.</span></div>
+    <button class="btn btn-primary btn-sm" type="button" data-install>${isIos() && !installEvent ? "How to add" : "Install"}</button>
+    <button class="install-close" type="button" aria-label="Not now">×</button>`;
+  bar.querySelector("[data-install]").addEventListener("click", () => installApp());
+  bar.querySelector(".install-close").addEventListener("click", () => { store.set("gsmp-install-later", String(Date.now())); bar.remove(); });
+  document.body.append(bar);
+}
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();  // show our own nicer banner instead of the browser's
+  installEvent = e;
+  installBanner();
+  document.dispatchEvent(new Event("gsmp-installable"));
+});
+window.addEventListener("appinstalled", () => { document.querySelector(".install-banner")?.remove(); toast("GalaxySMP app installed!"); });
+if (isIos() && !EMBED) setTimeout(() => installBanner(), 1500);
+
 export { config };

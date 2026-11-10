@@ -7,6 +7,11 @@
   <meta name="description" content="GalaxySMP proximity voice chat.">
   <link rel="icon" href="/favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="GalaxySMP">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0a0c1b">
   <link rel="stylesheet" href="/css/style.css">
   <script type="module" src="/js/voice.js"></script>
@@ -41,7 +46,11 @@
       <section id="v-join" class="panel" hidden>
         <h2 style="font-size:1.2rem">Join voice as <span id="v-name"></span></h2>
         <p class="text-2">Your browser will ask to use your microphone. You join <strong>muted</strong>; unmute when you're ready to talk.</p>
-        <p class="note small" style="margin:0 0 18px"><strong>Playing on a phone or console?</strong> Keep this page open on a second device (another phone, tablet or computer). Phones pause the microphone when you switch to Minecraft.</p>
+        <div class="note small bg-tip" style="margin:0 0 18px">
+          <strong>Playing on the same phone?</strong> Join here first, then switch to Minecraft: voice keeps running in the background (you'll see it in your notifications / lock screen).
+          <span id="v-install-tip" hidden> For the best results <a href="#" id="v-install-link">install the GalaxySMP app</a> and use voice from it.</span>
+          <span class="text-3"> On iPhone, if others can't hear you after switching, use voice on a second device.</span>
+        </div>
         <button class="btn btn-primary btn-lg" type="button" id="v-join-btn">Join voice</button>
         <p class="form-error" id="v-join-error" role="alert"></p>
       </section>
