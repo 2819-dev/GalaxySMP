@@ -81,32 +81,46 @@ async function fetchGamerpic(env, sql, xuid) {
      WHERE xuid = ${xuid} AND (gamerpic_tried IS NULL OR gamerpic_tried < now() - interval '1 day')
      RETURNING xuid`;
   if (!row) return null; // tried recently
+  const why = async (reason) => {  // kept so a failing lookup can be fixed without guessing
+    try {
+      await sql`INSERT INTO economy_config (key, value, updated_by) VALUES ('gamerpic_debug', ${JSON.stringify({ [xuid]: { reason: String(reason).slice(0, 300), at: new Date().toISOString() } })}::jsonb, 'website')
+                ON CONFLICT (key) DO UPDATE SET value = economy_config.value || EXCLUDED.value, updated_at = now()`;
+    } catch { /* ignore */ }
+    return null;
+  };
   try {
     const res = await fetch(`https://xbl.io/api/v2/account/${xuid}`, {
       headers: { "X-Authorization": env.XBL_API_KEY, Accept: "application/json", "Accept-Language": "en-US" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) return why(`xbl.io answered ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const data = await res.json();
-    const settings = data?.profileUsers?.[0]?.settings || [];
+    if (data?.code === 429 || data?.content?.limitType) { // the free key's limit (60 per 5 minutes): try again in an hour
+      await sql`UPDATE players SET gamerpic_tried = now() - interval '23 hours' WHERE xuid = ${xuid}`;
+      return null;
+    }
+    const settings = (data?.content || data)?.profileUsers?.[0]?.settings || [];
     let pic = settings.find((x) => x.id === "GameDisplayPicRaw")?.value;
-    if (!pic) return null;
+    if (!pic) return why(`no picture in the answer: ${JSON.stringify(data).slice(0, 200)}`);
     const u = new URL(pic.replace(/^http:/, "https:"));
-    if (!/(^|\.)xboxlive\.com$/.test(u.hostname)) return null;
-    u.searchParams.set("w", "96");
-    u.searchParams.set("h", "96");
-    u.searchParams.set("format", "png");
-    const img = await fetch(u.toString());
+    if (!/(^|\.)xboxlive\.com$/.test(u.hostname)) return why(`unexpected picture host ${u.hostname}`);
+    // add the size as plain text: rebuilding the link would re-encode its inner url and the server refuses it
+    const raw = pic.replace(/^http:/, "https:").replace(/&(w|h|width|height)=\d+/g, "");
+    let img = await fetch(`${raw}${raw.includes("?") ? "&" : "?"}w=208&h=208`); // Xbox only makes 64, 208, 424 and 1080
+    if (!img.ok) {
+      await why(`resize refused ${img.status} ${(await img.text()).slice(0, 120)} | ${raw.slice(0, 220)}`);
+      img = await fetch(u.toString()); // some pictures can't be resized: take the original
+    }
     const type = img.headers.get("content-type") || "";
-    if (!img.ok || !/^image\/(png|jpeg|webp)/.test(type)) return null;
+    if (!img.ok || !/^image\/(png|jpeg|webp)/.test(type)) return why(`picture download failed: ${img.status} ${type}`);
     const bytes = new Uint8Array(await img.arrayBuffer());
-    if (bytes.length > 200_000) return null;
+    if (bytes.length > 400_000) return why(`picture too big (${bytes.length} bytes)`);
     let bin = "";
     for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
     const b64 = btoa(bin);
     await sql`UPDATE players SET gamerpic = ${b64}, gamerpic_type = ${type.split(";")[0]}, gamerpic_at = now() WHERE xuid = ${xuid}`;
     return { b64, type: type.split(";")[0] };
-  } catch {
-    return null;
+  } catch (e) {
+    return why(`error: ${e.message}`);
   }
 }
 
