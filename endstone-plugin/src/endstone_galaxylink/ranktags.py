@@ -387,7 +387,7 @@ class RankTags:
         self.eco = plugin.economy
         cfg = self.eco.get_config("ranktags") or {}
         self.enabled = cfg.get("enabled", True)
-        self.chat_pictures = cfg.get("chat", False)   # pictures in chat make Bedrock use its small font for the message
+        self.chat_pictures = cfg.get("chat", True)    # Discord-style chat: a picture name line, then the message in normal font
         self.version = cfg.get("version", 0)
         self.built = cfg.get("built") or {}           # signature -> glyph string, in the pack file on disk
         self.history = cfg.get("history") or {}       # pack version -> its glyphs (the last few builds)
@@ -515,8 +515,8 @@ class RankTags:
         if what in ("chat on", "chat off"):
             self.chat_pictures = what == "chat on"
             self.save()
-            sender.send_message("§7Gradient pictures in chat are now " + ("§aon§7 (note: Bedrock then shows messages in its small font)." if self.chat_pictures
-                                else "§coff§7: chat uses normal text so messages stay in the normal Minecraft font."))
+            sender.send_message("§7Chat style: " + ("§aDiscord style§7: a name line with the smooth gradient pictures, then messages in the normal font." if self.chat_pictures
+                                else "§eone line§7: [RANK] Name: message, colored text only."))
             return
         if what in ("on", "off"):
             self.enabled = what == "on"

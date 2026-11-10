@@ -284,6 +284,19 @@ class RankManager:
     def forget(self, player):
         self.attachments.pop(str(player.unique_id), None)
 
+    def chat_header(self, player):
+        """Discord-style chat: the name line, with the smooth gradient pictures and rank icon:
+            [👑 OWNER] VisionDevs
+        The message itself goes on its own line in plain text, so Bedrock keeps the normal Minecraft font
+        (it uses a small fallback font for a whole message as soon as it contains any picture)."""
+        rank = self.rank_for(player)
+        plans = getattr(self.plugin, "plans", None)
+        plan_tag = plans.tag_for(player) if plans else None
+        tags = [tag_text(t) for t in (rank, plan_tag) if t]
+        style = rank or plan_tag
+        name = name_text(player.name, style, bold=True) if style else f"§f§l{player.name}"
+        return ("§r ".join(tags) + "§r " if tags else "") + name + "§r"
+
     def chat_format(self, player):
         """[OWNER] **player1**: message  (rank color on the tag and name, never on the message)
 
@@ -294,7 +307,7 @@ class RankManager:
         rank = self.rank_for(player)
         plans = getattr(self.plugin, "plans", None)
         plan_tag = plans.tag_for(player) if plans else None
-        pics = PICTURES is not None and getattr(PICTURES, "chat_pictures", False)
+        pics = False  # one-line chat never has pictures (pictures go on the separate name line, see chat_header)
         tags = [tag_text(t) if pics else paint(f"[{t['prefix']}]", t) for t in (rank, plan_tag) if t]
         prefix = "§r ".join(tags) + "§r " if tags else ""
         style = rank or plan_tag  # the name takes the rank's color, or the plan's

@@ -45,7 +45,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.19.3"
+VERSION = "2.20.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -360,7 +360,25 @@ class GalaxyLink(Plugin):
         if self.moderation.on_chat(event):  # muted players can't chat
             return
         self.chatfilter.on_chat(event)  # scrambles bad words with §k (when it's on)
-        event.format = self.ranks.chat_format(event.player)
+        pics = getattr(self, "ranktags", None)
+        if pics is not None and pics.enabled and pics.chat_pictures:
+            # Discord style: "[👑 OWNER] Name" line (pictures) once, then each message on its own line in the
+            # normal Minecraft font. More messages from the same person within 2 minutes skip the name line.
+            p = event.player
+            now = time.time()
+            last = getattr(self, "_last_chat", None)
+            if not last or last[0] != str(p.xuid) or now - last[1] > 120:
+                header = self.ranks.chat_header(p)
+                for r in event.recipients:
+                    try:
+                        r.send_message(header)
+                    except Exception:
+                        pass
+            self._last_chat = (str(p.xuid), now)
+            event.format = "§f{1}"
+            self.logger.info(f"<{p.name}> {event.message}")
+        else:
+            event.format = self.ranks.chat_format(event.player)
 
     @event_handler
     def on_actor_spawn(self, event: ActorSpawnEvent):
