@@ -2,16 +2,23 @@
 // and Players (one card per player with everything staff need). All text goes in with textContent.
 import { h, openDialog, postJson, getJson, select, field, muteDialog, banDialog, MUTE_LABELS } from "/js/dialog.js";
 import { ticketChat, chip, when, LABELS, PRIORITIES, ticketEvent } from "/js/tickets.js";
+import { iconEl } from "/js/site.js";
 
 const $ = (id) => document.getElementById(id);
+// a button with a line icon in front of its text
+const ibtn = (name, label, onclick, cls = "btn btn-secondary") => {
+  const b = h("button", { class: cls, type: "button", onclick });
+  b.append(iconEl(name), label);
+  return b;
+};
 const money = (n) => (n == null ? "–" : `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
 // 1234 -> "1,234", 1234567 -> "1.2M": keeps the stat tiles from overflowing
 const short = (n) => {
   n = Number(n) || 0;
   const a = Math.abs(n);
   const one = (x) => x.toFixed(1).replace(/\.0$/, "");
-  if (a >= 1e9) return `${one(n / 1e9)}B`;
-  if (a >= 1e6) return `${one(n / 1e6)}M`;
+  if (a >= 999.95e6) return `${one(n / 1e9)}B`;
+  if (a >= 999.5e3) return `${one(n / 1e6)}M`;
   if (a >= 1e5) return `${Math.round(n / 1e3)}K`;
   return n.toLocaleString(undefined, { maximumFractionDigits: 1 });
 };
@@ -90,13 +97,13 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
     });
     const quick = h("section", { class: "panel ov-quick" },
       h("h2", { text: "Quick controls" }),
-      h("div", { class: "ov-q" }, h("h3", { text: "📢 In-game announcement" }), h("p", { class: "text-3 small", text: "Shows a box at the top of everyone's screen with a chime." }), annForm),
+      h("div", { class: "ov-q" }, h("h3", {}, iconEl("megaphone"), "In-game announcement"), h("p", { class: "text-3 small", text: "Shows a box at the top of everyone's screen with a chime." }), annForm),
       h("div", { class: "ov-q-row" },
-        h("button", { class: "btn btn-secondary", type: "button", text: "🛟 Answer tickets", onclick: () => selectTab("tickets") }),
-        h("button", { class: "btn btn-secondary", type: "button", text: "🔎 Find a player", onclick: () => { selectTab("players"); $("pl-search").focus(); } }),
-        h("button", { class: "btn btn-secondary", type: "button", text: "🤬 Chat filter", onclick: () => selectTab("words") }),
-        admin ? h("button", { class: "btn btn-secondary", type: "button", text: "🏷️ Ranks", onclick: () => selectTab("ranks") }) : null,
-        admin ? h("button", { class: "btn btn-secondary", type: "button", text: "💰 Economy", onclick: () => selectTab("economy") }) : null));
+        ibtn("lifebuoy", "Answer tickets", () => selectTab("tickets")),
+        ibtn("search", "Find a player", () => { selectTab("players"); $("pl-search").focus(); }),
+        ibtn("filter", "Chat filter", () => selectTab("words")),
+        admin ? ibtn("tag", "Ranks", () => selectTab("ranks")) : null,
+        admin ? ibtn("coins", "Economy", () => selectTab("economy")) : null));
 
     const online = h("section", { class: "panel" }, h("h2", { text: `In game now (${d.online.length})` }),
       d.online.length ? h("div", { class: "ov-online" }, d.online.map((p) => h("button", { class: "ov-player", type: "button", onclick: () => openPlayer(p.xuid) }, headImg(p.head, 28), h("span", { text: p.name }))))
@@ -108,7 +115,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
         h("time", { class: "text-3 small", text: when(r.at) })))) : h("p", { class: "text-3 small", text: "Nothing yet." }),
       h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Full audit log", onclick: () => selectTab("audit") }));
     const warn = d.server.online && d.server.outdated
-      ? h("div", { class: "panel ov-warn" }, h("b", { text: "⚠️ The server is running an old GalaxyLink plugin" }),
+      ? h("div", { class: "panel ov-warn" }, h("b", {}, iconEl("alert"), "The server is running an old GalaxyLink plugin"),
         h("p", { class: "text-2 small", style: "margin:4px 0 0", text: `It's on ${d.server.plugin || "an older version"}, but the website is made for ${d.server.latest}. New features (cosmetics, Night Vision, website moderation, heads...) won't work in game until you install the newest plugin file and restart the server.` }))
       : null;
     box.replaceChildren(...(warn ? [warn] : []), grid, h("div", { class: "ov-cols" }, quick, h("div", { class: "stack", style: "gap:16px" }, online, recent)));
@@ -127,14 +134,14 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
     try { d = await getJson(`/api/mod/tickets?status=${ticketFilter}`); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
     setBadge("tickets", d.open);
     box.replaceChildren();
-    if (!d.tickets.length) box.append(h("div", { class: "panel empty", text: ticketFilter === "active" ? "No open tickets. 🎉" : "No tickets here." }));
+    if (!d.tickets.length) box.append(h("div", { class: "panel empty", text: ticketFilter === "active" ? "No open tickets. All caught up!" : "No tickets here." }));
     for (const t of d.tickets) {
       box.append(h("button", { class: `panel tk-row prio-${t.priority}${t.staffUnread ? " unread" : ""}`, type: "button", onclick: () => openTicket(t.id) },
         headImg(t.user?.head, 36),
         h("span", { class: "tk-row-main" },
           h("span", { class: "tk-row-subject", text: t.subject }),
           h("span", { class: "tk-row-preview", text: `${t.user?.username || "?"}: ${t.preview || ""}` }),
-          h("span", { class: "tk-chips" }, chip("label", t.label), chip("priority", t.priority), t.assignedTo ? h("span", { class: "text-3 small", text: `👤 ${t.assignedTo}` }) : null)),
+          h("span", { class: "tk-chips" }, chip("label", t.label), chip("priority", t.priority), t.assignedTo ? h("span", { class: "text-3 small tk-assignee" }, iconEl("user"), t.assignedTo) : null)),
         h("span", { class: "tk-row-side" }, chip("status", t.status, true), h("span", { class: "text-3 small", text: when(t.lastMessageAt) }),
           t.staffUnread ? h("span", { class: "tk-unread", text: `${t.staffUnread} new` }) : null)));
     }
@@ -197,7 +204,8 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
     try { d = await getJson(`/api/mod/players/${encodeURIComponent(xuid)}`); } catch (e) { toast(e.message); return; }
     const p = d.player;
     const reload = (msg) => { if (msg) toast(msg); openPlayer(xuid); plSearch(); };
-    const act = (label, cls, fn, needAdmin) => (needAdmin && !admin ? null : h("button", { class: `btn btn-sm ${cls}`, type: "button", text: label, onclick: fn }));
+    const act = (label, cls, fn, needAdmin, ic) => (needAdmin && !admin ? null
+      : h("button", { class: `btn btn-sm ${cls}`, type: "button", onclick: fn }, ic ? iconEl(ic) : null, label));
     const gameAction = (action, title, opts = {}) => () => {
       const reason = h("input", { class: "input", id: "pa-reason", maxlength: 200, placeholder: opts.reasonRequired ? "Required: what did they do?" : "Optional" });
       const lens = opts.lengths ? select("pa-len", opts.lengths, opts.defaultLen) : null;
@@ -219,7 +227,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
     const notesBox = h("div", { class: "pc-notes" });
     for (const n of d.notes) {
       notesBox.append(h("div", { class: "pc-note" }, h("div", { class: "pc-note-head" }, h("b", { text: n.author }), h("time", { class: "text-3 small", text: fmt(n.at) }),
-        admin ? h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": "Delete note", text: "✕", onclick: async () => { await postJson(`/api/mod/players/${xuid}/note-delete`, { id: n.id }); reload(); } }) : null),
+        admin ? h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": "Delete note", onclick: async () => { await postJson(`/api/mod/players/${xuid}/note-delete`, { id: n.id }); reload(); } }, iconEl("x")) : null),
       h("p", { text: n.body })));
     }
     const noteInput = h("textarea", { class: "input", rows: 2, maxlength: 500, placeholder: "Add a private staff note (only staff see notes)" });
@@ -233,7 +241,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
         headImg(p.head, 64),
         h("div", {},
           h("h3", { class: "pc-name" }, p.name, p.op ? h("span", { class: "pl-tag op", text: "OP" }) : null),
-          h("p", { class: "text-3 small", style: "margin:2px 0 0", text: `${p.online ? "🟢 In game now" : `Last seen ${fmt(p.lastSeen)}`} · first joined ${fmt(p.firstSeen)}` }),
+          h("p", { class: "text-3 small", style: "margin:2px 0 0", text: `${p.online ? "In game now" : `Last seen ${fmt(p.lastSeen)}`} · first joined ${fmt(p.firstSeen)}` }, p.online ? h("span", { class: "pc-online-dot" }) : null),
           h("div", { class: "pc-tags" },
             p.rank ? h("span", { class: "pl-tag", style: `--c:${p.rank.color || "#aab"}`, text: `Rank: ${p.rank.name}` }) : h("span", { class: "pl-tag", text: "No rank" }),
             p.plan ? h("span", { class: `pl-tag plan ${p.plan}`, text: `${PLAN_NAMES[p.plan]}${p.planExpires ? ` until ${new Date(p.planExpires).toLocaleDateString()}` : ""}` }) : h("span", { class: "pl-tag", text: "Galaxy Free" }),
@@ -250,14 +258,14 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
         act("Kick", "btn-secondary", gameAction("kick", "Kick", { reasonRequired: true, text: "They're removed from the server but can join again." })),
         p.banned ? act("Unban", "btn-secondary", gameAction("unban", "Unban", { noReason: true }), true)
           : act("Ban", "btn-danger", gameAction("ban", "Ban", { lengths: [...LEN, ["perm", "Permanent"]], defaultLen: "perm", danger: true, reasonRequired: true }), true),
-        act("🗝️ Give crate keys", "btn-secondary", () => keyDialog(p, xuid, reload), true)),
+        act("Give crate keys", "btn-secondary", () => keyDialog(p, xuid, reload), true, "key")),
 
       admin ? h("h4", { text: "Rank, plan and money" }) : null,
       admin ? h("div", { class: "pc-actions" },
         act("Change rank", "btn-secondary", () => rankDialog(p, xuid, reload)),
         act("Change plan", "btn-secondary", () => planDialog(p, xuid, reload)),
         act("Change money", "btn-secondary", () => moneyDialog(p, xuid, reload)),
-        act("🛒 Give a Shop item", "btn-secondary", () => shopDialog(p, d.shop, xuid, reload))) : null,
+        act("Give a Shop item", "btn-secondary", () => shopDialog(p, d.shop, xuid, reload), false, "cart")) : null,
       h("h4", { text: "Store items" }),
       h("p", { class: "text-2 small", style: "margin:0", text: [
         `Cosmetics: ${d.shop.cosmetics.length ? d.shop.cosmetics.map((c) => c.replace(/^(trail|join)_/, "").replace(/_/g, " ")).join(", ") : "none"}`,

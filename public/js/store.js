@@ -1,6 +1,6 @@
 // Store page: Subscriptions (monthly plans) and Shop (one-time items).
 // Checkout answers "coming soon" until payments open.
-import { toast } from "/js/site.js";
+import { toast, iconEl } from "/js/site.js";
 import { rankTag } from "/js/rank-paint.js";
 
 async function startCheckout(id, option, button) {
@@ -76,7 +76,9 @@ function renderShop(data) {
     for (const item of cat.items) {
       const card = el("article", `panel shop-item cat-${cat.id}`);
       if (item.badge) card.append(el("span", "plan-badge", item.badge));
-      card.append(el("div", "shop-icon", item.icon || "🛒"), el("h4", "shop-name", item.name), el("p", "text-2 shop-desc", item.description));
+      const ico = el("div", "shop-icon");
+      ico.append(iconEl(item.icon || "cart"));
+      card.append(ico, el("h4", "shop-name", item.name), el("p", "text-2 shop-desc", item.description));
       let option = null;
       const amount = el("span", "shop-price", usd(item.options ? item.options[0].price : item.price));
       if (item.options) {
@@ -129,6 +131,7 @@ function watchTabs() {
   }
   renderPlans(data);
   renderShop(data);
+  document.querySelectorAll("[data-store-tab]").forEach((t) => t.prepend(iconEl(t.dataset.storeTab === "shop" ? "cart" : "star")));
   watchTabs();
   if (location.hash === "#shop") document.getElementById("shop").scrollIntoView();
 })();

@@ -151,7 +151,7 @@ export async function closeTicket(request, env, ctx, url, params) {
   const sql = getDb(env);
   const t = await loadTicket(sql, Number(params.id), user);
   const [updated] = await sql`UPDATE tickets SET status = 'closed', updated_at = now() WHERE id = ${t.id} RETURNING *`;
-  await sql`INSERT INTO ticket_messages (ticket_id, user_id, from_staff, body) VALUES (${t.id}, ${user.id}, ${isStaff(user) && Number(t.user_id) !== Number(user.id)}, ${"🔒 Ticket closed."})`;
+  await sql`INSERT INTO ticket_messages (ticket_id, user_id, from_staff, body) VALUES (${t.id}, ${user.id}, ${isStaff(user) && Number(t.user_id) !== Number(user.id)}, ${"Ticket closed."})`;
   await notify(env, updated);
   return json({ ok: true });
 }

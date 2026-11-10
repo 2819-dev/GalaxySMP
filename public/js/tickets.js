@@ -1,14 +1,15 @@
 // Support tickets: the live conversation view, shared by the community Support channel
 // (players) and the panel's Tickets tab (staff). All text goes in with textContent.
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
+import { iconEl } from "/js/site.js";
 
 export const LABELS = {
-  question: { name: "Question", icon: "❓" },
-  bug: { name: "Bug", icon: "🐞" },
-  report: { name: "Player report", icon: "🚩" },
-  appeal: { name: "Ban/mute appeal", icon: "⚖️" },
-  store: { name: "Store / plans", icon: "💳" },
-  other: { name: "Other", icon: "💬" },
+  question: { name: "Question", icon: "help" },
+  bug: { name: "Bug", icon: "bug" },
+  report: { name: "Player report", icon: "flag" },
+  appeal: { name: "Ban/mute appeal", icon: "scale" },
+  store: { name: "Store / plans", icon: "card" },
+  other: { name: "Other", icon: "message" },
 };
 export const PRIORITIES = { urgent: "Urgent", high: "High", normal: "Normal", low: "Low" };
 export const STATUSES = { open: "Needs staff", waiting: "Waiting for player", resolved: "Resolved", closed: "Closed" };
@@ -36,7 +37,7 @@ export function when(at) {
 export function chip(kind, value, staff) {
   if (kind === "label") {
     const l = LABELS[value] || LABELS.other;
-    return h("span", { class: `tk-chip tk-label ${value}`, text: `${l.icon} ${l.name}` });
+    return h("span", { class: `tk-chip tk-label ${value}` }, iconEl(l.icon), l.name);
   }
   if (kind === "priority") return h("span", { class: `tk-chip tk-prio ${value}`, text: PRIORITIES[value] });
   return h("span", { class: `tk-chip tk-status ${value}`, text: (staff ? STATUSES : PLAYER_STATUS)[value] });
@@ -97,7 +98,7 @@ export function ticketChat(box, id, opts) {
   function renderControls(t) {
     const mk = (name, options, value, key) => {
       const sel = h("select", { class: "input tk-select", "aria-label": name });
-      for (const [k, n] of Object.entries(options)) sel.append(h("option", { value: k, text: typeof n === "string" ? n : `${n.icon} ${n.name}`, selected: k === value }));
+      for (const [k, n] of Object.entries(options)) sel.append(h("option", { value: k, text: typeof n === "string" ? n : n.name, selected: k === value }));
       sel.addEventListener("change", () => update({ [key]: sel.value }));
       return h("label", { class: "tk-ctl" }, h("span", { text: name }), sel);
     };
@@ -148,7 +149,7 @@ export function ticketChat(box, id, opts) {
 export function newTicketDialog(toast, done) {
   const subject = h("input", { class: "input", id: "tk-subject", maxlength: 80, placeholder: "e.g. I lost my items after a crash" });
   const label = h("select", { class: "input", id: "tk-label" });
-  for (const [k, l] of Object.entries(LABELS)) label.append(h("option", { value: k, text: `${l.icon} ${l.name}` }));
+  for (const [k, l] of Object.entries(LABELS)) label.append(h("option", { value: k, text: l.name }));
   const body = h("textarea", { class: "input", id: "tk-body", maxlength: 500, rows: 5, placeholder: "Explain what happened. Staff will answer here." });
   openDialog({
     title: "Contact staff",

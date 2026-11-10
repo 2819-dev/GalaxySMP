@@ -1210,3 +1210,32 @@ img[src*="g=1"] { image-rendering: auto !important; }
 }
 
 .ov-warn { border-color: rgba(232,184,74,.5); background: rgba(232,184,74,.08); margin-bottom: 16px; padding: 14px 18px; }
+
+/* ---------- Line icons (instead of emojis) ---------- */
+.ic { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 0; }
+.ic svg { width: 1.1em; height: 1.1em; }
+.btn .ic, .with-ic .ic, .tk-assignee .ic, .ov-q h3 .ic, .ov-warn b .ic { margin-right: 6px; vertical-align: -0.15em; }
+.btn .ic svg { width: 16px; height: 16px; }
+.with-ic, .tk-assignee { display: inline-flex; align-items: center; }
+.tk-chip { display: inline-flex; align-items: center; gap: 4px; }
+.tk-chip .ic svg { width: 12px; height: 12px; stroke-width: 2.2; }
+.tk-row-icon { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); color: var(--accent-text); }
+.tk-row-icon svg { width: 20px; height: 20px; }
+.tk-hero-icon { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; flex-shrink: 0; color: #fff;
+  background: linear-gradient(135deg, #2457eb, #8a3cff); box-shadow: 0 8px 22px -6px rgba(90, 80, 255, .7), inset 0 1px 0 rgba(255,255,255,.3); font-size: 0; }
+.tk-hero-icon svg { width: 30px; height: 30px; }
+.shop-icon { font-size: 0; color: #fff; }
+.shop-icon svg { width: 26px; height: 26px; stroke-width: 1.9; }
+.cat-money .shop-icon { color: #7cf0b0; } .cat-plots .shop-icon { color: #ffd27a; } .cat-effects .shop-icon { color: #8fd2ff; } .cat-cosmetics .shop-icon { color: #ffa6dc; }
+.sg-vote { display: inline-flex; align-items: center; gap: 6px; }
+.sg-vote .ic svg { width: 17px; height: 17px; }
+.badge .e { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; flex-shrink: 0; font-size: 0;
+  background: linear-gradient(135deg, rgba(36,87,235,.3), rgba(160,90,255,.25)); color: #cfd8ff; }
+.badge .e svg { width: 22px; height: 22px; }
+.badge.locked .e { background: var(--surface-2); color: var(--text-3); }
+.icon-btn .ic svg, .icon-btn > svg { width: 16px; height: 16px; }
+.share-glyph { display: inline-flex; align-items: center; vertical-align: -0.2em; padding: 2px 4px; }
+.share-glyph svg { width: 15px; height: 15px; }
+.store-tab { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.store-tab .ic svg { width: 16px; height: 16px; }
+.pc-online-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-left: 6px; box-shadow: 0 0 6px var(--ok); }

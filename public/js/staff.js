@@ -1,5 +1,5 @@
 // Staff Tools page: reports, members, word filter, ranks, economy and audit log.
-import { toast } from "/js/site.js";
+import { toast, iconEl } from "/js/site.js";
 import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, voiceMuteDialog, select, field } from "/js/dialog.js";
 import { setupPanel } from "/js/staff-panel.js";
 import { MC_COLORS, hexOf, GRADIENTS, paint, gradientCss, rankTag } from "/js/rank-paint.js";
@@ -75,7 +75,7 @@ function gameReportCard(r) {
       h("span", {}, "Reported: ", h("b", { text: r.target })),
       h("span", {}, "By ", h("b", { text: r.reporter })),
       h("span", { text: fmt(r.at) }),
-      where ? h("span", { text: `📍 ${where}` }) : null),
+      where ? h("span", { class: "with-ic" }, iconEl("pin"), where) : null),
     h("div", { class: "quote", text: `${r.reason}${r.details ? `: ${r.details}` : ""}` }),
     r.history.length ? h("ul", { class: "report-list" }, r.history.map((x) => h("li", {},
       h("b", { text: KIND_WORDS[x.kind] || x.kind }),
@@ -240,11 +240,11 @@ function renderWords() {
       mask(w.word),
       h("span", { class: "kind", text: w.match === "contains" ? "anywhere" : "word" }),
       h("button", {
-        class: "icon-btn", type: "button", "aria-label": `Remove ${w.word}`, text: "✕",
+        class: "icon-btn", type: "button", "aria-label": `Remove ${w.word}`,
         onclick: async () => {
           try { await postJson(`/api/mod/words/${w.id}/delete`); toast("Removed from the filter."); loaders.words(); } catch (e) { toast(e.message); }
         },
-      })));
+      }, iconEl("x"))));
   }
 }
 

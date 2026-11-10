@@ -2,6 +2,7 @@
 // All text goes in with textContent, never as HTML.
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 import { ticketChat, newTicketDialog, onTicketEvent, chip, when, LABELS } from "/js/tickets.js";
+import { iconEl } from "/js/site.js";
 
 const panel = () => document.getElementById("channel-panel");
 const voiceBox = () => document.getElementById("voice-embed");
@@ -246,8 +247,8 @@ function card(s, canModerate, reload) {
   const vote = async (value) => {
     try { await postJson(`/api/community/suggestions/${s.id}/vote`, { value: s.myVote === value ? 0 : value }); reload(); } catch (e) { ctx.toast(e.message); }
   };
-  const up = h("button", { class: "sg-vote up", type: "button", "aria-pressed": String(s.myVote === 1), "aria-label": `Like (${s.likes})`, onclick: () => vote(1) }, "👍", String(s.likes));
-  const down = h("button", { class: "sg-vote down", type: "button", "aria-pressed": String(s.myVote === -1), "aria-label": `Dislike (${s.dislikes})`, onclick: () => vote(-1) }, "👎", String(s.dislikes));
+  const up = h("button", { class: "sg-vote up", type: "button", "aria-pressed": String(s.myVote === 1), "aria-label": `Like (${s.likes})`, onclick: () => vote(1) }, iconEl("thumbsUp"), String(s.likes));
+  const down = h("button", { class: "sg-vote down", type: "button", "aria-pressed": String(s.myVote === -1), "aria-label": `Dislike (${s.dislikes})`, onclick: () => vote(-1) }, iconEl("thumbsDown"), String(s.dislikes));
   let who;
   if (!s.anonymous) who = s.author;
   else if (s.author) who = `Anonymous (${s.mine ? "you" : s.author}, only ${s.mine ? "you and the owners" : "owners"} can see this)`;
@@ -310,7 +311,7 @@ function renderSupport(p, openId) {
   const list = h("div", { class: "stack", style: "gap:10px" });
   wrap.append(
     h("section", { class: "panel tk-hero" },
-      h("div", { class: "tk-hero-icon", "aria-hidden": "true", text: "🛟" }),
+      h("div", { class: "tk-hero-icon" }, iconEl("lifebuoy")),
       h("div", {},
         h("h2", { text: "Need help?" }),
         h("p", { class: "text-2", text: "Open a ticket to chat privately with the staff team: questions, bugs, lost items, reports or appeals. Only you and staff can see it." }),
@@ -327,7 +328,7 @@ function renderSupport(p, openId) {
     if (!data.tickets.length) list.append(h("div", { class: "panel empty", text: "You haven't opened any tickets yet." }));
     for (const t of data.tickets) {
       list.append(h("button", { class: `panel tk-row${t.userUnread ? " unread" : ""}`, type: "button", onclick: () => renderSupport(p, t.id) },
-        h("span", { class: "tk-row-icon", "aria-hidden": "true", text: (LABELS[t.label] || LABELS.other).icon }),
+        h("span", { class: "tk-row-icon" }, iconEl((LABELS[t.label] || LABELS.other).icon)),
         h("span", { class: "tk-row-main" },
           h("span", { class: "tk-row-subject", text: t.subject }),
           h("span", { class: "tk-row-preview", text: t.preview || "" })),

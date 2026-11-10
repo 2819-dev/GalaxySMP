@@ -14,6 +14,64 @@ const ICONS = {
   mountain: '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
   target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
   cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  // premium line icons (used instead of emojis)
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  thumbsUp: '<path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z"/><path d="M7 10l4-8a2.5 2.5 0 0 1 3 2.6L13.5 9H19a2 2 0 0 1 2 2.3l-1.3 8A2 2 0 0 1 17.7 21H7"/>',
+  thumbsDown: '<path d="M7 14V3H4a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1z"/><path d="M7 14l4 8a2.5 2.5 0 0 0 3-2.6l-.5-4.4H19a2 2 0 0 0 2-2.3l-1.3-8A2 2 0 0 0 17.7 3H7"/>',
+  lifebuoy: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6l3.6 3.6M14.8 14.8l3.6 3.6M18.4 5.6l-3.6 3.6M9.2 14.8l-3.6 3.6"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+  filter: '<path d="M4 5h16l-6 8v5l-4 2v-7z"/>',
+  tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+  alert: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>',
+  pin: '<path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M15 8l2 2"/>',
+  cart: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a1 1 0 0 0 1 .8h9.6a1 1 0 0 0 1-.8L21 7H6.2"/>',
+  star: '<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/>',
+  crown: '<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/><path d="M5 19h14"/>',
+  bank: '<path d="M3 10 12 4l9 6"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 21h18"/>',
+  wallet: '<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M16 15h2"/><path d="M6 6V5a2 2 0 0 1 2-2h9"/>',
+  store: '<path d="M4 10v10h16V10"/><path d="M3 4h18l-1 6H4z"/><path d="M8 4l-1 6M16 4l1 6M12 4v6"/><path d="M10 20v-5h4v5"/>',
+  moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z"/>',
+  heart: '<path d="M12 20s-7.5-4.6-9.2-9.4A4.8 4.8 0 0 1 12 6a4.8 4.8 0 0 1 9.2 4.6C19.5 15.4 12 20 12 20z"/>',
+  flame: '<path d="M12 22c4 0 7-2.7 7-6.6 0-3.5-2.4-5.6-3.6-8.4-.5 2.2-1.6 3.4-2.9 4C12.8 7.8 11.3 4.6 8.6 2.5 8.8 6.5 5 9 5 15.4 5 19.3 8 22 12 22z"/>',
+  music: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
+  sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+  soul: '<path d="M12 22c3.6 0 6-2.5 6-5.8 0-3-2-4.8-3-7.2-.6 1.8-1.6 2.6-2.6 3.1.2-2.9-1-5.5-3.2-7.1.2 3.4-3.2 5.6-3.2 11.2 0 3.3 2.4 5.8 6 5.8z"/><path d="M12 22c-1.7 0-3-1.1-3-2.8 0-1.6 1.2-2.6 1.8-3.8.6 1.2 2.2 1.8 2.2 3.6 0 .6.5 1 .9 1.3"/>',
+  flower: '<circle cx="12" cy="12" r="2.5"/><path d="M12 9.5C9 7 9.5 3 12 3s3 4 0 6.5zM14.5 12c2.5-3 6.5-2.5 6.5 0s-4 3-6.5 0zM12 14.5c3 2.5 2.5 6.5 0 6.5s-3-4 0-6.5zM9.5 12C7 15 3 14.5 3 12s4-3 6.5 0z"/>',
+  orbit: '<circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(-25 12 12)"/><circle cx="20" cy="7.5" r="1" fill="currentColor"/>',
+  firework: '<path d="M12 12v10"/><path d="M12 2v3M12 12 7 7M12 12l5-5M4 12h3M17 12h3M6.3 17.7 8 16M17.7 17.7 16 16M6.3 6.3 8 8M17.7 6.3 16 8"/>',
+  bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21a2 2 0 0 0 4 0"/>',
+  message: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .8c0 1.8-2.5 2.4-2.5 4"/><path d="M12 17h.01"/>',
+  bug: '<rect x="8" y="7" width="8" height="13" rx="4"/><path d="M12 11v9M9 7l-1.5-2.5M15 7l1.5-2.5M4 11h4M16 11h4M4 17h4M16 17h4M4 6l2 2M20 6l-2 2"/>',
+  scale: '<path d="M12 3v18M7 21h10M5 6h14"/><path d="M5 6l-3 7a3 3 0 0 0 6 0zM19 6l-3 7a3 3 0 0 0 6 0z"/>',
+  card: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
+  share: '<path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/>',
+  lock2: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  dot: '<circle cx="12" cy="12" r="5" fill="currentColor" stroke="none"/>',
+  check2: '<path d="M20 6 9 17l-5-5"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  pickaxe: '<path d="M16 8 4 20"/><path d="M6.5 5C10.5 2.8 15.5 3 19 5c2 3.5 2.2 8.5 0 12.5"/><path d="M14 4.2 19.8 10"/>',
+  gem: '<path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20M10 3 8 9l4 12 4-12-2-6"/>',
+  bricks: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9.3h18M3 14.6h18M9 4v5.3M15 9.3v5.3M9 14.6V20"/>',
+  castle: '<path d="M4 21V9h3V6h2v3h2V6h2v3h2V6h2v3h3v12z"/><path d="M10 21v-4a2 2 0 0 1 4 0v4"/>',
+  sword: '<path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="M13 19l6-6M16 16l4 4M19 21l2-2"/>',
+  skull: '<path d="M12 3a8 8 0 0 0-8 8c0 2.6 1.3 4.5 3 5.6V20h10v-3.4c1.7-1.1 3-3 3-5.6a8 8 0 0 0-8-8z"/><circle cx="9" cy="11.5" r="1.6"/><circle cx="15" cy="11.5" r="1.6"/><path d="M10 20v-2M14 20v-2"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  scroll: '<path d="M7 4h11a2 2 0 0 1 2 2v1h-4"/><path d="M16 7v11a3 3 0 0 1-3 3H6a3 3 0 0 0 3-3V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2h4"/><path d="M10.5 11h3M10.5 15h3"/>',
+  trophy2: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+  handshake: '<path d="m11 17 2 2a1.4 1.4 0 0 0 2-2"/><path d="m14 14 2.5 2.5a1.4 1.4 0 0 0 2-2l-3.9-3.9a2.8 2.8 0 0 0-4 0l-.9.9a1.4 1.4 0 0 1-2-2l2.8-2.8a5 5 0 0 1 5.6-1L18 7h3v8h-2"/><path d="M3 7h3l3 1M3 15h2l5 5a1.4 1.4 0 0 0 2-2"/>',
+  gavel: '<path d="m14 13-7.5 7.5a2.1 2.1 0 0 1-3-3L11 10"/><path d="m16 16 6-6M8 8l6-6M9 7l8 8M21 11l-8-8"/>',
+  wrench: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',
+  medal: '<circle cx="12" cy="15" r="5"/><path d="M8.5 11.5 5 3h4l3 6 3-6h4l-3.5 8.5"/><path d="m12 13 .9 1.8 2 .3-1.5 1.4.4 2-1.8-1-1.8 1 .4-2-1.5-1.4 2-.3z"/>',
+  portal: '<ellipse cx="12" cy="12" rx="6" ry="9"/><ellipse cx="12" cy="12" rx="2.5" ry="5"/>',
+  elevator: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 3v18M8 10l-1.5-2L5 10M8 14l-1.5 2L5 14"/><path d="M15 9.5l1.5-1.5L18 9.5M15 14.5l1.5 1.5L18 14.5"/>',
+  homes: '<path d="M2 12 8 7l6 5v8H2z"/><path d="M10 9.5 16 5l6 5v10h-8"/><path d="M6 20v-4h4v4"/>',
+  gift2: '<rect x="3" y="8" width="18" height="5" rx="1"/><path d="M5 13v8h14v-8M12 8v13"/><path d="M12 8C10 4 6.5 4 6.5 6.2 6.5 8 9.5 8 12 8zM12 8c2-4 5.5-4 5.5-1.8C17.5 8 14.5 8 12 8z"/>',
+  dice: '<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="15" cy="9" r="1.2" fill="currentColor"/><circle cx="9" cy="15" r="1.2" fill="currentColor"/>',
+  bag2: '<path d="M5 8h14l-1 13H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+  comet: '<circle cx="16" cy="8" r="3.5"/><path d="M13.5 10.5 3 21M12 8.5 5 15.5M15.5 12 8.5 19"/>',
   // server features
   always: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M20.5 4.5 21 8h-3.5"/>',
   coins: '<ellipse cx="9" cy="7" rx="6" ry="3"/><path d="M3 7v4c0 1.7 2.7 3 6 3s6-1.3 6-3V7"/><path d="M9 14v3c0 1.7 2.7 3 6 3s6-1.3 6-3v-4c0-1.7-2.7-3-6-3"/>',
@@ -42,6 +100,15 @@ const ICONS = {
   tools: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',
   megaphone: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
 };
+
+// The same icon as an element: <span class="ic">svg</span>
+export function iconEl(name, cls = "") {
+  const span = document.createElement("span");
+  span.className = `ic${cls ? ` ${cls}` : ""}`;
+  span.setAttribute("aria-hidden", "true");
+  span.innerHTML = icon(name); // fixed strings from ICONS, never user text
+  return span;
+}
 
 export function icon(name) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;
@@ -299,7 +366,7 @@ function showIosSteps() {
       <img src="/img/icon-192.png" alt="" width="56" height="56">
       <h3>Add GalaxySMP to your Home Screen</h3>
       <ol>
-        <li>Tap the <b>Share</b> button <span class="share-glyph" aria-hidden="true">⬆︎</span> at the bottom (or top) of Safari.</li>
+        <li>Tap the <b>Share</b> button <span class="share-glyph" aria-hidden="true">${icon("share")}</span> at the bottom (or top) of Safari.</li>
         <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
         <li>Tap <b>Add</b>. Open GalaxySMP from your Home Screen.</li>
       </ol>
@@ -349,17 +416,17 @@ function forceInstallScreen() {
     steps = `<ol>
       <li>This app's browser can't install GalaxySMP. Tap <b>Copy link</b> below.</li>
       <li>Open <b>Safari</b>, paste the link and go.</li>
-      <li>Then tap <b>Share</b> <span class="share-glyph" aria-hidden="true">⬆︎</span> → <b>Add to Home Screen</b> → <b>Add</b>.</li></ol>
+      <li>Then tap <b>Share</b> <span class="share-glyph" aria-hidden="true">${icon("share")}</span> → <b>Add to Home Screen</b> → <b>Add</b>.</li></ol>
       <button class="btn btn-secondary btn-block" type="button" data-copy-link>Copy link</button>`;
   } else if (otherBrowser) {
     steps = `<ol>
-      <li>Tap the <b>Share</b> button <span class="share-glyph" aria-hidden="true">⬆︎</span> (in the address bar or the ••• menu).</li>
+      <li>Tap the <b>Share</b> button <span class="share-glyph" aria-hidden="true">${icon("share")}</span> (in the address bar or the ••• menu).</li>
       <li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
       <li>Open <b>GalaxySMP</b> from your Home Screen.</li></ol>
       <p class="text-3 small">Don't see it? Open galaxymc.us in Safari and do it there.</p>`;
   } else {
     steps = `<ol>
-      <li>Tap the <b>Share</b> button <span class="share-glyph" aria-hidden="true">⬆︎</span> at the bottom of Safari (top on iPad).</li>
+      <li>Tap the <b>Share</b> button <span class="share-glyph" aria-hidden="true">${icon("share")}</span> at the bottom of Safari (top on iPad).</li>
       <li>Scroll down and tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
       <li>Open <b>GalaxySMP</b> from your Home Screen.</li></ol>`;
   }

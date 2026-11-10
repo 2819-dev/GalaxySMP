@@ -1,5 +1,18 @@
 // Public player profile: /player/<gamertag>
-import "/js/site.js";
+import { iconEl } from "/js/site.js";
+
+// A line icon for each achievement (instead of the emojis the game uses).
+const ACH_ICONS = {
+  welcome: "orbit", play_1h: "clock", play_10h: "clock", play_100h: "medal", play_500h: "comet",
+  mine_1k: "pickaxe", mine_10k: "pickaxe", mine_100k: "gem", diamonds: "gem", diamonds_100: "gem",
+  build_1k: "bricks", build_10k: "bricks", build_100k: "castle", hunt_100: "sword", hunt_1k: "sword", hunt_10k: "sword",
+  first_death: "skull", deaths_100: "skull", streak_7: "flame", streak_30: "calendar", streak_100: "flame", dailies_50: "gift2",
+  quests_10: "scroll", quests_100: "trophy2", quests_500: "trophy2", seller: "coins", seller_10k: "scale",
+  landowner: "home", landlord: "homes", rich_1k: "wallet", rich_10k: "coins", rich_100k: "crown", rich_1m: "crown",
+  crate_1: "dice", crate_50: "gift2", shopkeeper: "store", shop_tycoon: "store", customer: "bag2", auctioneer: "gavel",
+  generous: "handshake", job_10: "wrench", job_21: "medal", traveler: "portal", engineer: "elevator",
+};
+const achIcon = (id) => ACH_ICONS[id] || "star";
 import { h } from "/js/dialog.js";
 import { rankTag } from "/js/rank-paint.js";
 import { money, hours, playerSearch } from "/js/leaderboard.js";
@@ -66,7 +79,7 @@ async function load() {
       p.achievements.length
         ? h("div", { class: "badges" }, [...unlocked, ...p.achievements.filter((a) => !a.unlocked)].map((a) =>
             h("div", { class: `badge${a.unlocked ? "" : " locked"}`, title: a.desc },
-              h("span", { class: "e", "aria-hidden": "true", text: a.emoji || "⭐" }),
+              h("span", { class: "e" }, iconEl(achIcon(a.id))),
               h("div", {}, h("b", { text: a.name }), h("span", { text: a.unlocked ? a.desc : `Locked: ${a.desc}` })))))
         : h("p", { class: "text-3", style: "margin:0", text: "Badges appear once the server has sent them." })),
     h("p", { class: "text-3 small", style: "margin-top:12px" }, "Earn badges with ", h("code", { text: "/achievements" }), ", ", h("code", { text: "/quests" }), " and ", h("code", { text: "/daily" }), " in game. ",

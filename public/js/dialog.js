@@ -14,6 +14,14 @@ export function h(tag, attrs = {}, ...children) {
   return e;
 }
 
+// The ✕ button, drawn as a line icon (not a text character).
+export const X_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+function closeButton(onclick) {
+  const b = h("button", { type: "button", class: "icon-btn", "aria-label": "Close", onclick });
+  b.innerHTML = X_ICON;
+  return b;
+}
+
 // openDialog({ title, body, actions: [{ label, kind, onClick }] })
 // onClick may return a promise; returning false keeps the dialog open.
 export function openDialog({ title, body, actions = [] }) {
@@ -40,7 +48,7 @@ export function openDialog({ title, body, actions = [] }) {
   }
   dlg.append(
     h("div", { class: "dialog-head" }, h("h2", { text: title }),
-      h("button", { type: "button", class: "icon-btn", "aria-label": "Close", onclick: close, text: "✕" })),
+      closeButton(close)),
     h("div", { class: "dialog-body" }, body, err),
     footer
   );
