@@ -47,6 +47,7 @@ class Elevators:
         self.list = self.eco.get_config("elevators") or {}   # id (str) -> elevator
         self.pending = {}      # player uuid -> ("corner", first corner or None)
         self.trips = {}        # elevator id -> running trip
+        self.callers = {}      # elevator id -> players who called it (told if it can't come)
         self.last_tap = {}
         for e in self.list.values():  # the server stopped mid-trip: put the floor back where it was
             if e.get("row") is not None and e["row"] != e["cur"]:
@@ -82,15 +83,37 @@ class Elevators:
                         except Exception:
                             pass
 
-    def clear(self, e, y):
-        """Is the shaft free (only air) at height y?"""
+    def blocker(self, e, y):
+        """The first block in the shaft at height y, as (x, y, z, type), or None if it's empty."""
         d = self.dim(e)
         for x in range(e["x1"], e["x2"] + 1):
             for z in range(e["z1"], e["z2"] + 1):
                 t = d.get_block_at(x, y, z).type
                 if t not in ("minecraft:air", "minecraft:light_block") and not t.endswith("_air"):
-                    return False
-        return True
+                    return (x, y, z, t)
+        return None
+
+    def clear(self, e, y):
+        """Is the shaft free (only air) at height y?"""
+        return self.blocker(e, y) is None
+
+    def first_blocker(self, e, frm, to):
+        """What's in the way of a trip from floor frm to floor to (needs the shaft plus 2 blocks of headroom)."""
+        lo, hi = min(frm, to), max(frm, to) + 2
+        for y in range(lo, hi + 1):
+            if y == frm:
+                continue  # the cabin floor itself
+            b = self.blocker(e, y)
+            if b:
+                return b
+        return None
+
+    @staticmethod
+    def blocked_text(b):
+        x, y, z, t = b
+        return (f"§cThe elevator can't move: there's {t.replace('minecraft:', '').replace('_', ' ')} inside the shaft at "
+                f"{x}, {y}, {z}. §7Only the cabin has a floor: above and below it the shaft must be an empty hole "
+                "(no floor on the other floors inside the shaft).")
 
     def doors(self, e, floor_y):
         """Iron doors right next to the cabin at a floor (their bottom half)."""
@@ -211,11 +234,12 @@ class Elevators:
         for eid, e in self.list.items():
             if not self.near(e, block):
                 continue
-            for f in e["floors"]:
-                if f["y"] + 1 <= block.y <= f["y"] + 3:
-                    if self._debounce(p):
-                        self.call(p, eid, f["y"])
-                    return True
+            # the floor whose landing is closest to the button (buttons sit 1-2 blocks above the landing)
+            f = min(e["floors"], key=lambda f: abs(block.y - (f["y"] + 1.5)))
+            if f["y"] <= block.y <= f["y"] + 4:
+                if self._debounce(p):
+                    self.call(p, eid, f["y"])
+                return True
         return False
 
     def _debounce(self, p):
@@ -232,6 +256,7 @@ class Elevators:
             return player.send_tip(f"§aThe elevator is here: {self.floor_name(e, y)}")
         if y not in e["queue"]:
             e["queue"].append(y)
+        self.callers.setdefault(eid, set()).add(str(player.unique_id))
         player.send_tip(f"§eElevator called to {self.floor_name(e, y)}")
         self.plugin.server.scheduler.run_task(self.plugin, lambda: self.next(eid))
 
@@ -255,15 +280,15 @@ class Elevators:
             self.set_doors(e, target, True)
             return self.next(eid)
         step = 1 if target > e["row"] else -1
-        for y in range(e["row"] + step, target + step, step):  # the shaft must be empty on the way
-            for h in (0, 1, 2) if step == 1 else (0,):
-                yy = y + h if step == 1 else y
-                if yy == e["row"]:
-                    continue
-                if not self.clear(e, yy):
-                    for p in self.riders(e):
-                        p.send_message(f"§cThe elevator shaft is blocked at height {yy}.")
-                    return
+        b = self.first_blocker(e, e["row"], target)  # the shaft must be empty on the way
+        if b:
+            told = self.callers.pop(eid, set())
+            e["queue"].clear()
+            for p in self.plugin.server.online_players:
+                if self.inside(e, p) or str(p.unique_id) in told:
+                    p.send_message(self.blocked_text(b))
+            return
+        self.callers.pop(eid, None)
         self.set_doors(e, e["row"], False)
         for p in self.riders(e):
             self._sound(p, "random.door_close", 0.8, 1.0)
@@ -377,6 +402,7 @@ class Elevators:
         if e:
             form.add_button("§lAdd a floor here§r\n§8Stand on the landing next to the shaft", icon="textures/ui/up_arrow", on_click=lambda p: self.add_floor_form(p, e["id"]))
             form.add_button("§lFloors§r\n§8Rename or remove floors", icon="textures/ui/book_edit_default", on_click=lambda p: self.floors_menu(p, e["id"]))
+            form.add_button("§lCheck the shaft§r\n§8Find blocks in the way", icon="textures/ui/magnifyingGlass", on_click=lambda p: self.check_shaft(p, e["id"]))
             form.add_button("§c§lDelete this elevator", icon="textures/ui/trash", on_click=lambda p: self.delete(p, e["id"]))
         form.add_button("Close")
         player.send_form(form)
@@ -431,7 +457,8 @@ class Elevators:
         self.set_row(self.list[eid], y0, self.list[eid]["floor_block"])  # make the whole cabin floor the same block
         self.save()
         player.send_message(f"§aElevator created ({x2 - x1 + 1}x{z2 - z1 + 1} cabin) with its first floor, Lobby. "
-                            "§7Now go to each other floor, stand on the landing next to the shaft and use /elevator > Add a floor here.")
+                            "§7Now go to each other floor, stand on the landing next to the shaft and use the Elevator Tool > Add a floor here. "
+                            "Keep the shaft above the cabin an empty hole (no floor inside it on the other floors).")
 
     def add_floor_form(self, player, eid):
         e = self.list.get(eid)
@@ -452,8 +479,28 @@ class Elevators:
             e["floors"].sort(key=lambda f: f["y"])
             self.save()
             p.send_message(f"§aAdded floor §f{e['floors'][self.floor_index(e, y)]['name']}§a. §7Put a button next to the shaft here to call the elevator.")
+            in_way = [self.blocker(e, yy) for yy in (y, y + 1, y + 2) if yy != e["row"]]
+            in_way = [b for b in in_way if b]
+            if in_way:
+                x, by, z, t = in_way[0]
+                p.send_message(f"§eRemove the {t.replace('minecraft:', '').replace('_', ' ')} inside the shaft here (at {x}, {by}, {z}): "
+                               "on this floor the shaft must be an empty hole. The cabin's floor comes up into it.")
         player.send_form(ModalForm(title="Add a floor", controls=[TextInput("Floor name", "e.g. Floor 2, Shops, Roof", f"Floor {len(e['floors']) + 1}")],
                                    submit_button="Add", on_submit=submit))
+
+    def check_shaft(self, player, eid):
+        e = self.list.get(eid)
+        if not e:
+            return
+        lo, hi = e["floors"][0]["y"], e["floors"][-1]["y"]
+        b = self.first_blocker(e, e["row"], lo) or self.first_blocker(e, e["row"], hi)
+        names = ", ".join(f"{f['name']} (height {f['y']})" for f in e["floors"])
+        if len(e["floors"]) < 2:
+            player.send_message("§eThis elevator has only 1 floor. §7Stand on the landing of another floor next to the shaft and use Add a floor here.")
+        elif b:
+            player.send_message(self.blocked_text(b))
+        else:
+            player.send_message(f"§aThe shaft is clear. §7Floors: {names}. The cabin is at {self.floor_name(e, e['row'])}.")
 
     def floors_menu(self, player, eid):
         e = self.list.get(eid)
