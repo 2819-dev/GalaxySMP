@@ -165,6 +165,10 @@ class NpcManager:
 
     def find_missing(self):
         missing = [nid for nid in self.npcs if nid not in self.actors and not any(p[0] == nid for p in self.pending)]
+        # only look when a player is near a missing NPC (its area is loaded), not all the time
+        missing = [nid for nid in missing if any(
+            p.dimension.name == self.npcs[nid]["dim"] and math.dist((p.location.x, p.location.z), (self.npcs[nid]["x"], self.npcs[nid]["z"])) < 40
+            for p in self.plugin.server.online_players)]
         if not missing:
             return
         seen = {}

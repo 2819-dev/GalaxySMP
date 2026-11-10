@@ -1,13 +1,21 @@
-"""Floating text labels (shop signs, shop chests, crates), using the invisible galaxysmp:floating_text entity
-from the GalaxySMP blocks pack. Labels are saved, come back if they go missing (when someone is nearby),
-and can be changed or removed by key.
+"""Floating text labels (leaderboards, shop signs, shop chests, crates), using the invisible
+galaxysmp:floating_text entity from the GalaxySMP blocks pack.
+
+Safe by design: this never looks through all the entities in the world (that crashed some servers).
+  - When we summon a label, the spawn event hands us that exact entity and we keep it.
+  - If we don't have a label's entity (after a restart, or it disappeared), we remove any old copy at that
+    exact spot with a targeted /kill and summon a fresh one, only when a player is nearby (area loaded).
 """
 
 import math
 
 ENTITY = "galaxysmp:floating_text"
-TAG = "gsmp_ft"
 NEAR = 48
+
+
+def dim_cmd(name):
+    n = str(name).lower()
+    return "nether" if "nether" in n else "the_end" if "end" in n else "overworld"
 
 
 class FloatingTexts:
@@ -15,12 +23,14 @@ class FloatingTexts:
         self.plugin = plugin
         self.eco = plugin.economy
         self.labels = self.eco.get_config("floating_texts") or {}  # key -> {id, dim, x, y, z, text}
-        self.actors = {}
-        self.waiting = {}   # id -> updates waited after summoning
+        self.actors = {}        # label id -> Actor we summoned
+        self.expecting = None   # the label being summoned right now
+        self.errors = 0
 
     def save(self):
         self.eco.set_config("floating_texts", self.labels)
 
+    # ---------- public ----------
     def set(self, key, dim, x, y, z, text):
         """Adds or updates a label."""
         old = self.labels.get(key)
@@ -31,7 +41,7 @@ class FloatingTexts:
             if old["text"] != text:
                 old["text"] = text
                 self.save()
-                a = self.find(old)
+                a = self.live(old)
                 if a is not None:
                     self._name(a, text)
             return
@@ -39,20 +49,22 @@ class FloatingTexts:
         lab = {"id": lid, "dim": dim, "x": x, "y": y, "z": z, "text": text}
         self.labels[key] = lab
         self.save()
-        self.summon(lab)
+        if self.near(lab):
+            self.summon(lab)
 
     def remove(self, key):
         lab = self.labels.pop(key, None)
         if not lab:
             return
         self.save()
-        a = self.find(lab)
-        if a is not None:
-            try:
+        a = self.actors.pop(lab["id"], None)
+        try:
+            if a is not None and a.is_valid:
                 a.remove()
-            except Exception:
-                pass
-        self.actors.pop(lab["id"], None)
+                return
+        except Exception:
+            pass
+        self.kill_at(lab)
 
     # ---------- entities ----------
     @staticmethod
@@ -63,49 +75,52 @@ class FloatingTexts:
         except Exception:
             pass
 
-    def find(self, lab):
+    def live(self, lab):
         a = self.actors.get(lab["id"])
         try:
             if a is not None and a.is_valid:
                 return a
         except Exception:
             pass
-        want = f"{TAG}_{lab['id']}"
-        for actor in self.plugin.server.level.actors:
-            try:
-                if actor.type == ENTITY and want in actor.scoreboard_tags:
-                    self.actors[lab["id"]] = actor
-                    return actor
-            except Exception:
-                continue
+        self.actors.pop(lab["id"], None)
         return None
+
+    def run(self, line):
+        self.plugin.server.dispatch_command(self.plugin.server.command_sender, line)
+
+    def kill_at(self, lab):
+        """Removes floating text entities at exactly this label's spot (nothing else is touched)."""
+        self.run(f"execute in {dim_cmd(lab['dim'])} run kill @e[type={ENTITY},x={lab['x']},y={lab['y']},z={lab['z']},r=0.75]")
+
+    def crowded(self, lab):
+        """Another label right on this spot? (then /kill there would remove it too)"""
+        return any(o is not lab and o["dim"] == lab["dim"] and math.dist((o["x"], o["y"], o["z"]), (lab["x"], lab["y"], lab["z"])) < 1.0
+                   for o in self.labels.values())
 
     def summon(self, lab):
-        d = lab["dim"].lower()
-        dim = "nether" if "nether" in d else "the_end" if "end" in d else "overworld"
-        self.plugin.server.dispatch_command(self.plugin.server.command_sender,
-                                            f"execute in {dim} run summon {ENTITY} {lab['x']} {lab['y']} {lab['z']}")
-        self.waiting[lab["id"]] = 0
-        self.plugin.server.scheduler.run_task(self.plugin, lambda: self.adopt(lab), delay=10)
+        if not self.crowded(lab):
+            self.kill_at(lab)  # no duplicates: clear any old copy at this spot first
+        self.expecting = lab
+        try:
+            self.run(f"execute in {dim_cmd(lab['dim'])} run summon {ENTITY} {lab['x']} {lab['y']} {lab['z']}")
+        finally:
+            self.expecting = None
 
-    def adopt(self, lab):
-        if lab not in self.labels.values():
-            return None
-        for actor in self.plugin.server.level.actors:
-            try:
-                if actor.type != ENTITY or any(t.startswith("gsmp_") for t in actor.scoreboard_tags):
-                    continue
-                l = actor.location
-                if actor.dimension.name == lab["dim"] and math.dist((l.x, l.y, l.z), (lab["x"], lab["y"], lab["z"])) < 1.0:
-                    actor.add_scoreboard_tag(TAG)
-                    actor.add_scoreboard_tag(f"{TAG}_{lab['id']}")
-                    self._name(actor, lab["text"])
-                    self.actors[lab["id"]] = actor
-                    self.waiting.pop(lab["id"], None)
-                    return actor
-            except Exception:
-                continue
-        return None
+    def on_spawn(self, event):
+        """ActorSpawnEvent: the label we're summoning right now."""
+        lab = self.expecting
+        if lab is None:
+            return
+        try:
+            actor = event.actor
+            if actor.type != ENTITY:
+                return
+        except Exception:
+            return
+        self.actors[lab["id"]] = actor
+        self.expecting = None
+        # name it on the next tick, once it's fully in the world
+        self.plugin.server.scheduler.run_task(self.plugin, lambda: self._name(actor, lab["text"]), delay=1)
 
     def near(self, lab):
         for p in self.plugin.server.online_players:
@@ -118,25 +133,16 @@ class FloatingTexts:
         return False
 
     def update(self):
-        """Every minute: remove stray labels, put back missing ones near players."""
-        ids = {v["id"] for v in self.labels.values()}
-        for actor in list(self.plugin.server.level.actors):
-            try:
-                if actor.type == ENTITY:
-                    tags = [t for t in actor.scoreboard_tags if t.startswith(TAG + "_")]
-                    if tags and int(tags[0][len(TAG) + 1:]) not in ids:
-                        actor.remove()
-            except Exception:
-                continue
-        for lab in self.labels.values():
-            a = self.find(lab)
-            if a is not None:
-                if a.name_tag != lab["text"]:
-                    self._name(a, lab["text"])
-                continue
-            w = self.waiting.get(lab["id"])
-            if w is not None and w < 5:
-                self.waiting[lab["id"]] = w + 1
-                self.adopt(lab)
-            elif self.near(lab):
-                self.summon(lab)
+        """Every minute: refresh texts and put back missing labels where players are."""
+        try:
+            for lab in list(self.labels.values()):
+                a = self.live(lab)
+                if a is not None:
+                    if a.name_tag != lab["text"]:
+                        self._name(a, lab["text"])
+                elif self.near(lab):
+                    self.summon(lab)
+        except Exception as e:  # never let a label problem take anything else down
+            self.errors += 1
+            if self.errors <= 3:
+                self.plugin.logger.warning(f"Floating text update failed: {e}")

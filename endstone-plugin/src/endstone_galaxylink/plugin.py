@@ -12,7 +12,7 @@ import urllib.request
 
 from endstone import ColorFormat, Player
 from endstone.command import Command, CommandSender
-from endstone.event import (ActorDamageEvent, ActorDeathEvent, ActorExplodeEvent, BlockBreakEvent, BlockExplodeEvent,
+from endstone.event import (ActorDamageEvent, ActorDeathEvent, ActorExplodeEvent, ActorSpawnEvent, BlockBreakEvent, BlockExplodeEvent,
                             BlockFromToEvent, BlockPlaceEvent, PlayerChatEvent, PlayerCommandEvent, PlayerDeathEvent,
                             PlayerInteractActorEvent, PlayerInteractEvent, PlayerJoinEvent, PlayerQuitEvent,
                             event_handler)
@@ -43,7 +43,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.16.2"
+VERSION = "2.16.3"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -110,7 +110,7 @@ class GalaxyLink(Plugin):
         "modban": _cmd("Ban a player (staff).", "/modban <player: message>", "galaxylink.command.modban"),
         "inspect": _cmd("Turn the block inspector on or off: see who placed or broke blocks.", "/inspect", "galaxylink.command.inspect"),
         "rollback": _cmd("Undo a player's block changes (griefing).", "/rollback [player: message]", "galaxylink.command.rollback"),
-        "announce": _cmd("Open the announcement panel, or announce a message to everyone.", "/announce [message: message]", "galaxylink.command.announce"),
+        "announcement": _cmd("Open the announcement panel, or announce a message to everyone.", "/announcement [message: message]", "galaxylink.command.announce", ["ann"]),
         "chatfilter": _cmd("Turn the chat filter on or off for everyone.", "/chatfilter [state: message]", "galaxylink.command.chatfilter"),
         "minigames": _cmd("The Minigame Center: host, join or watch minigames.", "/minigames", "galaxylink.command.minigames", ["minigame", "mg"]),
         "tpd": _cmd("Teleport where you've been sent (e.g. to the staff member who accepted your minigame).", "/tpd", "galaxylink.command.tpd"),
@@ -345,6 +345,12 @@ class GalaxyLink(Plugin):
         event.format = self.ranks.chat_format(event.player)
 
     @event_handler
+    def on_actor_spawn(self, event: ActorSpawnEvent):
+        floating = getattr(self, "floating", None)
+        if floating is not None and floating.expecting is not None:
+            floating.on_spawn(event)  # the floating label we're summoning right now
+
+    @event_handler
     def on_player_command(self, event: PlayerCommandEvent):
         self.moderation.on_command(event)  # muted players can't /msg or /me
 
@@ -441,7 +447,7 @@ class GalaxyLink(Plugin):
             "plotaxe": lambda: self.plots.give_axe(sender),
             "minigames": lambda: self.minigames.open(sender),
             "chatfilter": lambda: self.chatfilter.command(sender, args),
-            "announce": lambda: self.announcements.command(sender, args),
+            "announcement": lambda: self.announcements.command(sender, args),
             "report": lambda: self.moderation.report_command(sender, args),
             "daily": lambda: self.progress.daily_menu(sender),
             "quests": lambda: self.progress.quests_menu(sender),

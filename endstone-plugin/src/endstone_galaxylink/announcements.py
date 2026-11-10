@@ -1,6 +1,6 @@
 """In-game announcements: a darkened galaxy box at the top of everyone's screen for 30 seconds, with a chime.
 
-/announce opens the panel:
+/announcement (or /ann) opens the panel:
   - Announce now: type a message (colour codes like §3 work).
   - Auto announcements: messages that are announced at random every few minutes.
 
@@ -127,7 +127,7 @@ class Announcements:
         elif hasattr(sender, "send_form"):
             self.panel(sender)
         else:
-            sender.send_message("Usage: /announce <message>")
+            sender.send_message("Usage: /announcement <message>")
 
     def _announce_and_tell(self, sender, text):
         wait = self.announce(text, getattr(sender, "name", "the console"))

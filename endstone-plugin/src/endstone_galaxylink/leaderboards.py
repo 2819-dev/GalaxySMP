@@ -2,8 +2,8 @@
 
 /leaderboard   place a board where you stand (choose what it ranks), remove the nearest one, or list them.
 
-Each board is an invisible floating-text entity (galaxysmp:floating_text, from the GalaxySMP blocks pack)
-whose name shows the top 10. If one goes missing it's put back when someone is nearby.
+Each board is a floating label (floating.py: the galaxysmp:floating_text entity from the GalaxySMP blocks
+pack) showing the top 10. If one goes missing it's put back when someone is nearby.
 """
 
 import json
@@ -36,8 +36,6 @@ class Leaderboards:
         self.plugin = plugin
         self.eco = plugin.economy
         self.boards = self.eco.get_config("leaderboards") or []  # [{id, key, dim, x, y, z}]
-        self.actors = {}
-        self.pending = {}  # board id -> ticks waited for the summoned entity
 
     def save(self):
         self.eco.set_config("leaderboards", self.boards)
@@ -63,93 +61,22 @@ class Leaderboards:
         lines.append("§8galaxymc.us/leaderboard")
         return "\n".join(lines)
 
-    # ---------- entities ----------
-    def find(self, board):
-        a = self.actors.get(board["id"])
-        try:
-            if a is not None and a.is_valid:
-                return a
-        except Exception:
-            pass
-        want = f"{TAG}_{board['id']}"
-        for actor in self.plugin.server.level.actors:
-            try:
-                if actor.type == ENTITY and want in actor.scoreboard_tags:
-                    self.actors[board["id"]] = actor
-                    return actor
-            except Exception:
-                continue
-        return None
+    # ---------- labels (floating.py does the entities safely) ----------
+    def key(self, board):
+        return f"lb:{board['id']}"
 
-    def someone_near(self, board):
-        for p in self.plugin.server.online_players:
-            try:
-                l = p.location
-                if p.dimension.name == board["dim"] and math.dist((l.x, l.z), (board["x"], board["z"])) < NEAR:
-                    return True
-            except Exception:
-                continue
-        return False
-
-    def summon(self, board):
-        dim = "nether" if "nether" in board["dim"].lower() else "the_end" if "end" in board["dim"].lower() else "overworld"
-        line = f"execute in {dim} run summon {ENTITY} {board['x']} {board['y']} {board['z']}"
-        self.plugin.server.dispatch_command(self.plugin.server.command_sender, line)
-        self.pending[board["id"]] = 0
-
-    def adopt(self, board):
-        """Tags the entity we just summoned."""
-        for actor in self.plugin.server.level.actors:
-            try:
-                if actor.type != ENTITY or any(t.startswith("gsmp_") for t in actor.scoreboard_tags):
-                    continue
-                l = actor.location
-                if actor.dimension.name == board["dim"] and math.dist((l.x, l.y, l.z), (board["x"], board["y"], board["z"])) < 1.5:
-                    actor.add_scoreboard_tag(TAG)
-                    actor.add_scoreboard_tag(f"{TAG}_{board['id']}")
-                    self.actors[board["id"]] = actor
-                    self.pending.pop(board["id"], None)
-                    return actor
-            except Exception:
-                continue
-        return None
+    def show(self, board):
+        ft = getattr(self.plugin, "floating", None)
+        if ft:
+            ft.set(self.key(board), board["dim"], board["x"], board["y"], board["z"], self.text(board["key"]))
 
     def update(self):
-        """Every minute (and right after placing): refresh the text, put back missing boards."""
-        ids = {b["id"] for b in self.boards}
-        for actor in list(self.plugin.server.level.actors):  # boards that were removed
-            try:
-                if actor.type == ENTITY:
-                    tags = [t for t in actor.scoreboard_tags if t.startswith(TAG + "_")]
-                    if tags and int(tags[0][len(TAG) + 1:]) not in ids:
-                        actor.remove()
-            except Exception:
-                continue
-        for board in self.boards:
-            actor = self.find(board) or (self.adopt(board) if board["id"] in self.pending else None)
-            if actor is None:
-                waited = self.pending.get(board["id"])
-                if waited is not None and waited < 5:
-                    self.pending[board["id"]] = waited + 1
-                    self.plugin.server.scheduler.run_task(self.plugin, lambda b=board: self._late(b), delay=20)
-                elif self.someone_near(board):
-                    self.summon(board)
-                    self.plugin.server.scheduler.run_task(self.plugin, lambda b=board: self._late(b), delay=10)
-                continue
-            try:
-                actor.name_tag = self.text(board["key"])
-                actor.is_name_tag_always_visible = True
-            except Exception:
-                pass
-
-    def _late(self, board):
-        actor = self.adopt(board)
-        if actor is not None:
-            try:
-                actor.name_tag = self.text(board["key"])
-                actor.is_name_tag_always_visible = True
-            except Exception:
-                pass
+        """Every minute: refresh the rankings on every board."""
+        try:
+            for board in self.boards:
+                self.show(board)
+        except Exception as e:
+            self.plugin.logger.warning(f"Leaderboard update failed: {e}")
 
     # ---------- /leaderboard ----------
     def menu(self, player):
@@ -176,12 +103,14 @@ class Leaderboards:
 
     def place(self, player, key):
         l = player.location
+        for b in self.boards:
+            if b["dim"] == player.dimension.name and math.dist((l.x, l.y + 1.0, l.z), (b["x"], b["y"], b["z"])) < 2:
+                return player.send_message("§cThere's already a leaderboard here. Move at least 2 blocks away.")
         bid = max([b["id"] for b in self.boards] + [0]) + 1
         board = {"id": bid, "key": key, "dim": player.dimension.name, "x": round(l.x, 2), "y": round(l.y + 1.0, 2), "z": round(l.z, 2)}
         self.boards.append(board)
         self.save()
-        self.summon(board)
-        self.plugin.server.scheduler.run_task(self.plugin, lambda: self._late(board), delay=10)
+        self.show(board)
         player.send_message(f"§aPlaced the {BOARD_BY_KEY[key][1]} leaderboard. §7It updates every minute. Step back to see it.")
 
     def remove_nearest(self, player):
@@ -195,13 +124,9 @@ class Leaderboards:
                 best, dist = b, d
         if not best:
             return player.send_message("§7No leaderboard within 5 blocks.")
-        actor = self.find(best)
-        if actor is not None:
-            try:
-                actor.remove()
-            except Exception:
-                pass
+        ft = getattr(self.plugin, "floating", None)
+        if ft:
+            ft.remove(self.key(best))
         self.boards.remove(best)
-        self.actors.pop(best["id"], None)
         self.save()
         player.send_message(f"§aRemoved the {BOARD_BY_KEY.get(best['key'], BOARDS[0])[1]} leaderboard.")
