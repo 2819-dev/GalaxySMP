@@ -28,7 +28,7 @@
           <a href="/status" class="status-line" data-status aria-live="polite">
             <span class="dot"></span><span data-status-text>Checking server</span>
           </a>
-          <h1>A Minecraft community for Bedrock players.</h1>
+          <h1>A Minecraft community for <span class="grad-text">Bedrock players.</span></h1>
           <p class="lead">Survival, Minigames, Skyblock and Creative, all connected through one hub. Actively moderated, family-friendly and free to play.</p>
           <div class="hero-actions">
             <a class="btn btn-primary btn-lg" href="/join">How to Join</a>
@@ -79,9 +79,21 @@
       </div>
     </section>
 
+    <section class="stats-strip-wrap">
+      <div class="container">
+        <div class="stats-strip" id="home-stats">
+          <div><span class="num" id="hs-online">–</span><span class="lbl">Playing now</span></div>
+          <div><span class="num" id="hs-players">–</span><span class="lbl">Players</span></div>
+          <div><span class="num" id="hs-hours">–</span><span class="lbl">Hours played</span></div>
+          <div><span class="num" id="hs-blocks">–</span><span class="lbl">Blocks mined</span></div>
+        </div>
+      </div>
+    </section>
+
     <section class="section">
       <div class="container">
         <div class="section-head">
+          <span class="eyebrow">Explore</span>
           <h2>Game modes</h2>
           <p>Every mode is available from the hub. Select an NPC to travel there instantly.</p>
         </div>

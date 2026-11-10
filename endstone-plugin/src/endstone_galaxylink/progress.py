@@ -465,11 +465,8 @@ class Progress:
     def leaderboard(self, key, limit=10):
         """Top players for a stat (used by the floating leaderboards). Online players' latest numbers are included."""
         self.save()
-        if key == "money":
-            rows = self.db.execute("SELECT name, cents FROM balances WHERE name IS NOT NULL ORDER BY cents DESC LIMIT ?", (limit * 2,)).fetchall()
-            ops = set(self.eco.get_config("ops") or [])
-            names = {r[0] for r in self.db.execute("SELECT name FROM balances WHERE xuid IN (%s)" % ",".join("?" * len(ops)), list(ops)).fetchall()} if ops else set()
-            return [(n, c) for n, c in rows if n not in names][:limit]
+        if key == "money":  # operators are included too
+            return self.db.execute("SELECT name, cents FROM balances WHERE name IS NOT NULL ORDER BY cents DESC LIMIT ?", (limit,)).fetchall()
         out = []
         for x, name, d in self.db.execute("SELECT xuid, name, data FROM player_stats").fetchall():
             s = json.loads(d)

@@ -59,13 +59,13 @@ export async function leaderboards(request, env, ctx, url) {
   const sql = getDb(env);
   const rows = await sql.query(
     `SELECT gamertag, ${board.col} AS value, (online_at > now() - interval '${ONLINE_SECONDS} seconds') AS online FROM players
-      WHERE NOT is_op AND ${board.col} IS NOT NULL AND ${board.col} > 0
+      WHERE ${board.col} IS NOT NULL AND ${board.col} > 0
       ORDER BY ${board.col} DESC, gamertag LIMIT 50`);
   const [totals] = await sql`
     SELECT count(*) FILTER (WHERE balance_cents IS NOT NULL)::int AS players, coalesce(sum(balance_cents), 0)::text AS money,
            coalesce(sum(playtime_s), 0)::text AS playtime, coalesce(sum(mined), 0)::text AS mined,
            count(*) FILTER (WHERE online_at > now() - interval '150 seconds')::int AS online
-      FROM players WHERE NOT is_op`;
+      FROM players`;
   return json({
     ok: true, board: key, title: board.title,
     boards: Object.entries(BOARDS).map(([k, b]) => ({ key: k, title: b.title })),
@@ -96,7 +96,7 @@ export async function profile(request, env, ctx, url, params) {
   const have = new Set(p.achievements || []);
   const rankAt = async (col, value) => {
     if (!value) return null;
-    const [r] = await sql.query(`SELECT count(*)::int + 1 AS pos FROM players WHERE NOT is_op AND ${col} > $1`, [value]);
+    const [r] = await sql.query(`SELECT count(*)::int + 1 AS pos FROM players WHERE ${col} > $1`, [value]);
     return r.pos;
   };
   return json({
@@ -109,7 +109,7 @@ export async function profile(request, env, ctx, url, params) {
       money: p.balance_cents == null ? null : Number(p.balance_cents),
       stats: { playtime: Number(p.playtime_s), mined: Number(p.mined), placed: Number(p.placed), kills: Number(p.kills), deaths: Number(p.deaths),
                quests: p.quests_done, streak: p.streak, bestStreak: p.best_streak },
-      positions: p.is_op ? {} : {
+      positions: {
         money: await rankAt("balance_cents", Number(p.balance_cents)), playtime: await rankAt("playtime_s", Number(p.playtime_s)),
         mined: await rankAt("mined", Number(p.mined)),
       },

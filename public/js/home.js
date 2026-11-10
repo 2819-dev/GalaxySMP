@@ -10,4 +10,18 @@ for (const m of config.gameModes) {
   worlds.appendChild(el);
 }
 
-startStatus();
+startStatus((st) => {
+  const n = st && typeof st.players === "object" ? st.players.online : st?.online;
+  if (Number.isFinite(n)) document.getElementById("hs-online").textContent = n.toLocaleString();
+});
+
+// Live numbers for the stats strip
+const short = (v) => (v >= 1e6 ? `${(v / 1e6).toFixed(1).replace(/\.0$/, "")}M` : v >= 1e4 ? `${Math.round(v / 1e3)}K` : v.toLocaleString());
+fetch("/api/leaderboards?board=playtime").then((r) => r.json()).then((d) => {
+  if (!d.ok) return;
+  document.getElementById("hs-players").textContent = short(d.totals.players);
+  document.getElementById("hs-hours").textContent = short(Math.round(d.totals.playtime / 3600));
+  document.getElementById("hs-blocks").textContent = short(d.totals.mined);
+  const online = document.getElementById("hs-online");
+  if (online.textContent === "–") online.textContent = d.totals.online.toLocaleString();
+}).catch(() => {});

@@ -57,11 +57,11 @@ export async function leaderboard(request, env) {
   const sql = getDb(env);
   const rows = await sql`
     SELECT gamertag, balance_cents FROM players
-     WHERE balance_cents IS NOT NULL AND NOT is_op
+     WHERE balance_cents IS NOT NULL
      ORDER BY balance_cents DESC, gamertag LIMIT 50`;
   const [stats] = await sql`
     SELECT count(*)::int AS players, coalesce(sum(balance_cents), 0)::text AS total, max(balance_at) AS updated
-      FROM players WHERE balance_cents IS NOT NULL AND NOT is_op`;
+      FROM players WHERE balance_cents IS NOT NULL`;
   return json({
     ok: true,
     players: rows.map((r) => ({ name: r.gamertag, cents: Number(r.balance_cents) })),

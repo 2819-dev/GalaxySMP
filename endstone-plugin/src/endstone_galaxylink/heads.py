@@ -64,10 +64,29 @@ def send_head(plugin, player):
     voice = getattr(plugin, "_voice", None)
     if not voice or not voice.ws:
         return
+    info = {}
     try:
-        hexdata, why = face_hex(player.skin.image)
+        skin = player.skin
+        img = skin.image
+        info = {"skin_id": str(getattr(skin, "id", ""))[:80], "shape": list(getattr(img, "shape", ()) or ()),
+                "dtype": str(getattr(img, "dtype", type(img).__name__))}
+        hexdata, why = face_hex(img)
+        if not hexdata:  # a small map of where the skin has pixels, so the face can be found on unusual skins
+            try:
+                w, h, flat = _pixels(img)
+                if w and h:
+                    step = max(1, w // 32)
+                    info["map"] = ["".join("#" if flat[((y * step) * w + x * step) * 4 + 3] else "." for x in range(0, w // step))
+                                   for y in range(0, h // step)]
+            except Exception:
+                pass
     except Exception as e:
-        hexdata, why = None, f"couldn't get the skin ({e})"
+        hexdata, why = None, f"couldn't get the skin ({type(e).__name__}: {e})"
+    if not hexdata:  # tell the website why (so it can be fixed without the server console)
+        try:
+            voice.send_json({"type": "head_error", "xuid": str(player.xuid), "name": player.name, "reason": why, "info": info})
+        except Exception:
+            pass
     if hexdata:
         voice.send_json({"type": "head", "xuid": str(player.xuid), "rgba": hexdata})
         if str(player.xuid) not in _reported:

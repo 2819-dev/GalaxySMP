@@ -12,6 +12,17 @@ export async function recordHead(env, msg) {
   await sql`UPDATE players SET head = ${rgba}, head_at = now() WHERE xuid = ${xuid} AND head IS DISTINCT FROM ${rgba}`;
 }
 
+// Why a player's head couldn't be made (kept so it can be fixed without the server console).
+export async function recordHeadError(env, msg) {
+  const xuid = String(msg.xuid || "");
+  if (!/^\d{1,20}$/.test(xuid)) return;
+  const entry = { name: String(msg.name || "").slice(0, 32), reason: String(msg.reason || "").slice(0, 300), info: msg.info || {}, at: new Date().toISOString() };
+  if (JSON.stringify(entry).length > 8000) entry.info = { note: "too big" };
+  const sql = getDb(env);
+  await sql`INSERT INTO economy_config (key, value, updated_by) VALUES ('head_debug', ${JSON.stringify({ [xuid]: entry })}::jsonb, 'server')
+            ON CONFLICT (key) DO UPDATE SET value = economy_config.value || EXCLUDED.value, updated_at = now()`;
+}
+
 // ---- a tiny PNG encoder (8x8 RGBA) ----
 const CRC = (() => {
   const t = new Uint32Array(256);
