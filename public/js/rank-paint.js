@@ -125,10 +125,49 @@ export function roleIcon(rank) {
   if (!rank || !rank.icon) return null;
   const img = iconImg(rank.icon);
   img.className = "role-icon";
-  img.title = rank.name || rank.prefix || "";
   img.alt = rank.name || "";
+  img.dataset.role = rank.name || rank.prefix || "";
+  img.tabIndex = 0;
+  img.setAttribute("role", "button");
+  img.setAttribute("aria-label", `Role: ${img.dataset.role}`);
+  // Like Discord: tap the icon to see the role's name in a small bubble (hover shows it too on computers).
+  const open = (e) => { e.stopPropagation(); e.preventDefault(); showRoleTip(img); };
+  img.addEventListener("click", open);
+  img.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") open(e); });
+  img.addEventListener("mouseenter", () => { if (matchMedia("(hover: hover)").matches) showRoleTip(img); });
+  img.addEventListener("mouseleave", () => { if (matchMedia("(hover: hover)").matches) hideRoleTip(); });
   return img;
 }
+
+let roleTip = null;
+let roleTipTimer = null;
+function hideRoleTip() {
+  clearTimeout(roleTipTimer);
+  roleTip?.remove();
+  roleTip = null;
+}
+function showRoleTip(img) {
+  hideRoleTip();
+  const tip = document.createElement("div");
+  tip.className = "role-tip";
+  tip.setAttribute("role", "tooltip");
+  const icon = iconImg(img.src.match(/rank_(.+)\.png/)?.[1] || "");
+  icon.className = "role-tip-icon";
+  tip.append(icon, document.createTextNode(img.dataset.role));
+  document.body.append(tip);
+  const r = img.getBoundingClientRect();
+  const w = tip.offsetWidth;
+  const left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+  const above = r.top - tip.offsetHeight - 8 > 4;
+  tip.style.left = `${left}px`;
+  tip.style.top = `${above ? r.top - tip.offsetHeight - 8 : r.bottom + 8}px`;
+  tip.classList.add(above ? "above" : "below");
+  tip.style.setProperty("--arrow-x", `${r.left + r.width / 2 - left}px`);
+  roleTip = tip;
+  roleTipTimer = setTimeout(hideRoleTip, 2500);
+}
+document.addEventListener("click", (e) => { if (roleTip && !e.target.closest?.(".role-icon")) hideRoleTip(); });
+window.addEventListener("scroll", hideRoleTip, true);
 
 // The rank's color as CSS: a smooth gradient or a single color (for role dots, headers and banners).
 export function rankCss(rank) {

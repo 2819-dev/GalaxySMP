@@ -905,3 +905,13 @@ img.avatar.head { image-rendering: pixelated; object-fit: cover; background: #1a
 .install-sheet-card ol { margin: 0 0 10px; padding-left: 20px; color: var(--text-2); line-height: 1.6; }
 .share-glyph { display: inline-block; padding: 0 4px; border: 1px solid var(--border-strong); border-radius: 5px; font-size: .8rem; }
 .chat ~ .install-banner, body:has(#view-chat:not([hidden])) .install-banner { bottom: 86px; }
+
+/* Role name bubble (tap a role icon, like Discord) */
+.role-icon { cursor: pointer; border-radius: 3px; }
+.role-icon:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+.role-tip { position: fixed; z-index: 140; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 7px;
+  background: #050713; color: #fff; font: 600 .84rem var(--font); white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,.5); pointer-events: none; animation: pc-in .1s ease-out; }
+.role-tip-icon { width: 16px; height: 16px; image-rendering: pixelated; }
+.role-tip::after { content: ""; position: absolute; left: calc(var(--arrow-x) - 5px); border: 5px solid transparent; }
+.role-tip.above::after { top: 100%; border-top-color: #050713; }
+.role-tip.below::after { bottom: 100%; border-bottom-color: #050713; }
