@@ -179,6 +179,40 @@ GALAXY_PACKS = [("resource", "6b0f4c3e-2d1a-4a8e-9c5b-1f7e3a9d2c41", "GalaxySMP 
                 ("resource", PACK_UUID, "GalaxySMP Rank Tags")]
 
 
+def clean_world_packs(logger=None):
+    """Removes old duplicate entries of our own packs from world_*_packs.json (keeps the newest version).
+    Stale entries make Minecraft say "at least one of your packs failed to load". Takes effect next restart."""
+    ours = {pid for _, pid, _ in GALAXY_PACKS}
+    for kind in ("resource", "behavior"):
+        path = level_folder() / f"world_{kind}_packs.json"
+        try:
+            data = json.loads(path.read_text("utf-8"))
+        except Exception:
+            continue
+        if not isinstance(data, list):
+            continue
+        best = {}
+        for e in data:
+            if isinstance(e, dict) and e.get("pack_id") in ours:
+                v = list(e.get("version") or [])
+                if e["pack_id"] not in best or v > best[e["pack_id"]]:
+                    best[e["pack_id"]] = v
+        keep, removed = [], []
+        for e in data:
+            if isinstance(e, dict) and e.get("pack_id") in ours and list(e.get("version") or []) != best[e["pack_id"]]:
+                removed.append(e)
+                continue
+            if isinstance(e, dict) and e.get("pack_id") in ours and any(isinstance(k, dict) and k.get("pack_id") == e["pack_id"] for k in keep):
+                removed.append(e)  # exact duplicate
+                continue
+            keep.append(e)
+        if removed:
+            path.write_text(json.dumps(keep, indent=2), "utf-8")
+            if logger:
+                logger.info(f"Removed {len(removed)} old duplicate GalaxySMP pack entr{'y' if len(removed) == 1 else 'ies'} "
+                            f"from world_{kind}_packs.json (fixes 'a pack failed to load' after the next restart).")
+
+
 def pack_report():
     """One line per GalaxySMP pack: which version the world loads, and duplicates (a common cause of
     'at least one of your packs failed to load')."""
@@ -210,7 +244,10 @@ class RankTags:
         self.history = cfg.get("history") or {}       # pack version -> its glyphs (the last few builds)
         # Only use pictures from the pack version the world really loaded (world_resource_packs.json).
         self.installed = installed_version(PACK_UUID)
-        self.active = dict(self.history.get(str(self.installed), {})) if self.installed else {}
+        mapping = self.history.get(str(self.installed))
+        if mapping is None and self.installed == self.version:  # built by an older plugin version (no history yet)
+            mapping = self.built
+        self.active = dict(mapping or {}) if self.installed else {}
 
     def save(self):
         keep = sorted(self.history, key=int)[-3:]

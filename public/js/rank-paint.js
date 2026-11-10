@@ -53,6 +53,17 @@ const iconImg = (icon) => {
 
 // Text in a rank's color, or one gradient color per letter. `icon` goes after the first character ("[").
 export function paint(text, rank, icon) {
+  const smooth = rank && rank.gradient ? GRADIENT_HEX[rank.gradient] : null;
+  if (smooth) {  // the website can show real smooth gradients (in game: tag pictures)
+    const span = document.createElement("span");
+    span.className = "rank-tag-smooth";
+    span.style.backgroundImage = `linear-gradient(90deg, ${smooth.join(", ")})`;
+    const chars = [...text];
+    span.append(chars[0] || "");
+    if (icon && chars.length > 1) span.append(iconImg(icon));
+    span.append(chars.slice(1).join(""));
+    return span;
+  }
   const span = document.createElement("span");
   const stops = rank && rank.gradient ? gradientChain(rank.gradient) : null;
   const n = [...text].filter((ch) => ch.trim()).length;

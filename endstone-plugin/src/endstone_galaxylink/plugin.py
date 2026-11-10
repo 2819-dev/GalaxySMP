@@ -45,7 +45,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.17.1"
+VERSION = "2.17.2"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -197,7 +197,8 @@ class GalaxyLink(Plugin):
         self.ranktags = RankTags(self)
         ranks_module.PICTURES = self.ranktags
         try:
-            from endstone_galaxylink.ranktags import pack_report
+            from endstone_galaxylink.ranktags import pack_report, clean_world_packs
+            clean_world_packs(self.logger)
             for line in pack_report():
                 self.logger.info("Packs: " + line)
         except Exception as e:
