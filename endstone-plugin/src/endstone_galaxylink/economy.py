@@ -233,6 +233,9 @@ class Economy:
             sender.send_message(f"§cYou don't have enough money. You have §e{self.balance_text(sender)}§c.")
             return
         self.credit(target, cents)
+        progress = getattr(self.plugin, "progress", None)
+        if progress:
+            progress.add(sender, "paid", cents)
         sender.send_message(f"§aYou paid §e{target.name} {money.exact(cents)}§a.")
         target.send_message(f"§e{sender.name}§a paid you §e{money.exact(cents)}§a.")
 

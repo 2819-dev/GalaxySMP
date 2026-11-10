@@ -18,6 +18,8 @@ import * as economy from "./routes/economy.js";
 import * as help from "./routes/help.js";
 import * as plans from "./routes/plans.js";
 import * as community from "./routes/community.js";
+import * as support from "./routes/support.js";
+import * as panel from "./routes/panel.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -87,6 +89,18 @@ const routes = [
   ["POST", "/api/community/suggestions/:id/vote", community.suggestionVote],
   ["POST", "/api/community/suggestions/:id/:action", community.suggestionAction],
   ["GET", "/api/store/plans", () => plans.storePlans()],
+  ["GET", "/api/support/tickets", (req, env) => support.myTickets(req, env)],
+  ["POST", "/api/support/tickets", (req, env) => support.createTicket(req, env)],
+  ["GET", "/api/support/tickets/:id", support.getTicket],
+  ["POST", "/api/support/tickets/:id/messages", support.postMessage],
+  ["POST", "/api/support/tickets/:id/close", support.closeTicket],
+  ["GET", "/api/mod/tickets", support.staffTickets],
+  ["GET", "/api/mod/overview", (req, env) => panel.overview(req, env)],
+  ["POST", "/api/mod/announce", (req, env) => panel.announce(req, env)],
+  ["GET", "/api/mod/players", panel.searchPlayers],
+  ["GET", "/api/mod/players/:xuid", panel.playerCard],
+  ["POST", "/api/mod/players/:xuid/:action", panel.playerAction],
+  ["POST", "/api/mod/tickets/:id/update", support.updateTicket],
   ["GET", "/api/mod/help", help.adminGetHelp],
   ["POST", "/api/mod/help/:action", help.adminHelpAction],
 ];

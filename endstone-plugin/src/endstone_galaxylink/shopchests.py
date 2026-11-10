@@ -322,6 +322,8 @@ class ShopChests:
         s["stock"] -= n
         self.save(sid)
         self.eco.add(s["owner"], s["owner_name"], cost)
+        self.plugin.progress.add(player, "shop_buys")
+        self.plugin.progress.bump(s["owner"], "shop_earned", cost, name=s["owner_name"])
         dropped = money.give(player, money.make_stacks(s["item"], n))
         player.send_message(f"§aBought {n}x {self.item_name(s)} for {money.exact(cost)}." + (" §7Some dropped at your feet." if dropped else ""))
         self.tell_owner(s, f"§a{player.name} bought {n}x {self.item_name(s)} from your shop for {money.exact(cost)}.")

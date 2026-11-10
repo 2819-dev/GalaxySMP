@@ -176,7 +176,7 @@ class Crates:
         if prize is None:
             return player.send_message("§cThis crate is empty. Tell staff!")
         keys[kind] -= 1
-        self.plugin.progress.touch(player)
+        self.plugin.progress.add(player, "crates")
         self.opening.add(uid)
         rewards = self.rewards[kind]
         _, name, color = TYPE_BY_KEY[kind]

@@ -30,10 +30,10 @@ const config = {
 
   // Shown on the home page. icon = one of: mountain, target, cloud, cube
   gameModes: [
-    { name: "Survival", icon: "mountain", text: "A shared world for building, exploring and trading with other players." },
-    { name: "Minigames", icon: "target", text: "Fast, competitive rounds with new matches starting throughout the day." },
-    { name: "Skyblock", icon: "cloud", text: "Begin on a small island in the sky and expand it with limited resources." },
-    { name: "Creative", icon: "cube", text: "Unlimited blocks and a private plot to build whatever you imagine." },
+    { name: "Survival", icon: "survival", tone: "survival", text: "A shared world for building, exploring and trading with other players." },
+    { name: "Minigames", icon: "minigames", tone: "minigames", text: "Fast, competitive rounds with new matches starting throughout the day." },
+    { name: "Skyblock", icon: "skyblock", tone: "skyblock", text: "Begin on a small island in the sky and expand it with limited resources." },
+    { name: "Creative", icon: "creative", tone: "creative", text: "Unlimited blocks and a private plot to build whatever you imagine." },
   ],
 };
 

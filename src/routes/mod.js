@@ -11,6 +11,7 @@ import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
 import { isOwner } from "../lib/names.js";
+import { openTicketCount } from "./support.js";
 import { hubBroadcast } from "./chat.js";
 import { voiceEvent, voiceStub } from "./voice.js";
 import { rankOf } from "../chat/messages.js";
@@ -454,7 +455,10 @@ export async function listAudit(request, env, ctx, url) {
 export async function staffSummary(request, env) {
   const user = await requireStaff(request, env);
   const sql = getDb(env);
-  return json({ ok: true, power: Number(user.role_power), openReports: await openReportCount(sql), muteOptions: MUTE_OPTIONS });
+  const power = Number(user.role_power);
+  const owner = isOwner(env, user.username, user.platform === "bedrock");
+  const panel = owner ? "Control Panel" : power >= ADMIN ? "Admin Panel" : "Staff Panel";
+  return json({ ok: true, power, owner, panel, openReports: await openReportCount(sql), openTickets: await openTicketCount(sql), muteOptions: MUTE_OPTIONS });
 }
 
 // ---------- In-game chat filter (on/off for the whole server) ----------

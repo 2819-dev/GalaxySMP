@@ -3,11 +3,13 @@
 import { icon, toast } from "/js/site.js";
 import { paint, rankTag, roleIcon, rankCss } from "/js/rank-paint.js";
 import { showPanel, hidePanel } from "/js/community-panels.js";
+import { ticketEvent } from "/js/tickets.js";
 
 // A member's current rank (live updates win over what an older message recorded).
 const rankFor = (id, fallback) => (state.members.has(id) ? state.members.get(id).rank : fallback) || null;
 
 const $ = (id) => document.getElementById(id);
+const HELP_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6l3.6 3.6M14.8 14.8l3.6 3.6M18.4 5.6l-3.6 3.6M9.2 14.8l-3.6 3.6"/></svg>';
 const MIC_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>';
 
 const state = {
@@ -206,6 +208,7 @@ function renderChannels() {
       if (state.unread.has(ch.id)) b.classList.add("unread");
       const mark = el("span", "hash");
       if (ch.kind === "voice") mark.innerHTML = MIC_SVG;
+      else if (ch.kind === "support") mark.innerHTML = HELP_SVG;
       else mark.textContent = "#";
       b.append(mark, el("span", "", ch.name));
       if (!ch.canPost && ch.kind === "text") {
@@ -231,7 +234,7 @@ async function selectChannel(id) {
   const ch = currentChannel();
   $("channel-name").textContent = ch.name;
   $("channel-topic").textContent = ch.topic || "";
-  document.querySelector(".chat-top .hash").textContent = ch.kind === "voice" ? "" : "#";
+  document.querySelector(".chat-top .hash").textContent = ch.kind === "voice" || ch.kind === "support" ? "" : "#";
   try { history.replaceState(null, "", "#" + ch.slug); } catch { /* ignore */ }
   renderChannels();
   // Special channels (Information, Auction House, Suggestions, Voice Chat, Events) have their own views.
@@ -679,6 +682,15 @@ function handleEvent(data) {
     case "message_deleted":
       removeMessage(data.messageId);
       break;
+    case "ticket": {
+      ticketEvent(data);
+      const support = state.channels?.find?.((c) => c.kind === "support");
+      if (support && Number(data.ownerId) === Number(state.me?.id) && state.channelId !== support.id && data.status === "waiting") {
+        state.unread.add(support.id);
+        renderChannels();
+      }
+      break;
+    }
     case "kicked":
       signedOut(data.reason || "You've been removed from the community.");
       break;

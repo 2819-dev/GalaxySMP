@@ -1,6 +1,7 @@
 // Staff Tools page: reports, members, word filter, ranks, economy and audit log.
 import { toast } from "/js/site.js";
 import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, voiceMuteDialog, select, field } from "/js/dialog.js";
+import { setupPanel } from "/js/staff-panel.js";
 import { MC_COLORS, hexOf, GRADIENTS, paint, gradientCss, rankTag } from "/js/rank-paint.js";
 
 const $ = (id) => document.getElementById(id);
@@ -15,10 +16,17 @@ const loaders = {};
 function selectTab(name) {
   document.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
   document.querySelectorAll("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== name));
-  history.replaceState(null, "", "#" + name);
+  if (location.hash.slice(1).split("/")[0] !== name) history.replaceState(null, "", "#" + name);
   loaders[name]?.();
 }
 document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => selectTab(b.dataset.tab)));
+
+function setBadge(name, n) {
+  const b = $(`tab-${name}-count`);
+  if (!b) return;
+  b.textContent = n ? String(n) : "";
+  b.dataset.n = String(n || 0);
+}
 
 function setCount(n) {
   const b = $("tab-reports-count");
@@ -785,9 +793,16 @@ $("help-reset").addEventListener("click", () => openDialog({
   }
   me = user;
   power = user.role.power;
-  $("staff-intro").textContent = `Signed in as ${user.username} (${user.role.name}). ${power >= 100 ? "You can use every tool on this page." : "Banning and ranks are reserved for Admins."}`;
+  let summary = {};
+  try { summary = await getJson("/api/mod/summary"); } catch { /* use defaults */ }
+  const panelName = summary.panel || (power >= 100 ? "Admin Panel" : "Staff Panel");
+  $("panel-title").textContent = panelName;
+  document.title = `${panelName} · GalaxySMP`;
+  $("staff-intro").textContent = `Signed in as ${user.username} (${summary.owner ? "Owner" : user.role.name}). ${summary.owner ? "You have full control of everything here." : power >= 100 ? "You can use every tool on this page." : "Banning, ranks, plans and money are reserved for Admins."}`;
   $("staff-app").hidden = false;
-  const start = location.hash.slice(1);
+  setBadge("tickets", summary.openTickets);
+  setupPanel({ loaders, power, owner: Boolean(summary.owner), selectTab, toast, setBadge });
+  const start = location.hash.slice(1).split("/")[0];
   if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"], [data-tab="help"]').forEach((t) => (t.hidden = false));
-  selectTab(["reports", "members", "words", "audit", ...(power >= 100 ? ["ranks", "economy", "help"] : [])].includes(start) ? start : "reports");
+  selectTab(["overview", "tickets", "players", "reports", "members", "words", "audit", ...(power >= 100 ? ["ranks", "economy", "help"] : [])].includes(start) ? start : "overview");
 })();

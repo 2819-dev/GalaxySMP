@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Staff Tools · GalaxySMP</title>
+  <title>Staff Panel · GalaxySMP</title>
   <meta name="robots" content="noindex">
   <link rel="icon" href="/favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -23,7 +23,7 @@
   <main id="main">
     <div class="container" style="max-width:960px">
       <header class="page-head" style="padding-bottom:20px">
-        <h1>Staff Tools</h1>
+        <h1 id="panel-title">Staff Panel</h1>
         <p id="staff-intro">Loading…</p>
         <p style="margin-top:8px"><a href="/staff-guide">Read the staff guide</a></p>
       </header>
@@ -34,8 +34,11 @@
 
       <div id="staff-app" hidden>
         <div class="staff-tabs" role="tablist">
-          <button role="tab" data-tab="reports" aria-selected="true">Reports <span class="count-badge" id="tab-reports-count"></span></button>
-          <button role="tab" data-tab="members" aria-selected="false">Members</button>
+          <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+          <button role="tab" data-tab="tickets" aria-selected="false">Tickets <span class="count-badge" id="tab-tickets-count"></span></button>
+          <button role="tab" data-tab="reports" aria-selected="false">Reports <span class="count-badge" id="tab-reports-count"></span></button>
+          <button role="tab" data-tab="players" aria-selected="false">Players</button>
+          <button role="tab" data-tab="members" aria-selected="false">Website members</button>
           <button role="tab" data-tab="words" aria-selected="false">Word filter</button>
           <button role="tab" data-tab="ranks" aria-selected="false" hidden>Ranks</button>
           <button role="tab" data-tab="economy" aria-selected="false" hidden>Economy</button>
@@ -43,7 +46,41 @@
           <button role="tab" data-tab="audit" aria-selected="false">Audit log</button>
         </div>
 
-        <section data-panel="reports">
+        <section data-panel="overview">
+          <div id="overview"><p class="text-3">Loading…</p></div>
+        </section>
+
+        <section data-panel="tickets" hidden>
+          <div id="tickets-main">
+            <div class="toolbar" style="justify-content:space-between">
+              <div class="tabs-mini">
+                <button type="button" data-tk-filter="active" aria-pressed="true">Open</button>
+                <button type="button" data-tk-filter="done" aria-pressed="false">Resolved &amp; closed</button>
+                <button type="button" data-tk-filter="all" aria-pressed="false">All</button>
+              </div>
+              <span class="text-3 small">Urgent and high priority tickets are shown first.</span>
+            </div>
+            <div class="stack" style="gap:8px" id="tickets-list"></div>
+          </div>
+          <div id="ticket-view" hidden></div>
+        </section>
+
+        <section data-panel="players" hidden>
+          <div class="toolbar">
+            <input class="input" id="pl-search" type="search" placeholder="Search by gamertag or website name" autocomplete="off">
+            <select class="input" id="pl-filter" aria-label="Show">
+              <option value="all">All players</option>
+              <option value="online">In game now</option>
+              <option value="staff">Staff and operators</option>
+              <option value="plans">Galaxy+ and Pro+</option>
+              <option value="punished">Warned, muted or banned</option>
+            </select>
+          </div>
+          <p class="text-3 small" style="margin:-4px 0 12px">Tap a player for their card: stats, rank, plan, money, punishments, reports, tickets and private staff notes, with in-game actions.</p>
+          <div class="panel" style="padding:0" id="pl-results"></div>
+        </section>
+
+        <section data-panel="reports" hidden>
           <h2 style="font-size:1.1rem;margin:0 0 12px">In-game reports <span class="text-3 small" style="font-weight:400">(made with /report)</span></h2>
           <div class="stack" id="game-reports-open"></div>
           <h2 style="font-size:1.1rem;margin:32px 0 12px">Chat reports</h2>

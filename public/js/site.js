@@ -14,6 +14,11 @@ const ICONS = {
   mountain: '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
   target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
   cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  // game modes
+  survival: '<path d="M16 8 4 20"/><path d="M6.5 5C10.5 2.8 15.5 3 19 5c2 3.5 2.2 8.5 0 12.5"/><path d="M14 4.2 19.8 10"/>',
+  minigames: '<path d="M6.5 7h11a4.5 4.5 0 0 1 4.4 5.5l-1 4.5a2.5 2.5 0 0 1-4.3 1.1L14.5 16h-5l-2.1 2.1A2.5 2.5 0 0 1 3.1 17l-1-4.5A4.5 4.5 0 0 1 6.5 7z"/><path d="M8 10v4M6 12h4"/><path d="M15.5 11h.01M18 13h.01"/>',
+  skyblock: '<path d="M2 11.5h20l-4.5 5L12 21.5l-5.5-5z"/><path d="M7.5 11.5V8"/><circle cx="7.5" cy="5.8" r="2.6"/><path d="M14.2 7.5h5.3a1.8 1.8 0 0 0 0-3.6h-.2a2.6 2.6 0 0 0-4.9-.4 2 2 0 0 0-.2 4z"/>',
+  creative: '<path d="M18.4 2.6a2 2 0 0 1 2.9 2.9L12 14.8 9.2 12z"/><path d="M8.6 13.4c-2.2 0-3.7 1.6-3.8 3.6-.1 1.4-.8 2.5-2.3 3.2 3.7 1 7.2.3 8.5-1.8a3.2 3.2 0 0 0-2.4-5z"/>',
   cube: '<path d="M21 16V8l-9-5-9 5v8l9 5 9-5z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   close: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -81,7 +86,7 @@ function renderHeader() {
       <img src="/img/wordmark.png" alt="${config.serverName}" width="132" height="23">
       <button class="drawer-close" type="button" aria-label="Close menu">${icon("close")}</button>
     </div>
-    <nav class="drawer-links">${drawerLinks}<a href="/staff" data-staff-link hidden>${icon("tools")}<span>Staff Tools</span></a></nav>
+    <nav class="drawer-links">${drawerLinks}<a href="/staff" data-staff-link hidden>${icon("tools")}<span>Staff Panel</span></a></nav>
     ${config.hosting === "realm" ? "" : `<div class="drawer-card"><span class="eyebrow">Server address</span>
       <button class="ip-chip" type="button" data-copy="${serverAddress}">${icon("copy")}<span>${serverAddress}</span><span class="ip-port">${config.bedrockPort}</span></button>
       <span class="text-3 small">Bedrock Edition · tap to copy</span></div>`}
@@ -101,7 +106,11 @@ function renderHeader() {
       if (!staffChecked) {
         staffChecked = true;
         fetch("/api/me").then((r) => r.json()).then((d) => {
-          if (d.user?.role?.power >= 50) drawer.querySelector("[data-staff-link]").hidden = false;
+          if (d.user?.role?.power >= 50) {
+            const link = drawer.querySelector("[data-staff-link]");
+            link.hidden = false;
+            fetch("/api/mod/summary").then((r) => r.json()).then((s) => { if (s.panel) link.querySelector("span").textContent = s.panel; }).catch(() => {});
+          }
         }).catch(() => {});
       }
     }

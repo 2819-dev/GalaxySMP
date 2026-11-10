@@ -480,6 +480,7 @@ class Elevators:
                           "floors": [{"y": y0, "name": "Lobby"}], "queue": []}
         self.set_row(self.list[eid], y0, self.list[eid]["floor_block"])  # make the whole cabin floor the same block
         self.save()
+        self.plugin.progress.add(player, "elevators")
         player.send_message(f"§aElevator created ({x2 - x1 + 1}x{z2 - z1 + 1} cabin) with its first floor, Lobby. "
                             "§7Now go to each other floor, stand on the landing next to the shaft and use the Elevator Tool > Add a floor here. "
                             "Keep the shaft above the cabin an empty hole (no floor inside it on the other floors).")

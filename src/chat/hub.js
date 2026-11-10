@@ -94,6 +94,16 @@ export class CommunityHub extends DurableObject {
       this.broadcast({ type: "presence", userId: event.userId, online: false });
       return;
     }
+    if (event.type === "ticket") { // support ticket changed: tell its owner and every staff member
+      const text = JSON.stringify(event);
+      for (const ws of this.ctx.getWebSockets()) {
+        const u = ws.deserializeAttachment();
+        if (u && ((u.power || 0) >= 50 || Number(u.id) === Number(event.ownerId))) {
+          try { ws.send(text); } catch { /* gone */ }
+        }
+      }
+      return;
+    }
     if (event.type === "words_changed") {
       this.words = null;
       return;

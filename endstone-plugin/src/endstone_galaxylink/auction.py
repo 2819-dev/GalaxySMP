@@ -98,6 +98,10 @@ class AuctionHouse:
         self.db.commit()
         payout = price - price * FEE_PERCENT // 100
         self.eco.add(seller, seller_name, payout)
+        try:
+            self.plugin.progress.bump(seller, "ah_sold", 1, name=seller_name)
+        except Exception:
+            pass
         dropped = money.give(player, money.rebuild(json.loads(item)))
         where = " (your inventory was full, so it dropped at your feet)" if dropped else ""
         seller_p = next((p for p in self.plugin.server.online_players if str(p.xuid) == seller), None)

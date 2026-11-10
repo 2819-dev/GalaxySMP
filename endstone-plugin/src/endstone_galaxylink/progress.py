@@ -108,6 +108,26 @@ ACHIEVEMENTS = [
     ("rich_1k", "Pocket Money", "Have $1,000", "💵", 0, lambda s, x: x.get("money", 0) >= 100000),
     ("rich_10k", "Wealthy", "Have $10,000", "💰", 0, lambda s, x: x.get("money", 0) >= 1000000),
     ("rich_100k", "Tycoon", "Have $100,000", "👑", 0, lambda s, x: x.get("money", 0) >= 10000000),
+    ("rich_1m", "Millionaire", "Have $1,000,000", "🤑", 0, lambda s, x: x.get("money", 0) >= 100000000),
+    ("play_500h", "Living Legend", "Play for 500 hours", "🌠", 100000, lambda s, x: s["playtime"] >= 1800000),
+    ("diamonds_100", "Diamond Hoarder", "Mine 100 diamond ores", "💎", 15000, lambda s, x: s.get("diamonds", 0) >= 100),
+    ("deaths_100", "Never Give Up", "Die 100 times", "🪦", 1000, lambda s, x: s["deaths"] >= 100),
+    ("streak_100", "Unstoppable", "Claim your daily reward 100 days in a row", "☄️", 75000, lambda s, x: s["best_streak"] >= 100),
+    ("dailies_50", "Loyal Player", "Claim 50 daily rewards", "🎁", 10000, lambda s, x: s.get("dailies", 0) >= 50),
+    ("quests_500", "Legendary Quester", "Complete 500 quests", "🗺️", 75000, lambda s, x: s["quests"] >= 500),
+    ("seller_10k", "Trader", "Sell $10,000 of items to the Shop", "⚖️", 5000, lambda s, x: s["sold"] >= 1000000),
+    ("crate_1", "Lucky Dip", "Open a crate", "🎰", 500, lambda s, x: s.get("crates", 0) >= 1),
+    ("crate_50", "Crate Collector", "Open 50 crates", "🎁", 10000, lambda s, x: s.get("crates", 0) >= 50),
+    ("shopkeeper", "Shopkeeper", "Earn $1,000 from your shop chests", "🏪", 2500, lambda s, x: s.get("shop_earned", 0) >= 100000),
+    ("shop_tycoon", "Store Tycoon", "Earn $50,000 from your shop chests", "🏬", 15000, lambda s, x: s.get("shop_earned", 0) >= 5000000),
+    ("customer", "Window Shopper", "Buy from another player's shop chest", "🛍️", 500, lambda s, x: s.get("shop_buys", 0) >= 1),
+    ("auctioneer", "Auctioneer", "Sell 10 items on the Auction House", "🔨", 5000, lambda s, x: s.get("ah_sold", 0) >= 10),
+    ("generous", "Generous", "Pay other players $1,000 in total", "🤝", 1000, lambda s, x: s.get("paid", 0) >= 100000),
+    ("job_10", "Skilled Worker", "Reach job level 10", "🛠️", 5000, lambda s, x: s.get("job_level", 0) >= 10),
+    ("job_21", "Master of the Trade", "Reach the top job level (21)", "🎖️", 25000, lambda s, x: s.get("job_level", 0) >= 21),
+    ("traveler", "Traveler", "Teleport to friends 25 times", "🌀", 2500, lambda s, x: s.get("tpas", 0) >= 25),
+    ("engineer", "Engineer", "Build an elevator", "🛗", 5000, lambda s, x: s.get("elevators", 0) >= 1),
+    ("landlord", "Landlord", "Own 3 plots at once", "🏘️", 10000, lambda s, x: x.get("plots", 0) >= 3),
 ]
 ACH_BY_ID = {a[0]: a for a in ACHIEVEMENTS}
 
@@ -194,6 +214,23 @@ class Progress:
         s[key] = s.get(key, 0) + n
         self.touch(player)
 
+    def bump(self, xuid, key, n=1, most=False, name=None):
+        """Counts something for any player, online or not (most=True keeps the highest value instead)."""
+        x = str(xuid)
+        s = self.cache.get(x)
+        online = s is not None
+        if not online:
+            s = self.load(x)
+            if s is None:
+                return
+        s[key] = max(s.get(key, 0), n) if most else s.get(key, 0) + n
+        if online:
+            self.dirty.add(x)
+            self.unsent.add(x)
+        else:
+            self.db.execute("INSERT OR REPLACE INTO player_stats (xuid, name, data) VALUES (?,?,?)", (x, s.get("name") or name, json.dumps(s)))
+            self.db.commit()
+
     def on_break(self, player, block_type, states):
         self.add(player, "mined")
         if ore("diamond")(block_type):
@@ -254,6 +291,7 @@ class Progress:
         s["streak"] = streak + 1
         s["best_streak"] = max(s["best_streak"], s["streak"])
         s["last_daily"] = str(self.today())
+        s["dailies"] = s.get("dailies", 0) + 1
         self.eco.credit(player, cents)
         extra = ""
         if day == 7:

@@ -1,21 +1,29 @@
 // Special community channels: Information, Events, Auction House, Suggestions and Voice Chat.
 // All text goes in with textContent, never as HTML.
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
+import { ticketChat, newTicketDialog, onTicketEvent, chip, when, LABELS } from "/js/tickets.js";
 
 const panel = () => document.getElementById("channel-panel");
 const voiceBox = () => document.getElementById("voice-embed");
 let refreshTimer = null;
 let ctx = null;
+let cleanup = null;
+
+function stopViews() {
+  clearInterval(refreshTimer);
+  cleanup?.();
+  cleanup = null;
+}
 
 export function hidePanel() {
-  clearInterval(refreshTimer);
+  stopViews();
   panel().hidden = true;
   voiceBox().hidden = true; // voice keeps running in the background
 }
 
 export function showPanel(channel, context) {
   ctx = context;
-  clearInterval(refreshTimer);
+  stopViews();
   const p = panel();
   p.replaceChildren();
   if (channel.kind === "voice") {
@@ -26,7 +34,7 @@ export function showPanel(channel, context) {
   voiceBox().hidden = true;
   p.hidden = false;
   p.scrollTop = 0;
-  const render = { info: renderInfo, events: renderEvents, auction: renderAuction, suggestions: renderSuggestions }[channel.kind];
+  const render = { info: renderInfo, events: renderEvents, auction: renderAuction, suggestions: renderSuggestions, support: renderSupport }[channel.kind];
   if (render) render(p);
 }
 
@@ -286,4 +294,47 @@ function newSuggestion(done) {
       },
     }],
   });
+}
+
+// ---------- Support: private live chat with staff ----------
+function renderSupport(p, openId) {
+  const wrap = h("div", { class: "cp-wrap" });
+  p.replaceChildren(wrap);
+  cleanup?.();
+  cleanup = null;
+  if (openId) {
+    cleanup = ticketChat(wrap, openId, { staff: false, toast: ctx.toast, onBack: () => renderSupport(p) });
+    return;
+  }
+  const staff = (ctx.me?.role?.power || 0) >= 50;
+  const list = h("div", { class: "stack", style: "gap:10px" });
+  wrap.append(
+    h("section", { class: "panel tk-hero" },
+      h("div", { class: "tk-hero-icon", "aria-hidden": "true", text: "🛟" }),
+      h("div", {},
+        h("h2", { text: "Need help?" }),
+        h("p", { class: "text-2", text: "Open a ticket to chat privately with the staff team: questions, bugs, lost items, reports or appeals. Only you and staff can see it." }),
+        h("div", { class: "cp-toolbar" },
+          h("button", { class: "btn btn-primary", type: "button", text: "Contact staff", onclick: () => newTicketDialog(ctx.toast, (id) => renderSupport(p, id)) }),
+          staff ? h("a", { class: "btn btn-ghost", href: "/staff#tickets", text: "Answer tickets (staff)" }) : null))),
+    h("h3", { class: "tk-list-title", text: "Your tickets" }),
+    list);
+
+  async function load() {
+    let data;
+    try { data = await getJson("/api/support/tickets"); } catch (e) { list.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
+    list.replaceChildren();
+    if (!data.tickets.length) list.append(h("div", { class: "panel empty", text: "You haven't opened any tickets yet." }));
+    for (const t of data.tickets) {
+      list.append(h("button", { class: `panel tk-row${t.userUnread ? " unread" : ""}`, type: "button", onclick: () => renderSupport(p, t.id) },
+        h("span", { class: "tk-row-icon", "aria-hidden": "true", text: (LABELS[t.label] || LABELS.other).icon }),
+        h("span", { class: "tk-row-main" },
+          h("span", { class: "tk-row-subject", text: t.subject }),
+          h("span", { class: "tk-row-preview", text: t.preview || "" })),
+        h("span", { class: "tk-row-side" }, chip("status", t.status, false), h("span", { class: "text-3 small", text: when(t.lastMessageAt) }),
+          t.userUnread ? h("span", { class: "tk-unread", text: `${t.userUnread} new` }) : null)));
+    }
+  }
+  cleanup = onTicketEvent((d) => { if (Number(d.ownerId) === Number(ctx.me?.id)) load(); });
+  load();
 }

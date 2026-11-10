@@ -121,6 +121,9 @@ class Teleports:
         del self.requests[str(player.unique_id)][str(sender.unique_id)]
         kind = req[0]
         player.send_message(f"§aAccepted {sender.name}'s request.")
+        progress = getattr(self.plugin, "progress", None)
+        if progress:
+            progress.add(sender if kind == "to" else player, "tpas")
         if kind == "to":
             sender.send_message(f"§a{player.name} accepted your request.")
             uid = player.unique_id

@@ -1,4 +1,4 @@
-// Rules page: shows the rules Admins edit in Staff Tools > Help menu (the same rules as /guide in game).
+// Rules page: shows the rules Admins edit in the staff panel > Help menu (the same rules as /guide in game).
 import "/js/site.js";
 
 function line(text) {

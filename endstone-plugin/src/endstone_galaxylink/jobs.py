@@ -169,6 +169,7 @@ class Jobs:
         info["xp"] += xp
         new_level = level_of(info["xp"])
         if new_level > level:
+            self.plugin.progress.bump(player.xuid, "job_level", new_level, most=True)
             name = JOB_BY_KEY[info["job"]][1]
             player.send_message(f"§a§lLevel up! §r§f{name} level {new_level}§a: you now earn {multiplier(new_level):.2f}x.")
             try:

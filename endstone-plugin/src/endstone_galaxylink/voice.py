@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.20.1",
+                    "User-Agent": "GalaxyLink-Endstone/2.21.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -211,9 +211,40 @@ class VoiceLink:
             self._on_main(lambda: self.plugin.auction.from_website(msg))
         elif msg.get("type") == "eco":
             self._on_main(lambda: self.plugin.economy.from_website(msg))
+        elif msg.get("type") == "announce":
+            self._on_main(lambda: self.plugin.announcements.announce(str(msg.get("text") or "")[:300], by=str(msg.get("by") or "staff")))
+        elif msg.get("type") == "mod_action":
+            self._on_main(lambda: self._mod_action(msg))
+        elif msg.get("type") == "givekey":
+            self._on_main(lambda: self.plugin.crates.give_keys(WebActor(msg.get("by")), str(msg.get("name") or ""),
+                                                               str(msg.get("kind") or "common"), max(1, min(1000, int(msg.get("amount") or 1)))))
         elif msg.get("type") == "icons":
             self.wanted = {k.lower(): v for k, v in (msg.get("icons") or {}).items()}
             self.plugin.server.scheduler.run_task(self.plugin, self._apply_icons)
+
+    def _mod_action(self, msg):
+        """Warn / mute / unmute / kick / ban / unban from the staff panel on the website."""
+        mod = self.plugin.moderation
+        actor = WebActor(msg.get("by"))
+        xuid, name = str(msg.get("xuid") or ""), str(msg.get("name") or "")
+        reason = str(msg.get("reason") or "")[:200]
+        minutes = msg.get("minutes")
+        minutes = None if minutes in (None, "", 0) else max(1, int(minutes))
+        kind = msg.get("action")
+        if kind == "warn":
+            mod.warn(actor, xuid, name, reason)
+        elif kind == "mute":
+            mod.mute(actor, xuid, name, minutes or 60, reason)
+        elif kind == "unmute":
+            mod.unmute(actor, xuid, name)
+        elif kind == "kick":
+            mod.kick(actor, xuid, name, reason)
+        elif kind == "ban":
+            mod.ban(actor, xuid, name, minutes, reason)
+        elif kind == "unban":
+            mod.unban(actor, xuid, name)
+        for line in actor.lines:
+            self.plugin.logger.info(f"[Website] {line}")
 
     def _on_main(self, fn):
         def run():
@@ -327,3 +358,16 @@ class VoiceLink:
         for key in list(self.applied):
             if key not in online:
                 del self.applied[key]
+
+
+class WebActor:
+    """Stands in for a staff member acting from the website (like the console: no in-game limits;
+    the website already checked their permissions)."""
+
+    def __init__(self, by):
+        self.name = f"{str(by or 'Staff')[:32]} (website)"
+        self.lines = []
+
+    def send_message(self, text):
+        import re
+        self.lines.append(re.sub("§.", "", str(text)))

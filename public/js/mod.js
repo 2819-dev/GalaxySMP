@@ -145,12 +145,12 @@ eventHooks.push((data) => {
     state.members.delete(data.userId);
     state.online.delete(data.userId);
     renderMembers();
-  } else if (data.type === "reports_open") {
-    setReportBadge(data.count);
+  } else if (data.type === "reports_open" || (data.type === "ticket" && myPower() >= STAFF)) {
+    getJson("/api/mod/summary").then((d) => setReportBadge((d.openReports || 0) + (d.openTickets || 0))).catch(() => {});
   }
 });
 
-// ---------- Staff tools link in the sidebar ----------
+// ---------- Staff panel link in the sidebar ----------
 function setReportBadge(n) {
   const b = document.getElementById("staff-badge");
   if (!b) return;
@@ -165,9 +165,13 @@ const observer = new MutationObserver(() => {
   if (!panel) return;
   const link = h("a", { class: "btn btn-secondary btn-sm staff-link", id: "staff-link", href: "/staff" });
   link.innerHTML = icon("shield");
-  link.append(h("span", { text: "Staff tools" }), h("span", { class: "count-badge", id: "staff-badge" }));
+  const label = h("span", { text: myPower() >= 100 ? "Admin Panel" : "Staff Panel" });
+  link.append(label, h("span", { class: "count-badge", id: "staff-badge" }));
   panel.before(link);
-  getJson("/api/mod/summary").then((d) => setReportBadge(d.openReports)).catch(() => {});
+  getJson("/api/mod/summary").then((d) => {
+    if (d.panel) label.textContent = d.panel;
+    setReportBadge((d.openReports || 0) + (d.openTickets || 0));
+  }).catch(() => {});
 });
 observer.observe(document.getElementById("channel-list"), { childList: true });
 
