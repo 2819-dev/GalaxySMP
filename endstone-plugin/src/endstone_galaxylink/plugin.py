@@ -45,7 +45,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.21.0"
+VERSION = "2.22.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -103,6 +103,7 @@ class GalaxyLink(Plugin):
         "achievements": _cmd("See your achievements.", "/achievements", "galaxylink.command.achievements", ["ach"]),
         "stats": _cmd("See your stats, or another player's.", "/stats [player: message]", "galaxylink.command.stats"),
         "leaderboard": _cmd("Place or remove floating leaderboards (staff).", "/leaderboard", "galaxylink.command.leaderboard", ["lb"]),
+        "cosmetics": _cmd("Pick a particle trail and join effects.", "/cosmetics", "galaxylink.command.cosmetics", ["trails"]),
         "jobs": _cmd("Pick a job and earn money while you play.", "/jobs", "galaxylink.command.jobs", ["job"]),
         "crates": _cmd("Crates: place them, edit prizes, give keys (staff).", "/crates", "galaxylink.command.crates"),
         "givekey": _cmd("Give crate keys (staff).", "/givekey <player: message>", "galaxylink.command.givekey"),
@@ -152,6 +153,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.ranktags": _perm("Allows /ranktags (operators).", "op"),
         "galaxylink.command.elevator": _perm("Allows /elevator (plans decide who can build).", True),
         "galaxylink.command.jobs": _perm("Allows /jobs.", True),
+        "galaxylink.command.cosmetics": _perm("Allows /cosmetics.", True),
         "galaxylink.command.crates": _perm("Allows /crates (operators, or give it with a rank).", "op"),
         "galaxylink.command.givekey": _perm("Allows /givekey (operators, or give it with a rank).", "op"),
         "galaxylink.command.leaderboard": _perm("Allows /leaderboard (operators, or give it with a rank).", "op"),
@@ -194,6 +196,8 @@ class GalaxyLink(Plugin):
         self.shopchests = ShopChests(self)
         self.crates = Crates(self)
         self.elevators = Elevators(self)
+        from endstone_galaxylink.cosmetics import Cosmetics, TRAIL_TICKS
+        self.cosmetics = Cosmetics(self)
         self.ranktags = RankTags(self)
         ranks_module.PICTURES = self.ranktags
         try:
@@ -208,6 +212,7 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self.elevators.tick, delay=2, period=2)
         self.server.scheduler.run_task(self, self.elevators.check_tools, delay=1200, period=1200)
         self.server.scheduler.run_task(self, self.jobs.tick, delay=100, period=100)
+        self.server.scheduler.run_task(self, self.cosmetics.tick, delay=TRAIL_TICKS, period=TRAIL_TICKS)
         self.server.scheduler.run_task(self, self.floating.update, delay=1400, period=1200)
         self.server.scheduler.run_task(self, self.leaderboards.update, delay=1300, period=1200)
         self.server.scheduler.run_task(self, self.moderation.tick, delay=600, period=600)
@@ -264,6 +269,7 @@ class GalaxyLink(Plugin):
         self.progress.on_join(player)
         self.shopchests.on_join(player)
         self.elevators.check_tool(player)
+        self.cosmetics.on_join(player)
         player.send_message("§7Need help? Type §e/guide§7 for server info, rules and commands.")
         self.refresh_tags()
         if self._voice:
@@ -491,6 +497,7 @@ class GalaxyLink(Plugin):
             "stats": lambda: self.progress.stats_command(sender, args),
             "leaderboard": lambda: self.leaderboards.menu(sender),
             "jobs": lambda: self.jobs.menu(sender),
+            "cosmetics": lambda: self.cosmetics.menu(sender),
             "elevator": lambda: self.elevators.command(sender),
             "ranktags": lambda: self.ranktags.command(sender, args),
             "crates": lambda: self.crates.admin_menu(sender),

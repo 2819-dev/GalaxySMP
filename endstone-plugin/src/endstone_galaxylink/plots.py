@@ -68,6 +68,7 @@ class Plots:
         self.inside = {}       # player uuid -> plot id they're standing in (for "Entering ..." messages)
         self.jobs = []         # running jobs: [generator, ticks to wait]
         self.extra = {}        # xuid -> extra plots (from the website)
+        self.extra_shop = {}   # xuid -> extra shop plots (from the website)
         self._ticks = 0
 
     # ---------- storage ----------
@@ -147,7 +148,7 @@ class Plots:
     def allowance(self, player, shop=False):
         plans = getattr(self.plugin, "plans", None)
         if shop:
-            return plans.plan_for(player).get("shopPlots", 1) if plans else 1
+            return (plans.plan_for(player).get("shopPlots", 1) if plans else 1) + int(self.extra_shop.get(str(player.xuid), 0))
         base = plans.plan_for(player).get("plots", 1) if plans else 1
         return base + int(self.extra.get(str(player.xuid), 0))
 
@@ -847,9 +848,11 @@ class Plots:
                     p.send_message(f"§7Entering §f{self.label(plot)}§7: §aavailable to claim")
 
     # ---------- website ----------
-    def update_extra(self, extra):
+    def update_extra(self, extra, extra_shop=None):
         if isinstance(extra, dict):
             self.extra = {str(k): int(v) for k, v in extra.items()}
+        if isinstance(extra_shop, dict):
+            self.extra_shop = {str(k): int(v) for k, v in extra_shop.items()}
 
     # ---------- /plot ----------
     def command(self, player, args):

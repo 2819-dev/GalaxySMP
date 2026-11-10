@@ -14,6 +14,10 @@ const ICONS = {
   mountain: '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
   target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
   cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  // server features
+  always: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M20.5 4.5 21 8h-3.5"/>',
+  coins: '<ellipse cx="9" cy="7" rx="6" ry="3"/><path d="M3 7v4c0 1.7 2.7 3 6 3s6-1.3 6-3V7"/><path d="M9 14v3c0 1.7 2.7 3 6 3s6-1.3 6-3v-4c0-1.7-2.7-3-6-3"/>',
+  gift: '<rect x="3" y="8" width="18" height="5" rx="1"/><path d="M5 13v8h14v-8M12 8v13"/><path d="M12 8C10 4 6.5 4 6.5 6.2 6.5 8 9.5 8 12 8zM12 8c2-4 5.5-4 5.5-1.8C17.5 8 14.5 8 12 8z"/>',
   // game modes
   survival: '<path d="M16 8 4 20"/><path d="M6.5 5C10.5 2.8 15.5 3 19 5c2 3.5 2.2 8.5 0 12.5"/><path d="M14 4.2 19.8 10"/>',
   minigames: '<path d="M6.5 7h11a4.5 4.5 0 0 1 4.4 5.5l-1 4.5a2.5 2.5 0 0 1-4.3 1.1L14.5 16h-5l-2.1 2.1A2.5 2.5 0 0 1 3.1 17l-1-4.5A4.5 4.5 0 0 1 6.5 7z"/><path d="M8 10v4M6 12h4"/><path d="M15.5 11h.01M18 13h.01"/>',

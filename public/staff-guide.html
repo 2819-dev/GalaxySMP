@@ -97,13 +97,13 @@
         <li>Open <strong>Panel → Word filter</strong>. Words are hidden; select <strong>Show words</strong> to see them.</li>
         <li>To add a word, type it, choose <strong>Whole word only</strong> or <strong>Anywhere</strong>, and select <strong>Add</strong>.
           <ul>
-            <li><strong>Whole word only</strong> is best for short words (for example, "ass" is blocked but "class" is fine).</li>
+            <li><strong>Whole word only</strong> is best for short words (for example, "cat" is blocked but "category" is fine).</li>
             <li><strong>Anywhere</strong> blocks it even inside other words. Use it for longer words that never appear innocently.</li>
           </ul>
         </li>
         <li>To remove a word, select the <strong>✕</strong> next to it.</li>
       </ol>
-      <p>Changes apply within a minute. The filter automatically catches tricks like <code>sh1t</code>, <code>$hit</code> and <code>s h i t</code>. Links, emails, phone numbers, addresses and other personal information are always blocked and don't need to be added.</p>
+      <p>Changes apply within a minute. The filter automatically catches tricks like <code>c@ts</code>, <code>caaats</code> and <code>c A t</code> (if "cats" were on the list). Links, emails, phone numbers, addresses and other personal information are always blocked and don't need to be added.</p>
 
       <h3>Reading the audit log</h3>
       <p><strong>Panel → Audit log</strong> lists every staff action, newest first: who did it, to whom, when, and the reason. Deleted messages show what they said. Nothing can be removed from the audit log, so it keeps staff accountable. Select <strong>Load older entries</strong> to go further back.</p>
@@ -250,7 +250,7 @@
       <h3>In-game chat filter</h3>
       <ul>
         <li>When it's on, bad words in Minecraft chat are <strong>scrambled</strong> (Minecraft's §k effect). The rest of the message still sends. The real word never reaches anyone's chat.</li>
-        <li>It uses the same word list as the website (Panel → <strong>Word filter</strong>) and catches the same tricks: sh1t, $hit, shiiit, s h i t.</li>
+        <li>It uses the same word list as the website (Panel → <strong>Word filter</strong>) and catches the same tricks: c@ts, caaats, c A t (if "cats" were on the list).</li>
         <li><strong>Turn it on or off for everyone:</strong> the switch at the top of Panel → Word filter (Moderators and Admins), or <code>/chatfilter on</code> / <code>/chatfilter off</code> in game (operators, or a rank given the <code>chatfilter</code> command). It starts on. Every change is in the audit log.</li>
       </ul>
 

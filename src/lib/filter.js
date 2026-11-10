@@ -15,8 +15,8 @@ export function normalize(text) {
     .replace(/[0134578@$!|€]/g, (c) => LEET[c] ?? c);
 }
 
-// "ass" -> /a+s+s+/ so stretched spellings ("aaasss") still match,
-// but "as" never matches "ass".
+// "cats" -> /c+a+t+s+/ so stretched spellings ("caaats") still match,
+// but "cat" never matches "cats".
 function letterPattern(word) {
   let out = "";
   for (let i = 0; i < word.length; i++) {

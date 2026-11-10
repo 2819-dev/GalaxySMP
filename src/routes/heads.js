@@ -65,20 +65,68 @@ export async function pngFromRgba(hex, size = 8) {
   return out;
 }
 
+// The picture URL for a player row (needs xuid, head_at and gamerpic_at). Players whose Minecraft
+// head hasn't arrived yet get their Xbox profile picture instead ("g=1"), fetched once by us.
+export function headUrlFor(p) {
+  if (!p?.xuid) return null;
+  if (p.head_at) return `/api/head/${p.xuid}?v=${new Date(p.head_at).getTime()}`;
+  return `/api/head/${p.xuid}?g=1&v=${p.gamerpic_at ? new Date(p.gamerpic_at).getTime() : 0}`;
+}
+
+// Xbox profile picture through OpenXBL (key in the Cloudflare secret XBL_API_KEY).
+// Fetched at most once a day per player; the picture itself is saved and served from galaxymc.us.
+async function fetchGamerpic(env, sql, xuid) {
+  const [row] = await sql`
+    UPDATE players SET gamerpic_tried = now()
+     WHERE xuid = ${xuid} AND (gamerpic_tried IS NULL OR gamerpic_tried < now() - interval '1 day')
+     RETURNING xuid`;
+  if (!row) return null; // tried recently
+  try {
+    const res = await fetch(`https://xbl.io/api/v2/account/${xuid}`, {
+      headers: { "X-Authorization": env.XBL_API_KEY, Accept: "application/json", "Accept-Language": "en-US" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const settings = data?.profileUsers?.[0]?.settings || [];
+    let pic = settings.find((x) => x.id === "GameDisplayPicRaw")?.value;
+    if (!pic) return null;
+    const u = new URL(pic.replace(/^http:/, "https:"));
+    if (!/(^|\.)xboxlive\.com$/.test(u.hostname)) return null;
+    u.searchParams.set("w", "96");
+    u.searchParams.set("h", "96");
+    u.searchParams.set("format", "png");
+    const img = await fetch(u.toString());
+    const type = img.headers.get("content-type") || "";
+    if (!img.ok || !/^image\/(png|jpeg|webp)/.test(type)) return null;
+    const bytes = new Uint8Array(await img.arrayBuffer());
+    if (bytes.length > 200_000) return null;
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    const b64 = btoa(bin);
+    await sql`UPDATE players SET gamerpic = ${b64}, gamerpic_type = ${type.split(";")[0]}, gamerpic_at = now() WHERE xuid = ${xuid}`;
+    return { b64, type: type.split(";")[0] };
+  } catch {
+    return null;
+  }
+}
+
 // GET /api/head/:xuid  (public: heads show on public profiles too)
 export async function headImage(request, env, ctx, url, params) {
   const xuid = String(params.xuid || "").replace(/\.png$/, "");
   if (!/^\d{1,20}$/.test(xuid)) throw new HttpError(404, "No head.");
   const sql = getDb(env);
-  const rows = await sql`SELECT head FROM players WHERE xuid = ${xuid} AND head IS NOT NULL`;
-  if (!rows.length) throw new HttpError(404, "No head yet.");
-  const png = await pngFromRgba(rows[0].head);
-  return new Response(png, {
-    headers: {
-      "Content-Type": "image/png",
-      // URLs carry ?v=<when it changed>, so a versioned head can be cached for a long time
-      "Cache-Control": url.searchParams.has("v") ? "public, max-age=31536000, immutable" : "public, max-age=300",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
+  const rows = await sql`SELECT head, gamerpic, gamerpic_type FROM players WHERE xuid = ${xuid}`;
+  const p = rows[0];
+  if (!p) throw new HttpError(404, "No head yet.");
+  const versioned = url.searchParams.has("v") && url.searchParams.get("v") !== "0";
+  const headers = {
+    "Cache-Control": versioned ? "public, max-age=31536000, immutable" : "public, max-age=3600",
+    "X-Content-Type-Options": "nosniff",
+  };
+  if (p.head) return new Response(await pngFromRgba(p.head), { headers: { ...headers, "Content-Type": "image/png" } });
+  let pic = p.gamerpic ? { b64: p.gamerpic, type: p.gamerpic_type || "image/png" } : null;
+  if (!pic && env.XBL_API_KEY) pic = await fetchGamerpic(env, sql, xuid);
+  if (!pic) return new Response("No picture yet.", { status: 404, headers: { "Cache-Control": "public, max-age=600" } });
+  const bytes = Uint8Array.from(atob(pic.b64), (c) => c.charCodeAt(0));
+  return new Response(bytes, { headers: { ...headers, "Content-Type": pic.type } });
 }

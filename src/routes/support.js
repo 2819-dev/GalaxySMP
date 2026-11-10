@@ -7,6 +7,7 @@ import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
 import { checkMessage, compileWordList } from "../lib/filter.js";
 import { hubStub } from "./chat.js";
+import { headUrlFor } from "./heads.js";
 
 const STAFF = 50;
 const STATUSES = ["open", "waiting", "resolved", "closed"];
@@ -37,13 +38,13 @@ function ticketOut(t) {
     id: Number(t.id), subject: t.subject, status: t.status, priority: t.priority, label: t.label,
     createdAt: t.created_at, updatedAt: t.updated_at, lastMessageAt: t.last_message_at,
     userUnread: t.user_unread, staffUnread: t.staff_unread,
-    user: t.username ? { id: Number(t.user_id), username: t.username, head: t.head_at && t.xuid ? `/api/head/${t.xuid}?v=${new Date(t.head_at).getTime()}` : null } : undefined,
+    user: t.username ? { id: Number(t.user_id), username: t.username, head: headUrlFor(t) } : undefined,
     assignedTo: t.assigned_name || null, preview: t.preview || null,
   };
 }
 
 const TICKET_SELECT = (sql) => sql`
-  SELECT t.*, u.username, p.xuid, p.head_at, a.username AS assigned_name,
+  SELECT t.*, u.username, p.xuid, p.head_at, p.gamerpic_at, a.username AS assigned_name,
          (SELECT body FROM ticket_messages m WHERE m.ticket_id = t.id ORDER BY m.id DESC LIMIT 1) AS preview
     FROM tickets t JOIN users u ON u.id = t.user_id
     LEFT JOIN players p ON p.uuid = u.mc_uuid
@@ -51,7 +52,7 @@ const TICKET_SELECT = (sql) => sql`
 
 async function loadTicket(sql, id, user) {
   const rows = await sql`
-    SELECT t.*, u.username, p.xuid, p.head_at, a.username AS assigned_name
+    SELECT t.*, u.username, p.xuid, p.head_at, p.gamerpic_at, a.username AS assigned_name
       FROM tickets t JOIN users u ON u.id = t.user_id
       LEFT JOIN players p ON p.uuid = u.mc_uuid
       LEFT JOIN users a ON a.id = t.assigned_to
@@ -63,7 +64,7 @@ async function loadTicket(sql, id, user) {
 
 async function detail(sql, t, viewer) {
   const msgs = await sql`
-    SELECT m.id, m.body, m.from_staff, m.created_at, u.username, p.xuid, p.head_at
+    SELECT m.id, m.body, m.from_staff, m.created_at, u.username, p.xuid, p.head_at, p.gamerpic_at
       FROM ticket_messages m LEFT JOIN users u ON u.id = m.user_id LEFT JOIN players p ON p.uuid = u.mc_uuid
      WHERE m.ticket_id = ${t.id} ORDER BY m.id`;
   // reading clears the unread counter for whoever is looking
@@ -74,7 +75,7 @@ async function detail(sql, t, viewer) {
     ticket: ticketOut(t),
     messages: msgs.map((m) => ({
       id: Number(m.id), body: m.body, fromStaff: m.from_staff, at: m.created_at, author: m.username || "Staff",
-      head: m.head_at && m.xuid ? `/api/head/${m.xuid}?v=${new Date(m.head_at).getTime()}` : null,
+      head: headUrlFor(m),
     })),
   };
 }

@@ -4,6 +4,7 @@ import { json, HttpError } from "../lib/http.js";
 import { requireUser, publicUser } from "../lib/auth.js";
 import { REACTIONS, loadHistory, rankOf } from "../chat/messages.js";
 import { MAX_LENGTH } from "../lib/filter.js";
+import { headUrlFor } from "./heads.js";
 
 export function hubStub(env) {
   return env.HUB.get(env.HUB.idFromName("community"));
@@ -24,7 +25,7 @@ export async function bootstrap(request, env) {
     sql`SELECT u.id, u.username, r.key AS role,
                rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon,
                rk.gradient AS rank_gradient, rk.position AS rank_position,
-               pl.xuid, pl.head_at, (pl.online_at > now() - interval '150 seconds') AS in_game, u.created_at,
+               pl.xuid, pl.head_at, pl.gamerpic_at, (pl.online_at > now() - interval '150 seconds') AS in_game, u.created_at,
                (SELECT s.plan FROM subscriptions s WHERE s.xuid = pl.xuid AND (s.expires_at IS NULL OR s.expires_at > now())) AS plan
           FROM users u JOIN roles r ON r.id = u.role_id
           LEFT JOIN players pl ON pl.uuid = u.mc_uuid
@@ -53,7 +54,7 @@ export async function bootstrap(request, env) {
     members: members.map((m) => ({
       id: Number(m.id), username: m.username, role: m.role, rank: rankOf(m),
       // Minecraft head picture (if the server has sent it), plan, and when they joined the community
-      head: m.head_at && m.xuid ? `/api/head/${m.xuid}?v=${new Date(m.head_at).getTime()}` : null,
+      head: headUrlFor(m),
       plan: m.plan || null, inGame: Boolean(m.in_game), since: m.created_at,
     })),
     reactions: REACTIONS,

@@ -39,7 +39,10 @@ class Plans:
             self.eco.set_config("plans", self.subs)
             plots = getattr(self.plugin, "plots", None)
             if plots:
-                plots.update_extra(msg.get("extraPlots"))
+                plots.update_extra(msg.get("extraPlots"), msg.get("extraShopPlots"))
+            cosmetics = getattr(self.plugin, "cosmetics", None)
+            if cosmetics:
+                cosmetics.update(msg.get("cosmetics"), msg.get("nightVision"))
             for p in self.plugin.server.online_players:
                 self.bill(p)
             self.plugin.refresh_tags()

@@ -1,6 +1,7 @@
 // Player stats (sent by the server), leaderboards and public player profiles.
 import { getDb } from "../lib/db.js";
 import { json, HttpError } from "../lib/http.js";
+import { headUrlFor } from "./heads.js";
 
 const BOARDS = {
   money: { col: "balance_cents", title: "Richest Players" },
@@ -80,7 +81,7 @@ export async function profile(request, env, ctx, url, params) {
   const sql = getDb(env);
   const rows = await sql`
     SELECT p.xuid, p.gamertag, p.first_seen, p.last_seen, p.balance_cents, p.is_op, p.playtime_s, p.mined, p.placed, p.kills, p.deaths,
-           p.quests_done, p.streak, p.best_streak, p.achievements, p.online_at, p.extra_plots, p.head_at,
+           p.quests_done, p.streak, p.best_streak, p.achievements, p.online_at, p.extra_plots, p.head_at, p.gamerpic_at,
            (p.online_at > now() - interval '150 seconds') AS online,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient,
            s.plan, s.expires_at, u.id AS user_id
@@ -103,7 +104,7 @@ export async function profile(request, env, ctx, url, params) {
     ok: true,
     player: {
       name: p.gamertag, online: Boolean(p.online), lastOnline: p.online_at || p.last_seen, firstSeen: p.first_seen,
-      head: p.head_at ? `/api/head/${p.xuid}?v=${new Date(p.head_at).getTime()}` : null,
+      head: headUrlFor(p),
       rank: p.rank_prefix ? { name: p.rank_name, prefix: p.rank_prefix, color: p.rank_color, icon: p.rank_icon, gradient: p.rank_gradient } : null,
       plan: p.plan || "free", linked: Boolean(p.user_id), staff: Boolean(p.is_op),
       money: p.balance_cents == null ? null : Number(p.balance_cents),

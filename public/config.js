@@ -30,10 +30,12 @@ const config = {
 
   // Shown on the home page. icon = one of: mountain, target, cloud, cube
   gameModes: [
-    { name: "Survival", icon: "survival", tone: "survival", text: "A shared world for building, exploring and trading with other players." },
-    { name: "Minigames", icon: "minigames", tone: "minigames", text: "Fast, competitive rounds with new matches starting throughout the day." },
-    { name: "Skyblock", icon: "skyblock", tone: "skyblock", text: "Begin on a small island in the sky and expand it with limited resources." },
-    { name: "Creative", icon: "creative", tone: "creative", text: "Unlimited blocks and a private plot to build whatever you imagine." },
+    { name: "Always Online", icon: "always", tone: "survival", text: "The server runs 24/7, so your world, plots and shops are there whenever you want to play." },
+    { name: "Minigames", icon: "minigames", tone: "minigames", text: "Skyblock, Bedwars, parkour, PvP and more at the Minigame Center, with new rounds all day." },
+    { name: "Proximity Voice", icon: "mic", tone: "skyblock", text: "Talk to players near you in game: voices get quieter as they walk away. Right in your browser." },
+    { name: "Economy & Jobs", icon: "coins", tone: "creative", text: "Earn money with jobs, sell at the Shop, run your own shop chests and trade on the Auction House." },
+    { name: "Plots & Protection", icon: "shield", tone: "plots", text: "Claim your own plot and shop plot. Nobody can grief them, and staff can roll back damage." },
+    { name: "Rewards & Crates", icon: "gift", tone: "rewards", text: "Daily rewards, 3 daily quests, 44 achievements, crates and leaderboards to climb." },
   ],
 };
 

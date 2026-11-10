@@ -242,11 +242,19 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
       admin ? h("div", { class: "pc-actions" },
         act("Change rank", "btn-secondary", () => rankDialog(p, xuid, reload)),
         act("Change plan", "btn-secondary", () => planDialog(p, xuid, reload)),
-        act("Change money", "btn-secondary", () => moneyDialog(p, xuid, reload))) : null,
+        act("Change money", "btn-secondary", () => moneyDialog(p, xuid, reload)),
+        act("🛒 Give a Shop item", "btn-secondary", () => shopDialog(p, d.shop, xuid, reload))) : null,
+      h("h4", { text: "WebShop" }),
+      h("p", { class: "text-2 small", style: "margin:0", text: [
+        `Cosmetics: ${d.shop.cosmetics.length ? d.shop.cosmetics.map((c) => c.replace(/^(trail|join)_/, "").replace(/_/g, " ")).join(", ") : "none"}`,
+        `extra plots: ${p.extraPlots || 0}`, `extra shop plots: ${d.shop.extraShopPlots}`,
+        d.shop.nightVisionUntil ? `Night Vision until ${fmt(d.shop.nightVisionUntil)}` : null].filter(Boolean).join(" · ") }),
+      d.shop.orders.length ? h("div", { class: "pc-list", style: "margin-top:6px" }, d.shop.orders.slice(0, 8).map((o) => h("div", { class: "pc-li" },
+        h("b", { text: o.item }), h("span", { text: `${o.option ? `(${o.option}) ` : ""}${o.source === "payment" ? "bought" : `given by ${o.by}`}` }), h("time", { class: "text-3 small", text: fmt(o.at) })))) : null,
 
       h("h4", { text: "Website account" }),
       acc ? h("div", {},
-        h("p", { class: "text-2 small", style: "margin:0 0 8px", text: `${acc.username} · ${acc.role} · joined ${fmt(acc.joined)}${acc.mutedUntil ? ` · muted until ${fmt(acc.mutedUntil)}` : ""}${acc.banned ? ` · BANNED (${acc.banReason || "no reason"})` : ""}` }),
+        h("p", { class: "text-2 small", style: "margin:0 0 8px", text: `${acc.username} · joined ${fmt(acc.joined)}${acc.mutedUntil ? ` · muted until ${fmt(acc.mutedUntil)}` : ""}${acc.banned ? ` · BANNED (${acc.banReason || "no reason"})` : ""}` }),
         h("div", { class: "pc-actions" },
           acc.mutedUntil ? act("Unmute on website", "btn-ghost", async () => { await postJson(`/api/mod/members/${acc.id}/unmute`, {}); reload("Unmuted."); })
             : act("Mute on website", "btn-secondary", () => muteDialog({ id: acc.id, username: acc.username }, reload)),
@@ -306,6 +314,29 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
       actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: async () => { await postJson("/api/mod/economy/money", { xuid, action: action.value, amount: amount.value }); reload("Money updated."); } }],
     });
   }
+  function shopDialog(p, shop, xuid, reload) {
+    const items = shop.catalog.flatMap((c) => c.items.map((i) => ({ ...i, cat: c.name })));
+    const sel = select("pa-shop-item", items.map((i) => [i.id, `${i.cat}: ${i.name}`]), items[0].id);
+    const opt = h("select", { class: "input", id: "pa-shop-opt" });
+    const optField = field("How long", opt);
+    const sync = () => {
+      const it = items.find((i) => i.id === sel.value);
+      opt.replaceChildren(...(it.options || []).map((o) => h("option", { value: o.id, text: o.name })));
+      optField.hidden = !it.options;
+    };
+    sel.addEventListener("change", sync);
+    sync();
+    openDialog({
+      title: `Give ${p.name} a Shop item`,
+      body: h("div", { class: "form" }, field("Item", sel), optField,
+        h("p", { class: "text-3 small", text: "Use this for giveaways, or for a purchase made another way. Money needs the server online." })),
+      actions: [{ label: "Cancel" }, { label: "Give", kind: "primary", onClick: async () => {
+        await postJson(`/api/mod/players/${xuid}/shopgive`, { item: sel.value, option: opt.value || null });
+        reload("Given!");
+      } }],
+    });
+  }
+
   function keyDialog(p, xuid, reload) {
     const kind = select("pa-key", [["common", "Common"], ["rare", "Rare"], ["galaxy", "Galaxy"]], "common");
     const amount = h("input", { class: "input", id: "pa-keys", type: "number", min: 1, max: 100, value: "1" });

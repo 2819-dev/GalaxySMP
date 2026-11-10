@@ -1167,3 +1167,44 @@ button.pc-li { cursor: pointer; }
 .worlds .world.world-survival .ico, .worlds .world.world-minigames .ico, .worlds .world.world-skyblock .ico, .worlds .world.world-creative .ico {
   background: var(--mode); box-shadow: 0 8px 22px -6px var(--mode-glow), inset 0 1px 0 rgba(255,255,255,.3); }
 .worlds .world .ico svg { stroke-width: 2.2; filter: drop-shadow(0 1px 1px rgba(0,0,0,.25)); }
+.world-plots { --mode: linear-gradient(135deg, #ffd166, #f08a24); --mode-glow: rgba(240,150,40,.55); }
+.world-rewards { --mode: linear-gradient(135deg, #ff7fc4, #c25cd6); --mode-glow: rgba(220,100,200,.55); }
+.worlds .world.world-plots .ico, .worlds .world.world-rewards .ico { background: var(--mode); box-shadow: 0 8px 22px -6px var(--mode-glow), inset 0 1px 0 rgba(255,255,255,.3); }
+@media (min-width: 961px) { .worlds:has(.world:nth-child(5)) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Xbox profile pictures (until the Minecraft head arrives) are photos, not pixel art */
+img[src*="g=1"] { image-rendering: auto !important; }
+
+/* ---------- Store: Subscriptions + Shop ---------- */
+.store-tabs { position: sticky; top: calc(var(--header-h) + 8px); z-index: 5; display: flex; gap: 6px; padding: 5px; margin: 0 0 24px;
+  background: rgba(16,19,46,.85); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 999px; width: fit-content; }
+.store-tab { padding: 8px 18px; border-radius: 999px; color: var(--text-2); font-weight: 700; }
+.store-tab.active { background: var(--accent); color: #fff; }
+.store-section { scroll-margin-top: calc(var(--header-h) + 70px); margin-bottom: 40px; }
+.store-h2 { font-size: 1.5rem; margin: 0 0 4px; }
+.store-sub { margin: 0 0 18px; }
+.plan-tag { background: #1a1a1f; }
+.plan-tag .rank-tag { font-size: 1rem; }
+.shop-cat { margin-bottom: 26px; }
+.shop-cat-name { font-size: 1.1rem; margin: 0; }
+.shop-cat-blurb { margin: 2px 0 12px; }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.shop-item { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 18px; }
+.shop-icon { font-size: 1.9rem; line-height: 1; width: 52px; height: 52px; display: grid; place-items: center; border-radius: 14px;
+  background: linear-gradient(135deg, rgba(36,87,235,.25), rgba(160,90,255,.2)); margin-bottom: 4px; }
+.cat-money .shop-icon { background: linear-gradient(135deg, rgba(52,199,123,.28), rgba(20,128,110,.2)); }
+.cat-plots .shop-icon { background: linear-gradient(135deg, rgba(255,209,102,.28), rgba(240,138,36,.2)); }
+.cat-effects .shop-icon { background: linear-gradient(135deg, rgba(92,200,255,.28), rgba(63,111,240,.22)); }
+.cat-cosmetics .shop-icon { background: linear-gradient(135deg, rgba(255,127,196,.28), rgba(194,92,214,.22)); }
+.shop-name { margin: 0; font-size: 1rem; }
+.shop-desc { margin: 0; font-size: .86rem; flex: 1; }
+.shop-limit { margin: 0; }
+.shop-select { height: 34px; font-size: .88rem; }
+.shop-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.shop-price { font-size: 1.15rem; font-weight: 800; }
+@media (max-width: 520px) {
+  .shop-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .shop-item { padding: 12px; }
+  .shop-foot { flex-direction: column; align-items: stretch; }
+  .store-tabs { width: 100%; }
+  .store-tab { flex: 1; text-align: center; padding: 8px 6px; }
+}

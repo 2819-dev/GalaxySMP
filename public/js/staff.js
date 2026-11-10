@@ -100,7 +100,7 @@ function reportCard(r) {
   const card = h("article", { class: "panel report-card" });
   card.append(
     h("div", { class: "meta" },
-      h("span", {}, "By ", h("b", { text: r.author.username }), ` (${ROLE_NAMES[r.author.role] || r.author.role})`),
+      h("span", {}, "By ", h("b", { text: r.author.username }), ""),
       h("span", { text: `#${r.channel}` }),
       h("span", { text: fmt(r.messageAt) }),
       h("span", { text: `${r.count} report${r.count === 1 ? "" : "s"}` }),
@@ -798,7 +798,7 @@ $("help-reset").addEventListener("click", () => openDialog({
   const panelName = summary.panel || (power >= 100 ? "Admin Panel" : "Staff Panel");
   $("panel-title").textContent = panelName;
   document.title = `${panelName} · GalaxySMP`;
-  $("staff-intro").textContent = `Signed in as ${user.username} (${summary.owner ? "Owner" : user.role.name}). ${summary.owner ? "You have full control of everything here." : power >= 100 ? "You can use every tool on this page." : "Banning, ranks, plans and money are reserved for Admins."}`;
+  $("staff-intro").textContent = `Signed in as ${user.username}. ${summary.owner ? "You have full control of everything here." : power >= 100 ? "You can use every tool on this page." : "Banning, ranks, plans and money are reserved for Admins."}`;
   $("staff-app").hidden = false;
   setBadge("tickets", summary.openTickets);
   setupPanel({ loaders, power, owner: Boolean(summary.owner), selectTab, toast, setBadge });

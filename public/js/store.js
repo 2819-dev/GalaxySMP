@@ -1,22 +1,18 @@
-// Store page: shows the subscription plans. Checkout answers "coming soon" until payments open.
+// Store page: Subscriptions (monthly plans) and Shop (one-time items).
+// Checkout answers "coming soon" until payments open.
 import { toast } from "/js/site.js";
+import { rankTag } from "/js/rank-paint.js";
 
-const HEX = { 6: "#FFAA00", b: "#55FFFF", 9: "#5555FF", e: "#FFFF55", g: "#DDD605", p: "#DEB12D" };
-const GRADIENT_STOPS = { gold: "egp6", galaxy: "bb99" };
-
-async function startCheckout(planId, button) {
+async function startCheckout(id, option, button) {
   button.disabled = true;
   try {
     const res = await fetch("/api/store/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rankId: planId }),
+      body: JSON.stringify({ rankId: id, option }),
     });
     const data = await res.json();
-    if (data.ok && data.url) {
-      location.href = data.url;
-      return;
-    }
+    if (data.ok && data.url) { location.href = data.url; return; }
     toast(data.message || data.error || "Payments open soon.");
   } catch {
     toast("The store is unavailable right now. Please try again later.");
@@ -25,70 +21,41 @@ async function startCheckout(planId, button) {
   }
 }
 
-document.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-checkout]");
-  if (btn) startCheckout(btn.getAttribute("data-checkout"), btn);
-});
-
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
   if (text != null) e.textContent = text;
   return e;
 };
+const usd = (n) => `$${Number(n).toFixed(2)}`;
 
-// [⭐ GALAXY+] painted one color per letter, like in game.
-function tagPreview(tag) {
-  const span = el("span", "plan-tag");
-  const stops = GRADIENT_STOPS[tag.gradient] || tag.color;
-  const text = `[${tag.prefix}]`;
-  const n = text.length;
-  [...text].forEach((ch, i) => {
-    if (i === 1 && tag.icon) {
-      const img = el("img", "rank-icon");
-      img.src = `/img/ranks/rank_${tag.icon}.png`;
-      img.alt = "";
-      span.append(img);
-    }
-    const c = el("span", null, ch);
-    c.style.color = HEX[stops[Math.round((i * (stops.length - 1)) / (n - 1))]] || "#fff";
-    span.append(c);
-  });
-  return span;
-}
-
-async function loadPlans() {
+function renderPlans(data) {
   const wrap = document.getElementById("plans");
-  let data;
-  try {
-    data = await (await fetch("/api/store/plans")).json();
-  } catch {
-    wrap.replaceChildren(el("p", "text-3", "Plans couldn't be loaded. Please try again later."));
-    return;
-  }
   wrap.replaceChildren();
   for (const plan of data.plans) {
     const card = el("article", `panel plan-card plan-${plan.id}`);
     if (plan.id === "pro") card.append(el("span", "plan-badge", "Best value"));
-    card.append(el("h2", "plan-name", plan.name));
-    if (plan.tag) card.append(tagPreview(plan.tag));
+    card.append(el("h3", "plan-name", plan.name));
+    if (plan.tag) {
+      const t = el("div", "plan-tag");
+      t.append(rankTag(plan.tag));
+      card.append(t);
+    }
     const price = el("div", "plan-price");
     if (plan.price) {
-      price.append(el("span", "plan-amount", `$${plan.price.toFixed(2)}`), el("span", "plan-per", "/month"));
+      price.append(el("span", "plan-amount", usd(plan.price)), el("span", "plan-per", "/month"));
       card.append(price, el("p", "plan-game", `+ $${plan.gameCost.toLocaleString("en-US")} in-game money / month`));
     } else {
       price.append(el("span", "plan-amount", "Free"));
       card.append(price, el("p", "plan-game", "For everyone, always"));
     }
     const ul = el("ul", "plan-perks");
-    for (const p of plan.perks) {
-      ul.append(el("li", null, p));
-    }
+    for (const p of plan.perks) ul.append(el("li", null, p));
     card.append(ul);
     if (plan.price) {
       const btn = el("button", "btn btn-primary", data.checkoutEnabled ? "Subscribe" : "Coming soon");
       btn.type = "button";
-      btn.setAttribute("data-checkout", plan.id);
+      btn.addEventListener("click", () => startCheckout(plan.id, null, btn));
       card.append(btn);
     } else {
       const a = el("a", "btn btn-secondary", "How to join");
@@ -99,27 +66,69 @@ async function loadPlans() {
   }
 }
 
-loadPlans();
-
-// One-time extras (like an extra plot), shown under the plans.
-async function loadExtras() {
-  let data;
-  try { data = await (await fetch("/api/store/plans")).json(); } catch { return; }
-  const box = document.getElementById("extras");
-  if (!box || !data.extras?.length) return;
-  for (const x of data.extras) {
-    const row = el("article", "panel extra-card");
-    const text = el("div");
-    text.append(el("h3", "plan-name", x.name), el("p", "text-2", x.description));
-    const right = el("div", "extra-buy");
-    right.append(el("span", "plan-amount", `$${x.price.toFixed(2)}`));
-    const btn = el("button", "btn btn-primary", data.checkoutEnabled ? "Buy" : "Coming soon");
-    btn.type = "button";
-    btn.setAttribute("data-checkout", x.id);
-    right.append(btn);
-    row.append(text, right);
-    box.append(row);
+function renderShop(data) {
+  const box = document.getElementById("shop-items");
+  box.replaceChildren();
+  for (const cat of data.shop || []) {
+    const sec = el("div", "shop-cat");
+    sec.append(el("h3", "shop-cat-name", cat.name), el("p", "text-3 small shop-cat-blurb", cat.blurb));
+    const grid = el("div", "shop-grid");
+    for (const item of cat.items) {
+      const card = el("article", `panel shop-item cat-${cat.id}`);
+      if (item.badge) card.append(el("span", "plan-badge", item.badge));
+      card.append(el("div", "shop-icon", item.icon || "🛒"), el("h4", "shop-name", item.name), el("p", "text-2 shop-desc", item.description));
+      let option = null;
+      const amount = el("span", "shop-price", usd(item.options ? item.options[0].price : item.price));
+      if (item.options) {
+        const sel = el("select", "input shop-select");
+        sel.setAttribute("aria-label", `${item.name}: how long`);
+        for (const o of item.options) {
+          const opt = el("option", null, `${o.name} · ${usd(o.price)}`);
+          opt.value = o.id;
+          sel.append(opt);
+        }
+        option = item.options[0].id;
+        sel.addEventListener("change", () => {
+          option = sel.value;
+          amount.textContent = usd(item.options.find((o) => o.id === option).price);
+        });
+        card.append(sel);
+      }
+      if (item.limit) card.append(el("p", "text-3 small shop-limit", item.limit === 1 ? "One per player" : `Up to ${item.limit} per player`));
+      const foot = el("div", "shop-foot");
+      const btn = el("button", "btn btn-primary btn-sm", data.checkoutEnabled ? "Buy" : "Coming soon");
+      btn.type = "button";
+      btn.addEventListener("click", () => startCheckout(item.id, option, btn));
+      foot.append(amount, btn);
+      card.append(foot);
+      grid.append(card);
+    }
+    sec.append(grid);
+    box.append(sec);
   }
-  box.hidden = false;
 }
-loadExtras();
+
+// Highlight the tab of the section on screen.
+function watchTabs() {
+  const tabs = [...document.querySelectorAll("[data-store-tab]")];
+  const set = (id) => tabs.forEach((t) => t.classList.toggle("active", t.dataset.storeTab === id));
+  set(location.hash === "#shop" ? "shop" : "subscriptions");
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) set(e.target.id);
+  }, { rootMargin: "-45% 0px -50% 0px" });
+  document.querySelectorAll(".store-section").forEach((s) => io.observe(s));
+}
+
+(async () => {
+  let data;
+  try {
+    data = await (await fetch("/api/store/plans")).json();
+  } catch {
+    document.getElementById("plans").replaceChildren(el("p", "text-3", "The store couldn't be loaded. Please try again later."));
+    return;
+  }
+  renderPlans(data);
+  renderShop(data);
+  watchTabs();
+  if (location.hash === "#shop") document.getElementById("shop").scrollIntoView();
+})();

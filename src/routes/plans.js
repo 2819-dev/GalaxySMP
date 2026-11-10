@@ -6,6 +6,7 @@ import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
 import { toPlugin } from "./economy.js";
 import PLANS from "../../endstone-plugin/src/endstone_galaxylink/plans.json";
+import { SHOP } from "../store/shop.js";
 
 export { PLANS };
 
@@ -23,17 +24,27 @@ export function storePlans() {
     ok: true,
     checkoutEnabled: false,
     plans: ["free", "plus", "pro"].map((id) => ({ id, ...PLANS[id] })),
-    extras: [{ id: "extra-plot", name: "Extra plot", price: 1, once: true, description: "One more plot to claim, on top of your plan's plots. Yours to keep." }],
+    shop: SHOP.map((c) => ({
+      id: c.id, name: c.name, blurb: c.blurb,
+      items: c.items.map(({ cents, days, ...i }) => ({ ...i, price: i.price != null ? i.price / 100 : undefined,
+        options: i.options?.map((o) => ({ id: o.id, name: o.name, price: o.price / 100 })) })),
+    })),
   }, 200, { "Cache-Control": "public, max-age=300" });
 }
 
 // Everything the server needs about plans: who has which plan, and extra plots.
 export async function planMessage(sql) {
-  const extra = await sql`SELECT xuid, extra_plots FROM players WHERE extra_plots > 0`;
+  const extra = await sql`
+    SELECT xuid, extra_plots, extra_shop_plots, cosmetics, night_vision_until FROM players
+     WHERE extra_plots > 0 OR extra_shop_plots > 0 OR cardinality(cosmetics) > 0 OR night_vision_until > now()`;
   return {
     type: "plans",
     subscriptions: await loadSubscriptions(sql),
-    extraPlots: Object.fromEntries(extra.map((r) => [r.xuid, Number(r.extra_plots)])),
+    extraPlots: Object.fromEntries(extra.filter((r) => r.extra_plots > 0).map((r) => [r.xuid, Number(r.extra_plots)])),
+    extraShopPlots: Object.fromEntries(extra.filter((r) => r.extra_shop_plots > 0).map((r) => [r.xuid, Number(r.extra_shop_plots)])),
+    cosmetics: Object.fromEntries(extra.filter((r) => r.cosmetics?.length).map((r) => [r.xuid, r.cosmetics])),
+    nightVision: Object.fromEntries(extra.filter((r) => r.night_vision_until && new Date(r.night_vision_until) > new Date())
+      .map((r) => [r.xuid, Math.floor(new Date(r.night_vision_until).getTime() / 1000)])),
   };
 }
 

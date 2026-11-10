@@ -8,6 +8,9 @@ import { isOwner } from "../lib/names.js";
 import { voiceStub } from "./voice.js";
 import { toPlugin } from "./economy.js";
 import { openTicketCount } from "./support.js";
+import { headUrlFor } from "./heads.js";
+import { sendPlans } from "./plans.js";
+import { SHOP_ITEMS, SHOP } from "../store/shop.js";
 
 const MOD = 50;
 const ADMIN = 100;
@@ -25,7 +28,7 @@ async function audit(sql, actorId, action, details) {
   await sql`INSERT INTO audit_log (actor_id, action, details) VALUES (${actorId}, ${action}, ${JSON.stringify(details)}::jsonb)`;
 }
 
-const headUrl = (p) => (p.head_at ? `/api/head/${p.xuid}?v=${new Date(p.head_at).getTime()}` : null);
+const headUrl = headUrlFor;
 const isOnline = (p) => Boolean(p.online_at && Date.now() - new Date(p.online_at).getTime() < 3 * 60_000);
 
 async function serverInfo(env) {
@@ -53,7 +56,7 @@ export async function overview(request, env) {
          ORDER BY a.id DESC LIMIT 8`,
     serverInfo(env),
   ]);
-  const online = await sql`SELECT xuid, gamertag, head_at FROM players WHERE online_at > now() - interval '3 minutes' ORDER BY gamertag LIMIT 60`;
+  const online = await sql`SELECT xuid, gamertag, head_at, gamerpic_at FROM players WHERE online_at > now() - interval '3 minutes' ORDER BY gamertag LIMIT 60`;
   return json({
     ok: true,
     owner: user.owner,
@@ -90,7 +93,7 @@ export async function searchPlayers(request, env, ctx, url) {
   const sql = getDb(env);
   const like = `%${q.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
   const rows = await sql`
-    SELECT p.xuid, p.gamertag, p.is_op, p.balance_cents, p.last_seen, p.online_at, p.head_at, p.playtime_s,
+    SELECT p.xuid, p.gamertag, p.is_op, p.balance_cents, p.last_seen, p.online_at, p.head_at, p.gamerpic_at, p.playtime_s,
            rk.name AS rank_name, rk.color AS rank_color, s.plan, s.expires_at,
            u.id AS user_id, u.username, u.banned, u.muted_until,
            (SELECT kind FROM game_punishments g WHERE g.xuid = p.xuid AND g.kind IN ('ban', 'unban') ORDER BY g.id DESC LIMIT 1) AS ban_state,
@@ -137,11 +140,12 @@ export async function playerCard(request, env, ctx, url, params) {
      WHERE p.xuid = ${xuid}`;
   const p = rows[0];
   if (!p) throw new HttpError(404, "That player hasn't joined the server yet.");
-  const [history, reports, notes, tickets] = await Promise.all([
+  const [history, reports, notes, tickets, orders] = await Promise.all([
     sql`SELECT kind, reason, minutes, by_name, created_at FROM game_punishments WHERE xuid = ${xuid} ORDER BY id DESC LIMIT 30`,
     sql`SELECT reporter_name, reason, details, status, created_at FROM game_reports WHERE target_xuid = ${xuid} ORDER BY id DESC LIMIT 15`,
     sql`SELECT id, author, body, created_at FROM player_notes WHERE xuid = ${xuid} ORDER BY id DESC LIMIT 50`,
     p.user_id ? sql`SELECT id, subject, status, priority, label, last_message_at FROM tickets WHERE user_id = ${p.user_id} ORDER BY id DESC LIMIT 10` : [],
+    sql`SELECT item, option, given_by, source, created_at FROM shop_orders WHERE xuid = ${xuid} ORDER BY id DESC LIMIT 30`,
   ]);
   return json({
     ok: true,
@@ -160,6 +164,12 @@ export async function playerCard(request, env, ctx, url, params) {
     reports: reports.map((r) => ({ by: r.reporter_name, reason: r.reason, details: r.details, status: r.status, at: r.created_at })),
     notes: notes.map((n) => ({ id: Number(n.id), author: n.author, body: n.body, at: n.created_at })),
     tickets: tickets.map((t) => ({ id: Number(t.id), subject: t.subject, status: t.status, priority: t.priority, label: t.label, at: t.last_message_at })),
+    shop: {
+      cosmetics: p.cosmetics || [], extraShopPlots: p.extra_shop_plots || 0,
+      nightVisionUntil: p.night_vision_until && new Date(p.night_vision_until) > new Date() ? p.night_vision_until : null,
+      orders: orders.map((o) => ({ item: SHOP_ITEMS[o.item]?.name || o.item, option: o.option, by: o.given_by, source: o.source, at: o.created_at })),
+      catalog: SHOP.map((c) => ({ id: c.id, name: c.name, items: c.items.map((i) => ({ id: i.id, name: i.name, limit: i.limit || null, options: i.options?.map((o) => ({ id: o.id, name: o.name })) })) })),
+    },
   });
 }
 
@@ -167,7 +177,7 @@ const GAME_ACTIONS = { warn: MOD, mute: MOD, unmute: MOD, kick: MOD, ban: ADMIN,
 
 export async function playerAction(request, env, ctx, url, params) {
   const action = String(params.action);
-  const needed = action === "givekey" || action === "note-delete" ? ADMIN : GAME_ACTIONS[action] ?? (action === "note" ? MOD : null);
+  const needed = ["givekey", "note-delete", "shopgive"].includes(action) ? ADMIN : GAME_ACTIONS[action] ?? (action === "note" ? MOD : null);
   if (needed == null) throw new HttpError(400, "Unknown action.");
   const user = await requireStaff(request, env, needed);
   const body = await readJson(request);
@@ -189,6 +199,7 @@ export async function playerAction(request, env, ctx, url, params) {
     await sql`DELETE FROM player_notes WHERE id = ${Number(body.id)} AND xuid = ${p.xuid}`;
     return json({ ok: true });
   }
+  if (action === "shopgive") return json(await giveShopItem(env, sql, p, body, user));
   if (action === "givekey") {
     const kind = KEY_KINDS.includes(body.kind) ? body.kind : null;
     const amount = Number(body.amount || 1);
@@ -216,4 +227,34 @@ export async function playerAction(request, env, ctx, url, params) {
   if (!sent) throw new HttpError(409, "The Minecraft server isn't connected right now, so in-game actions can't be done. Try again when it's online.");
   await audit(sql, user.id, `game.${action}`, { player: p.gamertag, reason, minutes });
   return json({ ok: true });
+}
+
+// Give a WebShop item (what a payment will do automatically once payments open).
+export async function giveShopItem(env, sql, p, body, user, source = "staff") {
+  const item = SHOP_ITEMS[String(body.item || "")];
+  if (!item) throw new HttpError(400, "Choose a Shop item.");
+  const option = item.options ? item.options.find((o) => o.id === body.option) : null;
+  if (item.options && !option) throw new HttpError(400, "Choose how long.");
+  if (item.limit) {
+    const [{ n }] = await sql`SELECT count(*)::int AS n FROM shop_orders WHERE xuid = ${p.xuid} AND item = ${item.id}`;
+    if (n >= item.limit) throw new HttpError(409, item.limit === 1 ? `${p.gamertag} already has ${item.name}.` : `${p.gamertag} already has the most (${item.limit}) of ${item.name}.`);
+  }
+  if (item.category === "money") {
+    const sent = await toPlugin(env, { type: "eco", action: "add", xuid: p.xuid, name: p.gamertag, cents: item.cents, by: user.username });
+    if (!sent) throw new HttpError(409, "The Minecraft server isn't connected right now, so money can't be added. Try again when it's online.");
+    await sql`UPDATE players SET balance_cents = coalesce(balance_cents, 0) + ${item.cents}, balance_at = now() WHERE xuid = ${p.xuid}`;
+  } else if (item.id === "extra_plot") {
+    await sql`UPDATE players SET extra_plots = extra_plots + 1 WHERE xuid = ${p.xuid}`;
+  } else if (item.id === "extra_shop_plot") {
+    await sql`UPDATE players SET extra_shop_plots = extra_shop_plots + 1 WHERE xuid = ${p.xuid}`;
+  } else if (item.id === "night_vision") {
+    await sql`UPDATE players SET night_vision_until = greatest(coalesce(night_vision_until, now()), now()) + make_interval(days => ${option.days}) WHERE xuid = ${p.xuid}`;
+  } else if (item.category === "cosmetics") {
+    await sql`UPDATE players SET cosmetics = array_append(cosmetics, ${item.id}) WHERE xuid = ${p.xuid} AND NOT (${item.id} = ANY(cosmetics))`;
+  }
+  const price = option ? option.price : item.price;
+  await sql`INSERT INTO shop_orders (xuid, item, option, price_cents, source, given_by) VALUES (${p.xuid}, ${item.id}, ${option?.id || null}, ${price || 0}, ${source}, ${user.username})`;
+  await audit(sql, user.id, "shop.give", { player: p.gamertag, item: item.name, option: option?.name || null });
+  const sent = item.category === "money" ? true : await sendPlans(env, sql);
+  return { ok: true, sent };
 }

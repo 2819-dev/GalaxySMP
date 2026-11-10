@@ -1,8 +1,8 @@
 """In-game chat filter: bad words are scrambled with §k (Minecraft's "obfuscated" text).
 
 Uses the same word list as the website (Staff Tools > Word filter), sent here over the live
-connection, and the same tricks as the website filter: l33t spellings (sh1t, $hit), stretched
-letters (shiiit) and spaced-out letters (s h i t, s.h.i.t).
+connection, and the same tricks as the website filter: l33t spellings (c@ts), stretched
+letters (caaats) and spaced-out letters (c A t, c.a.t.s).
 The scrambled part is made of random letters (never the real word), so the word itself never
 reaches anyone's chat.
 Staff turn it on or off for the whole server with /chatfilter or on the website.

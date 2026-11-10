@@ -542,7 +542,7 @@ export class VoiceHub extends DurableObject {
       this.sendRoster();
     } else if (event.type === "role_changed" || event.type === "banned") {
       for (const ws of targets) {
-        this.send(ws, { type: "closed", reason: event.type === "banned" ? "Your account has been banned." : "Your role changed. Please rejoin voice." });
+        this.send(ws, { type: "closed", reason: event.type === "banned" ? "Your account has been banned." : "Your permissions changed. Please rejoin voice." });
         try { ws.close(4005, "changed"); } catch { /* gone */ }
       }
       this.sendRoster();
