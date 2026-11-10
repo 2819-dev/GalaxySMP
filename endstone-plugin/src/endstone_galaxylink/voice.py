@@ -213,6 +213,9 @@ class VoiceLink:
             self._on_main(lambda: self.plugin.economy.from_website(msg))
         elif msg.get("type") == "announce":
             self._on_main(lambda: self.plugin.announcements.announce(str(msg.get("text") or "")[:300], by=str(msg.get("by") or "staff")))
+        elif msg.get("type") == "staff_alert":
+            text = str(msg.get("text") or "")[:200].replace("§", "")
+            self._on_main(lambda: [p.send_message(f"§d[Staff] §f{text}") for p in self.plugin.moderation.staff_online()])
         elif msg.get("type") == "mod_action":
             self._on_main(lambda: self._mod_action(msg))
         elif msg.get("type") == "givekey":

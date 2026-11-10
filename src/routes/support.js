@@ -8,6 +8,7 @@ import { requireUser } from "../lib/auth.js";
 import { checkMessage, compileWordList } from "../lib/filter.js";
 import { hubStub } from "./chat.js";
 import { headUrlFor } from "./heads.js";
+import { toPlugin } from "./economy.js";
 
 const STAFF = 50;
 const STATUSES = ["open", "waiting", "resolved", "closed"];
@@ -107,6 +108,8 @@ export async function createTicket(request, env) {
   const [t] = await sql`INSERT INTO tickets (user_id, subject, label, staff_unread) VALUES (${user.id}, ${subject}, ${label}, 1) RETURNING *`;
   await sql`INSERT INTO ticket_messages (ticket_id, user_id, body) VALUES (${t.id}, ${user.id}, ${text})`;
   await notify(env, t);
+  // staff who are playing get a message in game too (older plugins ignore it)
+  try { await toPlugin(env, { type: "staff_alert", text: `New support ticket from ${user.username}: ${subject}. Answer it on galaxymc.us (Panel > Tickets).` }); } catch { /* best effort */ }
   return json({ ok: true, id: Number(t.id) });
 }
 

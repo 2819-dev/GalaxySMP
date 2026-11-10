@@ -760,6 +760,10 @@ export async function startChat({ onSignedOut }) {
   }
   state.me = data.me;
   state.channels = data.channels;
+  if (data.ticketUnread) {
+    const support = data.channels.find((c) => c.kind === "support");
+    if (support) state.unread.add(support.id);
+  }
   state.categories = data.categories;
   state.reactions = data.reactions;
   state.roles = new Map(data.roles.map((r) => [r.key, r]));

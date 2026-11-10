@@ -36,6 +36,8 @@ export async function bootstrap(request, env) {
          LIMIT 500`,
   ]);
   await sql`UPDATE users SET last_seen_at = now() WHERE id = ${user.id}`;
+  // staff replies to your support tickets you haven't read yet (shows a dot on the Support channel)
+  const [{ ticket_unread: ticketUnread }] = await sql`SELECT coalesce(sum(user_unread), 0)::int AS ticket_unread FROM tickets WHERE user_id = ${user.id}`;
   const me = publicUser(user);
   return json({
     ok: true,
@@ -59,6 +61,7 @@ export async function bootstrap(request, env) {
     })),
     reactions: REACTIONS,
     maxLength: MAX_LENGTH,
+    ticketUnread,
   });
 }
 
