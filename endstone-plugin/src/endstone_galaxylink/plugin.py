@@ -45,7 +45,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.17.3"
+VERSION = "2.17.4"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -201,6 +201,7 @@ class GalaxyLink(Plugin):
             clean_world_packs(self.logger)
             for line in pack_report():
                 self.logger.info("Packs: " + line)
+            self.logger.info(self.ranktags.status())
         except Exception as e:
             self.logger.warning(f"Couldn't check the world's packs: {e}")
         self.server.scheduler.run_task(self, self.ranks.refresh_pictures, delay=40)  # plan tags, even before ranks arrive

@@ -173,8 +173,8 @@ def tag_text(rank):
     Gradient tags are smooth hex-gradient pictures once the rank tag pack is installed."""
     glyph = GLYPHS.get(rank.get("icon") or "")
     pics = PICTURES.glyphs_for(tag_spec(rank)) if PICTURES is not None and rank.get("gradient") else None
-    if pics:  # pics = pictures of "[PREFIX]"; put the icon right after "["
-        return "§f" + (pics[0] + glyph + " " + pics[1:] if glyph else pics)
+    if pics:  # pics = ["[" pictures, "PREFIX]" pictures]; the icon goes in between
+        return "§f" + (pics[0] + glyph + " " + pics[1] if glyph else pics[0] + pics[1])
     if glyph:
         text = paint(f"[{glyph} {rank['prefix']}]", rank)
         return text
@@ -199,6 +199,7 @@ class RankManager:
 
     # ---------- state from the website ----------
     def update(self, msg):
+        self.received = True  # gradient pictures are only built once the real ranks are here
         self.ranks = {r["id"]: r for r in msg.get("ranks", [])}
         self.assign = {str(k): v for k, v in (msg.get("assignments") or {}).items()}
         self.plugin.server.scheduler.run_task(self.plugin, self.apply_all)
@@ -242,7 +243,7 @@ class RankManager:
 
     def refresh_pictures(self):
         pics = getattr(self.plugin, "ranktags", None)
-        if pics:
+        if pics and getattr(self, "received", False):
             try:
                 pics.refresh(self.all_tags())
             except Exception as e:

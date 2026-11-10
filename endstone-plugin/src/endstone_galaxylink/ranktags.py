@@ -22,6 +22,7 @@ PAGES = list(range(0xE9, 0xF8))   # glyph pages E9-F7 (256 pictures each)
 CELL = 16                          # pixels per picture (256x256 page = the same size as normal text)
 UNIT = 2                           # pixels per Minecraft font pixel
 FILE = "GalaxySMP_RankTags.mcpack"
+FORMAT = 2                         # bump when the drawing changes, so everything is rebuilt
 
 # A 5x7 pixel font in the style of Minecraft's (# = pixel). Width = longest row.
 FONT_ROWS = {
@@ -138,30 +139,62 @@ def color_at(stops, t):
     return tuple(int(round(a[k] + (b[k] - a[k]) * f)) for k in range(3))
 
 
-def render_tag(text, stops):
-    """[OWNER] or a name -> one 16x16 picture per character, with one smooth gradient across the whole text.
-    Returns a list of (char, pixels or None for a space). pixels[y][x] = (r, g, b, a)."""
-    chars = [(ch, font_char(ch)) for ch in text]
-    total = sum((len(g[0]) + 1) * UNIT for ch, g in chars if g) or 1
-    out, x0 = [], 0
-    for ch, g in chars:
-        if g is None:
-            out.append((ch, None))
+SPACE_UNITS = 3
+
+
+def render_strip(text, stops):
+    """Draws the whole text as one strip with normal letter spacing (like Minecraft's chat font) and one
+    smooth gradient across it. Returns (pixels {(x, y): rgba}, width in pixels, x where the 2nd character starts)."""
+    layout, x = [], 0
+    for i, ch in enumerate(text):
+        g = font_char(ch)
+        if g is None:  # space (or a character the font doesn't have)
+            x += SPACE_UNITS
+            layout.append((None, x))
             continue
-        w = len(g[0])
-        px = [[(0, 0, 0, 0)] * CELL for _ in range(CELL)]
+        layout.append((g, x))
+        x += len(g[0]) + 1
+    units = max(1, x - 1)
+    width = units * UNIT
+    pixels, split = {}, None
+    for i, (g, x0) in enumerate(layout):
+        if i == 1:
+            split = x0 * UNIT
+        if g is None:
+            continue
         for row, line in enumerate(g):
             for col, c in enumerate(line):
                 if c != "#":
                     continue
                 for dx in range(UNIT):
-                    x = x0 + col * UNIT + dx
-                    color = color_at(stops, x / max(1, total - UNIT - 1))
+                    px = (x0 + col) * UNIT + dx
+                    color = color_at(stops, px / max(1, width - 1))
                     for dy in range(UNIT):
-                        px[row * UNIT + dy][col * UNIT + dx] = (*color, 255)
-        out.append((ch, px))
-        x0 += (w + 1) * UNIT
+                        pixels[(px, row * UNIT + dy)] = (*color, 255)
+    return pixels, width, split
+
+
+def tiles(pixels, x_from, x_to):
+    """Cuts part of a strip into 16x16 pictures that fit together exactly. Each picture gets two almost
+    invisible pixels at its left and right edge so Minecraft keeps its full width (no gaps, no overlap)."""
+    out = []
+    for left in range(x_from, x_to, CELL):
+        tile = {}
+        for x in range(CELL):
+            for y in range(CELL):
+                c = pixels.get((left + x, y))
+                if c:
+                    tile[(x, y)] = c
+        for edge in (0, CELL - 1):
+            tile.setdefault((edge, CELL - 1), (255, 255, 255, 1))
+        out.append(tile)
     return out
+
+
+def render_tag(text, stops):
+    """Kept for previews/tests: the strip as a list of 16x16 tiles."""
+    pixels, width, _ = render_strip(text, stops)
+    return tiles(pixels, 0, width)
 
 
 def png(width, height, pixels):
@@ -262,7 +295,7 @@ def pack_report():
 
 def signature(item):
     """What a text looks like (text + gradient colors): same signature = same pictures."""
-    return json.dumps([item.get("text", ""), item.get("stops")], separators=(",", ":"))
+    return json.dumps([FORMAT, item.get("text", ""), item.get("stops")], separators=(",", ":"))
 
 
 class RankTags:
@@ -300,7 +333,12 @@ class RankTags:
         """Pictures for any text (a tag or a player's name), or None to use colored text."""
         if not self.enabled or not stops or not text:
             return None
-        return self.active.get(signature({"text": text, "stops": stops}))
+        found = self.active.get(signature({"text": text, "stops": stops}))
+        if text.startswith("[") and not isinstance(found, list):
+            return None  # tags are stored as ["[", "PREFIX]"] so the icon can go in between
+        if not text.startswith("[") and not isinstance(found, str):
+            return None
+        return found
 
     # ---------- building the pack ----------
     def wanted(self, items):
@@ -320,26 +358,29 @@ class RankTags:
         want = self.wanted(tags)
         if set(want) == set(self.built):
             return False
-        built, cp, pages = {}, 0, {}
-        for sig, t in sorted(want.items()):
-            text = t["text"]
-            glyphs = []
-            for ch, px in render_tag(text, t["stops"]):
-                if px is None:
-                    glyphs.append(ch)
-                    continue
-                if cp >= len(PAGES) * 256:
+        built, pages = {}, {}
+        cp = [0]
+
+        def place(tile_list):
+            chars = []
+            for tile in tile_list:
+                if cp[0] >= len(PAGES) * 256:
                     break
-                page, idx = PAGES[cp // 256], cp % 256
-                pages.setdefault(page, {})
+                page, idx = PAGES[cp[0] // 256], cp[0] % 256
                 cx, cy = (idx % 16) * CELL, (idx // 16) * CELL
-                for y, row in enumerate(px):
-                    for x, c in enumerate(row):
-                        if c[3]:
-                            pages[page][(cx + x, cy + y)] = c
-                glyphs.append(chr((page << 8) + idx))
-                cp += 1
-            built[sig] = "".join(glyphs)
+                page_px = pages.setdefault(page, {})
+                for (x, y), c in tile.items():
+                    page_px[(cx + x, cy + y)] = c
+                chars.append(chr((page << 8) + idx))
+                cp[0] += 1
+            return "".join(chars)
+
+        for sig, t in sorted(want.items()):
+            pixels, width, split = render_strip(t["text"], t["stops"])
+            if t["text"].startswith("[") and split:  # tag: "[" and "PREFIX]" separately, the icon goes between
+                built[sig] = [place(tiles(pixels, 0, split)), place(tiles(pixels, split, width))]
+            else:
+                built[sig] = place(tiles(pixels, 0, width))
         self.version += 1
         self.write_pack(pages)
         self.built = built
@@ -370,6 +411,10 @@ class RankTags:
         tmp.write_bytes(buf.getvalue())
         tmp.replace(path)
 
+    def status(self):
+        return (f"Gradient pictures: {'on' if self.enabled else 'off'}; the world loads version {self.installed or 'none'}, "
+                f"newest built {self.version}; {len(self.active)} tags/names ready now.")
+
     # ---------- /ranktags ----------
     def command(self, sender, args):
         what = " ".join(args).strip().lower()
@@ -384,5 +429,6 @@ class RankTags:
                  f"waiting for a server restart (built version {self.version}, the world has {self.installed or 'none'})")
         sender.send_message(f"§7Smooth gradient rank tags are {state}§7 (pictures {ready}; file: BDS-Addons/{FILE}). "
                             "Use /ranktags on or /ranktags off.")
+        sender.send_message("§8- " + self.status())
         for line in pack_report():
             sender.send_message("§8- " + line)
