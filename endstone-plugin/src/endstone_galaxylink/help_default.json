@@ -226,6 +226,11 @@
    "example": "/shop"
   },
   {
+   "command": "Elevators",
+   "description": "Press a button next to an elevator to call it. Inside, tap the cabin floor to pick a floor. Galaxy+ and Pro+ can build them in their plots with /elevator.",
+   "example": "/elevator"
+  },
+  {
    "command": "/report [player]",
    "description": "Report a player who is breaking the rules. Staff get an alert right away.",
    "example": "/report Steve123"

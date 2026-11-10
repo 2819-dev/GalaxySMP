@@ -710,6 +710,9 @@ class Plots:
         if not plot:
             return
         owner = plot.get("owner")
+        el = getattr(self.plugin, "elevators", None)
+        if el:
+            el.remove_in_plot(plot)
         if plot.get("shop"):
             sc = getattr(self.plugin, "shopchests", None)
             if sc:

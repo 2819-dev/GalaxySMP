@@ -30,6 +30,7 @@ from endstone_galaxylink.floating import FloatingTexts
 from endstone_galaxylink.jobs import Jobs
 from endstone_galaxylink.shopchests import ShopChests
 from endstone_galaxylink.crates import Crates
+from endstone_galaxylink.elevators import Elevators
 from endstone_galaxylink.progress import HOSTILE, short as short_id
 from endstone_galaxylink.economy import HUD_TICKS, Economy
 from endstone_galaxylink.helpmenu import HelpMenu
@@ -42,7 +43,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.15.1"
+VERSION = "2.16.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -103,6 +104,7 @@ class GalaxyLink(Plugin):
         "jobs": _cmd("Pick a job and earn money while you play.", "/jobs", "galaxylink.command.jobs", ["job"]),
         "crates": _cmd("Crates: place them, edit prizes, give keys (staff).", "/crates", "galaxylink.command.crates"),
         "givekey": _cmd("Give crate keys (staff).", "/givekey <player: message>", "galaxylink.command.givekey"),
+        "elevator": _cmd("Build elevators (Galaxy+ and Pro+ in your plots, staff anywhere).", "/elevator", "galaxylink.command.elevator", ["elevators"]),
         "report": _cmd("Report a player who is breaking the rules.", "/report [player: message]", "galaxylink.command.report"),
         "mod": _cmd("Staff moderation panel: warn, mute, kick, ban, reports and block logs.", "/mod", "galaxylink.command.mod"),
         "modban": _cmd("Ban a player (staff).", "/modban <player: message>", "galaxylink.command.modban"),
@@ -144,6 +146,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.plotaxe": _perm("Allows /plotaxe (server operators).", "op"),
         "galaxylink.command.minigames": _perm("Allows /minigames.", True),
         "galaxylink.command.report": _perm("Allows /report.", True),
+        "galaxylink.command.elevator": _perm("Allows /elevator (plans decide who can build).", True),
         "galaxylink.command.jobs": _perm("Allows /jobs.", True),
         "galaxylink.command.crates": _perm("Allows /crates (operators, or give it with a rank).", "op"),
         "galaxylink.command.givekey": _perm("Allows /givekey (operators, or give it with a rank).", "op"),
@@ -186,6 +189,8 @@ class GalaxyLink(Plugin):
         self.jobs = Jobs(self)
         self.shopchests = ShopChests(self)
         self.crates = Crates(self)
+        self.elevators = Elevators(self)
+        self.server.scheduler.run_task(self, self.elevators.tick, delay=2, period=2)
         self.server.scheduler.run_task(self, self.jobs.tick, delay=100, period=100)
         self.server.scheduler.run_task(self, self.floating.update, delay=1400, period=1200)
         self.server.scheduler.run_task(self, self.leaderboards.update, delay=1300, period=1200)
@@ -312,6 +317,8 @@ class GalaxyLink(Plugin):
             return
         if self.crates.on_interact(event) or self.shopchests.on_interact(event):  # crates and shop chests
             return
+        if self.elevators.on_interact(event):  # call buttons and the floor panel
+            return
         if self.minigames.on_interact(event):  # Minigame Computer
             return
         self.plots.on_interact(event)
@@ -388,7 +395,7 @@ class GalaxyLink(Plugin):
         name = command.name
         player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "guide", "tpa", "tpahere", "tpaccept",
                        "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd",
-                       "report", "mod", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates"}
+                       "report", "mod", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates", "elevator"}
         if name in player_only and not isinstance(sender, Player):
             sender.send_message(f"/{name} can only be used in game.")
             return True
@@ -440,6 +447,7 @@ class GalaxyLink(Plugin):
             "stats": lambda: self.progress.stats_command(sender, args),
             "leaderboard": lambda: self.leaderboards.menu(sender),
             "jobs": lambda: self.jobs.menu(sender),
+            "elevator": lambda: self.elevators.menu(sender),
             "crates": lambda: self.crates.admin_menu(sender),
             "givekey": lambda: self.crates.givekey_command(sender, args),
             "mod": lambda: self.moderation.panel(sender),
