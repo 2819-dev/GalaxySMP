@@ -321,11 +321,14 @@ window.addEventListener("beforeinstallprompt", (e) => {
   document.dispatchEvent(new Event("gsmp-installable"));
 });
 window.addEventListener("appinstalled", () => { document.querySelector(".install-banner")?.remove(); toast("GalaxySMP app installed!"); });
-// iPhone / iPad: the website only works as the installed GalaxySMP app (Apple doesn't let sites install
-// themselves, so we show the steps full screen until it's opened from the Home Screen).
+// iPhone / iPad: voice chat only works in the installed GalaxySMP app (in Safari it stops as soon as you switch
+// to Minecraft). Apple doesn't let sites install themselves, so the voice page shows the steps until it's opened
+// from the Home Screen. The rest of the website works normally in Safari.
 const inAppBrowser = () => /FBAN|FBAV|Instagram|Line\/|Discord|Snapchat|TikTok|musical_ly|GSA\/|Twitter|LinkedInApp|Pinterest/i.test(navigator.userAgent);
+const installedTop = () => { try { return isInstalled() || window.top.navigator.standalone === true || window.top.matchMedia("(display-mode: standalone)").matches; } catch { return isInstalled(); } };
 function forceInstallScreen() {
-  if (EMBED || isInstalled() || !isIos() || location.pathname.startsWith("/privacy")) return;
+  // voice page only (also when it's shown inside the Community page's Voice Chat channel)
+  if (!location.pathname.startsWith("/voice") || installedTop() || !isIos()) return;
   const ua = navigator.userAgent;
   const otherBrowser = /CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
   let steps;
@@ -355,10 +358,10 @@ function forceInstallScreen() {
   wall.innerHTML = `
     <div class="install-wall-card">
       <img src="/img/icon-192.png" alt="" width="84" height="84" class="install-wall-icon">
-      <h1>Get the <span class="grad-text">GalaxySMP</span> app</h1>
-      <p class="text-2">On iPhone and iPad, GalaxySMP works as an app on your Home Screen: full screen, faster, and voice chat keeps working while you play Minecraft.</p>
+      <h1>Voice chat needs the <span class="grad-text">GalaxySMP</span> app</h1>
+      <p class="text-2">On iPhone and iPad, voice chat only keeps working while you play Minecraft in the GalaxySMP app on your Home Screen. It's free and takes 10 seconds.</p>
       <div class="install-wall-steps">${steps}</div>
-      <p class="text-3 small" style="margin-top:14px">Free, no App Store needed. <a href="/privacy">Privacy</a></p>
+      <p class="text-3 small" style="margin-top:14px">Free, no App Store needed. <a href="/" target="_top">Back to the website</a></p>
     </div>`;
   wall.querySelector("[data-copy-link]")?.addEventListener("click", async (e) => {
     try { await navigator.clipboard.writeText("https://galaxymc.us" + location.pathname); e.target.textContent = "Link copied!"; }
@@ -368,5 +371,6 @@ function forceInstallScreen() {
   document.body.append(wall);
 }
 forceInstallScreen();
+if (isIos() && !EMBED && !location.pathname.startsWith("/voice")) setTimeout(() => installBanner(), 1500);  // optional elsewhere
 
 export { config };
