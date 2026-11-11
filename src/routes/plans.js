@@ -19,10 +19,13 @@ export async function loadSubscriptions(sql) {
 }
 
 // Public: the Store page.
-export function storePlans() {
+export function storePlans(env) {
+  const cardsReady = Boolean(env?.STRIPE_SECRET_KEY && env?.STRIPE_WEBHOOK_SECRET);
+  const ON_SALE = ["cosmetics"]; // the same list as ON_SALE in routes/store.js
   return json({
     ok: true,
-    checkoutEnabled: false,
+    checkoutEnabled: cardsReady,
+    onSale: ON_SALE,
     plans: ["free", "plus", "pro"].map((id) => ({ id, ...PLANS[id] })),
     shop: SHOP.map((c) => ({
       id: c.id, name: c.name, blurb: c.blurb,

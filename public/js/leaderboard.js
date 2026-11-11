@@ -1,17 +1,10 @@
 // Leaderboards (stats are sent by the Minecraft server) and the player search.
+import { money, moneyExact } from "/js/money.js";
 import "/js/site.js";
 
 const $ = (id) => document.getElementById(id);
 
-export function money(cents) {
-  const d = cents / 100;
-  const trim = (n) => n.toFixed(2).replace(/\.?0+$/, "");
-  if (Math.abs(d) < 10000) return "$" + d.toLocaleString("en-US", { maximumFractionDigits: 2 });
-  for (const [size, letter] of [[1e15, "Q"], [1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]]) {
-    if (Math.abs(d) >= size) return `$${trim(d / size)}${letter}`;
-  }
-  return "$" + d;
-}
+export { money };
 export const hours = (s) => (s >= 3600 ? `${Math.floor(s / 3600).toLocaleString()}h ${Math.floor((s % 3600) / 60)}m` : `${Math.floor(s / 60)}m`);
 const plural = (v, word) => `${v.toLocaleString()} ${word}${v === 1 ? "" : "s"}`;
 const FORMAT = {
@@ -65,7 +58,7 @@ async function load() {
       const name = document.createElement("a"); name.className = "lb-name"; name.textContent = p.name; name.href = profileUrl(p.name);
       if (p.online) { const dot = document.createElement("span"); dot.className = "online-dot"; dot.title = "Online now"; name.append(dot); }
       const val = document.createElement("span"); val.className = "lb-money"; val.textContent = fmt(p.value);
-      if (data.board === "money") val.title = "$" + (p.value / 100).toLocaleString("en-US", { maximumFractionDigits: 2 });
+      if (data.board === "money") val.title = moneyExact(p.value);
       li.append(rank, name, val);
       list.append(li);
     });

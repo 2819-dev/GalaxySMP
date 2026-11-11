@@ -41,6 +41,7 @@
           <button role="tab" data-tab="words" aria-selected="false">Word filter</button>
           <button role="tab" data-tab="ranks" aria-selected="false" hidden>Ranks</button>
           <button role="tab" data-tab="economy" aria-selected="false" hidden>Economy</button>
+          <button role="tab" data-tab="promos" aria-selected="false" hidden>Promo codes</button>
           <button role="tab" data-tab="help" aria-selected="false" hidden>Help menu</button>
           <button role="tab" data-tab="dms" aria-selected="false" hidden>Messages</button>
           <button role="tab" data-tab="audit" aria-selected="false">Audit log</button>
@@ -142,7 +143,7 @@
             <p id="eco-server" class="small text-3" style="margin:0 0 12px"></p>
             <div class="toolbar"><input class="input" id="eco-search" type="search" placeholder="Search by gamertag" autocomplete="off"></div>
             <div id="eco-players"></div>
-            <p class="text-3 small" style="margin:12px 0 0">New players get $1,000. Operators have infinite money (∞). Public list: <a href="/leaderboard">Leaderboard</a>.</p>
+            <p class="text-3 small" style="margin:12px 0 0">New players get $1K. Operators have infinite money (∞). Public list: <a href="/leaderboard">Leaderboard</a>.</p>
           </div>
           <div class="panel">
             <div class="voice-head">
@@ -155,6 +156,17 @@
             </div>
             <p class="text-3 small" style="margin:0 0 6px">Prices are in dollars. Leave Buy or Sell empty to turn it off for that item. Tap a category to edit it. <span id="eco-status"></span></p>
             <div id="eco-shop"></div>
+          </div>
+        </section>
+
+        <section data-panel="promos" hidden>
+          <div class="panel">
+            <div class="voice-head">
+              <h2>Promo codes</h2>
+              <div class="row-actions"><button class="btn btn-primary btn-sm" type="button" id="promo-new">New promo code</button></div>
+            </div>
+            <p class="text-3 small" style="margin:0 0 12px">Discounts for the Store. Make a code anyone can type, or pick members: they get a pop-up telling them they have a promo code when they buy something it works on.</p>
+            <div id="promo-list"></div>
           </div>
         </section>
 

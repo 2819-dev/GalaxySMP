@@ -1,6 +1,7 @@
 // Staff panel tabs: Overview (live numbers + quick controls), Tickets (support live chat)
 // and Players (one card per player with everything staff need). All text goes in with textContent.
 import { faceSvg } from "/js/face.js";
+import { moneyDollars } from "/js/money.js";
 import { h, openDialog, postJson, getJson, select, field, muteDialog, banDialog, voiceMuteDialog, MUTE_LABELS } from "/js/dialog.js";
 import { ticketChat, chip, when, LABELS, PRIORITIES, ticketEvent } from "/js/tickets.js";
 import { iconEl } from "/js/site.js";
@@ -12,7 +13,7 @@ const ibtn = (name, label, onclick, cls = "btn btn-secondary") => {
   b.append(iconEl(name), label);
   return b;
 };
-const money = (n) => (n == null ? "–" : `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
+const money = (n) => (n == null ? "–" : moneyDollars(n));
 // 1234 -> "1,234", 1234567 -> "1.2M": keeps the stat tiles from overflowing
 const short = (n) => {
   n = Number(n) || 0;
@@ -30,7 +31,7 @@ const ACTION_WORDS = {
   "ticket.update": "updated a ticket", "game.announce": "announced in game", "game.givekey": "gave crate keys", "game.warn": "warned a player",
   "game.mute": "muted a player", "game.unmute": "unmuted a player", "game.kick": "kicked a player", "game.ban": "banned a player", "game.unban": "unbanned a player",
   "rank.assign": "gave a rank", "rank.remove": "removed a rank", "rank.update": "edited a rank", "rank.create": "made a rank", "rank.delete": "deleted a rank",
-  "plan.give": "gave a plan", "plan.remove": "removed a plan", "economy.money": "changed money", "economy.shop": "changed shop prices",
+  "plan.give": "gave a plan", "plan.remove": "removed a plan", "economy.money": "changed money", "economy.shop": "changed shop prices", "promo.create": "made a promo code", "promo.pause": "paused a promo code", "promo.resume": "turned on a promo code", "promo.delete": "deleted a promo code",
   mute: "muted a member", unmute: "unmuted a member", ban: "banned a member", unban: "unbanned a member", role: "changed a role", delete: "deleted a message",
 };
 const ICONS = {
@@ -123,7 +124,11 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
       ? h("div", { class: "panel ov-warn" }, h("b", {}, iconEl("alert"), "The GalaxySMP Icons pack is old or missing"),
         h("p", { class: "text-2 small", style: "margin:4px 0 0", text: `The world loads Icons ${d.server.iconsPack}, but ${d.server.latestIcons} is needed. Rank icons, voice icons and the pause-menu logo will look wrong until you upload the newest GalaxySMP_Voice_Icons.mcpack to BDS-Addons and restart.` }))
       : null;
-    box.replaceChildren(...[warn, packWarn].filter(Boolean), grid, h("div", { class: "ov-cols" }, quick, h("div", { class: "stack", style: "gap:16px" }, online, recent)));
+    const conflicts = d.server.online && d.server.iconConflicts?.length
+      ? h("div", { class: "panel ov-warn" }, h("b", {}, iconEl("alert"), "Another pack is covering the GalaxySMP icons"),
+        h("p", { class: "text-2 small", style: "margin:4px 0 0", text: `${d.server.iconConflicts.join(", ")} uses the same icon slot as GalaxySMP Icons. In the world's resource pack list, put GalaxySMP Icons above it (or remove that pack), then restart.` }))
+      : null;
+    box.replaceChildren(...[warn, packWarn, conflicts].filter(Boolean), grid, h("div", { class: "ov-cols" }, quick, h("div", { class: "stack", style: "gap:16px" }, online, recent)));
   };
 
   // ---------- Tickets ----------
@@ -252,7 +257,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
             p.plan ? h("span", { class: `pl-tag plan ${p.plan}`, text: `${PLAN_NAMES[p.plan]}${p.planExpires ? ` until ${new Date(p.planExpires).toLocaleDateString()}` : ""}` }) : h("span", { class: "pl-tag", text: "Galaxy Free" }),
             p.banned ? h("span", { class: "pl-tag bad", text: "Banned in game" }) : null))),
       h("div", { class: "pc-stats" },
-        statTile("Money", p.money == null ? "–" : `$${short(p.money)}`), statTile("Hours", short(p.stats.playtimeH)), statTile("Mined", short(p.stats.mined)),
+        statTile("Money", money(p.money)), statTile("Hours", short(p.stats.playtimeH)), statTile("Mined", short(p.stats.mined)),
         statTile("Kills", short(p.stats.kills)), statTile("Deaths", short(p.stats.deaths)), statTile("Achievements", p.stats.achievements), statTile("Warnings", p.warns)),
 
       h("h4", { text: "In game" }),
@@ -277,7 +282,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
         `extra plots: ${p.extraPlots || 0}`, `extra shop plots: ${d.shop.extraShopPlots}`,
         d.shop.nightVisionUntil ? `Night Vision until ${fmt(d.shop.nightVisionUntil)}` : null].filter(Boolean).join(" · ") }),
       d.shop.orders.length ? h("div", { class: "pc-list", style: "margin-top:6px" }, d.shop.orders.slice(0, 8).map((o) => h("div", { class: "pc-li" },
-        h("b", { text: o.item }), h("span", { text: `${o.option ? `(${o.option}) ` : ""}${o.source === "payment" ? "bought" : `given by ${o.by}`}` }), h("time", { class: "text-3 small", text: fmt(o.at) })))) : null,
+        h("b", { text: o.item }), h("span", { text: `${o.option ? `(${o.option}) ` : ""}${o.source === "payment" ? "bought" : o.source === "promo" ? `free with ${String(o.by).replace(/^promo /, "code ")}` : `given by ${o.by}`}` }), h("time", { class: "text-3 small", text: fmt(o.at) })))) : null,
 
       h("h4", { text: "Website and voice chat" }),
       acc ? h("div", {},

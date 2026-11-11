@@ -22,13 +22,13 @@ MODULE_UUID = "d2b6f7a3-8c4e-4fab-9a32-6e7d8c9bae12"
 #   "instant" letters: every letter/digit/symbol in a range of gradient colors, so any rank or name shows a real
 #   gradient the moment it's given (Bedrock trims each picture's empty right side, so letters keep natural widths).
 #   "strips": whole tags/names drawn perfectly smooth; these need a restart, then replace the instant letters.
-BASE_PAGES = list(range(0xE4, 0xE9)) + list(range(0xEC, 0xF9))   # E4-E8, EC-F8: 18 pages
+BASE_PAGES = list(range(0xE4, 0xE9)) + list(range(0xEC, 0xF7))   # E4-E8, EC-F6: 16 pages (F7, F8 = GalaxySMP Icons)
 PAGES = [0xE9, 0xEA, 0xEB]                                       # strips
 CELL = 16                          # pixels per picture (256x256 page = the same size as normal text)
 UNIT = 1                           # 1 image pixel = 1 text pixel (Bedrock draws pictures at that scale: same size as chat)
 TOP = 0                            # letters at the top of each picture (Bedrock lines pictures up by their top, like text)
 FILE = "GalaxySMP_RankTags.mcpack"
-FORMAT = 5                         # bump when the drawing changes, so everything is rebuilt
+FORMAT = 6                         # bump when the drawing changes, so everything is rebuilt
 CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789[]+-_.!?&'"
 
 # A 5x7 pixel font in the style of Minecraft's (# = pixel). Width = longest row.
@@ -297,7 +297,52 @@ def pack_report():
             lines.append(f"{name}: listed {len(found)} times {found} - keep only the newest one")
         else:
             lines.append(f"{name}: version {'.'.join(map(str, found[0]))}")
+    for pack, page in glyph_conflicts():
+        lines.append(f"WARNING: '{pack}' also draws glyph page {page}, which GalaxySMP Icons uses. Move GalaxySMP Icons "
+                     f"above it in the world's resource pack list (or remove that pack), or icons will look wrong.")
     return lines
+
+
+ICON_PAGES = ("F7", "F8")  # glyph pages drawn by the GalaxySMP Icons pack
+OLD_ICON_PAGES = ("E2", "E3")  # where they used to be (other add-ons use these, which broke our icons)
+
+
+def glyph_conflicts():
+    """Other packs on the server that draw the same glyph pages as GalaxySMP Icons (the pack higher in the
+    list wins the WHOLE page, so icons show up as someone else's pictures). [(pack name, page)]"""
+    import zipfile
+    ours = {"6b0f4c3e-2d1a-4a8e-9c5b-1f7e3a9d2c41", PACK_UUID}
+    pages = set(ICON_PAGES)
+    found = []
+    roots = [level_folder() / "resource_packs", Path.cwd() / "resource_packs"]
+    for root in roots:
+        try:
+            entries = list(root.iterdir())
+        except Exception:
+            continue
+        for entry in entries:
+            try:
+                if entry.is_dir():
+                    manifest = json.loads((entry / "manifest.json").read_text("utf-8", "ignore"))
+                    fonts = [f.name for f in (entry / "font").glob("glyph_*.png")] if (entry / "font").is_dir() else []
+                elif entry.suffix.lower() in (".mcpack", ".zip"):
+                    with zipfile.ZipFile(entry) as z:
+                        names = z.namelist()
+                        mf = next((n for n in names if n.endswith("manifest.json") and n.count("/") <= 1), None)
+                        manifest = json.loads(z.read(mf).decode("utf-8", "ignore")) if mf else {}
+                        fonts = [n.rsplit("/", 1)[-1] for n in names if "/font/glyph_" in "/" + n]
+                else:
+                    continue
+                head = manifest.get("header") or {}
+                if str(head.get("uuid")) in ours:
+                    continue
+                for f in fonts:
+                    page = f[len("glyph_"):-len(".png")].upper()
+                    if page in pages:
+                        found.append((str(head.get("name") or entry.name), page))
+            except Exception:
+                continue
+    return sorted(set(found))
 
 
 def gradient_palette():

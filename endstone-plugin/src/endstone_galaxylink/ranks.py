@@ -23,14 +23,14 @@ COLORS = [
 # A rank's staff powers on the website (ranks are the roles in game and on the site).
 WEB_ROLES = [(None, "None"), (3, "Moderator"), (4, "Admin")]
 
-# Rank icons drawn by the GalaxySMP Icons resource pack (glyph_E2.png, U+E210 onward).
+# Rank icons drawn by the GalaxySMP Icons resource pack (glyph_F7.png, U+F710 onward; moved from E2 because other add-ons use E2).
 ICONS = ["crown", "star", "shield", "sword", "gem", "heart", "hammer", "flame", "bolt", "rocket", "planet", "leaf",
            "pickaxe", "axe", "bow", "potion", "book", "key", "trophy", "medal", "code", "music", "paw", "fish",
            "mushroom", "flower", "moon", "sun", "snowflake", "skull", "ghost", "eye", "coin", "moneybag", "gift", "cake",
            "cookie", "apple", "bell", "lightbulb", "magnet", "compass", "clock", "hourglass", "flag", "anchor", "feather", "droplet",
            "tree", "cactus", "cloud", "rainbow", "cat", "slime", "dice", "gamepad", "redstone", "diamond", "emerald", "netherite",
            "goldingot", "ironingot", "amethyst", "lapis", "shootingstar", "wingeddiamond"]
-GLYPHS = {name: chr(0xE210 + i) for i, name in enumerate(ICONS)}
+GLYPHS = {name: chr(0xF710 + i) for i, name in enumerate(ICONS)}
 
 # Typed command names -> permission nodes. Same rules as the website (src/routes/ranks.js).
 ENDSTONE_COMMANDS = {"ban", "banip", "banlist", "plugins", "reload", "seed", "status", "unban", "unbanip", "version"}

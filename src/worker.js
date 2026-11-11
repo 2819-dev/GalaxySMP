@@ -3,7 +3,8 @@
 import { json, error, HttpError } from "./lib/http.js";
 import { getDb } from "./lib/db.js";
 import { handleStatus } from "./routes/status.js";
-import { listRanks, checkout } from "./routes/store.js";
+import { checkout, mine as storeMine } from "./routes/store.js";
+import * as promos from "./store/promos.js";
 import { serveStatic } from "./lib/static.js";
 import { linkStart, linkPoll, login, logout, me } from "./routes/auth.js";
 import { pluginPing, pluginLink } from "./routes/plugin.js";
@@ -31,7 +32,11 @@ export { VoiceHub } from "./voice/hub.js";
 const routes = [
   ["GET", "/api/status", (req, env, ctx) => handleStatus(req, ctx, env)],
   ["GET", "/api/health", (req, env) => health(env)],
-  ["GET", "/api/store/ranks", () => listRanks()],
+  ["GET", "/api/store/mine", (req, env) => storeMine(req, env)],
+  ["POST", "/api/store/promo", (req, env) => promos.checkRoute(req, env)],
+  ["GET", "/api/panel/promos", (req, env) => promos.listRoute(req, env)],
+  ["POST", "/api/panel/promos", (req, env) => promos.createRoute(req, env)],
+  ["POST", "/api/panel/promos/:id", promos.updateRoute],
   ["POST", "/api/store/checkout", (req, env) => checkout(req, env)],
   ["POST", "/api/auth/link/start", (req, env) => linkStart(req, env)],
   ["POST", "/api/auth/link/poll", (req, env) => linkPoll(req, env)],
@@ -91,7 +96,7 @@ const routes = [
   ["POST", "/api/community/suggestions", (req, env) => community.suggestionCreate(req, env)],
   ["POST", "/api/community/suggestions/:id/vote", community.suggestionVote],
   ["POST", "/api/community/suggestions/:id/:action", community.suggestionAction],
-  ["GET", "/api/store/plans", () => plans.storePlans()],
+  ["GET", "/api/store/plans", (req, env) => plans.storePlans(env)],
   ["GET", "/api/support/tickets", (req, env) => support.myTickets(req, env)],
   ["POST", "/api/support/tickets", (req, env) => support.createTicket(req, env)],
   ["GET", "/api/support/tickets/:id", support.getTicket],

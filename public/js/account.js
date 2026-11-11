@@ -1,13 +1,14 @@
 // Account (settings): profile, notifications, subscription, purchases & payments, security, privacy.
 import { toast, iconEl, isInstalled } from "/js/site.js";
 import { faceSvg } from "/js/face.js";
+import { moneyDollars } from "/js/money.js";
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 import { rankTag } from "/js/rank-paint.js";
 import { enableNotifications, disableNotifications, pushSupported } from "/js/notify.js";
 
 const $ = (id) => document.getElementById(id);
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }) : "–");
-const money = (n) => (n == null ? "–" : `$${Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 })}`);
+const money = (n) => (n == null ? "–" : moneyDollars(n));
 const usd = (n) => `$${Number(n).toFixed(2)}`;
 let data = null;
 
@@ -92,7 +93,7 @@ const SECTIONS = {
     return [
       h("section", { class: `panel acc-plan plan-${s.plan}` },
         h("div", {}, h("span", { class: "eyebrow", text: "Current plan" }), h("h2", { text: s.name }),
-          h("p", { class: "text-2 small", style: "margin:4px 0 0", text: paid ? (s.expires ? `Active until ${fmtDate(s.expires)}` : "Active (no end date)") + ` · ${usd(s.price)}/month + $${s.gameCost.toLocaleString("en-US")} in-game` : "Free forever. Upgrade any time for more plots, homes and cosmetics." })),
+          h("p", { class: "text-2 small", style: "margin:4px 0 0", text: paid ? (s.expires ? `Active until ${fmtDate(s.expires)}` : "Active (no end date)") + ` · ${usd(s.price)}/month + ${moneyDollars(s.gameCost)} in-game` : "Free forever. Upgrade any time for more plots, homes and cosmetics." })),
         h("a", { class: `btn ${paid ? "btn-secondary" : "btn-primary"}`, href: "/store#subscriptions", text: paid ? "Change plan" : "See plans" })),
       card("What your plan includes", null, h("ul", { class: "plan-perks", style: "margin:0" }, s.perks.map((p) => h("li", { text: p })))),
       card("Extras you own", null,
@@ -109,7 +110,7 @@ const SECTIONS = {
     const list = data.orders.length
       ? h("div", { class: "acc-table" }, data.orders.map((o) => h("div", { class: "acc-order" },
         h("div", {}, h("b", { text: o.item }), o.option ? h("span", { class: "text-3 small", text: ` · ${o.option}` }) : null),
-        h("span", { class: "text-3 small", text: o.source === "payment" ? usd(o.price) : "Gift from staff" }),
+        h("span", { class: "text-3 small", text: o.source === "payment" ? usd(o.price) : o.source === "promo" ? "Free with a promo code" : "Gift from staff" }),
         h("time", { class: "text-3 small", text: fmtDate(o.at) }))))
       : h("p", { class: "text-3", style: "margin:0", text: "No purchases yet." });
     return [

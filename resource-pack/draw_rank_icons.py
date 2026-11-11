@@ -427,7 +427,7 @@ if __name__ == "__main__":
 
 
 def add_to_sheet(sheet_path):
-    """Rank icons start at row 1 of glyph_E2.png: U+E210 (crown), U+E211 (star) ... U+E247 and so on (up to 240 icons fit)."""
+    """Rank icons start at row 1 of glyph_F7.png: U+F710 (crown), U+F711 (star) ... U+F747 and so on (up to 240 icons fit)."""
     sheet = Image.open(sheet_path).convert("RGBA")
     for i, (name, fn) in enumerate(ICONS):
         im = outline(fn())

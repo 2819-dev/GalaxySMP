@@ -5,10 +5,10 @@ export const SHOP = [
   {
     id: "money", name: "Money", blurb: "In-game money, added to your balance straight away.",
     items: [
-      { id: "money_1k", name: "$1,000", price: 50, cents: 100000, icon: "wallet", description: "A little extra spending money." },
-      { id: "money_10k", name: "$10,000", price: 200, cents: 1000000, icon: "coins", description: "Enough for a stack of crate keys." },
-      { id: "money_100k", name: "$100,000", price: 800, cents: 10000000, icon: "bank", description: "Big builds, big shops." },
-      { id: "money_1m", name: "$1,000,000", price: 2500, cents: 100000000, icon: "crown", badge: "Best value", description: "Become a Millionaire (that's an achievement too)." },
+      { id: "money_1k", name: "$1K", price: 50, cents: 100000, icon: "wallet", description: "A little extra spending money." },
+      { id: "money_10k", name: "$10K", price: 200, cents: 1000000, icon: "coins", description: "Enough for a stack of crate keys." },
+      { id: "money_100k", name: "$100K", price: 800, cents: 10000000, icon: "bank", description: "Big builds, big shops." },
+      { id: "money_1m", name: "$1M", price: 2500, cents: 100000000, icon: "crown", badge: "Best value", description: "Become a Millionaire (that's an achievement too)." },
     ],
   },
   {

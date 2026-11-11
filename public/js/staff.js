@@ -1,7 +1,9 @@
 // Staff Tools page: reports, members, word filter, ranks, economy and audit log.
+import { money, moneyExact } from "/js/money.js";
 import { toast, iconEl } from "/js/site.js";
 import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, voiceMuteDialog, select, field } from "/js/dialog.js";
 import { setupPanel } from "/js/staff-panel.js";
+import { setupPromos } from "/js/promos-panel.js";
 import { MC_COLORS, hexOf, GRADIENTS, paint, gradientCss, rankTag } from "/js/rank-paint.js";
 
 const $ = (id) => document.getElementById(id);
@@ -303,6 +305,10 @@ const DESCRIBE = {
   "rank.assign": (e) => [`gave ${e.details.player} the rank ${e.details.rank}`],
   "rank.remove": (e) => [`removed the rank from ${e.details.player}`],
   "economy.money": (e) => [e.details.action === "set" ? `set ${e.details.player}'s money to ${money(e.details.cents)}` : e.details.action === "add" ? `gave ${e.details.player} ${money(e.details.cents)}` : `took ${money(e.details.cents)} from ${e.details.player}`],
+  "promo.create": (e) => [`made promo code ${e.details.code} (${e.details.offer}${e.details.members ? `, for ${e.details.members} member${e.details.members === 1 ? "" : "s"}` : ""})`],
+  "promo.pause": (e) => [`paused promo code ${e.details.code}`],
+  "promo.resume": (e) => [`turned on promo code ${e.details.code}`],
+  "promo.delete": (e) => [`deleted promo code ${e.details.code}`],
   "economy.shop": (e) => [`changed the shop prices (${e.details.categories} categories, ${e.details.items} items)`],
   "economy.shop_reset": () => ["reset the shop to the built-in prices"],
   "help.save": () => ["edited the in-game Help menu"],
@@ -559,14 +565,7 @@ function deleteRank(r) {
 }
 
 // ---------- Economy (Admins) ----------
-const money = (cents) => {
-  const d = cents / 100;
-  if (Math.abs(d) < 10000) return "$" + d.toLocaleString("en-US", { maximumFractionDigits: 2 });
-  for (const [size, letter] of [[1e15, "Q"], [1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]]) {
-    if (Math.abs(d) >= size) return `$${(d / size).toFixed(2).replace(/\.?0+$/, "")}${letter}`;
-  }
-  return "$" + d;
-};
+
 let ecoData = null;
 let ecoShop = null;
 let ecoDirty = false;
@@ -628,7 +627,7 @@ function moneyDialog(p) {
   openDialog({
     title: `Money for ${p.gamertag}`,
     body: h("div", { class: "form" },
-      h("p", { class: "text-2", style: "margin:0", text: `Current balance: ${p.cents == null ? "none yet" : "$" + (p.cents / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}` }),
+      h("p", { class: "text-2", style: "margin:0", text: `Current balance: ${p.cents == null ? "none yet" : `${money(p.cents)} (${moneyExact(p.cents)})`}` }),
       field("Action", action), field("Amount in dollars", amount, "Works for offline players too, as long as the server is online.")),
     actions: [{ label: "Cancel" }, {
       label: "Save", kind: "primary",
@@ -817,8 +816,9 @@ $("help-reset").addEventListener("click", () => openDialog({
   $("staff-app").hidden = false;
   setBadge("tickets", summary.openTickets);
   setupPanel({ loaders, power, owner: Boolean(summary.owner), selectTab, toast, setBadge });
+  if (power >= 100) setupPromos({ loaders, toast });
   let start = location.hash.slice(1).split("/")[0];
-  if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"], [data-tab="help"]').forEach((t) => (t.hidden = false));
+  if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"], [data-tab="promos"], [data-tab="help"]').forEach((t) => (t.hidden = false));
   if (start === "members") { start = "players"; history.replaceState(null, "", "#players"); } // old link: Members is one tab now
-  selectTab(["overview", "tickets", "players", "reports", "words", "audit", ...(summary.owner ? ["dms"] : []), ...(power >= 100 ? ["ranks", "economy", "help"] : [])].includes(start) ? start : "overview");
+  selectTab(["overview", "tickets", "players", "reports", "words", "audit", ...(summary.owner ? ["dms"] : []), ...(power >= 100 ? ["ranks", "economy", "promos", "help"] : [])].includes(start) ? start : "overview");
 })();

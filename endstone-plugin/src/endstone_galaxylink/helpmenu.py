@@ -10,8 +10,8 @@ from importlib import resources
 
 from endstone.form import ActionForm
 
-# The GalaxySMP logo, drawn by the GalaxySMP Icons resource pack (font/glyph_E3.png).
-LOGO = "".join(chr(0xE300 + i) for i in range(6))
+# The GalaxySMP logo, drawn by the GalaxySMP Icons resource pack (font/glyph_F8.png).
+LOGO = "".join(chr(0xF800 + i) for i in range(6))
 
 INFO_ICON = "textures/ui/infobulb"
 RULES_ICON = "textures/ui/book_edit_default"

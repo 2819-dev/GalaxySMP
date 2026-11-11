@@ -9,22 +9,27 @@ INFINITE = "∞"
 
 
 def fmt(cents, op=False):
-    """$1,000 style for small amounts, $12.5K / $3.25M style for big ones (like DonutSMP)."""
+    """$12.50 for small amounts, $1.5K / $12.5K / $3.25M / $1B / $2T for big ones (like DonutSMP)."""
     if op:
         return INFINITE
-    dollars = cents / 100
-    if abs(dollars) < 10_000:
-        text = f"{dollars:,.2f}".rstrip("0").rstrip(".")
-        return "$" + text
-    for size, letter in ((1e15, "Q"), (1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "K")):
-        if abs(dollars) >= size:
+    sign = "-" if cents < 0 else ""
+    dollars = abs(cents) / 100
+    if dollars < 999.995:
+        return f"{sign}${dollars:,.0f}" if dollars == int(dollars) else f"{sign}${dollars:,.2f}"
+    units = ((1e3, "K"), (1e6, "M"), (1e9, "B"), (1e12, "T"), (1e15, "Q"))
+    for i in range(len(units) - 1, -1, -1):
+        size, letter = units[i]
+        if dollars >= size * 0.999995:
             text = f"{dollars / size:.2f}".rstrip("0").rstrip(".")
-            return f"${text}{letter}"
-    return f"${dollars:,.0f}"
+            if text == "1000" and i + 1 < len(units):  # 999.999K -> 1M
+                text, letter = "1", units[i + 1][1]
+            return f"{sign}${text}{letter}"
+    return f"{sign}${dollars:,.0f}"
 
 
 def exact(cents):
-    return "$" + f"{cents / 100:,.2f}".rstrip("0").rstrip(".")
+    """Same short style everywhere (the owner asked for K, M, B, T on all money)."""
+    return fmt(cents)
 
 
 _AMOUNT = re.compile(r"^\$?\s*([0-9][0-9,]*(?:\.[0-9]+)?|\.[0-9]+)\s*([kmbt]?)$", re.I)

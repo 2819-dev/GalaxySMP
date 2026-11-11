@@ -18,7 +18,7 @@ NEAR = 48
 
 # (key, title, how to show a value)
 BOARDS = [
-    ("money", "Richest Players", lambda v: f"${v / 100:,.0f}"),
+    ("money", "Richest Players", lambda v: __import__("endstone_galaxylink.money", fromlist=["fmt"]).fmt(v)),
     ("playtime", "Most Playtime", lambda v: f"{v // 3600}h {v % 3600 // 60}m"),
     ("mined", "Top Miners", lambda v: f"{v:,} blocks"),
     ("placed", "Top Builders", lambda v: f"{v:,} blocks"),

@@ -18,13 +18,13 @@ import urllib.parse
 # These characters are drawn by the "GalaxySMP Voice Icons" resource pack
 # (resource-pack/ in the website repository), which the server sends to players.
 ICONS = {
-    "talking": "\ue200",         # white speaker: talking nearby
-    "talking_group": "\ue201",   # green speaker: talking in a group
-    "talking_global": "\ue202",  # gold speaker: talking on the Global Mic
-    "muted": "\ue203",           # microphone crossed out: muted themselves
-    "deafened": "\ue204",        # headphones crossed out: deafened
-    "voice_muted": "\ue205",     # grey microphone crossed out: muted by staff
-    "disconnected": "\ue206",    # unplugged cable: not connected to voice
+    "talking": "\uf700",         # white speaker: talking nearby
+    "talking_group": "\uf701",   # green speaker: talking in a group
+    "talking_global": "\uf702",  # gold speaker: talking on the Global Mic
+    "muted": "\uf703",           # microphone crossed out: muted themselves
+    "deafened": "\uf704",        # headphones crossed out: deafened
+    "voice_muted": "\uf705",     # grey microphone crossed out: muted by staff
+    "disconnected": "\uf706",    # unplugged cable: not connected to voice
 }
 # In voice and quiet ("connected") shows no icon, like Simple Voice Chat.
 
@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.22.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.23.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -302,6 +302,8 @@ class VoiceLink:
                 from endstone_galaxylink.ranktags import world_packs
                 icons = [v for p, v in world_packs("resource") if p == "6b0f4c3e-2d1a-4a8e-9c5b-1f7e3a9d2c41"]
                 info["iconsPack"] = ".".join(map(str, max(icons))) if icons else "missing"
+                from endstone_galaxylink.ranktags import glyph_conflicts
+                info["iconConflicts"] = [f"{n} ({pg})" for n, pg in glyph_conflicts()][:5]
             except Exception:
                 pass
             try:

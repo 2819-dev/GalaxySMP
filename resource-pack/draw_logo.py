@@ -1,6 +1,6 @@
-# Splits the GalaxySMP wordmark into 6 font glyphs (U+E300 to U+E305) so the logo can be
+# Splits the GalaxySMP wordmark into 6 font glyphs (U+F800 to U+E305) so the logo can be
 # shown inside Minecraft menus (the Help menu's Server Information page).
-# Usage: python3 draw_logo.py ../public/img/wordmark.png src/font/glyph_E3.png
+# Usage: python3 draw_logo.py ../public/img/wordmark.png src/font/glyph_F8.png
 import sys
 from PIL import Image
 
@@ -16,4 +16,4 @@ for i in range(cells):
     part = logo.crop((i * CELL, 0, (i + 1) * CELL, CELL))
     sheet.paste(part, (i * CELL, 0))
 sheet.save(out)
-print(f"logo: {cells} glyphs, U+E300 to U+{0xE300 + cells - 1:X}")
+print(f"logo: {cells} glyphs, U+F800 to U+{0xF800 + cells - 1:X}")

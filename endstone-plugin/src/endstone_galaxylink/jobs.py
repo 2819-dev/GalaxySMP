@@ -68,7 +68,8 @@ def multiplier(level):
 
 
 def dollars(cents):
-    return f"${cents / 100:,.2f}"
+    from endstone_galaxylink.money import fmt
+    return fmt(cents)
 
 
 class Jobs:

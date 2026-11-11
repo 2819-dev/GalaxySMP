@@ -1,5 +1,6 @@
 // Special community channels: Information, Events, Auction House, Suggestions and Voice Chat.
 // All text goes in with textContent, never as HTML.
+import { money } from "/js/money.js";
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 import { ticketChat, newTicketDialog, onTicketEvent, chip, when, LABELS } from "/js/tickets.js";
 import { iconEl } from "/js/site.js";
@@ -122,14 +123,7 @@ function renderEvents(p) {
 }
 
 // ---------- Auction House ----------
-const money = (cents) => {
-  const d = cents / 100;
-  if (Math.abs(d) < 10000) return "$" + d.toLocaleString("en-US", { maximumFractionDigits: 2 });
-  for (const [size, letter] of [[1e15, "Q"], [1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]]) {
-    if (Math.abs(d) >= size) return `$${(d / size).toFixed(2).replace(/\.?0+$/, "")}${letter}`;
-  }
-  return "$" + d;
-};
+
 const timeLeft = (exp) => {
   const s = Math.max(0, exp - Date.now() / 1000);
   const hrs = Math.floor(s / 3600);
