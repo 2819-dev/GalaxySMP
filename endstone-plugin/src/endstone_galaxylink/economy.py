@@ -114,10 +114,12 @@ class Economy:
         if self._ticks % (SYNC_TICKS // HUD_TICKS) == 0:
             self.sync()
         ops = []
+        bw = getattr(self.plugin, "bedwars", None)
         for p in self.plugin.server.online_players:
             text = HUD.format(self.balance_text(p))
             try:
-                p.send_tip(text)
+                if bw is None or not bw.playing(p):
+                    p.send_tip(text)
                 key = str(p.unique_id)
                 if self.shown.get(key) != text:
                     p.score_tag = text

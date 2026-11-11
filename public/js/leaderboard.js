@@ -16,8 +16,11 @@ const FORMAT = {
   quests: (v) => plural(v, "quest"),
   streak: (v) => `${v.toLocaleString()} day${v === 1 ? "" : "s"}`,
   achievements: (v) => `${v} achievement${v === 1 ? "" : "s"}`,
+  bw_wins: (v) => plural(v, "win"),
+  bw_finals: (v) => plural(v, "final kill"),
+  bw_beds: (v) => plural(v, "bed") + " broken",
 };
-const SHORT = { money: "Money", playtime: "Playtime", mined: "Mining", placed: "Building", kills: "Mobs", quests: "Quests", streak: "Streak", achievements: "Badges" };
+const SHORT = { money: "Money", playtime: "Playtime", mined: "Mining", placed: "Building", kills: "Mobs", quests: "Quests", streak: "Streak", achievements: "Achievements", bw_wins: "Bedwars wins", bw_finals: "Bedwars final kills", bw_beds: "Bedwars beds" };
 export const profileUrl = (name) => `/player/${encodeURIComponent(name)}`;
 
 let board = new URLSearchParams(location.search).get("board") || "money";

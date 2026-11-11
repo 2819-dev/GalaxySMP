@@ -14,7 +14,8 @@ from endstone import ColorFormat, Player
 from endstone.command import Command, CommandSender
 from endstone.event import (ActorDamageEvent, ActorDeathEvent, ActorExplodeEvent, ActorSpawnEvent, BlockBreakEvent, BlockExplodeEvent,
                             BlockFromToEvent, BlockPlaceEvent, PlayerChatEvent, PlayerCommandEvent, PlayerDeathEvent,
-                            PlayerInteractActorEvent, PlayerInteractEvent, PlayerJoinEvent, PlayerQuitEvent,
+                            PlayerDropItemEvent, PlayerInteractActorEvent, PlayerInteractEvent, PlayerJoinEvent, PlayerQuitEvent,
+                            PlayerRespawnEvent,
                             event_handler)
 from endstone.plugin import Plugin
 
@@ -45,7 +46,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.23.2"
+VERSION = "2.24.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -119,6 +120,8 @@ class GalaxyLink(Plugin):
         "announcement": _cmd("Open the announcement panel, or announce a message to everyone.", "/announcement [message: message]", "galaxylink.command.announce", ["ann"]),
         "chatfilter": _cmd("Turn the chat filter on or off for everyone.", "/chatfilter [state: message]", "galaxylink.command.chatfilter"),
         "minigames": _cmd("The Minigame Center: host, join or watch minigames.", "/minigames", "galaxylink.command.minigames", ["minigame", "mg"]),
+        "bedwars": _cmd("Play Bedwars.", "/bedwars [action: message]", "galaxylink.command.bedwars", ["bw"]),
+        "leave": _cmd("Leave Bedwars and get your own items back.", "/leave", "galaxylink.command.bedwars"),
         "tpd": _cmd("Teleport where you've been sent (e.g. to the staff member who accepted your minigame).", "/tpd", "galaxylink.command.tpd"),
         "plotaxe": _cmd("Get the Plot Axe to make plots and protected areas.", "/plotaxe", "galaxylink.command.plotaxe"),
     }
@@ -151,6 +154,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.plot": _perm("Allows /plot.", True),
         "galaxylink.command.plotaxe": _perm("Allows /plotaxe (server operators).", "op"),
         "galaxylink.command.minigames": _perm("Allows /minigames.", True),
+        "galaxylink.command.bedwars": _perm("Allows /bedwars and /leave.", True),
         "galaxylink.command.report": _perm("Allows /report.", True),
         "galaxylink.command.dm": _perm("Allows /dm and /r.", True),
         "galaxylink.command.ranktags": _perm("Allows /ranktags (operators).", "op"),
@@ -204,6 +208,8 @@ class GalaxyLink(Plugin):
         from endstone_galaxylink.cosmetics import Cosmetics, TRAIL_TICKS
         self.cosmetics = Cosmetics(self)
         self.ranktags = RankTags(self)
+        from endstone_galaxylink.bedwars import Bedwars
+        self.bedwars = Bedwars(self)
         ranks_module.PICTURES = self.ranktags
         try:
             from endstone_galaxylink.ranktags import pack_report, clean_world_packs
@@ -224,9 +230,14 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self.blocklog.tick, delay=20, period=20)
         self.server.scheduler.run_task(self, self.announcements.tick, delay=20, period=20)
         self.server.scheduler.run_task(self, self.minigames.tick, delay=600, period=600)
+        self.server.scheduler.run_task(self, self.bedwars.tick, delay=100, period=10)
         self.server.scheduler.run_task(self, self.plots.tick, delay=1, period=1)
+        self.server.scheduler.run_task(self, self.plots.check_tools, delay=400, period=200)  # plot tools come back if missing
         self.server.scheduler.run_task(self, self.auction.tick, delay=600, period=600)
         self.register_events(self)
+        # Minecraft's "Days played" line under the coordinates counts 20-minute game days, not real days,
+        # which reads like a broken streak. Real daily streaks are in /daily and on profiles.
+        self.server.scheduler.run_task(self, lambda: self.server.dispatch_command(self.server.command_sender, "gamerule showdaysplayed false"), delay=40)
         self.server.scheduler.run_task(self, self.economy.tick, delay=HUD_TICKS, period=HUD_TICKS)
         self.server.scheduler.run_task(self, self.npcs.tick, delay=HOLD_TICKS, period=HOLD_TICKS)
         self.server.scheduler.run_task(self, self.plans.tick, delay=CHECK_TICKS, period=CHECK_TICKS)
@@ -245,6 +256,10 @@ class GalaxyLink(Plugin):
             [👑 OWNER]        rank (in the rank's color), only if they have one
             🎤 player1        voice icon, then the name in the rank's color
         The money line under it is the score tag (economy.py)."""
+        bw = getattr(self, "bedwars", None)
+        team_name = bw.name_tag(player) if bw is not None else None
+        if team_name:  # in Bedwars: the name in the team colour
+            return f"§r{icon} {team_name}" if icon else team_name
         style = self.ranks.display_tag(player)  # only the tag with the best priority (e.g. OWNER over PRO+)
         tags = [tag_text(style)] if style else []
         name = f"{name_text(player.name, style)}§r"
@@ -321,6 +336,7 @@ class GalaxyLink(Plugin):
         self.shopchests.on_join(player)
         self.elevators.check_tool(player)
         self.cosmetics.on_join(player)
+        self.bedwars.on_join(player)  # items from a Bedwars game they disconnected from come back
         player.send_message("§7Need help? Type §e/guide§7 for server info, rules and commands.")
         self.refresh_tags()
         if self._voice:
@@ -333,6 +349,15 @@ class GalaxyLink(Plugin):
         self.ranks.forget(event.player)
         self.teleports.on_quit(event.player)
         self.progress.on_quit(event.player)
+        self.bedwars.on_quit(event.player)
+
+    @event_handler
+    def on_player_respawn(self, event: PlayerRespawnEvent):
+        self.bedwars.on_respawn(event.player)
+
+    @event_handler
+    def on_drop_item(self, event: PlayerDropItemEvent):
+        self.bedwars.on_drop(event)  # the Leave Bedwars item can't be dropped
 
     @event_handler
     def on_player_death(self, event: PlayerDeathEvent):
@@ -355,10 +380,14 @@ class GalaxyLink(Plugin):
 
     @event_handler
     def on_interact_actor(self, event: PlayerInteractActorEvent):
+        if self.bedwars.on_interact_actor(event):  # Bedwars Item Shop
+            return
         self.npcs.on_interact(event)
 
     @event_handler
     def on_actor_damage(self, event: ActorDamageEvent):
+        if self.bedwars.on_damage(event):  # Bedwars deaths, teams and the waiting room
+            return
         self.npcs.on_damage(event)
         self.plots.on_damage(event)
 
@@ -366,6 +395,8 @@ class GalaxyLink(Plugin):
     @event_handler
     def on_block_break(self, event: BlockBreakEvent):
         if self.blocklog.on_break(event):  # block inspector
+            return
+        if self.bedwars.on_break(event):  # beds and the arena
             return
         if self.crates.on_break(event):  # crates can't be broken
             return
@@ -382,6 +413,8 @@ class GalaxyLink(Plugin):
     def on_block_place(self, event: BlockPlaceEvent):
         if self.blocklog.on_place(event):
             return
+        if self.bedwars.on_place(event):  # the arena keeps track of placed blocks
+            return
         self.plots.on_place(event)
         self.blocklog.log_place(event)
         if not event.cancelled:
@@ -391,6 +424,8 @@ class GalaxyLink(Plugin):
     @event_handler
     def on_interact(self, event: PlayerInteractEvent):
         if self.blocklog.on_interact(event):  # block inspector
+            return
+        if event.has_item and self.bedwars.on_use(event):  # the Leave Bedwars item
             return
         if self.crates.on_interact(event) or self.shopchests.on_interact(event):  # crates and shop chests
             return
@@ -445,6 +480,8 @@ class GalaxyLink(Plugin):
 
     @event_handler
     def on_player_command(self, event: PlayerCommandEvent):
+        if self.bedwars.on_command(event):  # only a few commands work during Bedwars
+            return
         self.moderation.on_command(event)  # muted players can't /msg or /me
 
     def on_disable(self) -> None:
@@ -539,6 +576,8 @@ class GalaxyLink(Plugin):
             "plot": lambda: self.plots.command(sender, args),
             "plotaxe": lambda: self.plots.give_axe(sender),
             "minigames": lambda: self.minigames.open(sender),
+            "bedwars": lambda: self.bedwars.command(sender, args),
+            "leave": lambda: self.bedwars.leave(sender),
             "chatfilter": lambda: self.chatfilter.command(sender, args),
             "announcement": lambda: self.announcements.command(sender, args),
             "report": lambda: self.moderation.report_command(sender, args),

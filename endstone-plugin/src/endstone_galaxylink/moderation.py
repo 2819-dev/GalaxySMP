@@ -21,6 +21,7 @@ import threading
 import time
 
 from endstone.form import ActionForm, Dropdown, ModalForm, TextInput
+from endstone_galaxylink.announcements import show_title
 
 REPORT_REASONS = ["Cheating or hacking", "Griefing", "Stealing", "Bad language", "Bullying or harassment", "Spam", "Other"]
 MUTE_CHOICES = [(10, "10 minutes"), (60, "1 hour"), (1440, "1 day"), (10080, "7 days"), (43200, "30 days")]
@@ -258,7 +259,7 @@ class Moderation:
         if p:
             p.send_message(f"§c§l[Warning]§r§c {reason or 'Please follow the server rules.'}§7 (from {getattr(actor, 'name', 'staff')})")
             try:
-                p.send_title("§c§lWarning", reason or "Please follow the rules", 10, 80, 20)
+                show_title(self.plugin, p, "§c§lWarning", reason or "Please follow the rules", 10, 80, 20)
             except Exception:
                 pass
         self.record("warn", xuid, name, actor, reason)
@@ -521,7 +522,7 @@ class Moderation:
                 return player.send_message("§cCouldn't reach the website. §7Reports are also on galaxymc.us (Staff Tools > Reports).")
             reports = data.get("reports") or []
             self._reports = {r["id"]: r for r in reports}
-            form = ActionForm(title="§lReports", content=f"{len(reports)} open report{'s' if len(reports) != 1 else ''}." if reports else "No open reports. Nice and quiet.")
+            form = ActionForm(title="§lReports", content=f"{len(reports)} open report{'s' if len(reports) != 1 else ''}." if reports else "There are no open reports.")
             for r in reports:
                 form.add_button(f"§l{r['target']}§r: {r['reason']}\n§8by {r['reporter']}", on_click=lambda s, i=r["id"]: self.report_menu(s, i))
             form.add_button("§l< Back", on_click=self.panel)

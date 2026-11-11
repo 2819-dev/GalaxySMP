@@ -35,7 +35,7 @@ GLYPHS = {name: chr(0xF710 + i) for i, name in enumerate(ICONS)}
 # Typed command names -> permission nodes. Same rules as the website (src/routes/ranks.js).
 ENDSTONE_COMMANDS = {"ban", "banip", "banlist", "plugins", "reload", "seed", "status", "unban", "unbanip", "version"}
 PLUGIN_COMMANDS = {"link", "ranks", "money", "pay", "baltop", "setmoney", "addmoney", "takemoney", "shop", "sell", "ah", "shopnpc",
-                   "guide", "tpa", "tpahere", "tpaccept", "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd", "chatfilter", "announce", "report", "mod", "modban", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates", "givekey", "elevator"}
+                   "guide", "tpa", "tpahere", "tpaccept", "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd", "chatfilter", "announce", "report", "mod", "modban", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates", "givekey", "elevator", "bedwars", "leave"}
 ALIASES = {"tp": "teleport", "msg": "tell", "w": "tell", "bal": "money", "balance": "money", "auction": "ah", "menu": "guide", "tpyes": "tpaccept", "plots": "plot", "minigame": "minigames", "mg": "minigames", "tpno": "tpdeny",
            "ban-ip": "banip", "unban-ip": "unbanip", "pardon": "unban"}
 PREFIXES = ("minecraft.command.", "endstone.command.", "galaxylink.command.")

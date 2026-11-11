@@ -49,7 +49,7 @@ loaders.reports = async () => {
   for (const r of game.open) gOpen.append(gameReportCard(r));
   const open = $("reports-open");
   open.replaceChildren();
-  if (!data.open.length) open.append(h("div", { class: "panel empty", text: "No open reports. Nice and quiet." }));
+  if (!data.open.length) open.append(h("div", { class: "panel empty", text: "There are no open reports." }));
   for (const r of data.open) open.append(reportCard(r));
 
   const closed = $("reports-closed");

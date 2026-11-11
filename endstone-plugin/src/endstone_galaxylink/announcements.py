@@ -25,13 +25,34 @@ SHOW_SECONDS = 30
 GAP_SECONDS = 3            # quiet time between two announcements
 MAX_LEN = 200
 DEFAULT_MESSAGES = [
-    "Need blocks, but don't wanna mine? Use §3/shop§r to buy blocks and items!",
-    "Lost? Type §3/guide§r for the rules, commands and server info.",
-    "Protect your builds! Use §3/plot§r to claim a plot.",
-    "Sell your extra items with §3/sell§r, or list them on the Auction House with §3/ah§r.",
-    "Want to play with friends? Find a Minigame Computer and host or join a game!",
-    "Join the community at §3galaxymc.us§r: chat, events, suggestions and voice chat.",
+    "Need building materials? Buy blocks and items with §3/shop§r.",
+    "New to GalaxySMP? Type §3/guide§r for the rules, commands and server information.",
+    "Keep your builds safe by claiming a plot with §3/plot§r.",
+    "Sell extra items with §3/sell§r, or list them on the Auction House with §3/ah§r.",
+    "Play Bedwars and other minigames at any Minigame Computer.",
+    "Visit §3galaxymc.us§r for community chat, events, voice chat and your profile.",
+    "Claim your daily reward every day with §3/daily§r to build your streak.",
 ]
+# The first wording of the built-in messages: saved lists still using it are updated to the new wording.
+OLD_DEFAULTS = {
+    "Need blocks, but don't wanna mine? Use §3/shop§r to buy blocks and items!": DEFAULT_MESSAGES[0],
+    "Lost? Type §3/guide§r for the rules, commands and server info.": DEFAULT_MESSAGES[1],
+    "Protect your builds! Use §3/plot§r to claim a plot.": DEFAULT_MESSAGES[2],
+    "Sell your extra items with §3/sell§r, or list them on the Auction House with §3/ah§r.": DEFAULT_MESSAGES[3],
+    "Want to play with friends? Find a Minigame Computer and host or join a game!": DEFAULT_MESSAGES[4],
+    "Join the community at §3galaxymc.us§r: chat, events, suggestions and voice chat.": DEFAULT_MESSAGES[5],
+}
+
+
+def show_title(plugin, player, title, subtitle="", fade_in=10, stay=40, fade_out=10):
+    """Any on-screen title from other features goes through here, so a showing announcement comes back after it."""
+    ann = getattr(plugin, "announcements", None)
+    if ann is not None:
+        return ann.title(player, title, subtitle, fade_in, stay, fade_out)
+    try:
+        player.send_title(title, subtitle, fade_in, stay, fade_out)
+    except Exception:
+        pass
 
 
 def tidy(text):
@@ -47,11 +68,17 @@ class Announcements:
         self.auto_on = saved.get("auto_on", True)
         self.minutes = int(saved.get("minutes", 10))
         self.messages = saved.get("messages") if isinstance(saved.get("messages"), list) else list(DEFAULT_MESSAGES)
+        if any(m in OLD_DEFAULTS for m in self.messages):
+            self.messages = [OLD_DEFAULTS.get(m, m) for m in self.messages]
+            if DEFAULT_MESSAGES[6] not in self.messages:
+                self.messages.append(DEFAULT_MESSAGES[6])
+            self.save()
         self.queue = []          # waiting manual announcements: [{"text", "by"}]
         self.current = None      # {"text", "ends"} while one is on screen
         self.free_at = 0         # when the next one may start (end of current + gap)
         self.next_auto = time.time() + self.minutes * 60
         self.last_auto = None
+        self.resume = {}         # player uuid -> when to put the announcement back (another title covered it)
 
     def save(self):
         self.eco.set_config("announcements", {"auto_on": self.auto_on, "minutes": self.minutes, "messages": self.messages})
@@ -72,6 +99,34 @@ class Announcements:
         except Exception:
             pass
 
+    def title(self, player, title, subtitle="", fade_in=10, stay=40, fade_out=10):
+        """Shows another on-screen title (daily reward, elevator floor, crate spin, warning...).
+        Minecraft only shows one title at a time, so this would knock an announcement off the screen.
+        The announcement comes back as soon as the other title has finished."""
+        try:
+            player.send_title(title, subtitle, fade_in, stay, fade_out)
+        except Exception:
+            return
+        if self.current:
+            self.resume[str(player.unique_id)] = time.time() + (fade_in + stay + fade_out) / 20 + 0.2
+
+    def _resume_due(self):
+        if not self.resume:
+            return
+        now = time.time()
+        for p in self.plugin.server.online_players:
+            key = str(p.unique_id)
+            at = self.resume.get(key)
+            if at is None or now < at:
+                continue
+            del self.resume[key]
+            if self.current:
+                left = self.current["ends"] - now
+                if left > 2:
+                    self._send(p, self.current["text"], left)
+        if not self.current:
+            self.resume.clear()
+
     def show(self, text, chime=True):
         now = time.time()
         self.current = {"text": text, "ends": now + SHOW_SECONDS}
@@ -90,6 +145,7 @@ class Announcements:
         now = time.time()
         if self.current and now >= self.current["ends"]:
             self.current = None
+        self._resume_due()
         if self.busy():
             return
         if self.queue:

@@ -133,6 +133,10 @@ class Minigames:
 
     def open(self, player):
         form = ActionForm(title="§l§bMinigame Center", content="What would you like to do?")
+        bw = getattr(self.plugin, "bedwars", None)
+        if bw is not None:
+            state = ("game running" if bw.game else f"{len(bw.queue)} waiting") if bw.ready() else "coming soon"
+            form.add_button(f"§c§lBedwars§r\n§8{state}", icon="textures/items/bed_red", on_click=bw.menu)
         locked = "" if self.plan_level(player) >= 1 or player.is_op else " §c(Galaxy+ only)"
         form.add_button(f"§lHost a Minigame{locked}§r\n§8Ask staff to run your own game", icon="textures/ui/icon_crown",
                         on_click=self.host_form)

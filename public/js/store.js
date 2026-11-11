@@ -153,7 +153,7 @@ function celebrate(name, message) {
     title: "It's yours!",
     body: h("div", { class: "co-done" }, h("div", { class: "co-done-icon" }, iconEl("check")), h("p", { class: "text-2", text: message || `${name} is yours!` }),
       h("p", { class: "text-3 small", text: "Pick cosmetics in game with /cosmetics." })),
-    actions: [{ label: "Nice!", kind: "primary" }],
+    actions: [{ label: "Done", kind: "primary" }],
   });
 }
 
@@ -429,7 +429,7 @@ function watchTabs() {
       title: "Thank you!",
       body: h("div", { class: "co-done" }, h("div", { class: "co-done-icon" }, iconEl("check")),
         h("p", { class: "text-2", text: paid === "credits" ? "Your credits are on their way. They show up in a few seconds." : "Your payment went through. Your item is on its way to you in game." })),
-      actions: [{ label: "Nice!", kind: "primary" }],
+      actions: [{ label: "Done", kind: "primary" }],
     });
   }
 })();

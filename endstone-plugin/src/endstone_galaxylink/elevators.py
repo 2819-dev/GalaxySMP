@@ -28,6 +28,7 @@ import time
 
 from endstone.event import PlayerInteractEvent
 from endstone.form import ActionForm, ModalForm, TextInput
+from endstone_galaxylink.announcements import show_title
 
 STEP = 0.2            # blocks per move (every 2 ticks = 2 blocks a second)
 DOOR_WAIT = 20        # ticks between doors closing and moving
@@ -387,7 +388,7 @@ class Elevators:
                 self.plugin.server.scheduler.run_task(self.plugin, lambda p=p: self._sound(p, "note.pling", 0.9, 1.2), delay=4)
                 self._sound(p, "random.door_open", 0.8, 1.0)
                 try:
-                    p.send_title("", f"§f§l{name}", 3, 25, 8)
+                    show_title(self.plugin, p, "", f"§f§l{name}", 3, 25, 8)
                 except Exception:
                     pass
         if e["queue"]:

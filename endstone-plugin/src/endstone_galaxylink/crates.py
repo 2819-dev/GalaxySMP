@@ -15,6 +15,7 @@ from endstone.event import PlayerInteractEvent
 from endstone.form import ActionForm, Dropdown, ModalForm, TextInput
 
 from endstone_galaxylink import money
+from endstone_galaxylink.announcements import show_title
 
 TYPES = [("common", "Common Crate", "§a"), ("rare", "Rare Crate", "§9"), ("galaxy", "Galaxy Crate", "§d")]
 TYPE_BY_KEY = {t[0]: t for t in TYPES}
@@ -196,7 +197,7 @@ class Crates:
         if p is None:
             return
         try:
-            p.send_title(f"{color}§l{name}", f"§7» {reward_name(r)} §7«", 0, 20, 0)
+            show_title(self.plugin, p, f"{color}§l{name}", f"§7» {reward_name(r)} §7«", 0, 20, 0)
             p.play_sound(p.location, "note.hat", 0.8, 1.6)
         except Exception:
             pass
@@ -211,7 +212,7 @@ class Crates:
         self.give(p, prize)
         _, name, color = TYPE_BY_KEY[kind]
         try:
-            p.send_title("§6§lYou won!", reward_name(prize), 0, 50, 15)
+            show_title(self.plugin, p, "§6§lYou won!", reward_name(prize), 0, 50, 15)
             p.play_sound(p.location, "random.levelup", 1.0, 1.0)
             p.play_sound(p.location, "firework.twinkle", 1.0, 1.0)
         except Exception:

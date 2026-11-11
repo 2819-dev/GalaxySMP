@@ -302,6 +302,29 @@ class Plots:
         if pb is not None and pa is not pb:
             event.is_cancelled = True
 
+    def ensure_tool(self, player):
+        """Players always keep their plot tool: the Plot Manager if they own a plot, otherwise the Plot
+        Claiming Shovel. If it went missing (died, cleared inventory, /clear...), it comes back.
+        Not inside Bedwars (minigame inventories have only minigame items)."""
+        bedwars = getattr(self.plugin, "bedwars", None)
+        if bedwars is not None and bedwars.playing(player):
+            return
+        try:
+            kind = "manager" if self.owned(player.xuid) else "shovel"
+            if self.has_tool(player, kind):
+                return
+            if player.inventory.first_empty() < 0:
+                return  # no room: try again later instead of dropping it on the ground
+            self.give_tool(player, kind)
+            name = "Plot Manager" if kind == "manager" else "Plot Claiming Shovel"
+            player.send_message(f"§7Your §f{name}§7 was returned to your inventory.")
+        except Exception as e:
+            self.plugin.logger.warning(f"Couldn't check plot tools: {e}")
+
+    def check_tools(self):
+        for p in self.plugin.server.online_players:
+            self.ensure_tool(p)
+
     def on_join(self, player):
         row = self.db.execute("SELECT shovel_given FROM plot_players WHERE xuid = ?", (str(player.xuid),)).fetchone()
         if not row:

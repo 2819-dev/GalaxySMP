@@ -18,6 +18,7 @@ import random
 import time
 
 from endstone.form import ActionForm
+from endstone_galaxylink.announcements import show_title
 
 try:
     from zoneinfo import ZoneInfo
@@ -98,7 +99,7 @@ ACHIEVEMENTS = [
     ("hunt_100", "Monster Hunter", "Defeat 100 mobs", "🗡️", 2500, lambda s, x: s["kills"] >= 100),
     ("hunt_1k", "Slayer", "Defeat 1,000 mobs", "⚔️", 10000, lambda s, x: s["kills"] >= 1000),
     ("hunt_10k", "Legendary Slayer", "Defeat 10,000 mobs", "🐉", 50000, lambda s, x: s["kills"] >= 10000),
-    ("first_death", "Oops", "Die for the first time", "💀", 0, lambda s, x: s["deaths"] >= 1),
+    ("first_death", "First Defeat", "Die for the first time", "💀", 0, lambda s, x: s["deaths"] >= 1),
     ("streak_7", "Week Streak", "Claim your daily reward 7 days in a row", "🔥", 5000, lambda s, x: s["best_streak"] >= 7),
     ("streak_30", "Dedicated", "Claim your daily reward 30 days in a row", "📅", 25000, lambda s, x: s["best_streak"] >= 30),
     ("quests_10", "Quester", "Complete 10 quests", "📜", 5000, lambda s, x: s["quests"] >= 10),
@@ -128,6 +129,11 @@ ACHIEVEMENTS = [
     ("traveler", "Traveler", "Teleport to friends 25 times", "🌀", 2500, lambda s, x: s.get("tpas", 0) >= 25),
     ("engineer", "Engineer", "Build an elevator", "🛗", 5000, lambda s, x: s.get("elevators", 0) >= 1),
     ("landlord", "Landlord", "Own 3 plots at once", "🏘️", 10000, lambda s, x: x.get("plots", 0) >= 3),
+    ("bw_first_game", "Bedwars Rookie", "Play a game of Bedwars", "🛏️", 500, lambda s, x: s.get("bw_games", 0) >= 1),
+    ("bw_first_win", "First Victory", "Win a game of Bedwars", "🏆", 2500, lambda s, x: s.get("bw_wins", 0) >= 1),
+    ("bw_wins_10", "Bedwars Veteran", "Win 10 games of Bedwars", "🥇", 15000, lambda s, x: s.get("bw_wins", 0) >= 10),
+    ("bw_beds_10", "Bed Breaker", "Destroy 10 beds in Bedwars", "🪓", 7500, lambda s, x: s.get("bw_beds", 0) >= 10),
+    ("bw_finals_25", "Finisher", "Get 25 final kills in Bedwars", "⚔️", 10000, lambda s, x: s.get("bw_finals", 0) >= 25),
 ]
 ACH_BY_ID = {a[0]: a for a in ACHIEVEMENTS}
 
@@ -300,7 +306,7 @@ class Progress:
         self.touch(player)
         player.send_message(f"§6§lDaily reward: §r§aDay {day}: {dollars(cents)}{extra} §7(streak: {s['streak']} day{'s' if s['streak'] != 1 else ''})")
         try:
-            player.send_title("§6Daily reward", f"§aDay {day}: {dollars(cents)}", 5, 50, 15)
+            show_title(self.plugin, player, "§6Daily reward", f"§aDay {day}: {dollars(cents)}", 5, 50, 15)
             player.play_sound(player.location, "random.levelup", 0.8, 1.2)
         except Exception:
             pass
@@ -482,7 +488,8 @@ class Progress:
     def row(self, xuid, s):
         return {"xuid": xuid, "name": s.get("name"), "playtime": s["playtime"], "mined": s["mined"], "placed": s["placed"],
                 "kills": s["kills"], "deaths": s["deaths"], "quests": s["quests"], "streak": s["streak"], "best": s["best_streak"],
-                "achievements": sorted(s["achievements"].keys()), "lastDaily": s.get("last_daily")}
+                "achievements": sorted(s["achievements"].keys()), "lastDaily": s.get("last_daily"),
+                "bedwars": {k: int(s.get(f"bw_{k}", 0)) for k in ("games", "wins", "kills", "finals", "beds")}}
 
     def push(self, everything=False):
         voice = getattr(self.plugin, "_voice", None)

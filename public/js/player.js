@@ -19,6 +19,7 @@ const ACH_ICONS = {
   landowner: "home", landlord: "homes", rich_1k: "wallet", rich_10k: "coins", rich_100k: "crown", rich_1m: "crown",
   crate_1: "dice", crate_50: "gift2", shopkeeper: "store", shop_tycoon: "store", customer: "bag2", auctioneer: "gavel",
   generous: "handshake", job_10: "wrench", job_21: "medal", traveler: "portal", engineer: "elevator",
+  bw_first_game: "sword", bw_first_win: "trophy2", bw_wins_10: "crown", bw_beds_10: "pickaxe", bw_finals_25: "skull",
 };
 const achIcon = (id) => ACH_ICONS[id] || "star";
 
@@ -135,6 +136,15 @@ async function load() {
       stat("scroll", "Quests done", short(s.quests)),
       stat("flame", "Daily streak", `${s.streak} day${s.streak === 1 ? "" : "s"}`, `Best: ${s.bestStreak}`)));
 
+  // ---- Bedwars ----
+  const bw = p.bedwars || {};
+  const bedwars = bw.games ? section("Bedwars",
+    h("div", { class: "pp-stats" },
+      stat("trophy2", "Wins", short(bw.wins), `${bw.games} game${bw.games === 1 ? "" : "s"} played`),
+      stat("sword", "Kills", short(bw.kills)),
+      stat("skull", "Final kills", short(bw.finals)),
+      stat("pickaxe", "Beds broken", short(bw.beds)))) : null;
+
   // ---- achievements (earned in game) ----
   const total = p.achievements.length;
   const pct = total ? Math.round((unlocked.length / total) * 100) : 0;
@@ -151,7 +161,7 @@ async function load() {
     h("p", { class: "text-3 small", style: "margin:12px 0 0" }, "Earn achievements with ", h("code", { text: "/achievements" }), ", ", h("code", { text: "/quests" }), " and ", h("code", { text: "/daily" }), " in game. ",
       h("a", { href: "/leaderboard", text: "See the leaderboards" }), "."));
 
-  box.replaceChildren(hero, h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, stats), h("div", { class: "pp-col" }, achievements)));
+  box.replaceChildren(hero, h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, stats, bedwars), h("div", { class: "pp-col" }, achievements)));
 }
 
 playerSearch($("player-search"), $("player-q"), $("player-suggest"));
