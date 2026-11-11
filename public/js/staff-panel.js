@@ -293,6 +293,9 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
         h("p", { class: "text-2 small", style: "margin:0 0 8px", text: [
           `${acc.username} · joined ${fmt(acc.joined)}`,
           acc.realName ? `real name: ${acc.realName}${acc.realNameHidden ? " (they hid it from players)" : ""}` : null,
+          acc.welcome ? `found us: ${({ friend: "a friend", family: "family", video: "a video", list: "a server list" })[acc.welcome.foundVia] || String(acc.welcome.foundVia || "?").replace(/^other: /, "")}${acc.welcome.invitedBy ? `, invited by ${acc.welcome.invitedBy}` : ""}` : "hasn't done the welcome steps yet",
+          acc.welcome?.interests?.length ? `likes: ${acc.welcome.interests.join(", ")}` : null,
+          acc.welcome?.bio ? `about: "${acc.welcome.bio}"` : null,
           acc.mutedUntil ? `muted until ${fmt(acc.mutedUntil)}${acc.muteReason ? ` (${acc.muteReason})` : ""}` : null,
           acc.voiceMutedUntil ? `voice muted until ${fmt(acc.voiceMutedUntil)}` : null,
           acc.globalMic ? "has the Global Mic" : null,

@@ -21,6 +21,7 @@ import * as plans from "./routes/plans.js";
 import * as community from "./routes/community.js";
 import * as support from "./routes/support.js";
 import * as panel from "./routes/panel.js";
+import * as onboarding from "./routes/onboarding.js";
 import * as dms from "./routes/dms.js";
 import * as notifyRoutes from "./routes/notify.js";
 import * as account from "./routes/account.js";
@@ -114,6 +115,8 @@ const routes = [
   ["POST", "/api/account/password", (req, env) => account.changePassword(req, env)],
   ["POST", "/api/account/signout-others", (req, env) => account.signOutOthers(req, env)],
   ["POST", "/api/account/real-name", (req, env) => account.setRealNameVisibility(req, env)],
+  ["GET", "/api/onboarding", (req, env) => onboarding.getOnboarding(req, env)],
+  ["POST", "/api/onboarding", (req, env) => onboarding.finishOnboarding(req, env)],
   ["POST", "/api/panel/members/:id/real-name", panel.setRealName],
   ["GET", "/api/notify", (req, env) => notifyRoutes.getSettings(req, env)],
   ["POST", "/api/notify/subscribe", (req, env) => notifyRoutes.subscribe(req, env)],

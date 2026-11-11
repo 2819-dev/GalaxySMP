@@ -15,7 +15,7 @@ import { SHOP_ITEMS } from "../store/shop.js";
 
 async function profileRow(sql, userId) {
   const [u] = await sql`
-    SELECT u.id, u.username, u.platform, u.created_at, u.muted_until, r.power, u.real_name, u.real_name_hidden,
+    SELECT u.id, u.username, u.platform, u.created_at, u.muted_until, r.power, u.real_name, u.real_name_hidden, u.onboarded_at,
            p.xuid, p.gamertag, p.head_at, p.gamerpic_at, p.balance_cents, p.playtime_s, p.streak, p.extra_plots, p.extra_shop_plots,
            p.cosmetics, p.night_vision_until, p.first_seen, p.last_seen, (p.online_at > now() - interval '150 seconds') AS in_game,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient,
@@ -42,6 +42,7 @@ export async function headerMe(request, env) {
       id: Number(u.id), username: u.username, head: headUrlFor(u), rank, plan: u.plan || null,
       money: u.balance_cents == null ? null : Number(u.balance_cents) / 100, inGame: Boolean(u.in_game),
       staff: Number(u.power) >= 50,
+      onboarding: !u.onboarded_at, // still has to do the welcome steps
     },
   }, 200, { "Cache-Control": "no-store" });
 }

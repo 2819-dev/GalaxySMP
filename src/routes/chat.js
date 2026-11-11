@@ -1,4 +1,5 @@
 // Chat API: everything the chat page needs, plus the live connection.
+import { INTEREST_NAME } from "./onboarding.js";
 import { getDb } from "../lib/db.js";
 import { json, HttpError } from "../lib/http.js";
 import { requireUser, publicUser } from "../lib/auth.js";
@@ -24,7 +25,7 @@ export async function bootstrap(request, env) {
     sql`SELECT id, name FROM categories ORDER BY position, id`,
     sql`SELECT id, category_id, slug, name, topic, min_post_power, kind FROM channels WHERE NOT hidden ORDER BY position, id`,
     sql`SELECT key, name, color, power FROM roles ORDER BY power DESC`,
-    sql`SELECT u.id, u.username, r.key AS role, u.real_name, u.real_name_hidden,
+    sql`SELECT u.id, u.username, r.key AS role, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color,
                rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon,
                rk.gradient AS rank_gradient, rk.position AS rank_position, rk.priority AS rank_priority,
                pl.xuid, pl.head_at, pl.gamerpic_at, (pl.online_at > now() - interval '150 seconds') AS in_game, u.created_at,
@@ -45,9 +46,11 @@ export async function bootstrap(request, env) {
     SELECT coalesce(sum(CASE WHEN user_a = ${user.id} THEN a_unread ELSE b_unread END), 0)::int AS dm_unread
       FROM dm_threads WHERE user_a = ${user.id} OR user_b = ${user.id}`;
   const me = publicUser(user);
+  const [{ onboarded_at: onboarded }] = await sql`SELECT onboarded_at FROM users WHERE id = ${user.id}`;
   return json({
     ok: true,
     me,
+    onboarding: !onboarded,
     categories: categories.map((c) => ({ id: c.id, name: c.name })),
     channels: channels.map((c) => ({
       id: c.id,
@@ -64,6 +67,7 @@ export async function bootstrap(request, env) {
       // Minecraft head picture (if the server has sent it), plan, and when they joined the community
       head: headUrlFor(m),
       plan: m.plan || null, inGame: Boolean(m.in_game), since: m.created_at,
+      bio: m.bio || null, interests: (m.interests || []).map((i) => INTEREST_NAME[i]).filter(Boolean), color: m.profile_color || null,
       // real name (set by staff): everyone sees it unless the member hid it; they and staff always do
       ...(m.real_name && (!m.real_name_hidden || Number(m.id) === Number(user.id) || me.role.power >= 50)
         ? { realName: m.real_name, realNameHidden: Boolean(m.real_name_hidden) } : {}),

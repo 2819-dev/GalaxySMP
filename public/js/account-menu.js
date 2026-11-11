@@ -14,6 +14,11 @@ export async function renderAccountButton(slot) {
   if (!slot) return;
   let me = null;
   try { me = (await (await fetch("/api/me/header", { credentials: "same-origin" })).json()).user; } catch { /* offline */ }
+  // New members finish the welcome steps first (the rules and privacy pages stay readable)
+  if (me?.onboarding && !["/welcome", "/rules", "/privacy"].includes(location.pathname)) {
+    location.replace("/welcome");
+    return;
+  }
   if (!me) {
     const a = make("a", "btn btn-ghost btn-sm acct-signin");
     a.href = "/community";

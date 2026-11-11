@@ -102,7 +102,7 @@ function openProfile(member, anchor) {
   card.setAttribute("role", "dialog");
   card.setAttribute("aria-label", `${member.username}'s profile`);
   const banner = el("div", "pc-banner");
-  banner.style.background = rankCss(rank) || "linear-gradient(90deg, #4FEBFD, #3DAAF4, #2149DD)";
+  banner.style.background = member.color ? `linear-gradient(120deg, ${member.color}, ${member.color}88)` : rankCss(rank) || "linear-gradient(90deg, #4FEBFD, #3DAAF4, #2149DD)";
   const pic = el("div", "pc-avatar" + (online ? " online" : ""));
   const big = avatar(member.username, false, member);
   pic.append(big);
@@ -135,7 +135,14 @@ function openProfile(member, anchor) {
     user.append(el("span", "pc-dot", " · "), real);
     if (member.realNameHidden) user.append(el("span", "pc-hidden", member.id === state.me?.id ? " (only you and staff see this)" : " (hidden from players)"));
   }
-  body.append(name, user, status, el("div", "pc-label", "Roles"), roles);
+  body.append(name, user, status);
+  if (member.bio) body.append(el("div", "pc-label", "About"), el("p", "pc-bio", member.bio));
+  if (member.interests?.length) {
+    const likes = el("div", "pc-likes");
+    for (const t of member.interests) likes.append(el("span", "pc-like", t));
+    body.append(el("div", "pc-label", "Likes to play"), likes);
+  }
+  body.append(el("div", "pc-label", "Roles"), roles);
   if (member.since) {
     body.append(el("div", "pc-label", "Member since"), el("div", "pc-since", new Date(member.since).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" })));
   }
@@ -944,6 +951,7 @@ export async function startChat({ onSignedOut }) {
     if (e.signedOut) return signedOut();
     throw e;
   }
+  if (data.onboarding) { location.replace("/welcome"); return; } // finish the welcome steps first
   state.me = data.me;
   state.channels = data.channels;
   if (data.ticketUnread) {

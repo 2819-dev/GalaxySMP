@@ -183,7 +183,7 @@ const SECTIONS = {
         } catch (e) { box.checked = !box.checked; toast(e.message); }
       });
       return card("Real name", null,
-        h("p", { class: "text-2", style: "margin:0 0 10px" }, "Staff added your real name: ", h("b", { text: data.realName }), ". It shows on your profile card next to your username."),
+        h("p", { class: "text-2", style: "margin:0 0 10px" }, "Your real name: ", h("b", { text: data.realName }), ". It shows on your profile card next to your username. To change it, ask staff."),
         h("label", { class: "acc-rn-switch", for: "acc-rn-hide" }, box, h("span", { text: "Hide my real name from other players" })),
         status);
     })() : null;
