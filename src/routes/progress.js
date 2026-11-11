@@ -1,4 +1,9 @@
 // Player stats (sent by the server), leaderboards and public player profiles.
+import { rankOf } from "../chat/messages.js";
+import { displayRank, loadPlanPriority } from "./ranks.js";
+import PLANS from "../../endstone-plugin/src/endstone_galaxylink/plans.json";
+import { INTEREST_NAME } from "./onboarding.js";
+import { requireUser } from "../lib/auth.js";
 import { getDb } from "../lib/db.js";
 import { json, HttpError } from "../lib/http.js";
 import { headUrlFor } from "./heads.js";
@@ -90,6 +95,7 @@ export async function profile(request, env, ctx, url, params) {
            p.quests_done, p.streak, p.best_streak, p.achievements, p.online_at, p.extra_plots, p.head_at, p.gamerpic_at,
            (p.online_at > now() - interval '150 seconds') AS online,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient,
+           rk.position AS rank_position, rk.priority AS rank_priority,
            s.plan, s.expires_at, u.id AS user_id
       FROM players p
       LEFT JOIN player_ranks pr ON pr.xuid = p.xuid LEFT JOIN ranks rk ON rk.id = pr.rank_id
@@ -111,7 +117,8 @@ export async function profile(request, env, ctx, url, params) {
     player: {
       name: p.gamertag, online: Boolean(p.online), lastOnline: p.online_at || p.last_seen, firstSeen: p.first_seen,
       head: headUrlFor(p),
-      rank: p.rank_prefix ? { name: p.rank_name, prefix: p.rank_prefix, color: p.rank_color, icon: p.rank_icon, gradient: p.rank_gradient } : null,
+      // the rank shown everywhere else (a paid plan's tag when it's the more important one)
+      rank: displayRank(rankOf(p), p.plan, await loadPlanPriority(sql), PLANS),
       plan: p.plan || "free", linked: Boolean(p.user_id), staff: Boolean(p.is_op),
       money: p.balance_cents == null ? null : Number(p.balance_cents),
       stats: { playtime: Number(p.playtime_s), mined: Number(p.mined), placed: Number(p.placed), kills: Number(p.kills), deaths: Number(p.deaths),
@@ -133,4 +140,27 @@ export async function searchPlayers(request, env, ctx, url) {
   const rows = await sql`SELECT gamertag, (online_at > now() - interval '150 seconds') AS online FROM players
                           WHERE lower(gamertag) LIKE ${like} ORDER BY last_seen DESC LIMIT 10`;
   return json({ ok: true, players: rows.map((r) => ({ name: r.gamertag, online: Boolean(r.online) })) });
+}
+
+// GET /api/players/:name/social (signed-in members): name, bio, likes, color, for the full profile page
+export async function socialProfile(request, env, ctx, url, params) {
+  const viewer = await requireUser(request, env);
+  const name = String(params.name || "").trim().replace(/^\./, "").toLowerCase().slice(0, 32);
+  const sql = getDb(env);
+  const [u] = await sql`
+    SELECT u.id, u.username, u.created_at, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color
+      FROM players p JOIN users u ON u.mc_uuid = p.uuid
+     WHERE lower(p.gamertag) = ${name} AND NOT u.banned
+     ORDER BY p.last_seen DESC LIMIT 1`;
+  if (!u) return json({ ok: true, member: null });
+  const me = Number(u.id) === Number(viewer.id);
+  const staff = Number(viewer.role_power) >= 50;
+  return json({
+    ok: true,
+    member: {
+      id: Number(u.id), username: u.username, since: u.created_at, isMe: me,
+      realName: u.real_name && (!u.real_name_hidden || me || staff) ? u.real_name : null, realNameHidden: Boolean(u.real_name_hidden),
+      bio: u.bio || null, interests: (u.interests || []).map((i) => INTEREST_NAME[i]).filter(Boolean), color: u.profile_color || null,
+    },
+  }, 200, { "Cache-Control": "no-store" });
 }

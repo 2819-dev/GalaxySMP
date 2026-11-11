@@ -79,3 +79,20 @@ export async function finishOnboarding(request, env) {
      WHERE id = ${user.id}`;
   return json({ ok: true });
 }
+
+// POST /api/account/profile { bio, interests, color } : edit the profile any time (Account > Profile)
+export async function editProfile(request, env) {
+  const user = await requireUser(request, env);
+  const body = await readJson(request, 8192);
+  const sql = getDb(env);
+  const interests = [...new Set((Array.isArray(body.interests) ? body.interests : []).map(String).filter((i) => INTEREST_NAME[i]))];
+  const bio = clean(body.bio, 120);
+  if (bio) {
+    const words = compileWordList(await sql`SELECT word, match FROM filter_words`);
+    const c = checkMessage(bio, words, { allowLinks: false });
+    if (!c.ok) throw new HttpError(400, `About you: ${c.message}`);
+  }
+  const color = COLORS.includes(body.color) ? body.color : null;
+  await sql`UPDATE users SET bio = ${bio || null}, interests = ${interests}, profile_color = ${color} WHERE id = ${user.id}`;
+  return json({ ok: true });
+}

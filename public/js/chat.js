@@ -728,7 +728,8 @@ function memberRow(m, isOnline) {
   const ri = roleIcon(m.rank);
   if (ri) name.append(ri);
   info.append(name);
-  if (m.inGame) info.append(el("span", "member-activity", "Playing GalaxySMP"));
+  if (m.status) info.append(el("span", "member-activity status", m.status));
+  else if (m.inGame) info.append(el("span", "member-activity", "Playing GalaxySMP"));
   row.append(wrap, info);
   row.dataset.id = m.id;
   row.tabIndex = 0;
@@ -988,8 +989,14 @@ export async function startChat({ onSignedOut }) {
     if (ch && ch.id !== state.channelId) selectChannel(ch.id);
   });
   const wanted = location.hash.slice(1);
-  const first = state.channels.find((c) => c.slug === wanted) || state.channels.find((c) => c.slug === "chat") || state.channels[0];
-  await selectChannel(first.id);
+  const dmWith = /^dm-(\d+)$/.exec(wanted);
+  if (dmWith && state.members.has(Number(dmWith[1]))) {
+    state.dmWith = Number(dmWith[1]); // "Message" on a full profile
+    await selectChannel(DM_CHANNEL);
+  } else {
+    const first = state.channels.find((c) => c.slug === wanted) || state.channels.find((c) => c.slug === "chat") || state.channels[0];
+    await selectChannel(first.id);
+  }
   connect();
   return state;
 }

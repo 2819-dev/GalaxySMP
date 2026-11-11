@@ -1,4 +1,5 @@
 // Chat API: everything the chat page needs, plus the live connection.
+import { isOwner } from "../lib/names.js";
 import { INTEREST_NAME } from "./onboarding.js";
 import { getDb } from "../lib/db.js";
 import { json, HttpError } from "../lib/http.js";
@@ -25,7 +26,7 @@ export async function bootstrap(request, env) {
     sql`SELECT id, name FROM categories ORDER BY position, id`,
     sql`SELECT id, category_id, slug, name, topic, min_post_power, kind FROM channels WHERE NOT hidden ORDER BY position, id`,
     sql`SELECT key, name, color, power FROM roles ORDER BY power DESC`,
-    sql`SELECT u.id, u.username, r.key AS role, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color,
+    sql`SELECT u.id, u.username, r.key AS role, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color, u.custom_presence, u.platform AS plat,
                rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon,
                rk.gradient AS rank_gradient, rk.position AS rank_position, rk.priority AS rank_priority,
                pl.xuid, pl.head_at, pl.gamerpic_at, (pl.online_at > now() - interval '150 seconds') AS in_game, u.created_at,
@@ -67,6 +68,8 @@ export async function bootstrap(request, env) {
       // Minecraft head picture (if the server has sent it), plan, and when they joined the community
       head: headUrlFor(m),
       plan: m.plan || null, inGame: Boolean(m.in_game), since: m.created_at,
+      status: isOwner(env, m.username, m.plat === "bedrock") && m.custom_presence?.title && (!m.custom_presence.until || new Date(m.custom_presence.until) > new Date())
+        ? `${m.custom_presence.label && m.custom_presence.label !== "Status" ? `${m.custom_presence.label} ` : ""}${m.custom_presence.title}` : null,
       bio: m.bio || null, interests: (m.interests || []).map((i) => INTEREST_NAME[i]).filter(Boolean), color: m.profile_color || null,
       // real name (set by staff): everyone sees it unless the member hid it; they and staff always do
       ...(m.real_name && (!m.real_name_hidden || Number(m.id) === Number(user.id) || me.role.power >= 50)

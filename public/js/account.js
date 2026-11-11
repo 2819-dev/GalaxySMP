@@ -17,6 +17,47 @@ const card = (title, desc, ...body) => h("section", { class: "panel acc-card" },
 const row = (label, value) => h("div", { class: "acc-row" }, h("span", { class: "acc-row-label", text: label }), value instanceof Node ? value : h("span", { text: String(value) }));
 
 // ---------- sections ----------
+// Edit profile: bio, what you like to play and your profile color (shown on your profile and profile card)
+function editProfileCard() {
+  const soc = data.social || { bio: "", interests: [], color: null };
+  const wrap = h("div", {}, h("p", { class: "text-3", style: "margin:0", text: "Loading…" }));
+  fetch("/api/onboarding", { credentials: "same-origin" }).then((r) => r.json()).then((d) => {
+    let picked = new Set(soc.interests);
+    let color = soc.color || d.colors[0];
+    const bio = h("textarea", { class: "input", id: "acc-bio", rows: 3, maxlength: 120, placeholder: "e.g. I love building castles and taming wolves!" });
+    bio.value = soc.bio || "";
+    const chips = h("div", { class: "ob-chips" }, d.interests.map((it) => {
+      const b = h("button", { class: "ob-chip", type: "button", "aria-pressed": String(picked.has(it.id)), text: it.name });
+      b.addEventListener("click", () => { picked.has(it.id) ? picked.delete(it.id) : picked.add(it.id); b.setAttribute("aria-pressed", String(picked.has(it.id))); });
+      return b;
+    }));
+    const colors = h("div", { class: "ob-colors", role: "radiogroup", "aria-label": "Profile color" });
+    const drawColors = () => colors.replaceChildren(...d.colors.map((c) => {
+      const b = h("button", { class: "ob-color", type: "button", role: "radio", "aria-checked": String(color === c), "aria-label": c, style: `--c:${c}` });
+      b.addEventListener("click", () => { color = c; drawColors(); });
+      return b;
+    }));
+    drawColors();
+    const save = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Save profile" });
+    save.addEventListener("click", async () => {
+      save.disabled = true;
+      try {
+        await postJson("/api/account/profile", { bio: bio.value, interests: [...picked], color });
+        data.social = { bio: bio.value.trim(), interests: [...picked], color };
+        toast("Profile saved.");
+      } catch (e) { toast(e.message); }
+      save.disabled = false;
+    });
+    wrap.replaceChildren(
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "acc-bio", text: "About you" }), bio,
+        h("p", { class: "hint", text: "Shown on your profile. Don't share where you live, your school or your phone number." })),
+      h("div", { class: "field" }, h("span", { class: "field-label", text: "What you like to play" }), chips),
+      h("div", { class: "field" }, h("span", { class: "field-label", text: "Profile color" }), colors),
+      h("div", { class: "acc-card-foot" }, save, h("a", { class: "btn btn-ghost btn-sm", href: `/player/${encodeURIComponent(data.profile.username)}`, text: "See my profile" })));
+  }).catch(() => {});
+  return card("Edit profile", "What people see on your profile card and full profile.", wrap);
+}
+
 const SECTIONS = {
   profile() {
     const p = data.profile;
@@ -42,6 +83,7 @@ const SECTIONS = {
         row("Last in game", p.inGame ? "Now" : fmtDate(p.lastSeen)),
         p.mutedUntil ? row("Chat", `Muted until ${new Date(p.mutedUntil).toLocaleString()}`) : null),
       h("p", { class: "text-3 small", text: "Your profile picture is your Minecraft head (or your Xbox picture until your head arrives). Your name and rank come from the game." }),
+      editProfileCard(),
     ];
   },
 
