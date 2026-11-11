@@ -105,7 +105,7 @@ function blocked(reason, message) {
 const URL_TOKEN_RE = new RegExp(`(?:\\b(?:https?|ftp):\\/\\/|\\bwww\\.|\\b[a-z0-9-]{2,}\\.(?:${TLDS})\\b)[^\\s]*`, "gi");
 
 // Returns { ok: true, text } or { ok: false, reason, message }.
-// opts.allowLinks: Admins and owners may share links (everything else is still checked).
+// opts.allowLinks: Admins and owners may share links, IPs and numbers (email, bad words etc. are still checked).
 export function checkMessage(raw, compiledWords, opts = {}) {
   let text = String(raw ?? "").replace(/\r\n?/g, "\n").replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, "");
   text = text.replace(/\n{3,}/g, "\n\n").trim();
@@ -118,8 +118,9 @@ export function checkMessage(raw, compiledWords, opts = {}) {
   if (EMAIL_RES.some((re) => re.test(scan))) return blocked("personal", "Email addresses can't be shared in chat.");
   if (opts.allowLinks) scan = scan.replace(URL_TOKEN_RE, " ");
   if (LINK_RES.some((re) => re.test(scan))) return blocked("link", "Links aren't allowed in chat.");
-  if (IP_RE.test(scan)) return blocked("link", "IP addresses aren't allowed in chat.");
-  if (PHONE_RES.some((re) => re.test(scan))) return blocked("personal", "Phone numbers and long numbers can't be shared in chat.");
+  // Admins (allowLinks) may also share server IPs, ports and other numbers (e.g. setup guides).
+  if (!opts.allowLinks && IP_RE.test(scan)) return blocked("link", "IP addresses aren't allowed in chat.");
+  if (!opts.allowLinks && PHONE_RES.some((re) => re.test(scan))) return blocked("personal", "Phone numbers and long numbers can't be shared in chat.");
   if (ADDRESS_RE.test(scan) || PERSONAL_RES.some((re) => re.test(scan))) {
     return blocked("personal", "For your safety, personal information can't be shared in chat.");
   }

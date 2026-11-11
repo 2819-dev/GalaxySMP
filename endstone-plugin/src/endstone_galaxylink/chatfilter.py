@@ -13,6 +13,7 @@ import re
 import unicodedata
 
 LEET = {"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b", "@": "a", "$": "s", "!": "i", "|": "i", "€": "e"}
+LINK_RE = re.compile(r"(?:https?://|www\.)\S+|\b[a-z0-9-]{2,}\.(?:com|net|org|gg|io|co|me|tv|xyz|us|live|dev|app|link)\b\S*", re.I)
 TOKEN = re.compile(r"[A-Za-z0-9@$!|€]+")
 
 
@@ -117,8 +118,11 @@ class ChatFilter:
                 merged.append((s, e))
         return merged
 
-    def clean(self, text):
+    def clean(self, text, keep_links=False):
         spans = self.bad_spans(text)
+        if keep_links and spans:  # never scramble part of a link (operators and staff can share links)
+            links = [(m.start(), m.end()) for m in LINK_RE.finditer(text)]
+            spans = [(s, e) for s, e in spans if not any(ls <= s < le or ls < e <= le for ls, le in links)]
         if not spans:
             return text
         out, last = [], 0
@@ -131,7 +135,10 @@ class ChatFilter:
 
     def on_chat(self, event):
         if self.enabled and (self.word_res or self.contains_res):
-            new = self.clean(event.message)
+            p = event.player
+            mod = getattr(self.plugin, "moderation", None)
+            trusted = p.is_op or bool(mod and mod.is_staff(p))
+            new = self.clean(event.message, keep_links=trusted)
             if new != event.message:
                 event.message = new
 
