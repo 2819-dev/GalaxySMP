@@ -8,7 +8,16 @@ import { h, openDialog, getJson, postJson, select, field, MUTE_LABELS } from "/j
 const $ = (id) => document.getElementById(id);
 const STAFF = 50;
 const ADMIN = 100;
-const FULL_VOLUME_WITHIN = 8; // blocks
+const FULL_VOLUME_WITHIN = 4; // blocks: full volume this close
+const FADE_POWER = 2.6;       // how the fade curves: ears hear loudness on a curve, so a straight fade sounds "full, then gone"
+const MUFFLE_FAR_HZ = 900;    // at the edge of hearing range, voices are muffled down to this (like sound through distance)
+
+// How loud (0..1) and how muffled (Hz) someone at distance d sounds. Smooth all the way to true silence at the range edge.
+export function distanceMix(d, range) {
+  if (d <= FULL_VOLUME_WITHIN) return { gain: 1, cutoff: 20000 };
+  const t = Math.min(1, (d - FULL_VOLUME_WITHIN) / Math.max(1, range - FULL_VOLUME_WITHIN));
+  return { gain: Math.pow(1 - t, FADE_POWER), cutoff: 20000 * Math.pow(MUFFLE_FAR_HZ / 20000, t) };
+}
 
 // ---------- Icons (same meaning as the icons before names in game) ----------
 const VICONS = {
@@ -264,11 +273,15 @@ function attachTrack(mid, track) {
   audio.srcObject = stream;
   audio.play().catch(() => {});
   const source = S.ctx.createMediaStreamSource(stream);
+  const muffle = S.ctx.createBiquadFilter(); // far-away voices sound muffled, not just quieter
+  muffle.type = "lowpass";
+  muffle.frequency.value = 20000;
+  muffle.Q.value = 0.5;
   const gain = S.ctx.createGain();
   gain.gain.value = 0;
   const pan = S.ctx.createStereoPanner();
-  source.connect(gain).connect(pan).connect(S.out || S.ctx.destination);
-  Object.assign(sub, { audio, source, gain, pan });
+  source.connect(muffle).connect(gain).connect(pan).connect(S.out || S.ctx.destination);
+  Object.assign(sub, { audio, source, muffle, gain, pan });
 }
 
 // Mirrors the server's rules; the server double-checks every request.
@@ -322,7 +335,7 @@ async function pull(owners) {
 }
 
 function dropNodes(sub) {
-  try { sub.source?.disconnect(); sub.gain?.disconnect(); sub.pan?.disconnect(); } catch { /* ignore */ }
+  try { sub.source?.disconnect(); sub.muffle?.disconnect(); sub.gain?.disconnect(); sub.pan?.disconnect(); } catch { /* ignore */ }
   if (sub.audio) sub.audio.srcObject = null;
 }
 
@@ -361,6 +374,7 @@ function updateMix() {
     const u = S.users.get(owner);
     let g = 0;
     let p = 0;
+    let cutoff = 20000;
     if (u && !S.deafened) {
       if ((u.global && u.canGlobal) || (me?.group && me.group === u.group)) {
         g = 1;
@@ -370,7 +384,7 @@ function updateMix() {
           const dx = b.x - a.x;
           const dz = b.z - a.z;
           const d = Math.hypot(dx, b.y - a.y, dz);
-          g = d <= FULL_VOLUME_WITHIN ? 1 : Math.max(0, 1 - (d - FULL_VOLUME_WITHIN) / (S.range - FULL_VOLUME_WITHIN));
+          ({ gain: g, cutoff } = distanceMix(d, S.range));
           const yaw = (a.yaw * Math.PI) / 180;
           const len = Math.hypot(dx, dz) || 1;
           p = Math.max(-1, Math.min(1, ((dx / len) * -Math.cos(yaw) + (dz / len) * -Math.sin(yaw)))) * 0.75;
@@ -379,8 +393,9 @@ function updateMix() {
       g *= (S.volumes[owner] ?? 100) / 100;
     }
     const t = S.ctx.currentTime;
-    sub.gain.gain.setTargetAtTime(g, t, 0.08);
+    sub.gain.gain.setTargetAtTime(g, t, 0.15); // a little slower, so walking away fades smoothly between position updates
     sub.pan.pan.setTargetAtTime(p, t, 0.08);
+    sub.muffle?.frequency.setTargetAtTime(cutoff, t, 0.15);
   }
 }
 
