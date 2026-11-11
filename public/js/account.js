@@ -1,5 +1,6 @@
 // Account (settings): profile, notifications, subscription, purchases & payments, security, privacy.
 import { toast, iconEl, isInstalled } from "/js/site.js";
+import { faceSvg } from "/js/face.js";
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 import { rankTag } from "/js/rank-paint.js";
 import { enableNotifications, disableNotifications, pushSupported } from "/js/notify.js";
@@ -19,8 +20,8 @@ const SECTIONS = {
   profile() {
     const p = data.profile;
     const face = h("img", { class: "acc-face", alt: "", width: 72, height: 72 });
-    face.src = p.head || "/img/icon-192.png";
-    face.addEventListener("error", () => { face.src = "/img/icon-192.png"; }, { once: true });
+    face.src = p.head || faceSvg(p.username);
+    face.addEventListener("error", () => { face.src = faceSvg(p.username); }, { once: true });
     return [
       h("section", { class: "panel acc-hero" }, face,
         h("div", { class: "acc-hero-main" },

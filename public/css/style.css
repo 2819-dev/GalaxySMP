@@ -904,7 +904,9 @@ img.avatar.head { image-rendering: pixelated; object-fit: cover; background: #1a
 .install-sheet-card h3 { margin: 12px 0 8px; font-size: 1.15rem; }
 .install-sheet-card ol { margin: 0 0 10px; padding-left: 20px; color: var(--text-2); line-height: 1.6; }
 .share-glyph { display: inline-block; padding: 0 4px; border: 1px solid var(--border-strong); border-radius: 5px; font-size: .8rem; }
-.chat ~ .install-banner, body:has(#view-chat:not([hidden])) .install-banner { bottom: 86px; }
+.install-banner.inline { position: static; transform: none; width: auto; margin: 0 0 8px; box-shadow: none; padding: 8px 8px 8px 10px; }
+.install-banner.inline img { width: 32px; height: 32px; }
+@media (max-width: 560px) { .install-text span { display: none; } }
 
 /* Role name bubble (tap a role icon, like Discord) */
 .role-icon { cursor: pointer; border-radius: 3px; }
@@ -1428,9 +1430,10 @@ body.app-mode .notify-banner { bottom: calc(86px + env(safe-area-inset-bottom));
 .msg-edit-input { width: 100%; resize: vertical; min-height: 44px; font: inherit; }
 .msg-edit-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
 .dm-bubble { position: relative; }
-.dm-edit-btn { position: absolute; top: -10px; left: -10px; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface-2); color: var(--text, #fff); display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity .15s; padding: 0; }
-.dm-edit-btn svg { width: 14px; height: 14px; }
-.dm-msg:hover .dm-edit-btn, .dm-edit-btn:focus-visible { opacity: 1; }
-@media (hover: none) { .dm-edit-btn { opacity: .85; } }
+.dm-edit-btn { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; padding: 1px 6px; border: 0; border-radius: 6px; background: rgba(255,255,255,.14); color: inherit; font: inherit; cursor: pointer; vertical-align: middle; }
+.dm-edit-btn svg { width: 11px; height: 11px; }
+.dm-edit-btn:hover, .dm-edit-btn:focus-visible { background: rgba(255,255,255,.26); }
+.dm-msg.mine .msg-text a { color: #fff; text-decoration-color: rgba(255,255,255,.7); }
+textarea.input.dm-input { resize: none; min-height: 44px; max-height: 140px; overflow-y: auto; }
 .dm-edit-wrap { min-width: 220px; }
 .dm-edit { width: 100%; resize: vertical; }

@@ -1,5 +1,6 @@
 // Staff panel tabs: Overview (live numbers + quick controls), Tickets (support live chat)
 // and Players (one card per player with everything staff need). All text goes in with textContent.
+import { faceSvg } from "/js/face.js";
 import { h, openDialog, postJson, getJson, select, field, muteDialog, banDialog, voiceMuteDialog, MUTE_LABELS } from "/js/dialog.js";
 import { ticketChat, chip, when, LABELS, PRIORITIES, ticketEvent } from "/js/tickets.js";
 import { iconEl } from "/js/site.js";
@@ -54,10 +55,10 @@ function svg(name) {
   s.innerHTML = ICONS[name]; // fixed strings above, never user text
   return s;
 }
-function headImg(src, size = 36) {
+function headImg(src, size = 36, name = "") {
   const img = h("img", { class: "pp-head", alt: "", width: size, height: size, loading: "lazy" });
-  img.src = src || "/img/icon-192.png";
-  img.addEventListener("error", () => { img.src = "/img/icon-192.png"; }, { once: true });
+  img.src = src || faceSvg(name || "?");
+  img.addEventListener("error", () => { img.src = faceSvg(name || "?"); }, { once: true });
   return img;
 }
 
@@ -106,7 +107,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
         admin ? ibtn("coins", "Economy", () => selectTab("economy")) : null));
 
     const online = h("section", { class: "panel" }, h("h2", { text: `In game now (${d.online.length})` }),
-      d.online.length ? h("div", { class: "ov-online" }, d.online.map((p) => h("button", { class: "ov-player", type: "button", onclick: () => openPlayer(p.xuid) }, headImg(p.head, 28), h("span", { text: p.name }))))
+      d.online.length ? h("div", { class: "ov-online" }, d.online.map((p) => h("button", { class: "ov-player", type: "button", onclick: () => openPlayer(p.xuid) }, headImg(p.head, 28, p.name), h("span", { text: p.name }))))
         : h("p", { class: "text-3 small", style: "margin:0", text: d.server.online ? "Nobody is playing right now." : "The server is offline." }));
     const recent = h("section", { class: "panel" }, h("h2", { text: "Recent staff activity" }),
       d.recent.length ? h("div", { class: "ov-recent" }, d.recent.map((r) => h("div", { class: "ov-recent-row" },
@@ -141,7 +142,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
     if (!d.tickets.length) box.append(h("div", { class: "panel empty", text: ticketFilter === "active" ? "No open tickets. All caught up!" : "No tickets here." }));
     for (const t of d.tickets) {
       box.append(h("button", { class: `panel tk-row prio-${t.priority}${t.staffUnread ? " unread" : ""}`, type: "button", onclick: () => openTicket(t.id) },
-        headImg(t.user?.head, 36),
+        headImg(t.user?.head, 36, t.user?.username),
         h("span", { class: "tk-row-main" },
           h("span", { class: "tk-row-subject", text: t.subject }),
           h("span", { class: "tk-row-preview", text: `${t.user?.username || "?"}: ${t.preview || ""}` }),
@@ -184,7 +185,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
     if (!d.players.length) box.append(h("div", { class: "empty", text: "No players found." }));
     for (const p of d.players) {
       box.append(h("button", { class: "pl-row", type: "button", onclick: () => openPlayer(p.xuid) },
-        h("span", { class: "pl-head-wrap" }, headImg(p.head, 36), p.online ? h("span", { class: "pl-dot", title: "In game" }) : null),
+        h("span", { class: "pl-head-wrap" }, headImg(p.head, 36, p.name), p.online ? h("span", { class: "pl-dot", title: "In game" }) : null),
         h("span", { class: "pl-main" },
           h("span", { class: "pl-name" }, h("b", { text: p.name }), p.op ? h("span", { class: "pl-tag op", text: "OP" }) : null,
             p.rank ? h("span", { class: "pl-tag", style: `--c:${p.rank.color || "#aab"}`, text: p.rank.name }) : null,
@@ -242,7 +243,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
     const acc = p.account;
     const body = h("div", { class: "pc" },
       h("div", { class: "pc-top" },
-        headImg(p.head, 64),
+        headImg(p.head, 64, p.name),
         h("div", {},
           h("h3", { class: "pc-name" }, p.name, p.op ? h("span", { class: "pl-tag op", text: "OP" }) : null),
           h("p", { class: "text-3 small", style: "margin:2px 0 0", text: `${p.online ? "In game now" : `Last seen ${fmt(p.lastSeen)}`} · first joined ${fmt(p.firstSeen)}` }, p.online ? h("span", { class: "pc-online-dot" }) : null),

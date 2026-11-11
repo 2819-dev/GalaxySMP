@@ -4,6 +4,7 @@ import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 import { ticketChat, newTicketDialog, onTicketEvent, chip, when, LABELS } from "/js/tickets.js";
 import { iconEl } from "/js/site.js";
 import { renderMarkdown } from "/js/markdown.js";
+import { faceSvg } from "/js/face.js";
 
 const panel = () => document.getElementById("channel-panel");
 const voiceBox = () => document.getElementById("voice-embed");
@@ -353,8 +354,8 @@ const dmTime = (at) => {
 };
 function dmFace(src, name) {
   const img = h("img", { class: "dm-face", alt: "", width: 36, height: 36, loading: "lazy" });
-  img.src = src || "/img/icon-192.png";
-  img.addEventListener("error", () => { img.src = "/img/icon-192.png"; }, { once: true });
+  img.src = src || faceSvg(name || "?");
+  img.addEventListener("error", () => { img.src = faceSvg(name || "?"); }, { once: true });
   img.title = name || "";
   return img;
 }
@@ -417,9 +418,9 @@ function renderDMs(p) {
       node.querySelector(".dm-meta").textContent = `${dmTime(m.at)}${m.via === "game" ? " · from the game" : ""}${m.editedAt ? " · edited" : ""}${m.from === meId ? (m.read ? " · Read" : " · Sent") : ""}`;
       node.querySelector(".dm-edit-btn")?.remove();
       if (m.from === meId && !m.read) { // your message they haven't read yet: you can still edit it
-        const b = h("button", { class: "dm-edit-btn", type: "button", "aria-label": "Edit message", title: "Edit (until they read it)" }, iconEl("pencil"));
+        const b = h("button", { class: "dm-edit-btn", type: "button", "aria-label": "Edit message", title: "Edit (until they read it)" }, iconEl("pencil"), "Edit");
         b.addEventListener("click", () => editDm(node, m));
-        node.querySelector(".dm-bubble").append(b);
+        node.querySelector(".dm-meta").append(b);
       }
     };
     const msgs = new Map();
@@ -465,6 +466,8 @@ function renderDMs(p) {
     };
     if (!d.messages.length) log.append(h("p", { class: "text-3 small dm-start", text: `This is the start of your messages with ${d.other.username}. Be kind, and never share passwords or personal information.` }));
     d.messages.forEach(add);
+    const grow = () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight + 2, 140) + "px"; };
+    input.addEventListener("input", grow);
     const composer = h("div", { class: "dm-composer" }, input, send);
     main.replaceChildren(h("div", { class: "dm-chat" }, head, log, d.blocked ? h("p", { class: "text-3 small dm-start", text: "You blocked this member." }) : composer));
     log.scrollTop = log.scrollHeight;
@@ -475,7 +478,8 @@ function renderDMs(p) {
       try {
         const r = await postJson(`/api/dm/with/${userId}`, { body: text });
         input.value = "";
-        if (!log.querySelector(`[data-id="${r.message.id}"]`)) { add(r.message); log.lastChild.dataset.id = r.message.id; }
+        grow();
+        if (!log.querySelector(`[data-id="${r.message.id}"]`)) add(r.message);
         log.querySelector(".dm-start")?.remove();
         log.scrollTop = log.scrollHeight;
         loadList();

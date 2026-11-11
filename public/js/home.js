@@ -16,7 +16,14 @@ startStatus((st) => {
 });
 
 // Live numbers for the stats strip
-const short = (v) => (v >= 1e6 ? `${(v / 1e6).toFixed(1).replace(/\.0$/, "")}M` : v >= 1e4 ? `${Math.round(v / 1e3)}K` : v.toLocaleString());
+const short = (v) => {
+  const one = (x) => x.toFixed(1).replace(/\.0$/, "");
+  if (v >= 999.95e9) return `${one(v / 1e12)}T`;
+  if (v >= 999.95e6) return `${one(v / 1e9)}B`;
+  if (v >= 999.5e3) return `${one(v / 1e6)}M`;
+  if (v >= 1e4) return `${Math.round(v / 1e3)}K`;
+  return v.toLocaleString();
+};
 fetch("/api/leaderboards?board=playtime").then((r) => r.json()).then((d) => {
   if (!d.ok) return;
   document.getElementById("hs-players").textContent = short(d.totals.players);

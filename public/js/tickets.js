@@ -1,5 +1,6 @@
 // Support tickets: the live conversation view, shared by the community Support channel
 // (players) and the panel's Tickets tab (staff). All text goes in with textContent.
+import { faceSvg } from "/js/face.js";
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 import { iconEl } from "/js/site.js";
 
@@ -45,8 +46,8 @@ export function chip(kind, value, staff) {
 
 function face(src, name) {
   const img = h("img", { class: "tk-face", alt: "", width: 32, height: 32, loading: "lazy" });
-  img.src = src || "/img/icon-192.png";
-  img.addEventListener("error", () => { img.src = "/img/icon-192.png"; }, { once: true });
+  img.src = src || faceSvg(name || "?");
+  img.addEventListener("error", () => { img.src = faceSvg(name || "?"); }, { once: true });
   img.title = name || "";
   return img;
 }

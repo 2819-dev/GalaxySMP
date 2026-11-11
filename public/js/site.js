@@ -400,7 +400,9 @@ export function installBanner(force) {
     <button class="install-close" type="button" aria-label="Not now">×</button>`;
   bar.querySelector("[data-install]").addEventListener("click", () => installApp());
   bar.querySelector(".install-close").addEventListener("click", () => { store.set("gsmp-install-later", String(Date.now())); bar.remove(); });
-  document.body.append(bar);
+  // In Community, sit above the message box instead of floating over the newest messages.
+  const host = document.querySelector(".composer-wrap");
+  if (host) { bar.classList.add("inline"); host.prepend(bar); } else document.body.append(bar);
 }
 
 window.addEventListener("beforeinstallprompt", (e) => {

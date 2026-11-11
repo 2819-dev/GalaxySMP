@@ -1,6 +1,7 @@
 // Your profile picture in the top right of every page. Tapping it opens a small profile card with
 // View full profile, Account (settings), quick links and Sign out. Signed out: a "Sign in" button.
 import { icon } from "/js/site.js";
+import { faceSvg } from "/js/face.js";
 
 const make = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -24,8 +25,8 @@ export async function renderAccountButton(slot) {
   const face = (cls) => {
     const img = make("img", cls);
     img.alt = "";
-    img.src = me.head || "/img/icon-192.png";
-    img.addEventListener("error", () => { img.src = "/img/icon-192.png"; }, { once: true });
+    img.src = me.head || faceSvg(me.username);
+    img.addEventListener("error", () => { img.src = faceSvg(me.username); }, { once: true });
     return img;
   };
   const btn = make("button", "acct-btn");
