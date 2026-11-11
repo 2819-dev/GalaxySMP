@@ -1342,3 +1342,82 @@ body.app-mode .notify-banner { bottom: calc(86px + env(safe-area-inset-bottom));
 .mention-face-blank { display: grid; place-items: center; background: var(--accent-tint); color: var(--accent-text); font-weight: 800; font-size: .8rem; }
 .mention-name { font-weight: 600; }
 .mention-hint { margin-left: auto; font-size: .75rem; color: var(--text-3); }
+
+/* ---------- Profile button (top right) and card ---------- */
+.acct-slot { display: flex; align-items: center; margin-left: 10px; min-width: 38px; }
+.acct-btn { position: relative; width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 2px solid var(--border-strong); background: var(--surface-2);
+  cursor: pointer; overflow: visible; transition: border-color .15s, transform .15s; }
+.acct-btn:hover, .acct-btn[aria-expanded="true"] { border-color: var(--accent-text); }
+.acct-btn:active { transform: scale(.96); }
+.acct-face { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; image-rendering: pixelated; display: block; }
+.acct-dot { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; background: var(--ok); border: 2px solid var(--bg); }
+.acct-signin { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.acct-signin svg { width: 16px; height: 16px; }
+.acct-card { position: fixed; z-index: 80; width: min(300px, calc(100vw - 16px)); background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,.55); padding: 14px; display: flex; flex-direction: column; gap: 12px;
+  animation: acct-in .14s ease-out; }
+@keyframes acct-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+.acct-card-head { display: flex; gap: 12px; align-items: center; }
+.acct-card-face { width: 56px; height: 56px; border-radius: 14px; object-fit: cover; image-rendering: pixelated; background: var(--surface-2); flex-shrink: 0; }
+.acct-who { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.acct-who b { font-size: 1.05rem; overflow-wrap: anywhere; }
+.acct-who .rank-tag { font-size: .8rem; }
+.acct-sub { font-size: .8rem; color: var(--text-3); }
+.acct-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.acct-actions .btn { justify-content: center; }
+.acct-links { display: flex; flex-direction: column; border-top: 1px solid var(--border); padding-top: 6px; }
+.acct-link { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 8px; color: var(--text-2); background: none; border: 0;
+  font: inherit; font-size: .92rem; text-align: left; cursor: pointer; }
+.acct-link:hover { background: var(--surface-2); color: var(--text); }
+.acct-link svg { width: 18px; height: 18px; flex-shrink: 0; }
+.acct-signout { color: var(--bad); }
+@media (max-width: 960px) { .acct-slot { margin-left: 8px; } }
+
+/* ---------- Account (settings) ---------- */
+.acc-layout { display: grid; grid-template-columns: 230px 1fr; gap: 24px; align-items: start; }
+.acc-nav { position: sticky; top: calc(var(--header-h) + 16px); display: flex; flex-direction: column; gap: 2px; padding: 8px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.acc-nav a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: var(--text-2); font-weight: 600; font-size: .95rem; }
+.acc-nav a:hover { background: var(--surface-2); color: var(--text); }
+.acc-nav a[aria-current="true"] { background: var(--accent-tint); color: #fff; }
+.acc-nav a .ic svg { width: 18px; height: 18px; }
+.acc-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.acc-card { padding: 20px; }
+.acc-card-head { margin-bottom: 12px; }
+.acc-card-head h2 { font-size: 1.1rem; margin: 0; }
+.acc-card-head p { margin: 4px 0 0; }
+.acc-card-foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+.acc-row { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: .95rem; }
+.acc-row:last-of-type { border-bottom: 0; }
+.acc-row-label { color: var(--text-3); }
+.acc-hero { display: flex; gap: 18px; align-items: center; padding: 20px;
+  background: linear-gradient(135deg, rgba(36,87,235,.22), rgba(138,60,255,.16)), var(--surface); }
+.acc-face { width: 72px; height: 72px; border-radius: 18px; object-fit: cover; image-rendering: pixelated; background: var(--surface-2); flex-shrink: 0; }
+.acc-hero-main h2 { margin: 0 0 6px; font-size: 1.5rem; overflow-wrap: anywhere; }
+.acc-hero-tags { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.acc-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.acc-badge { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); }
+.acc-badge.ok { background: rgba(52,199,123,.16); color: var(--ok); }
+.acc-plan { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 20px; }
+.acc-plan h2 { margin: 2px 0 0; font-size: 1.5rem; }
+.acc-plan.plan-plus { background: linear-gradient(135deg, rgba(124,255,138,.12), rgba(154,107,255,.14)), var(--surface); }
+.acc-plan.plan-pro { background: linear-gradient(135deg, rgba(255,138,242,.14), rgba(79,86,255,.16)), var(--surface); }
+.acc-notice { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: 12px; background: var(--surface-2); color: var(--text-2); }
+.acc-notice .ic svg { width: 22px; height: 22px; color: var(--accent-text); }
+.acc-table { display: flex; flex-direction: column; }
+.acc-order { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.acc-order:last-child { border-bottom: 0; }
+.acc-switch { width: 20px; height: 20px; accent-color: var(--accent); }
+@media (max-width: 760px) {
+  .acc-layout { grid-template-columns: 1fr; gap: 14px; }
+  .acc-nav { position: static; flex-direction: row; overflow-x: auto; scrollbar-width: none; padding: 6px; }
+  .acc-nav a { white-space: nowrap; padding: 8px 12px; }
+  .acc-hero { flex-direction: column; align-items: flex-start; }
+  .acc-order { grid-template-columns: 1fr auto; }
+  .acc-order time { grid-column: 1 / -1; }
+}
+
+@media (max-width: 440px) {
+  .site-header:has(.acct-btn) .nav-community, .site-header:has(.acct-signin) .nav-community { display: none; }
+  .acct-slot { margin-left: auto; }
+}

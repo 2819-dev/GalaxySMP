@@ -149,6 +149,7 @@ function renderHeader() {
         <div class="nav-actions">${chip}<a class="btn btn-primary btn-sm" href="/community">Community</a></div>
       </nav>
       <a class="btn btn-primary btn-sm nav-community" href="/community">Community</a>
+      <div class="acct-slot" id="acct-slot"></div>
     </div>
   </header>
   <div class="drawer-backdrop" hidden></div>
@@ -157,7 +158,7 @@ function renderHeader() {
       <img src="/img/wordmark.png" alt="${config.serverName}" width="132" height="23">
       <button class="drawer-close" type="button" aria-label="Close menu">${icon("close")}</button>
     </div>
-    <nav class="drawer-links">${drawerLinks}<a href="/staff" data-staff-link hidden>${icon("tools")}<span>Staff Panel</span></a><a href="#" data-notify-link hidden>${icon("bell")}<span>Notifications</span></a></nav>
+    <nav class="drawer-links">${drawerLinks}<a href="/staff" data-staff-link hidden>${icon("tools")}<span>Staff Panel</span></a><a href="/account" data-account-link hidden>${icon("user")}<span>Account</span></a><a href="#" data-notify-link hidden>${icon("bell")}<span>Notifications</span></a></nav>
     ${config.hosting === "realm" ? "" : `<div class="drawer-card"><span class="eyebrow">Server address</span>
       <button class="ip-chip" type="button" data-copy="${serverAddress}">${icon("copy")}<span>${serverAddress}</span><span class="ip-port">${config.bedrockPort}</span></button>
       <span class="text-3 small">Bedrock Edition · tap to copy</span></div>`}
@@ -178,6 +179,7 @@ function renderHeader() {
         staffChecked = true;
         fetch("/api/me").then((r) => r.json()).then((d) => {
           if (d.user) {
+            drawer.querySelector("[data-account-link]").hidden = false;
             const n = drawer.querySelector("[data-notify-link]");
             n.hidden = false;
             n.addEventListener("click", (e) => { e.preventDefault(); setOpen(false); import("/js/notify.js").then((m) => m.openPreferences()); });
@@ -210,7 +212,7 @@ function renderFooter() {
         </div>
         <div><h4>Play</h4><ul><li><a href="/join">How to Join</a></li><li><a href="/status">Server Status</a></li><li><a href="/leaderboard">Leaderboards</a></li><li><a href="/store">Store</a></li></ul></div>
         <div><h4>Community</h4><ul><li><a href="/community">Community Chat</a></li><li><a href="/voice">Voice Chat</a></li><li><a href="/rules">Rules</a></li></ul></div>
-        <div><h4>Legal</h4><ul><li><a href="/privacy">Privacy Policy</a></li></ul></div>
+        <div><h4>Account</h4><ul><li><a href="/account">Account settings</a></li><li><a href="/account#notifications">Notifications</a></li><li><a href="/privacy">Privacy Policy</a></li></ul></div>
       </div>
     </div>
     <div class="footer-bottom">
@@ -332,6 +334,7 @@ if (EMBED) document.documentElement.classList.add("embedded");
 else {
   renderHeader();
   renderFooter();
+  if (!EMBED) import("/js/account-menu.js").then((m) => m.renderAccountButton(document.getElementById("acct-slot"))).catch(() => {});
 }
 fillConfig();
 applyHosting();

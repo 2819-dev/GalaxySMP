@@ -22,6 +22,7 @@ import * as support from "./routes/support.js";
 import * as panel from "./routes/panel.js";
 import * as dms from "./routes/dms.js";
 import * as notifyRoutes from "./routes/notify.js";
+import * as account from "./routes/account.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -97,6 +98,10 @@ const routes = [
   ["POST", "/api/support/tickets/:id/messages", support.postMessage],
   ["POST", "/api/support/tickets/:id/close", support.closeTicket],
   ["GET", "/api/mod/tickets", support.staffTickets],
+  ["GET", "/api/me/header", (req, env) => account.headerMe(req, env)],
+  ["GET", "/api/account", (req, env) => account.getAccount(req, env)],
+  ["POST", "/api/account/password", (req, env) => account.changePassword(req, env)],
+  ["POST", "/api/account/signout-others", (req, env) => account.signOutOthers(req, env)],
   ["GET", "/api/notify", (req, env) => notifyRoutes.getSettings(req, env)],
   ["POST", "/api/notify/subscribe", (req, env) => notifyRoutes.subscribe(req, env)],
   ["POST", "/api/notify/unsubscribe", (req, env) => notifyRoutes.unsubscribe(req, env)],

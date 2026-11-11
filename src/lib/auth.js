@@ -15,7 +15,7 @@ export function clearCookie() {
   return `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
 }
 
-function readCookie(request) {
+export function readCookie(request) {
   const header = request.headers.get("Cookie") || "";
   for (const part of header.split(";")) {
     const [k, ...v] = part.trim().split("=");
