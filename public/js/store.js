@@ -418,7 +418,7 @@ function watchTabs() {
   renderAll();
   document.querySelectorAll("[data-store-tab]").forEach((t) => t.prepend(iconEl({ shop: "cart", credits: "coins" }[t.dataset.storeTab] || "star")));
   watchTabs();
-  if (["#shop", "#credits"].includes(location.hash)) document.querySelector(location.hash).scrollIntoView();
+  if (["#shop", "#credits", "#donate"].includes(location.hash)) document.querySelector(location.hash).scrollIntoView();
   const params = new URLSearchParams(location.search);
   const paid = params.get("paid");
   if (paid) {

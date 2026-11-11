@@ -1573,3 +1573,14 @@ textarea.input.dm-input { resize: none; min-height: 44px; max-height: 140px; ove
 .gift-picked { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(36,87,235,.16); }
 .gift-picked b { flex: 1; }
 .gift-hint { margin: 4px 2px 0; }
+
+/* Store: donate */
+.donate-card { display: flex; align-items: center; gap: 16px; margin: 0 0 20px; padding: 18px 20px; border-color: rgba(255,127,196,.35);
+  background: linear-gradient(120deg, rgba(255,127,196,.10), rgba(124,92,255,.10)); scroll-margin-top: calc(var(--header-h) + 20px); }
+.donate-icon { width: 48px; height: 48px; flex: none; display: grid; place-items: center; border-radius: 14px; background: rgba(255,127,196,.2); color: #ff9fd3; }
+.donate-icon svg { width: 26px; height: 26px; }
+.donate-text { flex: 1; min-width: 0; }
+.donate-text h2 { font-size: 1.1rem; margin: 0 0 4px; }
+.donate-text p { margin: 0; font-size: .92rem; }
+.donate-btn { flex: none; }
+@media (max-width: 600px) { .donate-card { flex-wrap: wrap; } .donate-btn { width: 100%; justify-content: center; } }
