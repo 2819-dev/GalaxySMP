@@ -4,6 +4,8 @@ import { icon, toast } from "/js/site.js";
 import { paint, rankTag, roleIcon, rankCss } from "/js/rank-paint.js";
 import { showPanel, hidePanel, dmEvent } from "/js/community-panels.js";
 import { ticketEvent } from "/js/tickets.js";
+import { renderMarkdown, plainText } from "/js/markdown.js";
+import { setupMentions } from "/js/mentions.js";
 
 // A member's current rank (live updates win over what an older message recorded).
 const rankFor = (id, fallback) => (state.members.has(id) ? state.members.get(id).rank : fallback) || null;
@@ -309,6 +311,18 @@ function renderMessages() {
   }
 }
 
+// Discord-style formatting and @mentions (markdown.js); mentions open the member's profile.
+function mdContext() {
+  if (!state.mdMembers || state.mdMembersAt !== state.members.size) {
+    state.mdMembers = [...state.members.values()].map((x) => ({ id: x.id, username: x.username }));
+    state.mdMembersAt = state.members.size;
+  }
+  return {
+    members: state.mdMembers, meName: state.me?.username,
+    onMention: (member, node) => openProfile(state.members.get(member.id) || member, node),
+  };
+}
+
 // Message text with clickable links (only Admins can post links). Text goes in as text nodes, never HTML.
 const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>"]+[^\s<>".,!?:;)\]]/gi;
 function linkify(box, text) {
@@ -350,12 +364,13 @@ function renderMessage(m, prev) {
     row.append(gt);
   }
   const me = state.me?.username;
-  if (me && new RegExp(`@${me.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(m.content)) row.classList.add("mention");
+  if (me && (new RegExp(`@${me.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(m.content) || (/@(everyone|here)\b/i.test(m.content) && roleOf(m.author.role).power >= 50) ||
+    (m.replyTo && m.replyTo.username === me && m.author.username !== me))) row.classList.add("mention");
 
   const body = el("div", "msg-body");
   if (m.replyTo) {
     const r = el("div", "msg-reply");
-    r.append(el("b", "", "@" + (m.replyTo.username || "unknown")), el("span", "", m.replyTo.content ?? "Original message was deleted"));
+    r.append(el("b", "", "@" + (m.replyTo.username || "unknown")), el("span", "", m.replyTo.content != null ? plainText(m.replyTo.content) : "Original message was deleted"));
     r.addEventListener("click", () => jumpTo(m.replyTo.id));
     body.append(r);
   }
@@ -372,7 +387,9 @@ function renderMessage(m, prev) {
   t.dateTime = m.createdAt;
   t.title = new Date(m.createdAt).toLocaleString();
   head.append(t);
-  body.append(head, linkify(el("div", "msg-text"), m.content));
+  const text = el("div", "msg-text");
+  text.append(renderMarkdown(m.content, mdContext()));
+  body.append(head, text);
   body.append(renderReactions(m));
   row.append(body);
 
@@ -767,6 +784,8 @@ function wireUi() {
   });
   const input = $("composer-input");
   input.addEventListener("input", autosize);
+  setupMentions(input, () => [...state.members.values()].filter((m) => m.id !== state.me?.id).map((m) => ({ id: m.id, username: m.username, head: m.head, online: state.online.has(m.id) })),
+    () => (state.me?.role?.power || 0) >= 50);
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !matchMedia("(pointer: coarse)").matches) {
       e.preventDefault();

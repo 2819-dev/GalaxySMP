@@ -113,6 +113,8 @@ export async function searchPlayers(request, env, ctx, url) {
             OR (${filter} = 'online' AND p.online_at > now() - interval '3 minutes')
             OR (${filter} = 'staff' AND (p.is_op OR rk.website_role IN (3, 4)))
             OR (${filter} = 'plans' AND s.plan IS NOT NULL)
+            OR (${filter} = 'web-muted' AND (u.banned OR u.muted_until > now()))
+            OR (${filter} = 'voice-muted' AND u.voice_muted_until > now())
             OR (${filter} = 'punished' AND EXISTS (SELECT 1 FROM game_punishments g WHERE g.xuid = p.xuid AND g.kind IN ('mute', 'ban', 'warn'))))
      ORDER BY (p.online_at > now() - interval '3 minutes') DESC NULLS LAST, p.last_seen DESC NULLS LAST
      LIMIT 60`;
@@ -136,7 +138,7 @@ export async function playerCard(request, env, ctx, url, params) {
   const xuid = String(params.xuid);
   const rows = await sql`
     SELECT p.*, rk.name AS rank_name, rk.color AS rank_color, rk.id AS rank_id, pr.assigned_by, s.plan, s.expires_at,
-           u.id AS user_id, u.username, u.banned, u.ban_reason, u.muted_until, u.mute_reason, u.created_at AS joined_site, r.name AS role_name, r.power AS role_power,
+           u.id AS user_id, u.username, u.banned, u.ban_reason, u.muted_until, u.mute_reason, u.voice_muted_until, u.voice_mute_reason, u.global_mic, u.created_at AS joined_site, r.name AS role_name, r.power AS role_power,
            (SELECT kind FROM game_punishments g WHERE g.xuid = p.xuid AND g.kind IN ('ban', 'unban') ORDER BY g.id DESC LIMIT 1) AS ban_state,
            (SELECT count(*)::int FROM game_punishments g WHERE g.xuid = p.xuid AND g.kind = 'warn') AS warns
       FROM players p
@@ -164,6 +166,8 @@ export async function playerCard(request, env, ctx, url, params) {
         id: Number(p.user_id), username: p.username, role: p.role_name, power: Number(p.role_power), joined: p.joined_site,
         banned: p.banned, banReason: p.ban_reason,
         mutedUntil: p.muted_until && new Date(p.muted_until) > new Date() ? p.muted_until : null, muteReason: p.mute_reason,
+        voiceMutedUntil: p.voice_muted_until && new Date(p.voice_muted_until) > new Date() ? p.voice_muted_until : null,
+        voiceMuteReason: p.voice_mute_reason, globalMic: Boolean(p.global_mic),
       } : null,
     },
     history: history.map((h) => ({ kind: h.kind, reason: h.reason, minutes: h.minutes, by: h.by_name, at: h.created_at })),

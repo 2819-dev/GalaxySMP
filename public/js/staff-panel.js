@@ -1,6 +1,6 @@
 // Staff panel tabs: Overview (live numbers + quick controls), Tickets (support live chat)
 // and Players (one card per player with everything staff need). All text goes in with textContent.
-import { h, openDialog, postJson, getJson, select, field, muteDialog, banDialog, MUTE_LABELS } from "/js/dialog.js";
+import { h, openDialog, postJson, getJson, select, field, muteDialog, banDialog, voiceMuteDialog, MUTE_LABELS } from "/js/dialog.js";
 import { ticketChat, chip, when, LABELS, PRIORITIES, ticketEvent } from "/js/tickets.js";
 import { iconEl } from "/js/site.js";
 
@@ -81,7 +81,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
       stat("ticket", "Open tickets", c.openTickets, c.urgentTickets ? `${c.urgentTickets} high/urgent` : "need a staff reply", "tickets", c.openTickets ? "warn" : ""),
       stat("flag", "Open reports", c.reports, "chat + in game", "reports", c.reports ? "warn" : ""),
       stat("cube", "Players", c.players, `${c.newPlayers} new this week · ${c.activeToday} today`, "players"),
-      stat("users", "Website members", c.members, `${c.newMembers} new this week`, "members"),
+      stat("users", "Website accounts", c.members, `${c.newMembers} new this week`, "players"),
       stat("star", "Paid plans", c.plans, "Galaxy+ and Pro+", admin ? "players" : null),
       stat("shield", "Punishments", c.punishmentsWeek, "in game, last 7 days", "players"));
 
@@ -278,13 +278,23 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
       d.shop.orders.length ? h("div", { class: "pc-list", style: "margin-top:6px" }, d.shop.orders.slice(0, 8).map((o) => h("div", { class: "pc-li" },
         h("b", { text: o.item }), h("span", { text: `${o.option ? `(${o.option}) ` : ""}${o.source === "payment" ? "bought" : `given by ${o.by}`}` }), h("time", { class: "text-3 small", text: fmt(o.at) })))) : null,
 
-      h("h4", { text: "Website account" }),
+      h("h4", { text: "Website and voice chat" }),
       acc ? h("div", {},
-        h("p", { class: "text-2 small", style: "margin:0 0 8px", text: `${acc.username} · joined ${fmt(acc.joined)}${acc.mutedUntil ? ` · muted until ${fmt(acc.mutedUntil)}` : ""}${acc.banned ? ` · BANNED (${acc.banReason || "no reason"})` : ""}` }),
+        h("p", { class: "text-2 small", style: "margin:0 0 8px", text: [
+          `${acc.username} · joined ${fmt(acc.joined)}`,
+          acc.mutedUntil ? `muted until ${fmt(acc.mutedUntil)}${acc.muteReason ? ` (${acc.muteReason})` : ""}` : null,
+          acc.voiceMutedUntil ? `voice muted until ${fmt(acc.voiceMutedUntil)}` : null,
+          acc.globalMic ? "has the Global Mic" : null,
+          acc.banned ? `BANNED (${acc.banReason || "no reason"})` : null].filter(Boolean).join(" · ") }),
         h("div", { class: "pc-actions" },
-          acc.mutedUntil ? act("Unmute on website", "btn-ghost", async () => { await postJson(`/api/mod/members/${acc.id}/unmute`, {}); reload("Unmuted."); })
+          acc.mutedUntil ? act("Unmute on website", "btn-secondary", async () => { await postJson(`/api/mod/members/${acc.id}/unmute`, {}); reload("Unmuted."); })
             : act("Mute on website", "btn-secondary", () => muteDialog({ id: acc.id, username: acc.username }, reload)),
-          acc.banned ? act("Unban on website", "btn-ghost", async () => { await postJson(`/api/mod/members/${acc.id}/unban`, {}); reload("Unbanned."); }, true)
+          acc.voiceMutedUntil ? act("Unmute in voice", "btn-secondary", async () => { await postJson(`/api/mod/members/${acc.id}/voice-unmute`, {}); reload("Unmuted in voice."); })
+            : act("Mute in voice", "btn-secondary", () => voiceMuteDialog({ id: acc.id, username: acc.username }, reload)),
+          acc.power < 50 ? act(acc.globalMic ? "Take Global Mic" : "Give Global Mic", "btn-secondary", async () => {
+            await postJson(`/api/mod/members/${acc.id}/global-mic`, { allowed: !acc.globalMic }); reload(acc.globalMic ? "Global Mic removed." : "Global Mic given.");
+          }, true) : null,
+          acc.banned ? act("Unban on website", "btn-secondary", async () => { await postJson(`/api/mod/members/${acc.id}/unban`, {}); reload("Unbanned."); }, true)
             : act("Ban on website", "btn-danger", () => banDialog({ id: acc.id, username: acc.username }, reload), true)))
         : h("p", { class: "text-3 small", style: "margin:0", text: "Not linked to a website account yet." }),
 
@@ -306,7 +316,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
       h("h4", { text: "Staff notes" }), notesBox, noteForm);
 
     closeDialogs();
-    openDialog({ title: "Player", body, actions: [{ label: "Close" }] }).dialog.classList.add("dialog-wide");
+    openDialog({ title: "Member", body, actions: [{ label: "Close" }] }).dialog.classList.add("dialog-wide");
   }
   function closeDialogs() {
     document.querySelectorAll("dialog.dialog").forEach((d) => { try { d.close(); } catch { /* already closed */ } d.remove(); });

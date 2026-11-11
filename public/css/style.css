@@ -1313,3 +1313,32 @@ img[src*="g=1"] { image-rendering: auto !important; }
 .np-row input { width: 20px; height: 20px; accent-color: var(--accent); }
 
 body.app-mode .notify-banner { bottom: calc(86px + env(safe-area-inset-bottom)); }
+
+/* ---------- Discord-style formatting ---------- */
+.msg-text .md-h { margin: 6px 0 2px; line-height: 1.25; font-weight: 800; }
+.msg-text .md-h1 { font-size: 1.5rem; }
+.msg-text .md-h2 { font-size: 1.25rem; }
+.msg-text .md-h3 { font-size: 1.05rem; }
+.msg-text .md-subtext { font-size: .75rem; color: var(--text-3); }
+.msg-text .md-quote { margin: 4px 0; padding: 0 0 0 12px; border-left: 4px solid var(--border-strong); }
+.msg-text .md-list { margin: 4px 0; padding-left: 1.4em; }
+.msg-text .md-code { font-family: var(--mono); font-size: .85em; background: var(--surface-3); padding: 1px 5px; border-radius: 4px; }
+.msg-text .md-codeblock { margin: 6px 0; padding: 10px 12px; background: #0b0d1c; border: 1px solid var(--border); border-radius: 8px;
+  font-family: var(--mono); font-size: .85rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow-y: auto; }
+.msg-text .md-spoiler { background: #2a2f55; color: transparent; border-radius: 4px; padding: 0 3px; cursor: pointer; transition: background .15s; }
+.msg-text .md-spoiler * { visibility: hidden; }
+.msg-text .md-spoiler.shown { background: rgba(255,255,255,.08); color: inherit; cursor: auto; }
+.msg-text .md-spoiler.shown * { visibility: visible; }
+.mention { background: rgba(88,101,242,.3); color: #c9cdfb; border-radius: 4px; padding: 0 3px; font-weight: 600; }
+.mention.clickable { cursor: pointer; }
+.mention.clickable:hover { background: rgba(88,101,242,.55); color: #fff; }
+.mention.me { background: rgba(232,184,74,.28); color: #ffe08a; }
+/* "@" suggestions */
+.mention-pop { position: relative; margin: 0 0 6px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px;
+  padding: 6px; display: flex; flex-direction: column; gap: 2px; max-height: 280px; overflow-y: auto; box-shadow: 0 12px 30px rgba(0,0,0,.45); }
+.mention-opt { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 0; border-radius: 6px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.mention-opt.active, .mention-opt:hover { background: var(--surface-3); }
+.mention-face { width: 24px; height: 24px; border-radius: 50%; image-rendering: pixelated; flex-shrink: 0; }
+.mention-face-blank { display: grid; place-items: center; background: var(--accent-tint); color: var(--accent-text); font-weight: 800; font-size: .8rem; }
+.mention-name { font-weight: 600; }
+.mention-hint { margin-left: auto; font-size: .75rem; color: var(--text-3); }

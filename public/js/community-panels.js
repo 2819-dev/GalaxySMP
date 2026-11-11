@@ -3,6 +3,7 @@
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 import { ticketChat, newTicketDialog, onTicketEvent, chip, when, LABELS } from "/js/tickets.js";
 import { iconEl } from "/js/site.js";
+import { renderMarkdown } from "/js/markdown.js";
 
 const panel = () => document.getElementById("channel-panel");
 const voiceBox = () => document.getElementById("voice-embed");
@@ -413,7 +414,7 @@ function renderDMs(p) {
     const add = (m) => {
       const mine = m.from === meId;
       log.append(h("div", { class: `dm-msg${mine ? " mine" : ""}` },
-        h("div", { class: "dm-bubble" }, h("div", { class: "dm-text", text: m.body }),
+        h("div", { class: "dm-bubble" }, h("div", { class: "dm-text msg-text" }, renderMarkdown(m.body)),
           h("div", { class: "dm-meta", text: `${dmTime(m.at)}${m.via === "game" ? " · from the game" : ""}` }))));
     };
     if (!d.messages.length) log.append(h("p", { class: "text-3 small dm-start", text: `This is the start of your messages with ${d.other.username}. Be kind, and never share passwords or personal information.` }));

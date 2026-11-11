@@ -37,8 +37,7 @@
           <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
           <button role="tab" data-tab="tickets" aria-selected="false">Tickets <span class="count-badge" id="tab-tickets-count"></span></button>
           <button role="tab" data-tab="reports" aria-selected="false">Reports <span class="count-badge" id="tab-reports-count"></span></button>
-          <button role="tab" data-tab="players" aria-selected="false">Players</button>
-          <button role="tab" data-tab="members" aria-selected="false">Website members</button>
+          <button role="tab" data-tab="players" aria-selected="false">Members</button>
           <button role="tab" data-tab="words" aria-selected="false">Word filter</button>
           <button role="tab" data-tab="ranks" aria-selected="false" hidden>Ranks</button>
           <button role="tab" data-tab="economy" aria-selected="false" hidden>Economy</button>
@@ -68,16 +67,18 @@
 
         <section data-panel="players" hidden>
           <div class="toolbar">
-            <input class="input" id="pl-search" type="search" placeholder="Search by gamertag or website name" autocomplete="off">
+            <input class="input" id="pl-search" type="search" placeholder="Search members by gamertag or website name" autocomplete="off">
             <select class="input" id="pl-filter" aria-label="Show">
               <option value="all">All players</option>
               <option value="online">In game now</option>
               <option value="staff">Staff and operators</option>
               <option value="plans">Galaxy+ and Pro+</option>
-              <option value="punished">Warned, muted or banned</option>
+              <option value="punished">Warned, muted or banned in game</option>
+              <option value="web-muted">Muted or banned on the website</option>
+              <option value="voice-muted">Muted in voice chat</option>
             </select>
           </div>
-          <p class="text-3 small" style="margin:-4px 0 12px">Tap a player for their card: stats, rank, plan, money, punishments, reports, tickets and private staff notes, with in-game actions.</p>
+          <p class="text-3 small" style="margin:-4px 0 12px">Everyone in one list: tap a member for their card with stats, rank, plan, money, punishments, reports, tickets and private staff notes, plus in-game, website and voice chat actions.</p>
           <div class="panel" style="padding:0" id="pl-results"></div>
         </section>
 
@@ -90,18 +91,7 @@
           <div class="panel" style="padding:0" id="reports-closed"></div>
         </section>
 
-        <section data-panel="members" hidden>
-          <div class="toolbar">
-            <input class="input" id="member-search" type="search" placeholder="Search by username" autocomplete="off">
-            <select class="input" id="member-filter" aria-label="Show">
-              <option value="all">Everyone</option>
-              <option value="staff">Staff</option>
-              <option value="muted">Muted</option>
-              <option value="banned">Banned</option>
-            </select>
-          </div>
-          <div class="panel" style="padding:0" id="member-results"></div>
-        </section>
+<!-- Website members are part of the Members tab now (player cards). -->
 
         <section data-panel="words" hidden>
           <div class="panel cf-panel" style="margin-bottom:16px">

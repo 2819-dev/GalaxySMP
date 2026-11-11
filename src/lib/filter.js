@@ -111,7 +111,7 @@ export function checkMessage(raw, compiledWords, opts = {}) {
   text = text.replace(/\n{3,}/g, "\n\n").trim();
   if (!text) return blocked("empty", "Your message is empty.");
   if (text.length > MAX_LENGTH) return blocked("length", `Messages can be at most ${MAX_LENGTH} characters.`);
-  if (text.split("\n").length > 8) return blocked("spam", "Please keep messages to a few lines.");
+  if (text.split("\n").length > 20) return blocked("spam", "Please keep messages to 20 lines or fewer.");
 
   let scan = text.toLowerCase();
   for (const own of OWN_ADDRESSES) scan = scan.split(own).join(" ");

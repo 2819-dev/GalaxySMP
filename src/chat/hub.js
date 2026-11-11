@@ -236,6 +236,15 @@ export class CommunityHub extends DurableObject {
       return;
     }
     const lower = text.toLowerCase();
+    // staff: @everyone pings every member, @here everyone online (website or in game)
+    if ((user.power || 0) >= 50 && /@(everyone|here)\b/.test(lower)) {
+      const everyone = /@everyone\b/.test(lower);
+      const ids = everyone ? "all" : [...new Set([...this.onlineUserIds(),
+        ...(await sql`SELECT u.id FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE p.online_at > now() - interval '150 seconds'`).map((r) => Number(r.id))])]
+        .filter((id) => id !== user.id);
+      await notify(this.env, ids, "mentions", { title: `${user.username} in #${ch.name}`, body: text, url: `/community#${ch.slug}`, tag: `chat-${ch.slug}` });
+      return;
+    }
     const targets = await sql`
       SELECT DISTINCT u.id FROM users u
        WHERE u.id <> ${user.id} AND NOT u.banned

@@ -143,17 +143,8 @@ async function resolve(r, outcome) {
 }
 
 // ---------- Members ----------
-let searchTimer;
-loaders.members = async () => {
-  const q = $("member-search").value.trim().replace(/^\./, "");
-  const data = await getJson(`/api/mod/members?q=${encodeURIComponent(q)}&filter=${$("member-filter").value}`);
-  const list = $("member-results");
-  list.replaceChildren();
-  if (!data.members.length) list.append(h("div", { class: "empty", text: "No members found." }));
-  for (const m of data.members) list.append(memberRow(m));
-};
-$("member-search").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(loaders.members, 300); });
-$("member-filter").addEventListener("change", () => loaders.members());
+// Website accounts are part of the Members tab now (player cards in staff-panel.js).
+loaders.members = () => loaders.players?.();
 
 // Admins: give a member a rank (the same ranks as in game).
 async function memberRankDialog(m, done) {
@@ -826,7 +817,8 @@ $("help-reset").addEventListener("click", () => openDialog({
   $("staff-app").hidden = false;
   setBadge("tickets", summary.openTickets);
   setupPanel({ loaders, power, owner: Boolean(summary.owner), selectTab, toast, setBadge });
-  const start = location.hash.slice(1).split("/")[0];
+  let start = location.hash.slice(1).split("/")[0];
   if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"], [data-tab="help"]').forEach((t) => (t.hidden = false));
-  selectTab(["overview", "tickets", "players", "reports", "members", "words", "audit", ...(summary.owner ? ["dms"] : []), ...(power >= 100 ? ["ranks", "economy", "help"] : [])].includes(start) ? start : "overview");
+  if (start === "members") { start = "players"; history.replaceState(null, "", "#players"); } // old link: Members is one tab now
+  selectTab(["overview", "tickets", "players", "reports", "words", "audit", ...(summary.owner ? ["dms"] : []), ...(power >= 100 ? ["ranks", "economy", "help"] : [])].includes(start) ? start : "overview");
 })();
