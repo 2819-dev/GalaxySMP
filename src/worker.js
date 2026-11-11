@@ -21,6 +21,7 @@ import * as community from "./routes/community.js";
 import * as support from "./routes/support.js";
 import * as panel from "./routes/panel.js";
 import * as dms from "./routes/dms.js";
+import * as notifyRoutes from "./routes/notify.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -96,6 +97,11 @@ const routes = [
   ["POST", "/api/support/tickets/:id/messages", support.postMessage],
   ["POST", "/api/support/tickets/:id/close", support.closeTicket],
   ["GET", "/api/mod/tickets", support.staffTickets],
+  ["GET", "/api/notify", (req, env) => notifyRoutes.getSettings(req, env)],
+  ["POST", "/api/notify/subscribe", (req, env) => notifyRoutes.subscribe(req, env)],
+  ["POST", "/api/notify/unsubscribe", (req, env) => notifyRoutes.unsubscribe(req, env)],
+  ["POST", "/api/notify/prefs", (req, env) => notifyRoutes.savePrefs(req, env)],
+  ["POST", "/api/notify/test", (req, env) => notifyRoutes.testPush(req, env)],
   ["GET", "/api/dm/threads", (req, env) => dms.listThreads(req, env)],
   ["GET", "/api/dm/with/:userId", dms.getConversation],
   ["POST", "/api/dm/with/:userId", dms.postMessage],
@@ -152,6 +158,11 @@ async function health(env) {
 }
 
 export default {
+  // Daily notifications (reward reminder, daily summary): see "triggers" in wrangler.jsonc.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(notifyRoutes.daily(env, event.cron).catch((e) => console.error("daily notifications failed", e)));
+  },
+
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     // One public address: send www.galaxymc.us and the old workers.dev pages to galaxymc.us.

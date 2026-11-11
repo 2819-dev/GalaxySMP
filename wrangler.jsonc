@@ -19,7 +19,9 @@
   // Non-secret settings.
   "vars": {
     // These Minecraft names automatically become Admin when they link their account.
-    "OWNER_USERNAMES": "Ashcore2261,.VisionDevs"
+    "OWNER_USERNAMES": "Ashcore2261,.VisionDevs",
+    // Public half of the push notification key (the private half is the secret VAPID_PRIVATE_KEY).
+    "VAPID_PUBLIC_KEY": "BP5VrTsXYzWntM0KFJscpHJxYaKx3r_z0YxCrARToCNdAJuossf_2GjkLfFL-MKavTkhu2rUyaKM1vFFGwPZov0"
   },
 
   // Live chat: one Durable Object (SQLite-backed, available on the free plan).
@@ -39,6 +41,9 @@
     { "name": "AUTH_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
     { "name": "POLL_LIMITER", "namespace_id": "1002", "simple": { "limit": 60, "period": 60 } }
   ],
+
+  // Daily notifications (reward reminder at 16:05 UTC = noon US Eastern, summary at 00:35 UTC = evening).
+  "triggers": { "crons": ["5 16 * * *", "35 0 * * *"] },
 
   "observability": { "enabled": true }
 }

@@ -5,6 +5,7 @@ import { DurableObject } from "cloudflare:workers";
 import { getDb } from "../lib/db.js";
 import { checkMessage, compileWordList } from "../lib/filter.js";
 import { REACTIONS, loadMessage, loadReactions } from "./messages.js";
+import { notify } from "../routes/notify.js";
 
 const WORDS_TTL_MS = 60_000;
 const BURST = { count: 5, windowMs: 10_000 };
@@ -223,6 +224,29 @@ export class CommunityHub extends DurableObject {
     const message = await loadMessage(sql, r.id);
     this.send(ws, { type: "sent", nonce: msg.nonce, id: message.id });
     this.broadcast({ type: "message", message });
+    this.ctx.waitUntil(this.pushFor(sql, user, channelId, r.id, check.text).catch((e) => console.error("push failed", e)));
+  }
+
+  // Phone/computer notifications: #announcements posts (Updates), and @mentions / replies.
+  async pushFor(sql, user, channelId, messageId, text) {
+    const [ch] = await sql`SELECT slug, name FROM channels WHERE id = ${channelId}`;
+    if (!ch) return;
+    if (ch.slug === "announcements") {
+      await notify(this.env, "all", "updates", { title: `New in #${ch.name}`, body: text, url: `/community#${ch.slug}`, tag: `ann-${messageId}`, ttl: 24 * 3600 });
+      return;
+    }
+    const lower = text.toLowerCase();
+    const targets = await sql`
+      SELECT DISTINCT u.id FROM users u
+       WHERE u.id <> ${user.id} AND NOT u.banned
+         AND (position('@' || lower(u.username) in ${lower}) > 0
+              OR u.id = (SELECT m.user_id FROM messages m JOIN messages me ON me.reply_to = m.id WHERE me.id = ${messageId}))
+       LIMIT 25`;
+    if (targets.length) {
+      await notify(this.env, targets.map((t) => t.id), "mentions", {
+        title: `${user.username} in #${ch.name}`, body: text, url: `/community#${ch.slug}`, tag: `chat-${ch.slug}`,
+      });
+    }
   }
 
   async onReact(ws, user, msg) {

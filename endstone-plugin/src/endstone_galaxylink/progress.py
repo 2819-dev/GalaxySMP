@@ -482,7 +482,7 @@ class Progress:
     def row(self, xuid, s):
         return {"xuid": xuid, "name": s.get("name"), "playtime": s["playtime"], "mined": s["mined"], "placed": s["placed"],
                 "kills": s["kills"], "deaths": s["deaths"], "quests": s["quests"], "streak": s["streak"], "best": s["best_streak"],
-                "achievements": sorted(s["achievements"].keys())}
+                "achievements": sorted(s["achievements"].keys()), "lastDaily": s.get("last_daily")}
 
     def push(self, everything=False):
         voice = getattr(self.plugin, "_voice", None)

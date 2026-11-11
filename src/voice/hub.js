@@ -19,6 +19,9 @@ import { loadShop, recordBalances } from "../routes/economy.js";
 import { loadHelp } from "../routes/help.js";
 import { planMessage } from "../routes/plans.js";
 import { hubStub } from "../routes/chat.js";
+import { notify } from "../routes/notify.js";
+
+const DOWN_AFTER_MS = 3 * 60 * 1000; // quick restarts (under 3 minutes) don't send notifications
 
 export const RANGE = 48; // blocks
 const PULL_RANGE = RANGE * 1.3; // a little slack so walking to the edge doesn't cut out
@@ -237,6 +240,7 @@ export class VoiceHub extends DurableObject {
       for (const old of this.ctx.getWebSockets("plugin")) { try { old.close(1000, "replaced"); } catch { /* gone */ } }
       this.ctx.acceptWebSocket(server, ["plugin"]);
       server.serializeAttachment({ kind: "plugin" });
+      this.ctx.waitUntil(this.serverUp());
       this.send(server, { type: "active", on: this.voiceSockets().length > 0 });
       this.sendIcons();
       this.ctx.waitUntil(this.sendRanks());
@@ -276,12 +280,35 @@ export class VoiceHub extends DurableObject {
       if (a && a.kind === "plugin" && this.ctx.getWebSockets("plugin").every((s) => s === ws)) {
         this.positions.clear();
         await this.ctx.storage.delete("server"); // server went away: status shows offline right away
+        await this.ctx.storage.put("pluginGoneAt", Date.now());
+        await this.ctx.storage.setAlarm(Date.now() + DOWN_AFTER_MS); // still gone in 3 minutes: tell members
       }
       return;
     }
     this.broadcast({ type: "left", id: a.id });
     await this.cleanupGroups();
     this.sendRoster();
+  }
+
+  // ---------- server online / offline notifications ----------
+  async alarm() {
+    const goneAt = await this.ctx.storage.get("pluginGoneAt");
+    if (!goneAt || this.pluginSocket()) return;
+    if (await this.ctx.storage.get("downNotified")) return;
+    await this.ctx.storage.put("downNotified", goneAt);
+    await notify(this.env, "all", "server", {
+      title: "GalaxySMP is offline", body: "The server is restarting or down. We'll let you know when it's back.", url: "/status", tag: "server", ttl: 3600,
+    }).catch(() => {});
+  }
+
+  async serverUp() {
+    await this.ctx.storage.delete("pluginGoneAt");
+    const notified = await this.ctx.storage.get("downNotified");
+    if (!notified) return;
+    await this.ctx.storage.delete("downNotified");
+    await notify(this.env, "all", "server", {
+      title: "GalaxySMP is back online", body: "Come play! galaxymc.smp.live", url: "/", tag: "server", ttl: 3600, urgent: true,
+    }).catch(() => {});
   }
 
   // ---------- messages ----------
@@ -303,6 +330,11 @@ export class VoiceHub extends DurableObject {
     if (msg.type === "answer" && msg.req) {
       const done = this.waiting?.get(msg.req);
       if (done) done(msg);
+      return;
+    }
+    if (msg.type === "announcement") { // a staff announcement in game: notify members who want them
+      const text = String(msg.text || "").slice(0, 200);
+      if (text) this.ctx.waitUntil(notify(this.env, "all", "announcements", { title: "GalaxySMP announcement", body: text, url: "/", tag: "announcement", ttl: 3 * 3600 }).catch(() => {}));
       return;
     }
     if (msg.type === "chatfilter_state") {

@@ -10,6 +10,7 @@ import { hubStub } from "./chat.js";
 import { headUrlFor } from "./heads.js";
 import { toPlugin } from "./economy.js";
 import { checkPlugin } from "./ranks.js";
+import { notify as pushNotify } from "./notify.js";
 
 const MAX = 500;
 const clean = (v) => String(v ?? "").replace(/\r\n?/g, "\n").replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, "").trim().slice(0, MAX);
@@ -60,6 +61,9 @@ async function sendDm(env, sql, from, to, text, via) {
   const [msg] = await sql`INSERT INTO dm_messages (thread_id, sender_id, body, via) VALUES (${thread.id}, ${from.id}, ${check.text}, ${via}) RETURNING id, created_at`;
   const out = { id: Number(msg.id), threadId: Number(thread.id), from: Number(from.id), fromName: from.username, to: Number(to.id), body: check.text, at: msg.created_at, via };
   await notify(env, out);
+  try { // phone/computer notification for the recipient
+    await pushNotify(env, [to.id], "dms", { title: `Message from ${from.username}`, body: check.text, url: "/community#messages", tag: `dm-${from.id}` });
+  } catch { /* best effort */ }
   // in game: show it to the recipient if they're playing (the plugin delivers game-to-game DMs itself)
   if (via === "web" && to.xuid) {
     try { await toPlugin(env, { type: "dm", toXuid: String(to.xuid), from: from.username, text: check.text }); } catch { /* server offline */ }

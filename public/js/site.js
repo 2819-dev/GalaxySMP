@@ -157,7 +157,7 @@ function renderHeader() {
       <img src="/img/wordmark.png" alt="${config.serverName}" width="132" height="23">
       <button class="drawer-close" type="button" aria-label="Close menu">${icon("close")}</button>
     </div>
-    <nav class="drawer-links">${drawerLinks}<a href="/staff" data-staff-link hidden>${icon("tools")}<span>Staff Panel</span></a></nav>
+    <nav class="drawer-links">${drawerLinks}<a href="/staff" data-staff-link hidden>${icon("tools")}<span>Staff Panel</span></a><a href="#" data-notify-link hidden>${icon("bell")}<span>Notifications</span></a></nav>
     ${config.hosting === "realm" ? "" : `<div class="drawer-card"><span class="eyebrow">Server address</span>
       <button class="ip-chip" type="button" data-copy="${serverAddress}">${icon("copy")}<span>${serverAddress}</span><span class="ip-port">${config.bedrockPort}</span></button>
       <span class="text-3 small">Bedrock Edition · tap to copy</span></div>`}
@@ -177,6 +177,11 @@ function renderHeader() {
       if (!staffChecked) {
         staffChecked = true;
         fetch("/api/me").then((r) => r.json()).then((d) => {
+          if (d.user) {
+            const n = drawer.querySelector("[data-notify-link]");
+            n.hidden = false;
+            n.addEventListener("click", (e) => { e.preventDefault(); setOpen(false); import("/js/notify.js").then((m) => m.openPreferences()); });
+          }
           if (d.user?.role?.power >= 50) {
             const link = drawer.querySelector("[data-staff-link]");
             link.hidden = false;

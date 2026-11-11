@@ -1,6 +1,7 @@
 import { toast, config } from "/js/site.js";
 import { startChat, stopChat } from "/js/chat.js";
 import "/js/mod.js";
+import { maybeAskForNotifications, refreshSubscription, openPreferences } from "/js/notify.js";
 
 const $ = (id) => document.getElementById(id);
 const views = ["loading", "auth", "code", "chat"];
@@ -26,11 +27,15 @@ async function showChat() {
   show("chat");
   try {
     await startChat({ onSignedOut: () => show("auth") });
+    refreshSubscription();
+    setTimeout(maybeAskForNotifications, 2500);
   } catch (e) {
     show("auth");
     toast(e.message || "Couldn't open the chat. Please try again.");
   }
 }
+
+$("notify-prefs").addEventListener("click", () => openPreferences());
 
 $("sign-out").addEventListener("click", async () => {
   stopChat();

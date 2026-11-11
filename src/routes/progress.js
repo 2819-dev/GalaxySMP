@@ -31,7 +31,8 @@ export async function recordStats(env, list, online) {
         ON CONFLICT (xuid) DO UPDATE SET playtime_s = EXCLUDED.playtime_s, mined = EXCLUDED.mined, placed = EXCLUDED.placed,
           kills = EXCLUDED.kills, deaths = EXCLUDED.deaths, quests_done = EXCLUDED.quests_done, streak = EXCLUDED.streak,
           best_streak = EXCLUDED.best_streak, achievements = EXCLUDED.achievements, stats_at = now(),
-          gamertag = CASE WHEN ${Boolean(p.name)} THEN EXCLUDED.gamertag ELSE players.gamertag END`;
+          gamertag = CASE WHEN ${Boolean(p.name)} THEN EXCLUDED.gamertag ELSE players.gamertag END,
+          last_daily = coalesce(${/^\d{4}-\d{2}-\d{2}$/.test(String(p.lastDaily || "")) ? p.lastDaily : null}::date, players.last_daily)`;
     }));
   }
   if (onlineIds.length) await sql`UPDATE players SET online_at = now() WHERE xuid = ANY(${onlineIds})`;

@@ -116,6 +116,12 @@ class Announcements:
             return None
         wait = max(0, self.free_at - time.time()) + len(self.queue) * (SHOW_SECONDS + GAP_SECONDS)
         self.queue.append({"text": text, "by": by})
+        voice = getattr(self.plugin, "_voice", None)
+        if voice is not None and voice.ws:  # the website sends it as a notification to members who want them
+            try:
+                voice.send_json({"type": "announcement", "text": text, "by": str(by)[:40]})
+            except Exception:
+                pass
         # an auto announcement shouldn't fire right after a manual one
         self.next_auto = max(self.next_auto, time.time() + wait + SHOW_SECONDS + 60)
         self.tick()
