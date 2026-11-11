@@ -164,6 +164,7 @@ export async function playerCard(request, env, ctx, url, params) {
       stats: { playtimeH: Math.round(Number(p.playtime_s || 0) / 360) / 10, mined: Number(p.mined || 0), placed: Number(p.placed || 0), kills: Number(p.kills || 0), deaths: Number(p.deaths || 0), quests: p.quests_done, streak: p.streak, achievements: (p.achievements || []).length },
       account: p.user_id ? {
         id: Number(p.user_id), username: p.username, role: p.role_name, power: Number(p.role_power), joined: p.joined_site,
+        ...(await sql`SELECT real_name, real_name_hidden FROM users WHERE id = ${p.user_id}`.then(([r]) => ({ realName: r?.real_name || null, realNameHidden: Boolean(r?.real_name_hidden) }))),
         credits: Number((await sql`SELECT credit_cents FROM users WHERE id = ${p.user_id}`)[0]?.credit_cents || 0) / 100,
         banned: p.banned, banReason: p.ban_reason,
         mutedUntil: p.muted_until && new Date(p.muted_until) > new Date() ? p.muted_until : null, muteReason: p.mute_reason,
@@ -268,4 +269,16 @@ export async function giveShopItem(env, sql, p, body, user, source = "staff") {
   await audit(sql, user.id, "shop.give", { player: p.gamertag, item: item.name, option: option?.name || null });
   const sent = item.category === "money" ? true : await sendPlans(env, sql);
   return { ok: true, sent };
+}
+
+// POST /api/panel/members/:id/real-name { name } (Admins): empty removes it
+export async function setRealName(request, env, ctx, url, params) {
+  const user = await requireStaff(request, env, ADMIN);
+  const body = await readJson(request);
+  const sql = getDb(env);
+  const name = clean(body.name, 60).replace(/\s+/g, " ") || null;
+  const [u] = await sql`UPDATE users SET real_name = ${name} WHERE id = ${Number(params.id)} RETURNING username`;
+  if (!u) throw new HttpError(404, "That member doesn't exist.");
+  await audit(sql, user.id, "member.real_name", { member: u.username, set: Boolean(name) });
+  return json({ ok: true, realName: name });
 }

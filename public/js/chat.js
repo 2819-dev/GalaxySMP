@@ -128,7 +128,14 @@ function openProfile(member, anchor) {
   // Staff powers (Moderator / Admin) are only permissions: they're never shown, only the rank is.
   if (!roles.childNodes.length) roles.append(el("span", "text-3 small", "No roles yet"));
   const body = el("div", "pc-body");
-  body.append(name, el("div", "pc-user", member.username), status, el("div", "pc-label", "Roles"), roles);
+  const user = el("div", "pc-user", member.username);
+  if (member.realName) {
+    const real = el("span", "pc-realname", member.realName);
+    if (member.realNameHidden) real.title = member.id === state.me?.id ? "Only you and staff can see this" : "Hidden from other players";
+    user.append(el("span", "pc-dot", " · "), real);
+    if (member.realNameHidden) user.append(el("span", "pc-hidden", member.id === state.me?.id ? " (only you and staff see this)" : " (hidden from players)"));
+  }
+  body.append(name, user, status, el("div", "pc-label", "Roles"), roles);
   if (member.since) {
     body.append(el("div", "pc-label", "Member since"), el("div", "pc-since", new Date(member.since).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" })));
   }

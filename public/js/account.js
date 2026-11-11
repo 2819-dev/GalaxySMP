@@ -168,7 +168,27 @@ const SECTIONS = {
           load("privacy");
         } }))))
       : h("p", { class: "text-3", style: "margin:0", text: "You haven't blocked anyone. Block someone from your conversation with them in Direct Messages." });
+    const realName = data.realName ? (() => {
+      const box = h("input", { type: "checkbox", id: "acc-rn-hide" });
+      box.checked = data.realNameHidden;
+      const status = h("p", { class: "text-3 small", style: "margin:8px 0 0" });
+      const say = () => { status.textContent = box.checked ? "Only you and staff can see your real name." : "Everyone in the community can see your real name on your profile."; };
+      say();
+      box.addEventListener("change", async () => {
+        try {
+          await postJson("/api/account/real-name", { hidden: box.checked });
+          data.realNameHidden = box.checked;
+          say();
+          toast(box.checked ? "Your real name is hidden." : "Your real name is shown.");
+        } catch (e) { box.checked = !box.checked; toast(e.message); }
+      });
+      return card("Real name", null,
+        h("p", { class: "text-2", style: "margin:0 0 10px" }, "Staff added your real name: ", h("b", { text: data.realName }), ". It shows on your profile card next to your username."),
+        h("label", { class: "acc-rn-switch", for: "acc-rn-hide" }, box, h("span", { text: "Hide my real name from other players" })),
+        status);
+    })() : null;
     return [
+      realName,
       card("Blocked members", "Blocked members can't send you direct messages.", blocked),
       card("Your data", null,
         h("p", { class: "text-2", style: "margin:0 0 10px", text: "Read what we store and why in the privacy policy. To have your account and messages deleted, open a ticket in Community → Support." }),

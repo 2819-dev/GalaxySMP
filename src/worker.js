@@ -113,6 +113,8 @@ const routes = [
   ["GET", "/api/account", (req, env) => account.getAccount(req, env)],
   ["POST", "/api/account/password", (req, env) => account.changePassword(req, env)],
   ["POST", "/api/account/signout-others", (req, env) => account.signOutOthers(req, env)],
+  ["POST", "/api/account/real-name", (req, env) => account.setRealNameVisibility(req, env)],
+  ["POST", "/api/panel/members/:id/real-name", panel.setRealName],
   ["GET", "/api/notify", (req, env) => notifyRoutes.getSettings(req, env)],
   ["POST", "/api/notify/subscribe", (req, env) => notifyRoutes.subscribe(req, env)],
   ["POST", "/api/notify/unsubscribe", (req, env) => notifyRoutes.unsubscribe(req, env)],

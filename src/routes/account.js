@@ -15,7 +15,7 @@ import { SHOP_ITEMS } from "../store/shop.js";
 
 async function profileRow(sql, userId) {
   const [u] = await sql`
-    SELECT u.id, u.username, u.platform, u.created_at, u.muted_until, r.power,
+    SELECT u.id, u.username, u.platform, u.created_at, u.muted_until, r.power, u.real_name, u.real_name_hidden,
            p.xuid, p.gamertag, p.head_at, p.gamerpic_at, p.balance_cents, p.playtime_s, p.streak, p.extra_plots, p.extra_shop_plots,
            p.cosmetics, p.night_vision_until, p.first_seen, p.last_seen, (p.online_at > now() - interval '150 seconds') AS in_game,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient,
@@ -79,6 +79,7 @@ export async function getAccount(request, env) {
       price: o.price_cents / 100, source: o.source, at: o.created_at,
     })),
     credits,
+    realName: u.real_name || null, realNameHidden: Boolean(u.real_name_hidden),
     sessions: sessions[0].n,
     blocked: blocked.map((b) => ({ id: Number(b.blocked_id), username: b.username })),
   });
@@ -111,4 +112,13 @@ export async function signOutOthers(request, env) {
   const mine = await sha256(readCookie(request) || "");
   const gone = await sql`DELETE FROM sessions WHERE user_id = ${user.id} AND token_hash <> ${mine} RETURNING 1`;
   return json({ ok: true, signedOut: gone.length });
+}
+
+// POST /api/account/real-name { hidden } : who can see the real name staff added
+export async function setRealNameVisibility(request, env) {
+  const user = await requireUser(request, env);
+  const body = await readJson(request);
+  const sql = getDb(env);
+  await sql`UPDATE users SET real_name_hidden = ${Boolean(body.hidden)} WHERE id = ${user.id}`;
+  return json({ ok: true, hidden: Boolean(body.hidden) });
 }

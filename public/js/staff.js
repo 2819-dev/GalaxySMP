@@ -310,6 +310,7 @@ const DESCRIBE = {
   "promo.pause": (e) => [`paused promo code ${e.details.code}`],
   "promo.resume": (e) => [`turned on promo code ${e.details.code}`],
   "promo.delete": (e) => [`deleted promo code ${e.details.code}`],
+  "member.real_name": (e) => [e.details.set ? `set ${e.details.member}'s real name` : `removed ${e.details.member}'s real name`],
   "credits.give": (e) => [`gave ${e.details.to} $${(e.details.cents / 100).toFixed(2)} of credits`],
   "credits.take": (e) => [`took $${(e.details.cents / 100).toFixed(2)} of credits from ${e.details.to}`],
   "credits.gift": (e) => [`gifted $${(e.details.cents / 100).toFixed(2)} of credits to ${e.details.to}`],

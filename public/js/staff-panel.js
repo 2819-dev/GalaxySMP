@@ -292,11 +292,13 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
       acc ? h("div", {},
         h("p", { class: "text-2 small", style: "margin:0 0 8px", text: [
           `${acc.username} · joined ${fmt(acc.joined)}`,
+          acc.realName ? `real name: ${acc.realName}${acc.realNameHidden ? " (they hid it from players)" : ""}` : null,
           acc.mutedUntil ? `muted until ${fmt(acc.mutedUntil)}${acc.muteReason ? ` (${acc.muteReason})` : ""}` : null,
           acc.voiceMutedUntil ? `voice muted until ${fmt(acc.voiceMutedUntil)}` : null,
           acc.globalMic ? "has the Global Mic" : null,
           acc.banned ? `BANNED (${acc.banReason || "no reason"})` : null].filter(Boolean).join(" · ") }),
         h("div", { class: "pc-actions" },
+          admin ? act(acc.realName ? "Change real name" : "Add real name", "btn-secondary", () => realNameDialog(acc, reload)) : null,
           acc.mutedUntil ? act("Unmute on website", "btn-secondary", async () => { await postJson(`/api/mod/members/${acc.id}/unmute`, {}); reload("Unmuted."); })
             : act("Mute on website", "btn-secondary", () => muteDialog({ id: acc.id, username: acc.username }, reload)),
           acc.voiceMutedUntil ? act("Unmute in voice", "btn-secondary", async () => { await postJson(`/api/mod/members/${acc.id}/voice-unmute`, {}); reload("Unmuted in voice."); })
@@ -351,6 +353,19 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
       actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: async () => { await postJson("/api/mod/economy/plan", { xuid, plan: plan.value || null, days: Number(days.value), extraPlots: Number(extra.value) }); reload("Plan updated."); } }],
     });
   }
+  function realNameDialog(acc, reload) {
+    const input = h("input", { class: "input", id: "pa-realname", maxlength: 60, placeholder: "e.g. Alex", autocomplete: "off", value: acc.realName || "" });
+    openDialog({
+      title: `Real name for ${acc.username}`,
+      body: h("div", {}, h("p", { class: "text-2", style: "margin-top:0", text: "Shown on their profile card next to their username. Everyone sees it unless they hide it in Account → Privacy (then only they and staff do). Leave it empty to remove it." }),
+        field("Real name", input)),
+      actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: async () => {
+        await postJson(`/api/panel/members/${acc.id}/real-name`, { name: input.value });
+        reload(input.value.trim() ? "Real name saved." : "Real name removed.");
+      } }],
+    });
+  }
+
   function creditsDialog(acc, action, reload) {
     const amount = h("input", { class: "input", id: "pa-credits", type: "number", min: 0.01, step: "0.01", value: action === "give" ? "5.00" : "", inputmode: "decimal" });
     openDialog({

@@ -1584,3 +1584,10 @@ textarea.input.dm-input { resize: none; min-height: 44px; max-height: 140px; ove
 .donate-text p { margin: 0; font-size: .92rem; }
 .donate-btn { flex: none; }
 @media (max-width: 600px) { .donate-card { flex-wrap: wrap; } .donate-btn { width: 100%; justify-content: center; } }
+
+/* Real names */
+.pc-realname { color: var(--text); font-weight: 600; }
+.pc-dot { color: var(--text-3); }
+.pc-hidden { color: var(--text-3); font-size: .78rem; }
+.acc-rn-switch { display: flex; align-items: center; gap: 10px; font-weight: 600; cursor: pointer; }
+.acc-rn-switch input { width: 18px; height: 18px; flex: none; margin: 0; accent-color: var(--accent); }
