@@ -5,7 +5,7 @@ import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser, readCookie, getUser } from "../lib/auth.js";
 import { sha256 } from "../lib/crypto.js";
-import { baseName } from "../lib/names.js";
+import { baseName, isOwner } from "../lib/names.js";
 import { limit, clientIp } from "../lib/ratelimit.js";
 import { headUrlFor } from "./heads.js";
 import { rankOf } from "../chat/messages.js";
@@ -42,6 +42,7 @@ export async function headerMe(request, env) {
       id: Number(u.id), username: u.username, head: headUrlFor(u), rank, plan: u.plan || null,
       money: u.balance_cents == null ? null : Number(u.balance_cents) / 100, inGame: Boolean(u.in_game),
       staff: Number(u.power) >= 50,
+      panel: Number(u.power) < 50 ? null : isOwner(env, user.username, user.platform === "bedrock") ? "Control Panel" : Number(u.power) >= 100 ? "Admin Panel" : "Staff Panel",
       onboarding: !u.onboarded_at, // still has to do the welcome steps
     },
   }, 200, { "Cache-Control": "no-store" });

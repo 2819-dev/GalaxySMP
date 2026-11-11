@@ -100,7 +100,7 @@ export async function renderAccountButton(slot) {
     };
     links.append(item("/community", "users", "Community"), item("/community#messages", "chat", "Messages"), item("/account#notifications", "bell", "Notifications"),
       item("/account#subscription", "star", "Subscription"));
-    if (me.staff) links.append(item("/staff", "tools", "Staff Panel"));
+    if (me.staff) links.append(item("/staff", "tools", me.panel || "Staff Panel"));
     const out = make("button", "acct-link acct-signout");
     out.type = "button";
     out.innerHTML = icon("logout"); // fixed icon only
