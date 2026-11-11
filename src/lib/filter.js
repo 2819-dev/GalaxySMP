@@ -100,8 +100,13 @@ function blocked(reason, message) {
   return { ok: false, reason, message };
 }
 
+// Links (with their path) that Admins may post; removed before the other checks so a link's
+// numbers or letters aren't mistaken for a phone number or personal info.
+const URL_TOKEN_RE = new RegExp(`(?:\\b(?:https?|ftp):\\/\\/|\\bwww\\.|\\b[a-z0-9-]{2,}\\.(?:${TLDS})\\b)[^\\s]*`, "gi");
+
 // Returns { ok: true, text } or { ok: false, reason, message }.
-export function checkMessage(raw, compiledWords) {
+// opts.allowLinks: Admins and owners may share links (everything else is still checked).
+export function checkMessage(raw, compiledWords, opts = {}) {
   let text = String(raw ?? "").replace(/\r\n?/g, "\n").replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, "");
   text = text.replace(/\n{3,}/g, "\n\n").trim();
   if (!text) return blocked("empty", "Your message is empty.");
@@ -110,8 +115,8 @@ export function checkMessage(raw, compiledWords) {
 
   let scan = text.toLowerCase();
   for (const own of OWN_ADDRESSES) scan = scan.split(own).join(" ");
-
   if (EMAIL_RES.some((re) => re.test(scan))) return blocked("personal", "Email addresses can't be shared in chat.");
+  if (opts.allowLinks) scan = scan.replace(URL_TOKEN_RE, " ");
   if (LINK_RES.some((re) => re.test(scan))) return blocked("link", "Links aren't allowed in chat.");
   if (IP_RE.test(scan)) return blocked("link", "IP addresses aren't allowed in chat.");
   if (PHONE_RES.some((re) => re.test(scan))) return blocked("personal", "Phone numbers and long numbers can't be shared in chat.");

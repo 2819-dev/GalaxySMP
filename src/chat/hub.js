@@ -170,7 +170,8 @@ export class CommunityHub extends DurableObject {
     const channelId = Number(msg.channelId);
     if (!Number.isInteger(channelId)) return reject("Unknown channel.");
 
-    const check = checkMessage(msg.content, await this.wordList());
+    // Admins (owners included) may post links; everyone else can't.
+    const check = checkMessage(msg.content, await this.wordList(), { allowLinks: (user.power || 0) >= 100 });
     if (!check.ok) return reject(check.message);
     const limited = this.rateCheck(user.id, check.text);
     if (limited) return reject(limited);

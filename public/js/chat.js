@@ -299,6 +299,28 @@ function renderMessages() {
   }
 }
 
+// Message text with clickable links (only Admins can post links). Text goes in as text nodes, never HTML.
+const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>"]+[^\s<>".,!?:;)\]]/gi;
+function linkify(box, text) {
+  let last = 0;
+  for (const m of String(text).matchAll(URL_RE)) {
+    if (m.index > last) box.append(text.slice(last, m.index));
+    const href = /^https?:\/\//i.test(m[0]) ? m[0] : `https://${m[0]}`;
+    let ok = false;
+    try { ok = ["http:", "https:"].includes(new URL(href).protocol); } catch { /* not a link */ }
+    if (ok) {
+      const a = el("a", "msg-link", m[0]);
+      a.href = href;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer nofollow ugc";
+      box.append(a);
+    } else box.append(m[0]);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) box.append(text.slice(last));
+  return box;
+}
+
 function isGrouped(m, prev) {
   return prev && prev.author.id === m.author.id && !m.replyTo && new Date(m.createdAt) - new Date(prev.createdAt) < 5 * 60_000;
 }
@@ -340,7 +362,7 @@ function renderMessage(m, prev) {
   t.dateTime = m.createdAt;
   t.title = new Date(m.createdAt).toLocaleString();
   head.append(t);
-  body.append(head, el("div", "msg-text", m.content));
+  body.append(head, linkify(el("div", "msg-text"), m.content));
   body.append(renderReactions(m));
   row.append(body);
 

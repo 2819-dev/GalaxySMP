@@ -1245,3 +1245,6 @@ img[src*="g=1"] { image-rendering: auto !important; }
 .plan-priority-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 8px; }
 .plan-priority-row label { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; color: var(--text-2); }
 .plan-priority-row .input { width: 110px; }
+
+.msg-link { color: var(--accent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+.msg-link:hover { color: #9fe4ff; }
