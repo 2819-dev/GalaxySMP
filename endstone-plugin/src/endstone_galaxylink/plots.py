@@ -167,15 +167,20 @@ class Plots:
         return m["role"] if m else None
 
     # ---------- protection ----------
+    @staticmethod
+    def bypasses(player, plot):
+        """Players on a protected area's bypass list can do everything there, like operators."""
+        return plot is not None and plot.get("kind") == "area" and player.name.lower() in (plot.get("bypass") or [])
+
     def may_build(self, player, plot):
-        if plot is None or player.is_op:
+        if plot is None or player.is_op or self.bypasses(player, plot):
             return True
         if plot["kind"] == "area" or not plot.get("owner"):
             return False
         return self.role(player, plot) in ("owner", "builder")
 
     def may_use(self, player, plot, block_type):
-        if plot is None or player.is_op:
+        if plot is None or player.is_op or self.bypasses(player, plot):
             return True
         t = block_type.split(":")[-1]
         if any(k in t for k in HARMLESS):
@@ -751,6 +756,8 @@ class Plots:
         else:
             on = [label for key, label in AREA_FLAGS if (plot.get('flags') or {}).get(key)]
             info += "Allowed: " + ("; ".join(on) if on else "nothing (fully protected)")
+            if plot.get("bypass_names"):
+                info += "\nBypass list: " + ", ".join(plot["bypass_names"])
         form = ActionForm(title="Edit plot", content=info)
         form.add_button("§lSettings", on_click=lambda p: self.admin_settings(p, pid))
         if plot.get("owner"):
@@ -764,6 +771,9 @@ class Plots:
                     Dropdown("Who can claim it (plots only)", [n for _, n in CLAIM_LEVELS],
                              next((i for i, (k, _) in enumerate(CLAIM_LEVELS) if k == plot.get("claim")), 0))]
         controls += [Toggle(f"Protected area: {label}", bool((plot.get("flags") or {}).get(key))) for key, label in AREA_FLAGS]
+        controls.append(TextInput("Bypass list (protected areas only): players who can build and use everything here, "
+                                  "separated by commas", "e.g. Steve, Alex Builder",
+                                  ", ".join(plot.get("bypass_names") or plot.get("bypass") or [])))
 
         def submit(p, data):
             try:
@@ -773,6 +783,11 @@ class Plots:
             if plot["kind"] == "area":
                 plot["name"] = str(v[0]).strip()[:32] or plot.get("name")
                 plot["flags"] = {key: bool(on) for (key, _), on in zip(AREA_FLAGS, v[2:2 + len(AREA_FLAGS)])}
+                names = [" ".join(n.split())[:32] for n in str(v[2 + len(AREA_FLAGS)] or "").split(",")]
+                seen = set()
+                names = [n for n in names if n and not (n.lower() in seen or seen.add(n.lower()))][:50]  # no duplicates
+                plot["bypass_names"] = names               # as typed (shown in the form)
+                plot["bypass"] = [n.lower() for n in names]  # what the protection checks
             else:
                 plot["claim"] = CLAIM_LEVELS[int(v[1])][0]
             self.save(pid)
