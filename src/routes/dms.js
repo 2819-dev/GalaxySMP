@@ -18,7 +18,7 @@ const pair = (x, y) => (Number(x) < Number(y) ? [Number(x), Number(y)] : [Number
 
 async function notify(env, payload) {
   try {
-    await hubStub(env).fetch("https://hub/internal/broadcast", { method: "POST", body: JSON.stringify({ type: "dm", ...payload }) });
+    await hubStub(env).fetch("https://hub/internal/broadcast", { method: "POST", body: JSON.stringify({ type: "dm", ...payload }) }); // payload.type can override
   } catch { /* live update is best effort */ }
 }
 
@@ -108,10 +108,14 @@ export async function getConversation(request, env, ctx, url, params) {
   if (thread) {
     const before = Number(url.searchParams.get("before")) || null;
     const rows = await sql`
-      SELECT id, sender_id, body, via, created_at FROM dm_messages
+      SELECT id, sender_id, body, via, created_at, read_at, edited_at FROM dm_messages
        WHERE thread_id = ${thread.id} AND (${before}::bigint IS NULL OR id < ${before})
        ORDER BY id DESC LIMIT 60`;
-    messages = rows.reverse().map((m) => ({ id: Number(m.id), from: Number(m.sender_id), body: m.body, via: m.via, at: m.created_at }));
+    messages = rows.reverse().map((m) => ({ id: Number(m.id), from: Number(m.sender_id), body: m.body, via: m.via, at: m.created_at,
+      read: Boolean(m.read_at), editedAt: m.edited_at || null }));
+    // opening the conversation reads their messages: the sender can't edit them any more
+    const read = await sql`UPDATE dm_messages SET read_at = now() WHERE thread_id = ${thread.id} AND sender_id <> ${me.id} AND read_at IS NULL RETURNING id`;
+    if (read.length) await notify(env, { type: "dm_read", ids: read.map((r) => Number(r.id)), from: Number(me.id), to: Number(other.id) });
     await sql`UPDATE dm_threads SET a_unread = CASE WHEN user_a = ${me.id} THEN 0 ELSE a_unread END,
                                    b_unread = CASE WHEN user_b = ${me.id} THEN 0 ELSE b_unread END WHERE id = ${thread.id}`;
   }
@@ -198,4 +202,28 @@ export async function pluginDm(request, env) {
   } catch (e) {
     return json({ ok: false, message: e.message });
   }
+}
+
+// Edit your own DM, only while the other person hasn't read it yet.
+export async function editMessage(request, env, ctx, url, params) {
+  const me = await requireUser(request, env);
+  const body = await readJson(request);
+  const sql = getDb(env);
+  const [m] = await sql`
+    SELECT m.id, m.sender_id, m.read_at, t.user_a, t.user_b FROM dm_messages m JOIN dm_threads t ON t.id = m.thread_id WHERE m.id = ${Number(params.id)}`;
+  if (!m) throw new HttpError(404, "That message no longer exists.");
+  if (Number(m.sender_id) !== Number(me.id)) throw new HttpError(403, "You can only edit your own messages.");
+  if (m.read_at) throw new HttpError(409, "They've already read this message, so it can't be edited.");
+  const from = await loadUser(sql, me.id);
+  if (from.muted_until && new Date(from.muted_until) > new Date()) throw new HttpError(403, "You're muted, so you can't edit messages right now.");
+  const text = clean(body.body);
+  if (!text) throw new HttpError(400, "Type a message first.");
+  const words = compileWordList(await sql`SELECT word, match FROM filter_words`);
+  const check = checkMessage(text, words, { allowLinks: Number(from.power) >= 100 });
+  if (!check.ok) throw new HttpError(400, check.message);
+  const [done] = await sql`UPDATE dm_messages SET body = ${check.text}, edited_at = now() WHERE id = ${m.id} AND read_at IS NULL RETURNING id, edited_at`;
+  if (!done) throw new HttpError(409, "They've just read this message, so it can't be edited any more.");
+  const other = Number(m.user_a) === Number(me.id) ? Number(m.user_b) : Number(m.user_a);
+  await notify(env, { type: "dm_edit", id: Number(m.id), body: check.text, editedAt: done.edited_at, from: Number(me.id), to: other });
+  return json({ ok: true, body: check.text, editedAt: done.edited_at });
 }

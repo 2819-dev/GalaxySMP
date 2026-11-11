@@ -1421,3 +1421,16 @@ body.app-mode .notify-banner { bottom: calc(86px + env(safe-area-inset-bottom));
   .site-header:has(.acct-btn) .nav-community, .site-header:has(.acct-signin) .nav-community { display: none; }
   .acct-slot { margin-left: auto; }
 }
+
+/* ---------- Editing messages ---------- */
+.msg-edited { margin-left: 6px; font-size: .7rem; color: var(--text-3); }
+.msg-edit { margin-top: 4px; }
+.msg-edit-input { width: 100%; resize: vertical; min-height: 44px; font: inherit; }
+.msg-edit-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.dm-bubble { position: relative; }
+.dm-edit-btn { position: absolute; top: -10px; left: -10px; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface-2); color: var(--text, #fff); display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity .15s; padding: 0; }
+.dm-edit-btn svg { width: 14px; height: 14px; }
+.dm-msg:hover .dm-edit-btn, .dm-edit-btn:focus-visible { opacity: 1; }
+@media (hover: none) { .dm-edit-btn { opacity: .85; } }
+.dm-edit-wrap { min-width: 220px; }
+.dm-edit { width: 100%; resize: vertical; }

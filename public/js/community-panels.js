@@ -411,11 +411,57 @@ function renderDMs(p) {
         h("span", { class: "text-3 small", text: d.other.inGame ? "Playing on GalaxySMP: they'll see this in game" : "Not in game right now" })),
       blockBtn);
     const meId = ctx.me?.id;
+    const fill = (node, m) => {
+      const text = node.querySelector(".dm-text");
+      text.replaceChildren(renderMarkdown(m.body));
+      node.querySelector(".dm-meta").textContent = `${dmTime(m.at)}${m.via === "game" ? " · from the game" : ""}${m.editedAt ? " · edited" : ""}${m.from === meId ? (m.read ? " · Read" : " · Sent") : ""}`;
+      node.querySelector(".dm-edit-btn")?.remove();
+      if (m.from === meId && !m.read) { // your message they haven't read yet: you can still edit it
+        const b = h("button", { class: "dm-edit-btn", type: "button", "aria-label": "Edit message", title: "Edit (until they read it)" }, iconEl("pencil"));
+        b.addEventListener("click", () => editDm(node, m));
+        node.querySelector(".dm-bubble").append(b);
+      }
+    };
+    const msgs = new Map();
     const add = (m) => {
       const mine = m.from === meId;
-      log.append(h("div", { class: `dm-msg${mine ? " mine" : ""}` },
-        h("div", { class: "dm-bubble" }, h("div", { class: "dm-text msg-text" }, renderMarkdown(m.body)),
-          h("div", { class: "dm-meta", text: `${dmTime(m.at)}${m.via === "game" ? " · from the game" : ""}` }))));
+      const node = h("div", { class: `dm-msg${mine ? " mine" : ""}` },
+        h("div", { class: "dm-bubble" }, h("div", { class: "dm-text msg-text" }), h("div", { class: "dm-meta" })));
+      node.dataset.id = m.id;
+      msgs.set(m.id, { m, node });
+      fill(node, m);
+      log.append(node);
+    };
+    const editDm = (node, m) => {
+      if (node.querySelector(".dm-edit")) return;
+      const box = h("textarea", { class: "input dm-edit", rows: 2, maxlength: 500 });
+      box.value = m.body;
+      const save = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Save" });
+      const cancel = h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Cancel" });
+      const wrap = h("div", { class: "dm-edit-wrap" }, box, h("div", { class: "msg-edit-bar" }, save, cancel));
+      const text = node.querySelector(".dm-text");
+      text.hidden = true;
+      text.after(wrap);
+      const close = () => { wrap.remove(); text.hidden = false; };
+      cancel.addEventListener("click", close);
+      const commit = async () => {
+        const body = box.value.trim();
+        if (!body || body === m.body) return close();
+        save.disabled = true;
+        try {
+          const r = await postJson(`/api/dm/messages/${m.id}/edit`, { body });
+          m.body = r.body;
+          m.editedAt = r.editedAt;
+          close();
+          fill(node, m);
+        } catch (e) { ctx.toast(e.message); save.disabled = false; if (/read/.test(e.message)) { m.read = true; close(); fill(node, m); } }
+      };
+      save.addEventListener("click", commit);
+      box.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey && !e.isComposing && window.matchMedia("(hover: hover)").matches) { e.preventDefault(); commit(); }
+        if (e.key === "Escape") close();
+      });
+      box.focus();
     };
     if (!d.messages.length) log.append(h("p", { class: "text-3 small dm-start", text: `This is the start of your messages with ${d.other.username}. Be kind, and never share passwords or personal information.` }));
     d.messages.forEach(add);
@@ -443,9 +489,18 @@ function renderDMs(p) {
     });
     // live: new messages in this conversation
     main.onDm = (m) => {
-      if (![m.from, m.to].includes(userId) || log.querySelector(`[data-id="${m.id}"]`)) return;
+      if (![m.from, m.to].includes(userId)) return;
+      if (m.type === "dm_read") { // they read your messages: no more editing those
+        for (const id of m.ids || []) { const x = msgs.get(id); if (x && !x.m.read) { x.m.read = true; x.node.querySelector(".dm-edit-wrap")?.remove(); x.node.querySelector(".dm-text").hidden = false; fill(x.node, x.m); } }
+        return;
+      }
+      if (m.type === "dm_edit") {
+        const x = msgs.get(m.id);
+        if (x) { x.m.body = m.body; x.m.editedAt = m.editedAt; fill(x.node, x.m); }
+        return;
+      }
+      if (log.querySelector(`[data-id="${m.id}"]`)) return;
       add(m);
-      log.lastChild.dataset.id = m.id;
       log.querySelector(".dm-start")?.remove();
       log.scrollTop = log.scrollHeight;
       if (m.from === userId) getJson(`/api/dm/with/${userId}`).catch(() => {}); // marks it read
@@ -470,7 +525,7 @@ function renderDMs(p) {
     setTimeout(() => search.focus(), 50);
   }
 
-  const onDm = (m) => { main.onDm?.(m); if (!current || ![m.from, m.to].includes(current)) loadList(); };
+  const onDm = (m) => { main.onDm?.(m); if (m.type === "dm_read" || m.type === "dm_edit") return; if (!current || ![m.from, m.to].includes(current)) loadList(); };
   dmListeners.add(onDm);
   cleanup = () => dmListeners.delete(onDm);
   loadList();

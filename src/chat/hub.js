@@ -100,7 +100,7 @@ export class CommunityHub extends DurableObject {
       for (const ws of this.socketsFor(event.to)) { try { ws.send(text); } catch { /* gone */ } }
       return;
     }
-    if (event.type === "dm") { // a direct message: only its sender and recipient get it
+    if (event.type === "dm" || event.type === "dm_read" || event.type === "dm_edit") { // only the sender and the recipient get these
       const text = JSON.stringify(event);
       for (const id of [event.from, event.to]) for (const ws of this.socketsFor(id)) { try { ws.send(text); } catch { /* gone */ } }
       return;
@@ -143,6 +143,8 @@ export class CommunityHub extends DurableObject {
     try {
       if (msg.type === "send") await this.onSend(ws, user, msg);
       else if (msg.type === "react") await this.onReact(ws, user, msg);
+      else if (msg.type === "seen") await this.onSeen(user, msg);
+      else if (msg.type === "edit") await this.onEdit(ws, user, msg);
     } catch (e) {
       console.error("hub error", e);
       this.send(ws, { type: "error", nonce: msg.nonce, message: "Something went wrong. Please try again." });
@@ -256,6 +258,39 @@ export class CommunityHub extends DurableObject {
         title: `${user.username} in #${ch.name}`, body: text, url: `/community#${ch.slug}`, tag: `chat-${ch.slug}`,
       });
     }
+  }
+
+  // Someone saw these messages on screen: their authors can't edit them any more.
+  async onSeen(user, msg) {
+    const ids = (Array.isArray(msg.ids) ? msg.ids : []).map(Number).filter(Number.isInteger).slice(0, 100);
+    if (!ids.length) return;
+    const sql = getDb(this.env);
+    const rows = await sql`
+      UPDATE messages SET seen_at = now()
+       WHERE id = ANY(${ids}::bigint[]) AND user_id <> ${user.id} AND seen_at IS NULL AND deleted_at IS NULL
+       RETURNING id`;
+    if (rows.length) this.broadcast({ type: "seen", ids: rows.map((r) => Number(r.id)) });
+  }
+
+  // Edit your own message, only while nobody has seen it yet.
+  async onEdit(ws, user, msg) {
+    const reject = (message) => this.send(ws, { type: "rejected", nonce: msg.nonce, message });
+    const id = Number(msg.messageId);
+    if (!Number.isInteger(id)) return reject("Unknown message.");
+    const sql = getDb(this.env);
+    const [m] = await sql`SELECT user_id, seen_at, deleted_at FROM messages WHERE id = ${id}`;
+    if (!m || m.deleted_at) return reject("That message no longer exists.");
+    if (Number(m.user_id) !== Number(user.id)) return reject("You can only edit your own messages.");
+    if (m.seen_at) return reject("Someone has already read this message, so it can't be edited. You can delete it instead.");
+    const check = checkMessage(msg.content, await this.wordList(), { allowLinks: (user.power || 0) >= 100 });
+    if (!check.ok) return reject(check.message);
+    const [u] = await sql`SELECT banned, muted_until FROM users WHERE id = ${user.id}`;
+    if (u?.banned || (u?.muted_until && new Date(u.muted_until) > new Date())) return reject("You can't edit messages right now.");
+    const done = await sql`UPDATE messages SET content = ${check.text}, edited_at = now() WHERE id = ${id} AND seen_at IS NULL RETURNING id`;
+    if (!done.length) return reject("Someone has just read this message, so it can't be edited any more.");
+    const message = await loadMessage(sql, id);
+    this.send(ws, { type: "edited", nonce: msg.nonce, id });
+    this.broadcast({ type: "message_updated", message });
   }
 
   async onReact(ws, user, msg) {

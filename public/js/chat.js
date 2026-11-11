@@ -309,6 +309,81 @@ function renderMessages() {
     box.append(renderMessage(m, prev));
     prev = m;
   }
+  markSeen();
+}
+
+// ---------- Seen (others' messages on screen) and editing your own unseen messages ----------
+// Tells the server which messages from others you've now seen: their authors can no longer edit them.
+let seenTimer = null;
+function markSeen() {
+  clearTimeout(seenTimer);
+  seenTimer = setTimeout(() => {
+    if (document.visibilityState !== "visible" || !state.me || !state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+    state.seenSent = state.seenSent || new Set();
+    const ids = sortedMessages().filter((m) => !m.seen && m.author.id !== state.me.id && !state.seenSent.has(m.id)).map((m) => m.id).slice(-100);
+    if (!ids.length) return;
+    ids.forEach((id) => state.seenSent.add(id));
+    state.ws.send(JSON.stringify({ type: "seen", ids }));
+  }, 600);
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") markSeen(); });
+
+function rerenderMessage(id) {
+  const m = state.messages.get(id);
+  const row = document.querySelector(`.msg[data-id="${id}"]`);
+  if (!m || !row) return;
+  const list = sortedMessages();
+  const i = list.findIndex((x) => x.id === id);
+  const prev = i > 0 && new Date(list[i - 1].createdAt).toDateString() === new Date(m.createdAt).toDateString() ? list[i - 1] : null;
+  row.replaceWith(renderMessage(m, prev));
+}
+
+const canEdit = (m) => state.me && m.author.id === state.me.id && !m.seen && currentChannel()?.canPost;
+
+function startEdit(m) {
+  const row = document.querySelector(`.msg[data-id="${m.id}"]`);
+  const text = row?.querySelector(".msg-text");
+  if (!row || !text || row.querySelector(".msg-edit")) return;
+  const box = el("textarea", "input msg-edit-input");
+  box.value = m.content;
+  box.maxLength = state.maxLength || 500;
+  box.rows = Math.min(8, m.content.split("\n").length + 1);
+  const save = el("button", "btn btn-primary btn-sm", "Save");
+  save.type = "button";
+  const cancel = el("button", "btn btn-ghost btn-sm", "Cancel");
+  cancel.type = "button";
+  const hint = el("span", "text-3 small", "Enter to save · Esc to cancel");
+  const wrap = el("div", "msg-edit");
+  const bar = el("div", "msg-edit-bar");
+  bar.append(save, cancel, hint);
+  wrap.append(box, bar);
+  text.hidden = true;
+  text.after(wrap);
+  const close = () => { wrap.remove(); text.hidden = false; };
+  const commit = () => {
+    const content = box.value.trim();
+    if (!content) return;
+    if (content === m.content) return close();
+    send({ type: "edit", messageId: m.id, content, nonce: "edit-" + m.id });
+    save.disabled = true;
+    state.editing = { id: m.id, close };
+  };
+  save.addEventListener("click", commit);
+  cancel.addEventListener("click", close);
+  box.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !matchMedia("(pointer: coarse)").matches) { e.preventDefault(); commit(); }
+    if (e.key === "Escape") { e.preventDefault(); close(); $("composer-input").focus(); }
+  });
+  box.focus();
+  box.setSelectionRange(box.value.length, box.value.length);
+}
+
+// Up arrow in an empty message box: edit your last message (if nobody has seen it yet), like Discord.
+function editLastMessage() {
+  const mine = sortedMessages().filter((m) => m.author.id === state.me?.id);
+  const last = mine[mine.length - 1];
+  if (last && canEdit(last)) { startEdit(last); return true; }
+  return false;
 }
 
 // Discord-style formatting and @mentions (markdown.js); mentions open the member's profile.
@@ -389,6 +464,11 @@ function renderMessage(m, prev) {
   head.append(t);
   const text = el("div", "msg-text");
   text.append(renderMarkdown(m.content, mdContext()));
+  if (m.editedAt) {
+    const ed = el("span", "msg-edited", "(edited)");
+    ed.title = `Edited ${new Date(m.editedAt).toLocaleString()}`;
+    text.append(ed);
+  }
   body.append(head, text);
   body.append(renderReactions(m));
   row.append(body);
@@ -396,6 +476,7 @@ function renderMessage(m, prev) {
   const actions = el("div", "msg-actions");
   if (currentChannel()?.canPost) actions.append(actionBtn("reply", "Reply", () => startReply(m)));
   actions.append(actionBtn("smile", "Add reaction", (e) => openPicker(row, m, e)));
+  if (canEdit(m)) actions.append(actionBtn("pencil", "Edit (until someone reads it)", () => startEdit(m)));
   for (const extra of messageActionHooks) extra(m, actions, actionBtn);
   row.append(actions);
 
@@ -497,6 +578,7 @@ function addMessage(m) {
   }
   if (stick) $("messages").scrollTop = $("messages").scrollHeight;
   else $("jump-latest").hidden = false;
+  markSeen();
 }
 
 export function removeMessage(id) {
@@ -714,6 +796,12 @@ function handleEvent(data) {
       break;
     case "rejected":
     case "error": {
+      if (String(data.nonce || "").startsWith("edit-")) { // a message edit didn't go through
+        state.editing?.close();
+        state.editing = null;
+        note(`Not edited: ${data.message}`);
+        break;
+      }
       const text = state.pending.get(data.nonce);
       state.pending.delete(data.nonce);
       const input = $("composer-input");
@@ -730,8 +818,33 @@ function handleEvent(data) {
     case "message_deleted":
       removeMessage(data.messageId);
       break;
+    case "seen":
+      for (const id of data.ids || []) {
+        const m = state.messages.get(id);
+        if (!m || m.seen) continue;
+        m.seen = true;
+        if (m.author.id === state.me?.id) {
+          if (state.editing?.id === id) { state.editing.close(); state.editing = null; note("Someone just read your message, so it can't be edited any more."); }
+          rerenderMessage(id); // the Edit button goes away
+        }
+      }
+      break;
+    case "message_updated":
+      if (state.messages.has(data.message.id)) {
+        state.messages.set(data.message.id, data.message);
+        if (state.editing?.id === data.message.id) state.editing = null;
+        rerenderMessage(data.message.id);
+      }
+      break;
+    case "edited":
+      state.editing = null;
+      break;
     case "voice_invite":
       toast(`${data.from} invited you to the voice group "${data.group}". Open Voice Chat to join.`);
+      break;
+    case "dm_read":
+    case "dm_edit":
+      dmEvent(data);
       break;
     case "dm": {
       dmEvent(data);
@@ -790,6 +903,10 @@ function wireUi() {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !matchMedia("(pointer: coarse)").matches) {
       e.preventDefault();
       submit();
+    }
+    if (e.key === "ArrowUp" && !input.value && editLastMessage()) {
+      e.preventDefault();
+      return;
     }
     if (e.key === "Escape" && state.replyTo) {
       state.replyTo = null;

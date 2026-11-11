@@ -111,6 +111,7 @@ const routes = [
   ["GET", "/api/dm/with/:userId", dms.getConversation],
   ["POST", "/api/dm/with/:userId", dms.postMessage],
   ["POST", "/api/dm/block/:userId", dms.setBlock],
+  ["POST", "/api/dm/messages/:id/edit", dms.editMessage],
   ["GET", "/api/mod/dms", dms.ownerThreads],
   ["GET", "/api/mod/dms/:id", dms.ownerThread],
   ["POST", "/api/plugin/dm", (req, env) => dms.pluginDm(req, env)],

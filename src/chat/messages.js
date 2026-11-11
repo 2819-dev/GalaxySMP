@@ -18,6 +18,8 @@ export function formatMessage(r) {
     channelId: Number(r.channel_id),
     content: r.content,
     createdAt: r.created_at,
+    seen: Boolean(r.seen_at),          // another member has seen it (it can't be edited after that)
+    editedAt: r.edited_at || null,
     author: { id: Number(r.author_id), username: r.username, role: r.role_key, color: r.color, rank: rankOf(r) },
     replyTo: r.reply_to
       ? {
@@ -31,7 +33,7 @@ export function formatMessage(r) {
 }
 
 const SELECT = `
-  SELECT m.id, m.channel_id, m.content, m.created_at, m.reply_to,
+  SELECT m.id, m.channel_id, m.content, m.created_at, m.reply_to, m.seen_at, m.edited_at,
          u.id AS author_id, u.username, r.key AS role_key, r.color,
          rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient, rk.position AS rank_position,
          p.content AS reply_content, pu.username AS reply_username,
