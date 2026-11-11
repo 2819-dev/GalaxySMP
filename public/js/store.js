@@ -11,7 +11,7 @@ let data = null;   // /api/store/plans
 let me = { signedIn: false, owned: {}, promos: [] }; // /api/store/mine
 
 // ---------- What can be bought ----------
-const itemOnSale = (cat) => data.checkoutEnabled && (data.onSale || []).includes(cat.id);
+const itemOnSale = (cat) => (data.onSale || []).includes(cat.id);
 const ownedCount = (id) => me.owned?.[id] || 0;
 const promoFits = (p, tags) => !p.targets?.length || p.targets.some((t) => tags.includes(t));
 const priceAfter = (p, price) => {
@@ -39,8 +39,11 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
   const codeInput = h("input", { class: "input", id: "co-code", placeholder: "Promo code", maxlength: 32, autocomplete: "off", autocapitalize: "characters" });
   const applyBtn = h("button", { class: "btn btn-secondary", type: "button", text: "Apply" });
   const codeRow = h("div", { class: "co-code-row" }, codeInput, applyBtn);
-  const payBtn = h("button", { class: "btn btn-primary co-pay", type: "button" });
+  const payBtn = h("button", { class: "btn btn-primary co-pay", type: "button" });     // credits (or free)
+  const cardBtn = h("button", { class: "btn btn-secondary co-pay", type: "button" }); // card
+  const creditNote = h("p", { class: "co-credit-note text-3 small" });
   const err = h("p", { class: "form-error", role: "alert" });
+  const have = Number(me.credits || 0);
 
   const draw = () => {
     const final = applied ? applied.final : price;
@@ -55,7 +58,22 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
       remove.addEventListener("click", () => { applied = null; draw(); });
       appliedRow.replaceChildren(iconEl("tag"), h("span", { class: "co-applied-text" }, h("b", { text: applied.code }), ` · ${applied.label}`), remove);
     }
-    payBtn.textContent = final === 0 ? "Get it free" : `Pay ${usd(final)}${isPlan ? " a month" : ""}`;
+    const enough = have >= final;
+    if (final === 0) {
+      payBtn.textContent = "Get it free";
+      payBtn.disabled = false;
+      cardBtn.hidden = true;
+      creditNote.textContent = "";
+    } else {
+      payBtn.textContent = enough ? `Pay ${usd(final)} with credits` : "Top up credits";
+      payBtn.disabled = false;
+      payBtn.dataset.topup = enough ? "" : "1";
+      cardBtn.hidden = !me.cards;
+      cardBtn.textContent = `Pay ${usd(Math.max(0.5, final))} with card`;
+      cardBtn.className = "btn btn-secondary co-pay";
+      creditNote.replaceChildren(`You have ${usd(have)} of credits. `,
+        enough ? `${usd(have - final)} left after this.` : "Top up once and buy in one tap next time.");
+    }
   };
 
   async function apply(code) {
@@ -74,17 +92,16 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
   applyBtn.addEventListener("click", () => apply(codeInput.value));
   codeInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); apply(codeInput.value); } });
 
-  payBtn.addEventListener("click", async () => {
+  const pay = async (method, btn) => {
     err.textContent = "";
-    payBtn.disabled = true;
+    btn.disabled = true;
     try {
-      const r = await postJson("/api/store/checkout", { item: id, option: option(), code: applied?.code || "" });
-      if (r.url) { location.href = r.url; return; }
-      if (r.free) {
+      const r = await postJson("/api/store/checkout", { item: id, option: option(), code: applied?.code || "", method });
+      if (r.url) { location.href = r.url; return; } // Stripe's secure card page
+      if (r.done) {
         dlg.close();
-        me.owned[id] = (me.owned[id] || 0) + 1;
-        me.promos = me.promos.filter((p) => p.code !== applied?.code || p.kindRaw === "percent");
-        refreshMine().then(renderAll);
+        await refreshMine();
+        renderAll();
         celebrate(name, r.message);
         return;
       }
@@ -92,9 +109,15 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
     } catch (e) {
       err.textContent = e.message;
     } finally {
-      payBtn.disabled = false;
+      btn.disabled = false;
+      draw();
     }
+  };
+  payBtn.addEventListener("click", () => {
+    if (payBtn.dataset.topup) { dlg.close(); document.getElementById("credits").scrollIntoView({ behavior: "smooth" }); return; }
+    pay("credits", payBtn);
   });
+  cardBtn.addEventListener("click", () => pay("card", cardBtn));
 
   // "You have a promo code!" pop-up for promos made just for this member
   const offer = mine[0] ? h("div", { class: "co-offer", role: "status" },
@@ -116,7 +139,8 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
     codeRow, appliedRow,
     h("div", { class: "co-total" }, h("span", { class: "text-2", text: "Total" }), h("span", {}, was, " ", total)),
     err,
-    payBtn,
+    h("div", { class: "co-pay-row" }, payBtn, cardBtn),
+    creditNote,
     h("p", { class: "co-fine text-3 small" }, iconEl("lock2"), "Card payments are handled securely by Stripe. We never see your card. Under 18? Ask a parent or guardian first."));
   const { dialog: dlg } = openDialog({ title: "Checkout", body, actions: [] });
   dlg.classList.add("co-dialog");
@@ -244,16 +268,23 @@ function renderShop() {
   }
 }
 
-// ---------- Member strip (signed in, promo codes) ----------
+// ---------- Member strip: balance, promo codes ----------
 function renderStrip() {
   const strip = document.getElementById("store-me");
   if (!me.signedIn) {
-    strip.replaceChildren(h("span", { class: "text-2", text: "Sign in to buy things and use promo codes." }), h("a", { class: "btn btn-secondary btn-sm", href: "/community", text: "Sign in" }));
+    strip.replaceChildren(h("span", { class: "text-2", text: "Sign in to buy things, top up credits and use promo codes." }), h("a", { class: "btn btn-secondary btn-sm", href: "/community", text: "Sign in" }));
     strip.hidden = false;
     return;
   }
-  const bits = [h("span", { class: "text-2" }, "Signed in as ", h("b", { text: me.username }))];
-  if (!me.linked) bits.push(h("span", { class: "text-3 small", text: "· Link your Minecraft account with /link in game to buy." }));
+  const bal = h("div", { class: "store-balance" },
+    h("span", { class: "store-balance-icon" }, iconEl("coins")),
+    h("div", {}, h("span", { class: "text-3 small", text: "Galaxy Credits" }), h("b", { class: "store-balance-amount", text: usd(me.credits || 0) })));
+  const top = h("a", { class: "btn btn-primary btn-sm", href: "#credits", text: "Top up" });
+  const giftBtn = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Gift credits" });
+  giftBtn.addEventListener("click", giftDialog);
+  const row = h("div", { class: "store-me-row" }, bal, h("div", { class: "store-me-actions" }, top, giftBtn));
+  const bits = [row];
+  if (!me.linked) bits.push(h("p", { class: "text-3 small", style: "margin:0", text: "Link your Minecraft account with /link in game so we know who to give things to." }));
   if (me.promos?.length) {
     bits.push(h("span", { class: "store-promo-pill" }, iconEl("gift"), me.promos.length === 1 ? `You have a promo code: ${me.promos[0].code} (${me.promos[0].label})` : `You have ${me.promos.length} promo codes`));
   }
@@ -261,8 +292,57 @@ function renderStrip() {
   strip.hidden = false;
 }
 
+// ---------- Credits: top-up packs ----------
+function renderCredits() {
+  const box = document.getElementById("credit-packs");
+  box.replaceChildren(...(me.packs || []).map((p) => {
+    const card = h("article", { class: `panel credit-pack${p.badge ? " best" : ""}` });
+    if (p.badge) card.append(h("span", { class: "shop-badge", text: p.badge }));
+    card.append(
+      h("div", { class: "credit-amount", text: usd(p.credit) }),
+      h("p", { class: "credit-sub text-2 small", text: p.bonus ? `${usd(p.price)} + ${usd(p.bonus)} bonus` : "Galaxy Credits" }));
+    const btn = h("button", { class: "btn btn-primary btn-sm", type: "button", text: `Buy for ${usd(p.price)}` });
+    btn.addEventListener("click", async () => {
+      if (!me.signedIn) { location.href = "/community"; return; }
+      btn.disabled = true;
+      try {
+        const r = await postJson("/api/store/topup", { pack: p.id });
+        if (r.url) { location.href = r.url; return; }
+        toast(r.message || "Card payments open soon.");
+      } catch (e) {
+        toast(e.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    card.append(btn);
+    return card;
+  }));
+}
+
+function giftDialog() {
+  const to = h("input", { class: "input", id: "gift-to", placeholder: "Their website name", autocomplete: "off", maxlength: 32 });
+  const amount = h("input", { class: "input", id: "gift-amount", type: "number", min: 1, step: "0.01", value: "1.00", inputmode: "decimal" });
+  openDialog({
+    title: "Gift credits",
+    body: h("div", {},
+      h("p", { class: "text-2", style: "margin-top:0", text: `You have ${usd(me.credits || 0)} of credits. Gifts can't be undone, so check the name. Up to $50 a day.` }),
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "gift-to", text: "Send to" }), to),
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "gift-amount", text: "Amount ($)" }), amount)),
+    actions: [{ label: "Cancel" }, {
+      label: "Send gift", kind: "primary", onClick: async () => {
+        const r = await postJson("/api/store/gift", { to: to.value, amount: amount.value });
+        toast(r.message);
+        await refreshMine();
+        renderStrip();
+      },
+    }],
+  });
+}
+
 function renderAll() {
   renderStrip();
+  renderCredits();
   renderPlans();
   renderFilters();
   renderShop();
@@ -276,7 +356,7 @@ async function refreshMine() {
 function watchTabs() {
   const tabs = [...document.querySelectorAll("[data-store-tab]")];
   const set = (id) => tabs.forEach((t) => t.classList.toggle("active", t.dataset.storeTab === id));
-  set(location.hash === "#shop" ? "shop" : "subscriptions");
+  set(["#shop", "#credits"].includes(location.hash) ? location.hash.slice(1) : "subscriptions");
   const io = new IntersectionObserver((entries) => {
     for (const e of entries) if (e.isIntersecting) set(e.target.id);
   }, { rootMargin: "-45% 0px -50% 0px" });
@@ -291,9 +371,20 @@ function watchTabs() {
     return;
   }
   renderAll();
-  document.querySelectorAll("[data-store-tab]").forEach((t) => t.prepend(iconEl(t.dataset.storeTab === "shop" ? "cart" : "star")));
+  document.querySelectorAll("[data-store-tab]").forEach((t) => t.prepend(iconEl({ shop: "cart", credits: "coins" }[t.dataset.storeTab] || "star")));
   watchTabs();
-  if (location.hash === "#shop") document.getElementById("shop").scrollIntoView();
+  if (["#shop", "#credits"].includes(location.hash)) document.querySelector(location.hash).scrollIntoView();
   const params = new URLSearchParams(location.search);
-  if (params.get("paid")) { toast("Thanks for your purchase! It's on its way to you in game."); history.replaceState(null, "", "/store"); }
+  const paid = params.get("paid");
+  if (paid) {
+    history.replaceState(null, "", "/store");
+    // Stripe tells us about the payment a moment later: check the balance again shortly
+    setTimeout(async () => { await refreshMine(); renderAll(); }, 3000);
+    openDialog({
+      title: "Thank you!",
+      body: h("div", { class: "co-done" }, h("div", { class: "co-done-icon" }, iconEl("check")),
+        h("p", { class: "text-2", text: paid === "credits" ? "Your credits are on their way. They show up in a few seconds." : "Your payment went through. Your item is on its way to you in game." })),
+      actions: [{ label: "Nice!", kind: "primary" }],
+    });
+  }
 })();

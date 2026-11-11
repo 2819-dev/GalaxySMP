@@ -1,5 +1,6 @@
 // Account settings (the profile menu in the top right > Account): profile, subscription, purchases,
 // password, signed-in devices and blocked members. Notification settings live in notify.js.
+import { balance as creditBalance, history as creditHistory } from "../store/credits.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser, readCookie, getUser } from "../lib/auth.js";
@@ -54,6 +55,7 @@ export async function getAccount(request, env) {
     sql`SELECT count(*)::int AS n FROM sessions WHERE user_id = ${user.id} AND expires_at > now()`,
     sql`SELECT b.blocked_id, x.username FROM dm_blocks b JOIN users x ON x.id = b.blocked_id WHERE b.user_id = ${user.id} ORDER BY x.username`,
   ]);
+  const credits = { balance: await creditBalance(sql, user.id) / 100, history: await creditHistory(sql, user.id, 30) };
   const plan = u.plan ? PLANS[u.plan] : PLANS.free;
   return json({
     ok: true,
@@ -76,6 +78,7 @@ export async function getAccount(request, env) {
       option: o.option ? SHOP_ITEMS[o.item]?.options?.find((x) => x.id === o.option)?.name || o.option : null,
       price: o.price_cents / 100, source: o.source, at: o.created_at,
     })),
+    credits,
     sessions: sessions[0].n,
     blocked: blocked.map((b) => ({ id: Number(b.blocked_id), username: b.username })),
   });

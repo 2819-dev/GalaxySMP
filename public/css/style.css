@@ -1526,3 +1526,41 @@ textarea.input.dm-input { resize: none; min-height: 44px; max-height: 140px; ove
 .promo-chip { background: rgba(36,87,235,.22); border-color: transparent; }
 .promo-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 560px) { .promo-row { flex-direction: column; align-items: stretch; } .promo-actions { justify-content: flex-end; } }
+
+/* Galaxy Credits */
+.store-me { flex-direction: column; align-items: stretch; }
+.store-me-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.store-me-actions { display: flex; gap: 8px; }
+.store-me .store-me-actions .btn { margin-left: 0; }
+.store-balance { display: flex; align-items: center; gap: 10px; }
+.store-balance > div { display: flex; flex-direction: column; line-height: 1.15; }
+.store-balance-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: linear-gradient(135deg, rgba(255,209,102,.3), rgba(240,138,36,.22)); color: #ffd27a; }
+.store-balance-icon svg { width: 22px; height: 22px; }
+.store-balance-amount { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.credit-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.credit-pack { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 18px; }
+.credit-pack .btn { margin-top: 10px; width: 100%; justify-content: center; }
+.credit-pack.best { border-color: rgba(255,209,102,.55); box-shadow: 0 10px 34px rgba(255,190,80,.12); }
+.credit-amount { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
+.credit-sub { margin: 0; }
+@media (max-width: 760px) { .credit-grid { grid-template-columns: 1fr 1fr; } }
+.co-pay-row { display: flex; flex-direction: column; gap: 8px; }
+.co-pay-row .btn:disabled { opacity: .55; }
+.co-credit-note { margin: -4px 0 0; text-align: center; }
+
+.acc-credits { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.acc-credits > div { display: flex; flex-direction: column; }
+.acc-credits-amount { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.acc-plus { color: #7cf0b0; font-weight: 700; }
+
+/* Control Panel > Payments */
+.pay-status { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: rgba(255,190,80,.12); margin-bottom: 14px; }
+.pay-status.ok { background: rgba(52,199,123,.12); }
+.pay-status svg { width: 20px; height: 20px; flex: none; }
+.pay-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.pay-tile { display: flex; flex-direction: column; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.pay-tile b { font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.pay-h3 { font-size: 1rem; margin: 18px 0 8px; }
+.pay-amount { font-variant-numeric: tabular-nums; }
+.promo-status.bad { background: rgba(255,107,107,.16); color: #ff9b9b; }
+@media (max-width: 640px) { .pay-tiles { grid-template-columns: 1fr 1fr; } }

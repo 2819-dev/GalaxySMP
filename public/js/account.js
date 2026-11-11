@@ -110,13 +110,21 @@ const SECTIONS = {
     const list = data.orders.length
       ? h("div", { class: "acc-table" }, data.orders.map((o) => h("div", { class: "acc-order" },
         h("div", {}, h("b", { text: o.item }), o.option ? h("span", { class: "text-3 small", text: ` · ${o.option}` }) : null),
-        h("span", { class: "text-3 small", text: o.source === "payment" ? usd(o.price) : o.source === "promo" ? "Free with a promo code" : "Gift from staff" }),
+        h("span", { class: "text-3 small", text: o.source === "payment" ? `${usd(o.price)} by card` : o.source === "credits" ? `${usd(o.price)} in credits` : o.source === "promo" ? "Free with a promo code" : "Gift from staff" }),
         h("time", { class: "text-3 small", text: fmtDate(o.at) }))))
       : h("p", { class: "text-3", style: "margin:0", text: "No purchases yet." });
     return [
-      card("Payments", null,
-        h("div", { class: "acc-notice" }, iconEl("card"),
-          h("p", { style: "margin:0", text: "Online payments are opening soon. When they do, you'll manage payment methods, receipts and your subscription billing here. Until then, staff can give plans and items for events and giveaways." }))),
+      card("Galaxy Credits", "Your Store balance. Top up once, then buy things in one tap.",
+        h("div", { class: "acc-credits" },
+          h("div", {}, h("span", { class: "text-3 small", text: "Balance" }), h("b", { class: "acc-credits-amount", text: usd(data.credits?.balance || 0) })),
+          h("a", { class: "btn btn-primary btn-sm", href: "/store#credits", text: "Top up" })),
+        data.credits?.history?.length
+          ? h("div", { class: "acc-table", style: "margin-top:12px" }, data.credits.history.map((c) => h("div", { class: "acc-order" },
+            h("div", {}, h("b", { text: ({ topup: "Top-up", purchase: "Bought", gift_in: "Gift received", gift_out: "Gift sent", refund: "Refund", staff: "From staff" })[c.reason] || c.reason }), c.detail ? h("span", { class: "text-3 small", text: ` · ${c.detail}` }) : null),
+            h("span", { class: `small ${c.amount >= 0 ? "acc-plus" : "text-3"}`, text: `${c.amount >= 0 ? "+" : "-"}${usd(Math.abs(c.amount))}` }),
+            h("time", { class: "text-3 small", text: fmtDate(c.at) }))))
+          : h("p", { class: "text-3", style: "margin:12px 0 0", text: "No credit activity yet." }),
+        h("p", { class: "text-3 small", style: "margin:12px 0 0", text: "Card payments are handled by Stripe on its own secure page; we never see your card. Need a refund? Open a support ticket." })),
       card("Purchase history", "Everything you've bought or been given from the Store.", list),
     ];
   },

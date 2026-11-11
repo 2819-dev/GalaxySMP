@@ -4,6 +4,7 @@ import { toast, iconEl } from "/js/site.js";
 import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, voiceMuteDialog, select, field } from "/js/dialog.js";
 import { setupPanel } from "/js/staff-panel.js";
 import { setupPromos } from "/js/promos-panel.js";
+import { setupPayments } from "/js/payments-panel.js";
 import { MC_COLORS, hexOf, GRADIENTS, paint, gradientCss, rankTag } from "/js/rank-paint.js";
 
 const $ = (id) => document.getElementById(id);
@@ -309,6 +310,8 @@ const DESCRIBE = {
   "promo.pause": (e) => [`paused promo code ${e.details.code}`],
   "promo.resume": (e) => [`turned on promo code ${e.details.code}`],
   "promo.delete": (e) => [`deleted promo code ${e.details.code}`],
+  "credits.gift": (e) => [`gifted $${(e.details.cents / 100).toFixed(2)} of credits to ${e.details.to}`],
+  "payment.refunded": (e) => [`a $${(e.details.cents / 100).toFixed(2)} payment was refunded (${e.details.item})`],
   "economy.shop": (e) => [`changed the shop prices (${e.details.categories} categories, ${e.details.items} items)`],
   "economy.shop_reset": () => ["reset the shop to the built-in prices"],
   "help.save": () => ["edited the in-game Help menu"],
@@ -817,8 +820,12 @@ $("help-reset").addEventListener("click", () => openDialog({
   setBadge("tickets", summary.openTickets);
   setupPanel({ loaders, power, owner: Boolean(summary.owner), selectTab, toast, setBadge });
   if (power >= 100) setupPromos({ loaders, toast });
+  if (summary.owner) {
+    setupPayments({ loaders });
+    document.querySelector('[data-tab="payments"]').hidden = false;
+  }
   let start = location.hash.slice(1).split("/")[0];
   if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"], [data-tab="promos"], [data-tab="help"]').forEach((t) => (t.hidden = false));
   if (start === "members") { start = "players"; history.replaceState(null, "", "#players"); } // old link: Members is one tab now
-  selectTab(["overview", "tickets", "players", "reports", "words", "audit", ...(summary.owner ? ["dms"] : []), ...(power >= 100 ? ["ranks", "economy", "promos", "help"] : [])].includes(start) ? start : "overview");
+  selectTab(["overview", "tickets", "players", "reports", "words", "audit", ...(summary.owner ? ["dms", "payments"] : []), ...(power >= 100 ? ["ranks", "economy", "promos", "help"] : [])].includes(start) ? start : "overview");
 })();

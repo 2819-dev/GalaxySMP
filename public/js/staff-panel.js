@@ -282,7 +282,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
         `extra plots: ${p.extraPlots || 0}`, `extra shop plots: ${d.shop.extraShopPlots}`,
         d.shop.nightVisionUntil ? `Night Vision until ${fmt(d.shop.nightVisionUntil)}` : null].filter(Boolean).join(" · ") }),
       d.shop.orders.length ? h("div", { class: "pc-list", style: "margin-top:6px" }, d.shop.orders.slice(0, 8).map((o) => h("div", { class: "pc-li" },
-        h("b", { text: o.item }), h("span", { text: `${o.option ? `(${o.option}) ` : ""}${o.source === "payment" ? "bought" : o.source === "promo" ? `free with ${String(o.by).replace(/^promo /, "code ")}` : `given by ${o.by}`}` }), h("time", { class: "text-3 small", text: fmt(o.at) })))) : null,
+        h("b", { text: o.item }), h("span", { text: `${o.option ? `(${o.option}) ` : ""}${o.source === "payment" ? "bought by card" : o.source === "credits" ? "bought with credits" : o.source === "promo" ? `free with ${String(o.by).replace(/^promo /, "code ")}` : `given by ${o.by}`}` }), h("time", { class: "text-3 small", text: fmt(o.at) })))) : null,
 
       h("h4", { text: "Website and voice chat" }),
       acc ? h("div", {},
