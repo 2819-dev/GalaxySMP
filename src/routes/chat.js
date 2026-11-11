@@ -41,6 +41,9 @@ export async function bootstrap(request, env) {
   const planPriority = await loadPlanPriority(sql);
   // staff replies to your support tickets you haven't read yet (shows a dot on the Support channel)
   const [{ ticket_unread: ticketUnread }] = await sql`SELECT coalesce(sum(user_unread), 0)::int AS ticket_unread FROM tickets WHERE user_id = ${user.id}`;
+  const [{ dm_unread: dmUnread }] = await sql`
+    SELECT coalesce(sum(CASE WHEN user_a = ${user.id} THEN a_unread ELSE b_unread END), 0)::int AS dm_unread
+      FROM dm_threads WHERE user_a = ${user.id} OR user_b = ${user.id}`;
   const me = publicUser(user);
   return json({
     ok: true,
@@ -65,6 +68,7 @@ export async function bootstrap(request, env) {
     reactions: REACTIONS,
     maxLength: MAX_LENGTH,
     ticketUnread,
+    dmUnread,
   });
 }
 

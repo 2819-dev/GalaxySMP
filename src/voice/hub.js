@@ -18,6 +18,7 @@ import { loadRanksState, recordPlayers } from "../routes/ranks.js";
 import { loadShop, recordBalances } from "../routes/economy.js";
 import { loadHelp } from "../routes/help.js";
 import { planMessage } from "../routes/plans.js";
+import { hubStub } from "../routes/chat.js";
 
 export const RANGE = 48; // blocks
 const PULL_RANGE = RANGE * 1.3; // a little slack so walking to the edge doesn't cut out
@@ -83,7 +84,10 @@ export class VoiceHub extends DurableObject {
   }
 
   publicGroups() {
-    return Object.values(this.groups).map((g) => ({ id: g.id, name: g.name, locked: Boolean(g.passwordHash) }));
+    return Object.values(this.groups).map((g) => ({
+      id: g.id, name: g.name, locked: Boolean(g.passwordHash), saved: Boolean(g.saved), owner: g.createdBy,
+      members: (g.members || []).map((m) => ({ id: m.id, username: m.username })),
+    }));
   }
 
   rosterEntry(a) {
@@ -151,7 +155,7 @@ export class VoiceHub extends DurableObject {
     const used = new Set([...this.members().values()].map(({ a }) => a.groupId).filter(Boolean));
     let changed = false;
     for (const id of Object.keys(this.groups)) {
-      if (!used.has(id)) { delete this.groups[id]; changed = true; }
+      if (!used.has(id) && !this.groups[id].saved) { delete this.groups[id]; changed = true; } // saved groups stay
     }
     if (changed) await this.saveGroups();
   }
@@ -462,11 +466,66 @@ export class VoiceHub extends DurableObject {
         const g = this.groups[String(msg.id)];
         if (!g) throw new Error("That group no longer exists.");
         const staff = (a.power || 0) >= 50;
-        if (g.passwordHash && !staff && (await sha256(`${g.id}:${String(msg.password || "")}`)) !== g.passwordHash) {
+        const invited = g.createdBy === a.id || (g.members || []).some((m) => m.id === a.id); // invited players skip the password
+        if (g.passwordHash && !staff && !invited && (await sha256(`${g.id}:${String(msg.password || "")}`)) !== g.passwordHash) {
           throw new Error("Wrong group password.");
         }
         this.update(ws, { groupId: g.id });
         await this.cleanupGroups();
+        this.sendRoster();
+        return reply({ ok: true });
+      }
+      case "group.invite": {
+        // The group's creator invites a member by name: the group is saved so they can join any time.
+        const g = this.groups[String(msg.id)];
+        if (!g) throw new Error("That group no longer exists.");
+        if (g.createdBy !== a.id && (a.power || 0) < 100) throw new Error("Only the person who made this group can invite players.");
+        const name = String(msg.name || "").trim().toLowerCase().slice(0, 32);
+        if (!name) throw new Error("Type the player's name.");
+        const sql = getDb(this.env);
+        const [u] = await sql`
+          SELECT u.id, u.username, p.xuid FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid
+           WHERE NOT u.banned AND (lower(u.username) = ${name} OR lower(p.gamertag) = ${name})
+           UNION ALL
+          SELECT u.id, u.username, p.xuid FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid
+           WHERE NOT u.banned AND lower(u.username) LIKE ${name.replace(/[\\%_]/g, (c) => "\\" + c) + "%"}
+           LIMIT 1`;
+        if (!u) throw new Error(`No community member called ${msg.name}. They need a galaxymc.us account (/link in game).`);
+        if (Number(u.id) === a.id) throw new Error("You're already in your own group.");
+        g.members = g.members || [];
+        if (g.members.length >= 20) throw new Error("A group can have up to 20 invited players.");
+        const savedMine = Object.values(this.groups).filter((x) => x.saved && x.createdBy === a.id && x.id !== g.id);
+        if (!g.saved && savedMine.length >= 3) throw new Error("You can keep up to 3 saved groups. Delete one first.");
+        if (!g.members.some((m) => m.id === Number(u.id))) g.members.push({ id: Number(u.id), username: u.username });
+        g.saved = true;
+        await this.saveGroups();
+        // tell them: on the website (community/voice pages) and in game
+        const note = { type: "voice_invite", to: Number(u.id), from: a.username, groupId: g.id, group: g.name };
+        try { await hubStub(this.env).fetch("https://hub/internal/broadcast", { method: "POST", body: JSON.stringify(note) }); } catch { /* best effort */ }
+        for (const ws of this.voiceSockets()) {
+          if (ws.deserializeAttachment()?.id === Number(u.id)) this.send(ws, note);
+        }
+        const plugin = this.pluginSocket();
+        if (plugin && u.xuid) this.send(plugin, { type: "voice_invite", toXuid: String(u.xuid), from: a.username, group: g.name });
+        this.sendRoster();
+        return reply({ ok: true, invited: u.username });
+      }
+      case "group.uninvite": {
+        const g = this.groups[String(msg.id)];
+        if (!g) throw new Error("That group no longer exists.");
+        if (g.createdBy !== a.id && (a.power || 0) < 100) throw new Error("Only the person who made this group can change it.");
+        g.members = (g.members || []).filter((m) => m.id !== Number(msg.userId));
+        await this.saveGroups();
+        this.sendRoster();
+        return reply({ ok: true });
+      }
+      case "group.delete": {
+        const g = this.groups[String(msg.id)];
+        if (!g) throw new Error("That group no longer exists.");
+        if (g.createdBy !== a.id && (a.power || 0) < 100) throw new Error("Only the person who made this group can delete it.");
+        for (const { ws, a: other } of this.members().values()) if (other.groupId === g.id) this.update(ws, { groupId: null });
+        delete this.groups[g.id];
+        await this.saveGroups();
         this.sendRoster();
         return reply({ ok: true });
       }

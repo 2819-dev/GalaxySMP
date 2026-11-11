@@ -35,7 +35,7 @@ export function showPanel(channel, context) {
   voiceBox().hidden = true;
   p.hidden = false;
   p.scrollTop = 0;
-  const render = { info: renderInfo, events: renderEvents, auction: renderAuction, suggestions: renderSuggestions, support: renderSupport }[channel.kind];
+  const render = { info: renderInfo, events: renderEvents, auction: renderAuction, suggestions: renderSuggestions, support: renderSupport, dms: renderDMs }[channel.kind];
   if (render) render(p);
 }
 
@@ -338,4 +338,141 @@ function renderSupport(p, openId) {
   }
   cleanup = onTicketEvent((d) => { if (Number(d.ownerId) === Number(ctx.me?.id)) load(); });
   load();
+}
+
+// ---------- Direct messages ----------
+const dmListeners = new Set();
+export function dmEvent(data) {
+  for (const fn of dmListeners) fn(data);
+}
+const dmTime = (at) => {
+  const d = new Date(at);
+  const today = new Date().toDateString() === d.toDateString();
+  return today ? d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : d.toLocaleDateString([], { month: "short", day: "numeric" });
+};
+function dmFace(src, name) {
+  const img = h("img", { class: "dm-face", alt: "", width: 36, height: 36, loading: "lazy" });
+  img.src = src || "/img/icon-192.png";
+  img.addEventListener("error", () => { img.src = "/img/icon-192.png"; }, { once: true });
+  img.title = name || "";
+  return img;
+}
+
+function renderDMs(p) {
+  const wrap = h("div", { class: "dm-wrap" });
+  const side = h("div", { class: "dm-side" });
+  const main = h("div", { class: "dm-main" });
+  wrap.append(side, main);
+  p.replaceChildren(wrap);
+  let current = ctx.dmWith || null;
+  let threads = [];
+
+  const newBtn = h("button", { class: "btn btn-primary btn-sm", type: "button", onclick: pickMember }, "New message");
+  async function loadList() {
+    let d;
+    try { d = await getJson("/api/dm/threads"); } catch (e) { side.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
+    threads = d.threads;
+    side.replaceChildren(h("div", { class: "dm-side-head" }, h("b", { text: "Messages" }), newBtn));
+    if (!threads.length) side.append(h("p", { class: "text-3 small dm-empty", text: "No conversations yet. Tap a member's name and choose Message, or start one here." }));
+    for (const t of threads) {
+      side.append(h("button", { class: `dm-row${t.other.id === current ? " active" : ""}${t.unread ? " unread" : ""}`, type: "button", onclick: () => open(t.other.id) },
+        dmFace(t.other.head, t.other.username),
+        h("span", { class: "dm-row-main" },
+          h("span", { class: "dm-row-name" }, t.other.username, t.other.inGame ? h("span", { class: "dm-ingame", title: "Playing now" }) : null),
+          h("span", { class: "dm-row-preview", text: `${t.mine ? "You: " : ""}${t.preview || ""}` })),
+        h("span", { class: "dm-row-side" }, h("span", { class: "text-3 small", text: dmTime(t.at) }), t.unread ? h("span", { class: "tk-unread", text: String(t.unread) }) : null)));
+    }
+    wrap.classList.toggle("has-open", Boolean(current));
+  }
+
+  async function open(userId) {
+    current = userId;
+    wrap.classList.add("has-open");
+    side.querySelectorAll(".dm-row").forEach((r) => r.classList.remove("active"));
+    let d;
+    try { d = await getJson(`/api/dm/with/${userId}`); } catch (e) { main.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
+    if (current !== userId) return;
+    const log = h("div", { class: "dm-log", role: "log", "aria-live": "polite" });
+    const input = h("textarea", { class: "input dm-input", rows: 1, maxlength: 500, placeholder: `Message ${d.other.username}`, "aria-label": "Message" });
+    const send = h("button", { class: "btn btn-primary", type: "button", text: "Send" });
+    const blockBtn = h("button", { class: "btn btn-ghost btn-sm", type: "button", text: d.blocked ? "Unblock" : "Block" });
+    blockBtn.addEventListener("click", () => openDialog({
+      title: d.blocked ? `Unblock ${d.other.username}?` : `Block ${d.other.username}?`,
+      body: h("p", { class: "text-2", text: d.blocked ? "They'll be able to message you again." : "They won't be able to message you, and you won't be able to message them." }),
+      actions: [{ label: "Cancel" }, { label: d.blocked ? "Unblock" : "Block", kind: d.blocked ? "primary" : "danger", onClick: async () => {
+        await postJson(`/api/dm/block/${userId}`, { blocked: !d.blocked }); open(userId);
+      } }],
+    }));
+    const head = h("div", { class: "dm-head" },
+      h("button", { class: "btn btn-ghost btn-sm dm-back", type: "button", text: "← Back", onclick: () => { current = null; wrap.classList.remove("has-open"); loadList(); } }),
+      dmFace(d.other.head, d.other.username),
+      h("div", { class: "dm-head-main" }, h("b", { text: d.other.username }),
+        h("span", { class: "text-3 small", text: d.other.inGame ? "Playing on GalaxySMP: they'll see this in game" : "Not in game right now" })),
+      blockBtn);
+    const meId = ctx.me?.id;
+    const add = (m) => {
+      const mine = m.from === meId;
+      log.append(h("div", { class: `dm-msg${mine ? " mine" : ""}` },
+        h("div", { class: "dm-bubble" }, h("div", { class: "dm-text", text: m.body }),
+          h("div", { class: "dm-meta", text: `${dmTime(m.at)}${m.via === "game" ? " · from the game" : ""}` }))));
+    };
+    if (!d.messages.length) log.append(h("p", { class: "text-3 small dm-start", text: `This is the start of your messages with ${d.other.username}. Be kind, and never share passwords or personal information.` }));
+    d.messages.forEach(add);
+    const composer = h("div", { class: "dm-composer" }, input, send);
+    main.replaceChildren(h("div", { class: "dm-chat" }, head, log, d.blocked ? h("p", { class: "text-3 small dm-start", text: "You blocked this member." }) : composer));
+    log.scrollTop = log.scrollHeight;
+    async function sendIt() {
+      const text = input.value.trim();
+      if (!text) return;
+      send.disabled = true;
+      try {
+        const r = await postJson(`/api/dm/with/${userId}`, { body: text });
+        input.value = "";
+        if (!log.querySelector(`[data-id="${r.message.id}"]`)) { add(r.message); log.lastChild.dataset.id = r.message.id; }
+        log.querySelector(".dm-start")?.remove();
+        log.scrollTop = log.scrollHeight;
+        loadList();
+      } catch (e) { ctx.toast(e.message); }
+      send.disabled = false;
+      input.focus();
+    }
+    send.addEventListener("click", sendIt);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing && window.matchMedia("(hover: hover)").matches) { e.preventDefault(); sendIt(); }
+    });
+    // live: new messages in this conversation
+    main.onDm = (m) => {
+      if (![m.from, m.to].includes(userId) || log.querySelector(`[data-id="${m.id}"]`)) return;
+      add(m);
+      log.lastChild.dataset.id = m.id;
+      log.querySelector(".dm-start")?.remove();
+      log.scrollTop = log.scrollHeight;
+      if (m.from === userId) getJson(`/api/dm/with/${userId}`).catch(() => {}); // marks it read
+    };
+    loadList();
+    if (window.matchMedia("(hover: hover)").matches) input.focus();
+  }
+
+  function pickMember() {
+    const members = [...(ctx.members?.values?.() || [])].filter((m) => m.id !== ctx.me?.id).sort((a, b) => a.username.localeCompare(b.username));
+    const search = h("input", { class: "input", id: "dm-search", placeholder: "Search members", autocomplete: "off" });
+    const list = h("div", { class: "dm-pick" });
+    let dlg;
+    const draw = () => {
+      const q = search.value.trim().toLowerCase();
+      list.replaceChildren(...members.filter((m) => !q || m.username.toLowerCase().includes(q)).slice(0, 50).map((m) =>
+        h("button", { class: "dm-row", type: "button", onclick: () => { dlg.close(); open(m.id); } }, dmFace(m.head, m.username), h("span", { class: "dm-row-name", text: m.username }))));
+    };
+    search.addEventListener("input", draw);
+    draw();
+    dlg = openDialog({ title: "New message", body: h("div", { class: "form" }, search, list), actions: [{ label: "Cancel" }] });
+    setTimeout(() => search.focus(), 50);
+  }
+
+  const onDm = (m) => { main.onDm?.(m); if (!current || ![m.from, m.to].includes(current)) loadList(); };
+  dmListeners.add(onDm);
+  cleanup = () => dmListeners.delete(onDm);
+  loadList();
+  if (current) open(current);
+  else main.replaceChildren(h("div", { class: "dm-placeholder" }, h("p", { class: "text-3", text: "Pick a conversation, or start a new one. Messages also reach players in game, and they can reply with /dm." })));
 }

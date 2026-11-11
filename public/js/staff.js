@@ -828,5 +828,5 @@ $("help-reset").addEventListener("click", () => openDialog({
   setupPanel({ loaders, power, owner: Boolean(summary.owner), selectTab, toast, setBadge });
   const start = location.hash.slice(1).split("/")[0];
   if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"], [data-tab="help"]').forEach((t) => (t.hidden = false));
-  selectTab(["overview", "tickets", "players", "reports", "members", "words", "audit", ...(power >= 100 ? ["ranks", "economy", "help"] : [])].includes(start) ? start : "overview");
+  selectTab(["overview", "tickets", "players", "reports", "members", "words", "audit", ...(summary.owner ? ["dms"] : []), ...(power >= 100 ? ["ranks", "economy", "help"] : [])].includes(start) ? start : "overview");
 })();

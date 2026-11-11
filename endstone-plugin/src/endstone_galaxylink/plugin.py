@@ -109,6 +109,8 @@ class GalaxyLink(Plugin):
         "givekey": _cmd("Give crate keys (staff).", "/givekey <player: message>", "galaxylink.command.givekey"),
         "elevator": _cmd("Get the Elevator Tool back, or open it (Galaxy+, Pro+ and staff).", "/elevator", "galaxylink.command.elevator", ["elevators"]),
         "ranktags": _cmd("Smooth gradient rank tags (pictures) on or off.", "/ranktags [state: message]", "galaxylink.command.ranktags"),
+        "dm": _cmd("Send a direct message to a community member (website and game).", "/dm <player: message>", "galaxylink.command.dm", ["msgweb"]),
+        "r": _cmd("Reply to your last direct message.", "/r <message: message>", "galaxylink.command.dm", ["reply"]),
         "report": _cmd("Report a player who is breaking the rules.", "/report [player: message]", "galaxylink.command.report"),
         "mod": _cmd("Staff moderation panel: warn, mute, kick, ban, reports and block logs.", "/mod", "galaxylink.command.mod"),
         "modban": _cmd("Ban a player (staff).", "/modban <player: message>", "galaxylink.command.modban"),
@@ -150,6 +152,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.plotaxe": _perm("Allows /plotaxe (server operators).", "op"),
         "galaxylink.command.minigames": _perm("Allows /minigames.", True),
         "galaxylink.command.report": _perm("Allows /report.", True),
+        "galaxylink.command.dm": _perm("Allows /dm and /r.", True),
         "galaxylink.command.ranktags": _perm("Allows /ranktags (operators).", "op"),
         "galaxylink.command.elevator": _perm("Allows /elevator (plans decide who can build).", True),
         "galaxylink.command.jobs": _perm("Allows /jobs.", True),
@@ -196,6 +199,8 @@ class GalaxyLink(Plugin):
         self.shopchests = ShopChests(self)
         self.crates = Crates(self)
         self.elevators = Elevators(self)
+        from endstone_galaxylink.dms import DirectMessages
+        self.dms = DirectMessages(self)
         from endstone_galaxylink.cosmetics import Cosmetics, TRAIL_TICKS
         self.cosmetics = Cosmetics(self)
         self.ranktags = RankTags(self)
@@ -490,6 +495,8 @@ class GalaxyLink(Plugin):
             "chatfilter": lambda: self.chatfilter.command(sender, args),
             "announcement": lambda: self.announcements.command(sender, args),
             "report": lambda: self.moderation.report_command(sender, args),
+            "dm": lambda: self.dms.command(sender, args),
+            "r": lambda: self.dms.reply(sender, args),
             "daily": lambda: self.progress.daily_menu(sender),
             "quests": lambda: self.progress.quests_menu(sender),
             "achievements": lambda: self.progress.achievements_menu(sender),

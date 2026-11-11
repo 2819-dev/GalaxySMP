@@ -43,6 +43,7 @@
           <button role="tab" data-tab="ranks" aria-selected="false" hidden>Ranks</button>
           <button role="tab" data-tab="economy" aria-selected="false" hidden>Economy</button>
           <button role="tab" data-tab="help" aria-selected="false" hidden>Help menu</button>
+          <button role="tab" data-tab="dms" aria-selected="false" hidden>Messages</button>
           <button role="tab" data-tab="audit" aria-selected="false">Audit log</button>
         </div>
 
@@ -192,6 +193,13 @@
             <p class="text-3 small" style="margin:0 0 10px">Players tap a command to see its example. "Staff only" commands are shown to operators only.</p>
             <div id="help-commands" class="stack"></div>
           </div>
+        </section>
+
+        <section data-panel="dms" hidden>
+          <p class="text-3 small" style="margin:0 0 12px">Owners only. Every direct message between members, for safety (the privacy policy says owners can read them). Opening a conversation is recorded in the audit log.</p>
+          <div class="toolbar"><input class="input" id="dm-owner-search" type="search" placeholder="Search by member name" autocomplete="off"></div>
+          <div id="dm-owner-list" class="panel" style="padding:0"></div>
+          <div id="dm-owner-view" hidden></div>
         </section>
 
         <section data-panel="audit" hidden>

@@ -213,6 +213,15 @@ class VoiceLink:
             self._on_main(lambda: self.plugin.economy.from_website(msg))
         elif msg.get("type") == "announce":
             self._on_main(lambda: self.plugin.announcements.announce(str(msg.get("text") or "")[:300], by=str(msg.get("by") or "staff")))
+        elif msg.get("type") == "voice_invite":
+            def tell():
+                p = next((x for x in self.plugin.server.online_players if str(x.xuid) == str(msg.get("toXuid"))), None)
+                if p is not None:
+                    p.send_message(f"§b{str(msg.get('from'))[:32]}§7 invited you to the voice group §b{str(msg.get('group'))[:24]}§7. "
+                                   "Join on §egalaxymc.us/voice§7 (Voice Chat > Groups).")
+            self._on_main(tell)
+        elif msg.get("type") == "dm":
+            self._on_main(lambda: self.plugin.dms.deliver(msg))
         elif msg.get("type") == "staff_alert":
             text = str(msg.get("text") or "")[:200].replace("§", "")
             self._on_main(lambda: [p.send_message(f"§d[Staff] §f{text}") for p in self.plugin.moderation.staff_online()])

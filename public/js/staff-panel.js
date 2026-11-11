@@ -373,6 +373,43 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
     });
   }
 
+  // ---------- Messages (owners): read any DM conversation ----------
+  if (owner) {
+    document.querySelector('[data-tab="dms"]').hidden = false;
+    let dmTimer = null;
+    const listDms = async () => {
+      $("dm-owner-view").hidden = true;
+      $("dm-owner-list").hidden = false;
+      let d;
+      try { d = await getJson(`/api/mod/dms?q=${encodeURIComponent($("dm-owner-search").value)}`); } catch (e) { $("dm-owner-list").replaceChildren(h("p", { class: "text-3", style: "padding:16px", text: e.message })); return; }
+      const box = $("dm-owner-list");
+      box.replaceChildren();
+      if (!d.threads.length) box.append(h("div", { class: "empty", text: "No direct messages yet." }));
+      for (const t of d.threads) {
+        box.append(h("button", { class: "pl-row", type: "button", onclick: () => openDm(t.id) },
+          h("span", { class: "pl-main" },
+            h("span", { class: "pl-name" }, h("b", { text: `${t.a.username} ↔ ${t.b.username}` })),
+            h("span", { class: "pl-sub", text: `${t.count} message${t.count === 1 ? "" : "s"} · last ${fmt(t.at)} · ${t.preview || ""}` })),
+          h("span", { class: "pl-chev", "aria-hidden": "true", text: "›" })));
+      }
+    };
+    const openDm = async (id) => {
+      let d;
+      try { d = await getJson(`/api/mod/dms/${id}`); } catch (e) { toast(e.message); return; }
+      $("dm-owner-list").hidden = true;
+      const view = $("dm-owner-view");
+      view.hidden = false;
+      view.replaceChildren(h("div", { class: "panel" },
+        h("div", { class: "voice-head" }, h("h2", { text: `${d.between[0]} ↔ ${d.between[1]}` }),
+          h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "← Back", onclick: listDms })),
+        h("div", { class: "pc-list" }, d.messages.map((m) => h("div", { class: "pc-li" },
+          h("b", { text: m.from }), h("span", { text: m.body, style: "white-space:pre-wrap;overflow-wrap:anywhere" }),
+          h("time", { class: "text-3 small", text: `${fmt(m.at)}${m.via === "game" ? " · game" : ""}` }))))));
+    };
+    loaders.dms = listDms;
+    $("dm-owner-search").addEventListener("input", () => { clearTimeout(dmTimer); dmTimer = setTimeout(listDms, 250); });
+  }
+
   return { openPlayer };
 }
 

@@ -94,6 +94,16 @@ export class CommunityHub extends DurableObject {
       this.broadcast({ type: "presence", userId: event.userId, online: false });
       return;
     }
+    if (event.type === "voice_invite") { // only the invited member
+      const text = JSON.stringify(event);
+      for (const ws of this.socketsFor(event.to)) { try { ws.send(text); } catch { /* gone */ } }
+      return;
+    }
+    if (event.type === "dm") { // a direct message: only its sender and recipient get it
+      const text = JSON.stringify(event);
+      for (const id of [event.from, event.to]) for (const ws of this.socketsFor(id)) { try { ws.send(text); } catch { /* gone */ } }
+      return;
+    }
     if (event.type === "ticket") { // support ticket changed: tell its owner and every staff member
       const text = JSON.stringify(event);
       for (const ws of this.ctx.getWebSockets()) {

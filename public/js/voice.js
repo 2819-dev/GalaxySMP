@@ -154,6 +154,9 @@ function onMessage(m) {
       else p.resolve(m);
       return;
     }
+    case "voice_invite":
+      toast(`${m.from} invited you to the voice group "${m.group}". Tap Join under Groups.`);
+      return;
     case "roster":
       S.users = new Map(m.users.map((u) => [u.id, u]));
       S.groups = m.groups;
@@ -208,7 +211,9 @@ function applyMic() {
 }
 
 function startMeter() {
+  try { S.meterSrc?.disconnect(); } catch { /* ignore */ }
   const src = S.ctx.createMediaStreamSource(S.stream);
+  S.meterSrc = src;
   S.analyser = S.ctx.createAnalyser();
   S.analyser.fftSize = 512;
   src.connect(S.analyser);
@@ -241,6 +246,7 @@ async function setupRtc() {
     else if (pc.connectionState === "failed") setConn("Audio connection failed. Try leaving and rejoining.", "is-offline");
   });
   const tx = pc.addTransceiver(S.track, { direction: "sendonly" });
+  S.tx = tx;
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
   const res = await request("rtc.push", { sdp: offer.sdp, mid: tx.mid });
@@ -449,19 +455,63 @@ function renderGroups() {
   const box = $("v-groups");
   const me = S.users.get(S.myId);
   box.replaceChildren();
-  if (!S.groups.length) box.append(h("p", { class: "text-3 small", style: "margin:0", text: "No groups right now." }));
-  for (const g of S.groups) {
+  if (!S.groups.length) box.append(h("p", { class: "text-3 small", style: "margin:0", text: "No groups right now. Make one, then invite players: you can talk to them even when one of you isn't in game." }));
+  // your saved groups and groups you're invited to first
+  const rank = (g) => (g.owner === S.myId ? 0 : g.members?.some((x) => x.id === S.myId) ? 1 : 2);
+  for (const g of [...S.groups].sort((a, b) => rank(a) - rank(b))) {
     const members = [...S.users.values()].filter((u) => u.group === g.id);
     const mine = me?.group === g.id;
+    const owner = g.owner === S.myId;
+    const invited = !owner && g.members?.some((x) => x.id === S.myId);
     const ic = h("span", { class: "vstate" });
-    ic.innerHTML = vicon(g.locked ? "lock" : "group");
-    const row = h("div", { class: "vrow" + (mine ? " mine" : "") }, ic,
-      h("div", { class: "vinfo" }, h("div", { class: "vname", text: g.name }), h("div", { class: "vdetail", text: `${members.length} in group · ${members.map((m) => m.username).join(", ")}` })),
+    ic.innerHTML = vicon(g.locked && !owner && !invited ? "lock" : "group");
+    const detail = `${members.length} in group${members.length ? ` · ${members.map((m) => m.username).join(", ")}` : ""}`;
+    const tags = [g.saved ? "Saved" : null, owner ? "Yours" : null, invited ? "Invited" : null].filter(Boolean).join(" · ");
+    const buttons = h("div", { class: "vgroup-actions" },
       mine
         ? h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Leave", onclick: () => request("group.leave").catch((e) => toast(e.message)) })
-        : h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Join", onclick: () => joinGroup(g) }));
+        : h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Join", onclick: () => joinGroup(g, owner || invited) }),
+      owner ? h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Invite", onclick: () => manageGroup(g) }) : null);
+    const row = h("div", { class: "vrow" + (mine ? " mine" : "") }, ic,
+      h("div", { class: "vinfo" },
+        h("div", { class: "vname" }, g.name, tags ? h("span", { class: "vtag", text: tags }) : null),
+        h("div", { class: "vdetail", text: detail }),
+        owner && g.members?.length ? h("div", { class: "vdetail", text: `Invited: ${g.members.map((x) => x.username).join(", ")}` }) : null),
+      buttons);
     box.append(row);
   }
+}
+
+// Invite players to your group (it's saved, so they can join it any time, in game or not).
+function manageGroup(g) {
+  const name = h("input", { class: "input", id: "invite-name", maxlength: 32, placeholder: "Player or member name", autocomplete: "off" });
+  const list = h("div", { class: "stack", style: "gap:6px" });
+  const draw = () => {
+    const cur = S.groups.find((x) => x.id === g.id) || g;
+    list.replaceChildren(...(cur.members || []).map((m) => h("div", { class: "vinvite" }, h("span", { text: m.username }),
+      h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: async () => {
+        try { await request("group.uninvite", { id: g.id, userId: m.id }); setTimeout(draw, 300); } catch (e) { toast(e.message); }
+      } }))));
+    if (!cur.members?.length) list.append(h("p", { class: "text-3 small", style: "margin:0", text: "Nobody invited yet." }));
+  };
+  draw();
+  openDialog({
+    title: `Invite to ${g.name}`,
+    body: h("div", { class: "form" },
+      h("p", { class: "text-2 small", style: "margin:0", text: "Invited players get a message (on the website and in game) and can join this group any time, without the password. You'll hear each other wherever you are, even if one of you isn't in game." }),
+      field("Invite a player", name), h("div", { class: "field-label", text: "Invited" }), list),
+    actions: [
+      { label: "Delete group", kind: "danger", onClick: async () => { await request("group.delete", { id: g.id }); toast("Group deleted."); } },
+      { label: "Close" },
+      { label: "Invite", kind: "primary", onClick: async () => {
+        const r = await request("group.invite", { id: g.id, name: name.value });
+        toast(`Invited ${r.invited}.`);
+        name.value = "";
+        setTimeout(draw, 300);
+        return false; // keep the dialog open for more invites
+      } },
+    ],
+  });
 }
 
 function renderControls() {
@@ -495,8 +545,8 @@ function renderWhere() {
 }
 
 // ---------- Groups ----------
-function joinGroup(g) {
-  if (!g.locked || (S.me.role.power || 0) >= STAFF) {
+function joinGroup(g, invited) {
+  if (!g.locked || invited || (S.me.role.power || 0) >= STAFF) {
     request("group.join", { id: g.id }).catch((e) => toast(e.message));
     return;
   }
@@ -615,7 +665,42 @@ function stopBackgroundAudio() {
   }
 }
 
-document.addEventListener("visibilitychange", () => { if (S.ctx) resumeAudio(); });
+// iPhone/iPad pause the microphone of web apps that aren't on screen (switching to Minecraft).
+// When you come back, get the mic again and put it back into the call, so you're not left muted.
+async function recoverMic() {
+  if (!S.track || !S.tx || S.leaving || S.recovering) return;
+  if (S.track.readyState === "live" && !S.track.muted) return;
+  S.recovering = true;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    const track = stream.getAudioTracks()[0];
+    await S.tx.sender.replaceTrack(track);
+    S.stream?.getTracks().forEach((t) => t.stop());
+    S.stream = stream;
+    S.track = track;
+    watchTrack(track);
+    applyMic();
+    if (S.analyser) {
+      S.timers.forEach((t) => clearInterval(t));
+      S.timers = [];
+      startMeter();
+      S.timers.push(setInterval(updateSubscriptions, 700));
+      S.timers.push(setInterval(updateMix, 100));
+    }
+    toast("Microphone back on.");
+  } catch { /* the user can rejoin */ }
+  S.recovering = false;
+}
+function watchTrack(track) {
+  track.addEventListener("ended", () => { if (document.visibilityState === "visible") recoverMic(); });
+  track.addEventListener("unmute", () => applyMic());
+}
+const isIPad = () => /iPad/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+document.addEventListener("visibilitychange", () => {
+  if (!S.ctx) return;
+  resumeAudio();
+  if (document.visibilityState === "visible") setTimeout(recoverMic, 400);
+});
 
 async function join() {
   $("v-join-error").textContent = "";
@@ -638,6 +723,7 @@ async function join() {
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     }).catch(() => { throw new Error("Microphone access was blocked. Allow the microphone for galaxymc.us in your browser settings, then try again."); });
     S.track = S.stream.getAudioTracks()[0];
+    watchTrack(S.track);
     S.micOn = false;
     applyMic();
     show("v-app");
@@ -648,6 +734,7 @@ async function join() {
     startMeter();
     S.timers.push(setInterval(updateSubscriptions, 700));
     S.timers.push(setInterval(updateMix, 100));
+    if (isIPad()) notice("iPad tip: iPadOS pauses the microphone when Voice isn't on screen. Open Voice in Split View or Slide Over next to Minecraft (swipe up the Dock and drag GalaxySMP to the side) so others keep hearing you. If you switch away anyway, your mic turns back on when you come back.", true);
   } catch (e) {
     cleanup();
     show("v-join");

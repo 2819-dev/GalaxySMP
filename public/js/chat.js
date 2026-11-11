@@ -2,13 +2,15 @@
 // All text is inserted with textContent, never as HTML, so nothing a user types can run as code.
 import { icon, toast } from "/js/site.js";
 import { paint, rankTag, roleIcon, rankCss } from "/js/rank-paint.js";
-import { showPanel, hidePanel } from "/js/community-panels.js";
+import { showPanel, hidePanel, dmEvent } from "/js/community-panels.js";
 import { ticketEvent } from "/js/tickets.js";
 
 // A member's current rank (live updates win over what an older message recorded).
 const rankFor = (id, fallback) => (state.members.has(id) ? state.members.get(id).rank : fallback) || null;
 
 const $ = (id) => document.getElementById(id);
+export const DM_CHANNEL = -1;
+const DM_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>';
 const HELP_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6l3.6 3.6M14.8 14.8l3.6 3.6M18.4 5.6l-3.6 3.6M9.2 14.8l-3.6 3.6"/></svg>';
 const MIC_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>';
 
@@ -150,6 +152,12 @@ function openProfile(member, anchor) {
   const view = el("a", "btn btn-secondary btn-sm", "View full profile");
   view.href = `/player/${encodeURIComponent(member.username)}`;
   actions.append(view);
+  if (state.me && member.id !== state.me.id) {
+    const dm = el("button", "btn btn-primary btn-sm", "Message");
+    dm.type = "button";
+    dm.addEventListener("click", () => { closeProfile(); openDM(member.id); });
+    actions.prepend(dm);
+  }
   for (const hook of profileActionHooks) hook(member, actions, closeProfile);
   body.append(actions);
   card.append(banner, pic, body);
@@ -208,6 +216,7 @@ function renderChannels() {
       const mark = el("span", "hash");
       if (ch.kind === "voice") mark.innerHTML = MIC_SVG;
       else if (ch.kind === "support") mark.innerHTML = HELP_SVG;
+      else if (ch.kind === "dms") mark.innerHTML = DM_SVG;
       else mark.textContent = "#";
       b.append(mark, el("span", "", ch.name));
       if (!ch.canPost && ch.kind === "text") {
@@ -233,7 +242,7 @@ async function selectChannel(id) {
   const ch = currentChannel();
   $("channel-name").textContent = ch.name;
   $("channel-topic").textContent = ch.topic || "";
-  document.querySelector(".chat-top .hash").textContent = ch.kind === "voice" || ch.kind === "support" ? "" : "#";
+  document.querySelector(".chat-top .hash").textContent = ["voice", "support", "dms"].includes(ch.kind) ? "" : "#";
   try { history.replaceState(null, "", "#" + ch.slug); } catch { /* ignore */ }
   renderChannels();
   // Special channels (Information, Auction House, Suggestions, Voice Chat, Events) have their own views.
@@ -242,7 +251,8 @@ async function selectChannel(id) {
   document.querySelector(".composer-wrap").hidden = special;
   $("jump-latest").hidden = true;
   if (special) {
-    showPanel(ch, { me: state.me, toast });
+    showPanel(ch, { me: state.me, toast, dmWith: state.dmWith, members: state.members });
+    state.dmWith = null;
     return;
   }
   hidePanel();
@@ -703,6 +713,17 @@ function handleEvent(data) {
     case "message_deleted":
       removeMessage(data.messageId);
       break;
+    case "voice_invite":
+      toast(`${data.from} invited you to the voice group "${data.group}". Open Voice Chat to join.`);
+      break;
+    case "dm": {
+      dmEvent(data);
+      if (state.channelId !== DM_CHANNEL && Number(data.to) === Number(state.me?.id)) {
+        state.unread.add(DM_CHANNEL);
+        renderChannels();
+      }
+      break;
+    }
     case "ticket": {
       ticketEvent(data);
       const support = state.channels?.find?.((c) => c.kind === "support");
@@ -786,7 +807,10 @@ export async function startChat({ onSignedOut }) {
     const support = data.channels.find((c) => c.kind === "support");
     if (support) state.unread.add(support.id);
   }
-  state.categories = data.categories;
+  // Direct messages show as a channel at the top of the list (its own view, like Support).
+  data.channels.unshift({ id: DM_CHANNEL, categoryId: DM_CHANNEL, slug: "messages", name: "Direct Messages", topic: "Private chats with other members (also in game with /dm)", kind: "dms", canPost: false });
+  state.categories = [{ id: DM_CHANNEL, name: "Messages" }, ...data.categories];
+  if (data.dmUnread) state.unread.add(DM_CHANNEL);
   state.reactions = data.reactions;
   state.roles = new Map(data.roles.map((r) => [r.key, r]));
   state.members = new Map(data.members.map((m) => [m.id, m]));
@@ -818,6 +842,13 @@ export function stopChat() {
   clearInterval(state.pingTimer);
   try { state.ws?.close(1000, "bye"); } catch { /* ignore */ }
   state.ws = null;
+}
+
+// Opens the Direct Messages view on a conversation with this member.
+export function openDM(userId) {
+  state.dmWith = userId;
+  selectChannel(DM_CHANNEL);
+  closeDrawers();
 }
 
 export { openProfile };
