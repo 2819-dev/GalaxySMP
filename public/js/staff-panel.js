@@ -276,6 +276,10 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
         act("Change plan", "btn-secondary", () => planDialog(p, xuid, reload)),
         act("Change money", "btn-secondary", () => moneyDialog(p, xuid, reload)),
         act("Give a Shop item", "btn-secondary", () => shopDialog(p, d.shop, xuid, reload), false, "cart")) : null,
+      owner && acc ? h("h4", { text: `Galaxy Credits: $${Number(acc.credits || 0).toFixed(2)}` }) : null,
+      owner && acc ? h("div", { class: "pc-actions" },
+        act("Give credits", "btn-secondary", () => creditsDialog(acc, "give", reload), false, "coins"),
+        act("Take credits", "btn-secondary", () => creditsDialog(acc, "take", reload))) : null,
       h("h4", { text: "Store items" }),
       h("p", { class: "text-2 small", style: "margin:0", text: [
         `Cosmetics: ${d.shop.cosmetics.length ? d.shop.cosmetics.map((c) => c.replace(/^(trail|join)_/, "").replace(/_/g, " ")).join(", ") : "none"}`,
@@ -347,6 +351,20 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
       actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: async () => { await postJson("/api/mod/economy/plan", { xuid, plan: plan.value || null, days: Number(days.value), extraPlots: Number(extra.value) }); reload("Plan updated."); } }],
     });
   }
+  function creditsDialog(acc, action, reload) {
+    const amount = h("input", { class: "input", id: "pa-credits", type: "number", min: 0.01, step: "0.01", value: action === "give" ? "5.00" : "", inputmode: "decimal" });
+    openDialog({
+      title: action === "give" ? `Give credits to ${acc.username}` : `Take credits from ${acc.username}`,
+      body: h("div", {}, h("p", { class: "text-2", style: "margin-top:0", text: action === "give"
+        ? "They can spend these in the Store. They come from your unlimited owner credits, so they aren't real money."
+        : `They have $${Number(acc.credits || 0).toFixed(2)}. You can't take more than they have.` }), field("Amount ($)", amount)),
+      actions: [{ label: "Cancel" }, { label: action === "give" ? "Give" : "Take", kind: action === "give" ? "primary" : "danger", onClick: async () => {
+        const r = await postJson("/api/panel/credits", { userId: acc.id, action, amount: amount.value });
+        reload(r.message);
+      } }],
+    });
+  }
+
   function moneyDialog(p, xuid, reload) {
     const action = select("pa-money-act", [["add", "Add"], ["take", "Take away"], ["set", "Set to"]], "add");
     const amount = h("input", { class: "input", id: "pa-amount", inputmode: "decimal", placeholder: "e.g. 500" });

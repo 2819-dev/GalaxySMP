@@ -3,7 +3,7 @@
 import { json, error, HttpError } from "./lib/http.js";
 import { getDb } from "./lib/db.js";
 import { handleStatus } from "./routes/status.js";
-import { checkout, mine as storeMine, topup, gift, stripeWebhook, paymentsOverview } from "./routes/store.js";
+import { checkout, mine as storeMine, topup, gift, stripeWebhook, paymentsOverview, ownerCredits } from "./routes/store.js";
 import * as promos from "./store/promos.js";
 import { serveStatic } from "./lib/static.js";
 import { linkStart, linkPoll, login, logout, me } from "./routes/auth.js";
@@ -42,6 +42,7 @@ const routes = [
   ["POST", "/api/store/gift", (req, env) => gift(req, env)],
   ["POST", "/api/store/stripe-webhook", (req, env) => stripeWebhook(req, env)],
   ["GET", "/api/panel/payments", (req, env) => paymentsOverview(req, env)],
+  ["POST", "/api/panel/credits", (req, env) => ownerCredits(req, env)],
   ["POST", "/api/auth/link/start", (req, env) => linkStart(req, env)],
   ["POST", "/api/auth/link/poll", (req, env) => linkPoll(req, env)],
   ["POST", "/api/auth/login", (req, env) => login(req, env)],

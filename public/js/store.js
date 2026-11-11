@@ -43,7 +43,7 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
   const cardBtn = h("button", { class: "btn btn-secondary co-pay", type: "button" }); // card
   const creditNote = h("p", { class: "co-credit-note text-3 small" });
   const err = h("p", { class: "form-error", role: "alert" });
-  const have = Number(me.credits || 0);
+  const have = me.infinite ? Infinity : Number(me.credits || 0);
 
   const draw = () => {
     const final = applied ? applied.final : price;
@@ -65,14 +65,14 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
       cardBtn.hidden = true;
       creditNote.textContent = "";
     } else {
-      payBtn.textContent = enough ? `Pay ${usd(final)} with credits` : "Top up credits";
+      payBtn.textContent = me.infinite ? "Get it (free for the owner)" : enough ? `Pay ${usd(final)} with credits` : "Top up credits";
       payBtn.disabled = false;
       payBtn.dataset.topup = enough ? "" : "1";
-      cardBtn.hidden = !me.cards;
+      cardBtn.hidden = !me.cards || me.infinite;
       cardBtn.textContent = `Pay ${usd(Math.max(0.5, final))} with card`;
       cardBtn.className = "btn btn-secondary co-pay";
-      creditNote.replaceChildren(`You have ${usd(have)} of credits. `,
-        enough ? `${usd(have - final)} left after this.` : "Top up once and buy in one tap next time.");
+      creditNote.replaceChildren(me.infinite ? "You have unlimited credits as the owner. " : `You have ${usd(have)} of credits. `,
+        me.infinite ? "" : enough ? `${usd(have - final)} left after this.` : "Top up once and buy in one tap next time.");
     }
   };
 
@@ -135,7 +135,7 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
     offer,
     h("div", { class: `co-item cat-${cat}` },
       h("div", { class: "shop-icon" }, iconEl(icon)),
-      h("div", { class: "co-item-text" }, h("b", { text: name }), h("span", { class: "text-3 small", text: isPlan ? "Monthly subscription" : "One-time purchase" }))),
+      h("div", { class: "co-item-text" }, h("b", { text: name }), h("span", { class: "text-3 small", text: isPlan ? "30 days (buy again to add more)" : "One-time purchase" }))),
     codeRow, appliedRow,
     h("div", { class: "co-total" }, h("span", { class: "text-2", text: "Total" }), h("span", {}, was, " ", total)),
     err,
@@ -189,9 +189,9 @@ function renderPlans() {
       card.append(more);
     }
     if (plan.price) {
-      const sellable = false; // subscriptions: coming soon
-      const btn = h("button", { class: `btn ${sellable ? "btn-primary" : "btn-secondary is-soon"}`, type: "button", text: current ? "Your plan" : sellable ? "Subscribe" : "Coming soon" });
-      if (!sellable || current) btn.setAttribute("aria-disabled", "true");
+      const sellable = (data.onSale || []).includes("plans");
+      const btn = h("button", { class: `btn ${sellable ? "btn-primary" : "btn-secondary is-soon"}`, type: "button", text: !sellable ? "Coming soon" : current ? "Add 30 days" : "Get 30 days" });
+      if (!sellable) btn.setAttribute("aria-disabled", "true");
       else btn.addEventListener("click", () => checkout({ id: plan.id, option: () => null, name: plan.name, price: plan.price, icon: "star", cat: "plan", tags: ["subs", `plan:${plan.id}`], isPlan: true }));
       card.append(btn);
     } else {
@@ -278,11 +278,11 @@ function renderStrip() {
   }
   const bal = h("div", { class: "store-balance" },
     h("span", { class: "store-balance-icon" }, iconEl("coins")),
-    h("div", {}, h("span", { class: "text-3 small", text: "Galaxy Credits" }), h("b", { class: "store-balance-amount", text: usd(me.credits || 0) })));
+    h("div", {}, h("span", { class: "text-3 small", text: "Galaxy Credits" }), h("b", { class: "store-balance-amount", text: me.infinite ? "∞ Unlimited" : usd(me.credits || 0) })));
   const top = h("a", { class: "btn btn-primary btn-sm", href: "#credits", text: "Top up" });
   const giftBtn = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Gift credits" });
   giftBtn.addEventListener("click", giftDialog);
-  const row = h("div", { class: "store-me-row" }, bal, h("div", { class: "store-me-actions" }, top, giftBtn));
+  const row = h("div", { class: "store-me-row" }, bal, h("div", { class: "store-me-actions" }, me.infinite ? null : top, giftBtn));
   const bits = [row];
   if (!me.linked) bits.push(h("p", { class: "text-3 small", style: "margin:0", text: "Link your Minecraft account with /link in game so we know who to give things to." }));
   if (me.promos?.length) {
@@ -326,7 +326,7 @@ function giftDialog() {
   openDialog({
     title: "Gift credits",
     body: h("div", {},
-      h("p", { class: "text-2", style: "margin-top:0", text: `You have ${usd(me.credits || 0)} of credits. Gifts can't be undone, so check the name. Up to $50 a day.` }),
+      h("p", { class: "text-2", style: "margin-top:0", text: me.infinite ? "As the owner your credits are unlimited, so gifts don't cost you anything. They aren't real money." : `You have ${usd(me.credits || 0)} of credits. Gifts can't be undone, so check the name. Up to $50 a day.` }),
       h("div", { class: "field" }, h("label", { class: "field-label", for: "gift-to", text: "Send to" }), to),
       h("div", { class: "field" }, h("label", { class: "field-label", for: "gift-amount", text: "Amount ($)" }), amount)),
     actions: [{ label: "Cancel" }, {

@@ -19,7 +19,7 @@ export function setupPayments({ loaders }) {
         h("span", { class: "text-3 small", text: s.error ? ` · ${s.error}` : " · players can still spend credits and use promo codes. See the staff guide to connect it." })));
     const tile = (label, v) => h("div", { class: "pay-tile" }, h("span", { class: "text-3 small", text: label }), h("b", { text: usd(v) }));
     const tiles = h("div", { class: "pay-tiles" }, tile("Today", d.totals.day), tile("Last 7 days", d.totals.week), tile("Last 30 days", d.totals.month), tile("All time", d.totals.total));
-    const credits = h("p", { class: "text-3 small", style: "margin:8px 0 0", text: `${d.totals.count} card payment${d.totals.count === 1 ? "" : "s"} · ${usd(d.credits.held)} of credits waiting to be spent · ${usd(d.credits.spent)} spent in the Store. Amounts are before Stripe's fees.` });
+    const credits = h("p", { class: "text-3 small", style: "margin:8px 0 0", text: `${d.totals.count} card payment${d.totals.count === 1 ? "" : "s"} · ${usd(d.credits.held)} of credits waiting to be spent · ${usd(d.credits.spent)} spent in the Store · ${usd(d.credits.given)} given free by you (not real money). Card amounts are before Stripe's fees.` });
     const list = d.recent.length
       ? h("div", { class: "promo-list" }, d.recent.map((r) => h("div", { class: "promo-row" },
         h("div", { class: "promo-main" },

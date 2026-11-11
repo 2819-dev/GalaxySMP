@@ -10,16 +10,21 @@ import { SHOP_ITEMS } from "../store/shop.js";
 import { PACKS, PACK, GIFT_MIN, GIFT_DAILY_MAX, change, balance, history } from "../store/credits.js";
 import { createCheckout, verifyWebhook, stripe } from "../lib/stripe.js";
 import { giveShopItem } from "./panel.js";
-import { sendPlans } from "./plans.js";
+import { sendPlans, PLANS } from "./plans.js";
+import { isOwner } from "../lib/names.js";
 import { notify as pushNotify } from "./notify.js";
 
-// Shop categories that can be bought now. The rest show "Coming soon".
-export const ON_SALE = new Set(["cosmetics"]);
+// What can be bought now ("plans" = subscriptions). The rest show "Coming soon".
+export const ON_SALE = new Set(["plans", "money", "plots", "effects"]);
+export const PLAN_DAYS = 30; // a subscription bought here lasts 30 days (buying again adds 30 more)
+
+// The owner has unlimited credits (they aren't real money).
+const ownerOf = (env, user) => isOwner(env, user.username, user.platform === "bedrock");
 
 export const stripeReady = (env) => Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET);
 
 export function onSale(prod) {
-  return Boolean(prod && !prod.isPlan && ON_SALE.has(prod.category));
+  return Boolean(prod && (prod.isPlan ? ON_SALE.has("plans") : ON_SALE.has(prod.category)));
 }
 
 const usd = (c) => `$${(c / 100).toFixed(2)}`;
@@ -50,7 +55,7 @@ export async function mine(request, env) {
   }
   return json({
     ok: true, signedIn: true, username: user.username, linked: Boolean(p), owned, plan,
-    credits: (await balance(sql, user.id)) / 100, history: await history(sql, user.id, 15),
+    infinite: ownerOf(env, user), credits: ownerOf(env, user) ? 1e9 : (await balance(sql, user.id)) / 100, history: await history(sql, user.id, 15),
     promos: await memberPromos(sql, user), packs: publicPacks(), cards: stripeReady(env),
   });
 }
@@ -64,8 +69,12 @@ async function prepare(sql, user, body) {
   if (!onSale(prod)) return { soon: true, prod };
   const p = await linkedPlayer(sql, user.id);
   if (!p) throw new HttpError(409, "Link your Minecraft account first (type /link in game), so we know who to give it to.");
-  const item = SHOP_ITEMS[prod.key];
-  if (item.limit) {
+  const item = prod.isPlan ? null : SHOP_ITEMS[prod.key];
+  if (prod.isPlan) {
+    const [s] = await sql`SELECT plan, expires_at FROM subscriptions WHERE xuid = ${p.xuid}`;
+    if (s && !s.expires_at && s.plan === prod.key) throw new HttpError(409, `You already have ${prod.name} with no end date.`);
+  }
+  if (item?.limit) {
     const [{ n }] = await sql`SELECT count(*)::int AS n FROM shop_orders WHERE xuid = ${p.xuid} AND item = ${item.id}`;
     const has = n + ((p.cosmetics || []).includes(item.id) && !n ? 1 : 0);
     if (has >= item.limit) throw new HttpError(409, item.limit === 1 ? `You already have ${item.name}.` : `You already have the most (${item.limit}) of ${item.name}.`);
@@ -77,10 +86,24 @@ async function prepare(sql, user, body) {
 }
 
 async function deliver(env, sql, player, prod, by, source) {
+  if (prod.isPlan) return grantPlan(env, sql, player, prod, by, source);
   return giveShopItem(env, sql, { xuid: player.xuid, gamertag: player.gamertag }, { item: prod.key, option: prod.option }, by, source);
 }
 
-const doneMessage = (prod, sent) => `${prod.name} is yours! ${sent ? "It's ready in game." : "You'll get it next time the server is online."}`;
+// A subscription bought in the Store: 30 days. Same plan again = 30 more days; the other plan = switch to it.
+async function grantPlan(env, sql, player, prod, by, source) {
+  const [cur] = await sql`SELECT plan, expires_at FROM subscriptions WHERE xuid = ${player.xuid}`;
+  const keep = cur && cur.plan === prod.key && cur.expires_at && new Date(cur.expires_at) > new Date();
+  const from = keep ? new Date(cur.expires_at) : new Date();
+  const expires = new Date(from.getTime() + PLAN_DAYS * 86400_000).toISOString();
+  await sql`INSERT INTO subscriptions (xuid, plan, expires_at, granted_by) VALUES (${player.xuid}, ${prod.key}, ${expires}, ${by.username})
+            ON CONFLICT (xuid) DO UPDATE SET plan = EXCLUDED.plan, expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by`;
+  await sql`INSERT INTO shop_orders (xuid, item, option, price_cents, source, given_by) VALUES (${player.xuid}, ${"plan:" + prod.key}, ${`${PLAN_DAYS} days`}, ${prod.price}, ${source}, ${by.username})`;
+  const sent = await sendPlans(env, sql).catch(() => false);
+  return { ok: true, sent, expires };
+}
+
+const doneMessage = (prod, sent) => `${prod.name} is yours${prod.isPlan ? ` for ${PLAN_DAYS} days` : ""}! ${sent ? "It's ready in game." : "You'll get it next time the server is online."}`;
 
 // POST /api/store/checkout { item, option, code, method: "credits" | "card" }
 export async function checkout(request, env) {
@@ -99,12 +122,16 @@ export async function checkout(request, env) {
     return json({ ok: true, done: true, message: doneMessage(prod, result.sent) });
   }
 
+  if (body.method === "credits" && ownerOf(env, user)) {
+    const result = await deliver(env, sql, player, prod, { id: user.id, username: user.username }, "credits");
+    return json({ ok: true, done: true, message: doneMessage(prod, result.sent) });
+  }
   if (body.method === "credits") {
     const left = await change(sql, user.id, -final, "purchase", prod.name, prod.key);
     if (left === null) throw new HttpError(409, `You need ${usd(final)} of credits but have ${usd(await balance(sql, user.id))}. Top up, or pay with a card.`);
     try {
       const result = await deliver(env, sql, player, prod, { id: user.id, username: user.username }, "credits");
-      await sql`UPDATE shop_orders SET price_cents = ${final} WHERE id = (SELECT max(id) FROM shop_orders WHERE xuid = ${player.xuid} AND item = ${prod.key})`;
+      await sql`UPDATE shop_orders SET price_cents = ${final} WHERE id = (SELECT max(id) FROM shop_orders WHERE xuid = ${player.xuid} AND item = ${prod.isPlan ? "plan:" + prod.key : prod.key})`;
       if (promo) await sql`INSERT INTO promo_redemptions (promo_id, user_id, item, option, price_cents, final_cents, status)
                            VALUES (${promo.id}, ${user.id}, ${prod.key}, ${prod.option}, ${prod.price}, ${final}, 'used')`;
       return json({ ok: true, done: true, credits: left / 100, message: doneMessage(prod, result.sent) });
@@ -164,6 +191,15 @@ export async function gift(request, env) {
   const [to] = name ? await sql`SELECT id, username, banned FROM users WHERE username_lower = ${name}` : [];
   if (!to || to.banned) throw new HttpError(404, "There's no member with that name.");
   if (Number(to.id) === Number(user.id)) throw new HttpError(400, "You can't gift credits to yourself.");
+  if (ownerOf(env, user)) {
+    if (cents > 100_000_00) throw new HttpError(400, "That's a lot! Gifts go up to $100,000 at a time.");
+    await change(sql, to.id, cents, "staff", `Gift from ${user.username}`, String(user.id));
+    await audit(sql, user.id, "credits.give", { to: to.username, cents });
+    try {
+      await pushNotify(env, [to.id], "dms", { title: `${user.username} sent you ${usd(cents)} of credits!`, body: "Spend them in the GalaxySMP Store.", url: "/store", tag: `gift-${user.id}` });
+    } catch { /* best effort */ }
+    return json({ ok: true, message: `Sent ${usd(cents)} of credits to ${to.username}.` });
+  }
   const [{ sent }] = await sql`SELECT coalesce(-sum(delta_cents), 0)::bigint AS sent FROM credit_ledger
                                 WHERE user_id = ${user.id} AND reason = 'gift_out' AND created_at > now() - interval '1 day'`;
   if (Number(sent) + cents > GIFT_DAILY_MAX) throw new HttpError(429, `You can gift up to ${usd(GIFT_DAILY_MAX)} a day. You have ${usd(Math.max(0, GIFT_DAILY_MAX - Number(sent)))} left today.`);
@@ -191,7 +227,7 @@ async function fulfil(env, sql, payId) {
   try {
     if (!prod || !player) throw new Error("no player");
     await deliver(env, sql, player, prod, { id: pay.user_id, username: u?.username || "card" }, "payment");
-    await sql`UPDATE shop_orders SET price_cents = ${pay.amount_cents} WHERE id = (SELECT max(id) FROM shop_orders WHERE xuid = ${player.xuid} AND item = ${prod.key})`;
+    await sql`UPDATE shop_orders SET price_cents = ${pay.amount_cents} WHERE id = (SELECT max(id) FROM shop_orders WHERE xuid = ${player.xuid} AND item = ${prod.isPlan ? "plan:" + prod.key : prod.key})`;
   } catch (e) {
     // couldn't give it (e.g. they got it another way meanwhile): turn the payment into credit instead
     await change(sql, pay.user_id, pay.amount_cents, "refund", `${prod?.name || pay.item} couldn't be given, so you got credit instead`, String(pay.id));
@@ -208,6 +244,10 @@ async function refunded(env, sql, intentId) {
   } else {
     const player = await linkedPlayer(sql, pay.user_id);
     const item = SHOP_ITEMS[pay.item];
+    if (player && PLANS[pay.item] && pay.item !== "free") {
+      await sql`UPDATE subscriptions SET expires_at = greatest(now(), expires_at - make_interval(days => ${PLAN_DAYS})) WHERE xuid = ${player.xuid} AND plan = ${pay.item}`;
+      await sendPlans(env, sql).catch(() => {});
+    }
     if (player && item?.category === "cosmetics") {
       await sql`UPDATE players SET cosmetics = array_remove(cosmetics, ${item.id}) WHERE xuid = ${player.xuid}`;
       await sql`DELETE FROM shop_orders WHERE id = (SELECT max(id) FROM shop_orders WHERE xuid = ${player.xuid} AND item = ${item.id} AND source = 'payment')`;
@@ -267,15 +307,40 @@ export async function paymentsOverview(request, env) {
          WHERE p.status <> 'pending' OR p.created_at > now() - interval '1 hour'
          ORDER BY p.id DESC LIMIT 30`,
     sql`SELECT coalesce(sum(credit_cents), 0)::bigint AS held,
-               (SELECT coalesce(-sum(delta_cents), 0)::bigint FROM credit_ledger WHERE reason = 'purchase') AS spent
+               (SELECT coalesce(-sum(delta_cents), 0)::bigint FROM credit_ledger WHERE reason = 'purchase') AS spent,
+               (SELECT coalesce(sum(delta_cents), 0)::bigint FROM credit_ledger WHERE reason = 'staff') AS given
           FROM users`,
   ]);
-  const name = (r) => (r.kind === "topup" ? `${usd(r.credit_cents)} credits` : (SHOP_ITEMS[r.item]?.name || r.item));
+  const name = (r) => (r.kind === "topup" ? `${usd(r.credit_cents)} credits` : (SHOP_ITEMS[r.item]?.name || PLANS[r.item]?.name || r.item));
   return json({
     ok: true,
     stripe: await stripeStatus(env),
     totals: { day: Number(totals.day) / 100, week: Number(totals.week) / 100, month: Number(totals.month) / 100, total: Number(totals.total) / 100, count: totals.count },
-    credits: { held: Number(credits.held) / 100, spent: Number(credits.spent) / 100 },
+    credits: { held: Number(credits.held) / 100, spent: Number(credits.spent) / 100, given: Number(credits.given) / 100 },
     recent: recent.map((r) => ({ id: Number(r.id), who: r.username || "?", what: name(r), amount: r.amount_cents / 100, status: r.status, at: r.paid_at || r.created_at })),
   });
+}
+
+// POST /api/panel/credits { userId, action: "give" | "take", amount } (owner): free credits that aren't real money.
+export async function ownerCredits(request, env) {
+  const user = await requireUser(request, env);
+  if (!ownerOf(env, user)) throw new HttpError(403, "Only the owner can give credits.");
+  const body = await readJson(request);
+  const sql = getDb(env);
+  const [to] = await sql`SELECT id, username FROM users WHERE id = ${Number(body.userId) || 0}`;
+  if (!to) throw new HttpError(404, "That member doesn't exist.");
+  let cents = Math.round(Number(body.amount) * 100);
+  if (!Number.isFinite(cents) || cents < 1 || cents > 100_000_00) throw new HttpError(400, "Type an amount from $0.01 to $100,000.");
+  if (body.action === "take") {
+    cents = Math.min(cents, await balance(sql, to.id));
+    if (!cents) throw new HttpError(409, `${to.username} has no credits to take.`);
+    await change(sql, to.id, -cents, "staff", `Taken by ${user.username}`, String(user.id));
+  } else {
+    await change(sql, to.id, cents, "staff", `Gift from ${user.username}`, String(user.id));
+    try {
+      await pushNotify(env, [to.id], "dms", { title: `${user.username} sent you ${usd(cents)} of credits!`, body: "Spend them in the GalaxySMP Store.", url: "/store", tag: `gift-${user.id}` });
+    } catch { /* best effort */ }
+  }
+  await audit(sql, user.id, body.action === "take" ? "credits.take" : "credits.give", { to: to.username, cents });
+  return json({ ok: true, credits: (await balance(sql, to.id)) / 100, message: body.action === "take" ? `Took ${usd(cents)} of credits from ${to.username}.` : `Gave ${to.username} ${usd(cents)} of credits.` });
 }

@@ -74,7 +74,7 @@ export async function getAccount(request, env) {
       nightVisionUntil: u.night_vision_until && new Date(u.night_vision_until) > new Date() ? u.night_vision_until : null,
     },
     orders: orders.map((o) => ({
-      item: SHOP_ITEMS[o.item]?.name || o.item,
+      item: SHOP_ITEMS[o.item]?.name || (o.item.startsWith("plan:") ? PLANS[o.item.slice(5)]?.name : null) || o.item,
       option: o.option ? SHOP_ITEMS[o.item]?.options?.find((x) => x.id === o.option)?.name || o.option : null,
       price: o.price_cents / 100, source: o.source, at: o.created_at,
     })),

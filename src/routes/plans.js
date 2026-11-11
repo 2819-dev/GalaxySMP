@@ -21,7 +21,7 @@ export async function loadSubscriptions(sql) {
 // Public: the Store page.
 export function storePlans(env) {
   const cardsReady = Boolean(env?.STRIPE_SECRET_KEY && env?.STRIPE_WEBHOOK_SECRET);
-  const ON_SALE = ["cosmetics"]; // the same list as ON_SALE in routes/store.js
+  const ON_SALE = ["plans", "money", "plots", "effects"]; // the same list as ON_SALE in routes/store.js
   return json({
     ok: true,
     checkoutEnabled: cardsReady,

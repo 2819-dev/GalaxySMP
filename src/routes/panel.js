@@ -164,6 +164,7 @@ export async function playerCard(request, env, ctx, url, params) {
       stats: { playtimeH: Math.round(Number(p.playtime_s || 0) / 360) / 10, mined: Number(p.mined || 0), placed: Number(p.placed || 0), kills: Number(p.kills || 0), deaths: Number(p.deaths || 0), quests: p.quests_done, streak: p.streak, achievements: (p.achievements || []).length },
       account: p.user_id ? {
         id: Number(p.user_id), username: p.username, role: p.role_name, power: Number(p.role_power), joined: p.joined_site,
+        credits: Number((await sql`SELECT credit_cents FROM users WHERE id = ${p.user_id}`)[0]?.credit_cents || 0) / 100,
         banned: p.banned, banReason: p.ban_reason,
         mutedUntil: p.muted_until && new Date(p.muted_until) > new Date() ? p.muted_until : null, muteReason: p.mute_reason,
         voiceMutedUntil: p.voice_muted_until && new Date(p.voice_muted_until) > new Date() ? p.voice_muted_until : null,
