@@ -187,8 +187,22 @@ const SECTIONS = {
         h("label", { class: "acc-rn-switch", for: "acc-rn-hide" }, box, h("span", { text: "Hide my real name from other players" })),
         status);
     })() : null;
+    const activity = data.hasXbox ? (() => {
+      const box = h("input", { type: "checkbox", id: "acc-act" });
+      box.checked = data.showActivity;
+      box.addEventListener("change", async () => {
+        try {
+          await postJson("/api/account/activity", { show: box.checked });
+          toast(box.checked ? "Your Xbox activity shows on your profile." : "Your Xbox activity is hidden.");
+        } catch (e) { box.checked = !box.checked; toast(e.message); }
+      });
+      return card("Activity", "Like Discord: your profile shows what you're playing.",
+        h("label", { class: "acc-rn-switch", for: "acc-act" }, box, h("span", { text: "Show my Xbox activity on my profile" })),
+        h("p", { class: "text-3 small", style: "margin:8px 0 0", text: "When you're on GalaxySMP it always shows \"Playing Minecraft\". This switch is about what you do on Xbox Live outside the server." }));
+    })() : null;
     return [
       realName,
+      activity,
       card("Blocked members", "Blocked members can't send you direct messages.", blocked),
       card("Your data", null,
         h("p", { class: "text-2", style: "margin:0 0 10px", text: "Read what we store and why in the privacy policy. To have your account and messages deleted, open a ticket in Community → Support." }),

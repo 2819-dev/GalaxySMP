@@ -35,7 +35,12 @@ export async function recordStats(env, list, online) {
           last_daily = coalesce(${/^\d{4}-\d{2}-\d{2}$/.test(String(p.lastDaily || "")) ? p.lastDaily : null}::date, players.last_daily)`;
     }));
   }
-  if (onlineIds.length) await sql`UPDATE players SET online_at = now() WHERE xuid = ANY(${onlineIds})`;
+  if (onlineIds.length) {
+    // session_start: when they joined this time (for "Playing for 1h 20m" on their profile)
+    await sql`UPDATE players SET session_start = CASE WHEN online_at IS NULL OR online_at < now() - interval '150 seconds' OR session_start IS NULL
+                                                     THEN now() ELSE session_start END,
+                                 online_at = now() WHERE xuid = ANY(${onlineIds})`;
+  }
 }
 
 export async function recordAchievementDefs(env, list) {

@@ -1,5 +1,6 @@
 // GalaxySMP community chat (browser side).
 // All text is inserted with textContent, never as HTML, so nothing a user types can run as code.
+import { activityBlock } from "/js/activity.js";
 import { icon, toast } from "/js/site.js";
 import { paint, rankTag, roleIcon, rankCss } from "/js/rank-paint.js";
 import { showPanel, hidePanel, dmEvent } from "/js/community-panels.js";
@@ -136,6 +137,11 @@ function openProfile(member, anchor) {
     if (member.realNameHidden) user.append(el("span", "pc-hidden", member.id === state.me?.id ? " (only you and staff see this)" : " (hidden from players)"));
   }
   body.append(name, user, status);
+  const actSlot = el("div", "pc-activity");
+  body.append(actSlot);
+  fetch(`/api/presence/${member.id}`, { credentials: "same-origin" }).then((r) => r.json()).then((d) => {
+    if (d.activity && actSlot.isConnected) actSlot.append(activityBlock(d.activity).node);
+  }).catch(() => {});
   if (member.bio) body.append(el("div", "pc-label", "About"), el("p", "pc-bio", member.bio));
   if (member.interests?.length) {
     const likes = el("div", "pc-likes");

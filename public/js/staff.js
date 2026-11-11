@@ -5,6 +5,7 @@ import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, v
 import { setupPanel } from "/js/staff-panel.js";
 import { setupPromos } from "/js/promos-panel.js";
 import { setupPayments } from "/js/payments-panel.js";
+import { setupMyPresence } from "/js/presence-panel.js";
 import { MC_COLORS, hexOf, GRADIENTS, paint, gradientCss, rankTag } from "/js/rank-paint.js";
 
 const $ = (id) => document.getElementById(id);
@@ -825,6 +826,7 @@ $("help-reset").addEventListener("click", () => openDialog({
   if (power >= 100) setupPromos({ loaders, toast });
   if (summary.owner) {
     setupPayments({ loaders });
+    setupMyPresence({ toast });
     document.querySelector('[data-tab="payments"]').hidden = false;
   }
   let start = location.hash.slice(1).split("/")[0];

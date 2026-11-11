@@ -1645,3 +1645,29 @@ textarea.input.dm-input { resize: none; min-height: 44px; max-height: 140px; ove
 .ob-next { margin-left: auto; min-width: 140px; justify-content: center; }
 .ob-card .form-error:empty { display: none; }
 @media (max-width: 480px) { .ob-two { grid-template-columns: 1fr; } .ob-card { padding: 20px 16px; } .ob-head h1 { font-size: 1.25rem; } }
+
+/* Rich presence (activity) on profile cards */
+.pc-activity:empty { display: none; }
+.act { margin-top: 2px; }
+.act-row { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; background: var(--surface-2); }
+.act-art { position: relative; width: 52px; height: 52px; flex: none; display: grid; place-items: center; border-radius: 12px;
+  background: linear-gradient(135deg, #2b7a3d, #1f4f2a); color: #c9ffd6; }
+.act-art svg { width: 28px; height: 28px; }
+.act-art-custom { background: linear-gradient(135deg, #8A5CFF, #2457eb); color: #fff; }
+.act-art-xbox, .act-art-xbox-offline { background: linear-gradient(135deg, #107c10, #0b5a0b); color: #e8ffe8; }
+.act-art-xbox-offline { filter: grayscale(.7); opacity: .8; }
+.act-badge { position: absolute; right: -4px; bottom: -4px; width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center;
+  font: 800 .7rem var(--mono); background: #2457eb; color: #fff; border: 2px solid var(--surface-2); }
+.act-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.act-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-line { font-size: .82rem; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-time { font-variant-numeric: tabular-nums; color: #7cf0b0; }
+/* Control Panel: your status */
+#my-presence { margin-bottom: 16px; }
+.pr-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 18px; align-items: start; }
+.pr-preview { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px dashed var(--border-strong); border-radius: 12px; }
+.pr-icons { display: flex; flex-wrap: wrap; gap: 6px; }
+.pr-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); cursor: pointer; }
+.pr-icon svg { width: 18px; height: 18px; }
+.pr-icon[aria-checked="true"] { border-color: var(--accent); background: rgba(36,87,235,.25); color: #fff; }
+@media (max-width: 760px) { .pr-grid { grid-template-columns: 1fr; } }
