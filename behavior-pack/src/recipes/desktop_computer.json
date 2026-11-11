@@ -1,0 +1,19 @@
+{
+  "format_version": "1.20.10",
+  "minecraft:recipe_shaped": {
+    "description": { "identifier": "galaxysmp:desktop_computer" },
+    "tags": [ "crafting_table" ],
+    "pattern": [
+      "GGG",
+      "GRG",
+      " I "
+    ],
+    "key": {
+      "G": { "item": "minecraft:glass_pane" },
+      "R": { "item": "minecraft:redstone" },
+      "I": { "item": "minecraft:iron_ingot" }
+    },
+    "unlock": { "context": "AlwaysUnlocked" },
+    "result": { "item": "galaxysmp:desktop_computer", "count": 1 }
+  }
+}

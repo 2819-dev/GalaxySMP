@@ -664,6 +664,20 @@
      "icon": "textures/items/elytra"
     }
    ]
+  },
+  {
+   "id": "decor",
+   "name": "Decoration",
+   "icon": "textures/ui/gsmp_computer_icon",
+   "items": [
+    {
+     "id": "galaxysmp:desktop_computer",
+     "name": "Computer",
+     "buy": 500,
+     "sell": null,
+     "icon": "textures/ui/gsmp_computer_icon"
+    }
+   ]
   }
  ]
 }

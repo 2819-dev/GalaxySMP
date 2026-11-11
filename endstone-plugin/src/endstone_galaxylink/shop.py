@@ -19,11 +19,28 @@ def default_shop():
     return json.loads(resources.files("endstone_galaxylink").joinpath("shop_default.json").read_text("utf-8"))
 
 
+def add_new_items(shop):
+    """Adds the Decoration category (the decorative Computer) to a price list saved before it
+    existed. Runs once, so an Admin who removes it later keeps it removed."""
+    cats = shop.setdefault("categories", [])
+    if any(it.get("id") == "galaxysmp:desktop_computer" for c in cats for it in c.get("items", [])):
+        return shop
+    decor = next((c for c in default_shop()["categories"] if c.get("id") == "decor"), None)
+    if decor:
+        cats.append(decor)
+    return shop
+
+
 class Shop:
     def __init__(self, plugin):
         self.plugin = plugin
         self.eco = plugin.economy
-        self.set_shop(self.eco.get_config("shop") or default_shop(), save=False)
+        saved = self.eco.get_config("shop")
+        if saved and not self.eco.get_config("shop_added_computer"):
+            saved = add_new_items(saved)
+            self.eco.set_config("shop", saved)
+        self.eco.set_config("shop_added_computer", True)
+        self.set_shop(saved or default_shop(), save=False)
 
     # ---------- prices ----------
     def set_shop(self, shop, save=True):

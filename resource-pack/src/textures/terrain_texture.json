@@ -4,6 +4,9 @@
   "texture_data": {
     "galaxysmp_computer": {
       "textures": "textures/blocks/galaxysmp_computer"
+    },
+    "galaxysmp_desktop_computer": {
+      "textures": "textures/blocks/galaxysmp_desktop_computer"
     }
   }
 }
