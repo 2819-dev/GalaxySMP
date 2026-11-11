@@ -1,4 +1,5 @@
 // Player stats (sent by the server), leaderboards and public player profiles.
+import { badgesFor } from "./badges.js";
 import { rankOf } from "../chat/messages.js";
 import { displayRank, loadPlanPriority } from "./ranks.js";
 import PLANS from "../../endstone-plugin/src/endstone_galaxylink/plans.json";
@@ -96,7 +97,7 @@ export async function profile(request, env, ctx, url, params) {
            (p.online_at > now() - interval '150 seconds') AS online,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient,
            rk.position AS rank_position, rk.priority AS rank_priority,
-           s.plan, s.expires_at, u.id AS user_id
+           s.plan, s.expires_at, u.id AS user_id, u.username AS user_name, u.platform AS user_platform
       FROM players p
       LEFT JOIN player_ranks pr ON pr.xuid = p.xuid LEFT JOIN ranks rk ON rk.id = pr.rank_id
       LEFT JOIN subscriptions s ON s.xuid = p.xuid AND (s.expires_at IS NULL OR s.expires_at > now())
@@ -128,6 +129,7 @@ export async function profile(request, env, ctx, url, params) {
         mined: await rankAt("mined", Number(p.mined)),
       },
       achievements: defs.map((a) => ({ ...a, unlocked: have.has(a.id) })),
+      badges: p.user_id ? (await badgesFor(env, sql, [{ id: p.user_id, username: p.user_name, platform: p.user_platform }])).get(Number(p.user_id)) : [],
     },
   }, 200, { "Cache-Control": "public, max-age=30" });
 }

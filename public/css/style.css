@@ -1727,3 +1727,32 @@ textarea.input.dm-input { resize: none; min-height: 44px; max-height: 140px; ove
 }
 /* member list: custom status */
 .member-activity.status { color: var(--text-2); font-style: normal; }
+
+/* ---------- Badges (hexagons) ---------- */
+.hexb { position: relative; display: inline-grid; place-items: center; width: var(--s); height: var(--s); flex: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
+.hexb > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hexb-icon { position: relative; display: grid; place-items: center; color: var(--ink); }
+.hexb-icon svg { width: calc(var(--s) * .42); height: calc(var(--s) * .42); stroke-width: 2.2; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+.hexb-owner .hexb-icon svg { stroke: #FFD866; fill: rgba(255,216,102,.25); }
+.hexb-glow { filter: drop-shadow(0 0 calc(var(--s) * .12) rgba(255,205,80,.65)) drop-shadow(0 2px 3px rgba(0,0,0,.45)); animation: hexb-pulse 3.2s ease-in-out infinite; }
+@keyframes hexb-pulse { 50% { filter: drop-shadow(0 0 calc(var(--s) * .22) rgba(255,205,80,.85)) drop-shadow(0 2px 3px rgba(0,0,0,.45)); } }
+.hexb-shine { position: absolute; inset: 0; clip-path: polygon(50% 3%, 93% 27.5%, 93% 72.5%, 50% 97%, 7% 72.5%, 7% 27.5%); overflow: hidden; pointer-events: none; }
+.hexb-shine::after { content: ""; position: absolute; top: -20%; left: -60%; width: 40%; height: 140%; transform: rotate(20deg);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); animation: hexb-shine 3.6s ease-in-out infinite; }
+@keyframes hexb-shine { 0%, 55% { left: -60%; } 100% { left: 130%; } }
+@media (prefers-reduced-motion: reduce) { .hexb-glow, .hexb-shine::after { animation: none; } }
+.hexb-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.hexb-btn { background: none; border: 0; padding: 0; cursor: pointer; border-radius: 8px; transition: transform .15s; }
+.hexb-btn:hover, .hexb-btn:focus-visible { transform: translateY(-2px) scale(1.06); }
+.hexb-detail { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
+.hexb-detail h3 { margin: 8px 0 0; font-size: 1.25rem; }
+.hexb-detail p { margin: 0; }
+.pp-badges { margin-top: 10px; }
+.profile-card .hexb-row { margin: 6px 0 2px; }
+/* Control Panel > Badges */
+.bd-row { align-items: center; }
+.bd-hero { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 12px; }
+.bd-styles { display: flex; flex-wrap: wrap; gap: 6px; }
+.bd-pick { background: none; border: 2px solid transparent; border-radius: 12px; padding: 2px; cursor: pointer; }
+.bd-pick[aria-pressed="true"] { border-color: var(--accent); background: rgba(36,87,235,.15); }
+.promo-chip.off { opacity: .55; text-decoration: line-through; }

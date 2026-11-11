@@ -4,6 +4,7 @@ import { toast, iconEl } from "/js/site.js";
 import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, voiceMuteDialog, select, field } from "/js/dialog.js";
 import { setupPanel } from "/js/staff-panel.js";
 import { setupPromos } from "/js/promos-panel.js";
+import { setupBadges } from "/js/badges-panel.js";
 import { setupPayments } from "/js/payments-panel.js";
 import { setupMyPresence } from "/js/presence-panel.js";
 import { MC_COLORS, hexOf, GRADIENTS, paint, gradientCss, rankTag } from "/js/rank-paint.js";
@@ -312,6 +313,10 @@ const DESCRIBE = {
   "promo.resume": (e) => [`turned on promo code ${e.details.code}`],
   "promo.delete": (e) => [`deleted promo code ${e.details.code}`],
   "member.real_name": (e) => [e.details.set ? `set ${e.details.member}'s real name` : `removed ${e.details.member}'s real name`],
+  "badge.create": (e) => [`made the badge ${e.details.badge}`],
+  "badge.delete": (e) => [`deleted the badge ${e.details.badge}`],
+  "badge.award": (e) => [`gave the badge ${e.details.badge} to ${e.details.members} member${e.details.members === 1 ? "" : "s"}`],
+  "badge.revoke": (e) => [`took the badge ${e.details.badge} from ${e.details.members} member${e.details.members === 1 ? "" : "s"}`],
   "credits.give": (e) => [`gave ${e.details.to} $${(e.details.cents / 100).toFixed(2)} of credits`],
   "credits.take": (e) => [`took $${(e.details.cents / 100).toFixed(2)} of credits from ${e.details.to}`],
   "credits.gift": (e) => [`gifted $${(e.details.cents / 100).toFixed(2)} of credits to ${e.details.to}`],
@@ -824,13 +829,14 @@ $("help-reset").addEventListener("click", () => openDialog({
   setBadge("tickets", summary.openTickets);
   setupPanel({ loaders, power, owner: Boolean(summary.owner), selectTab, toast, setBadge });
   if (power >= 100) setupPromos({ loaders, toast });
+  if (power >= 100) setupBadges({ loaders, toast });
   if (summary.owner) {
     setupPayments({ loaders });
     setupMyPresence({ toast });
     document.querySelector('[data-tab="payments"]').hidden = false;
   }
   let start = location.hash.slice(1).split("/")[0];
-  if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"], [data-tab="promos"], [data-tab="help"]').forEach((t) => (t.hidden = false));
+  if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"], [data-tab="badges"], [data-tab="promos"], [data-tab="help"]').forEach((t) => (t.hidden = false));
   if (start === "members") { start = "players"; history.replaceState(null, "", "#players"); } // old link: Members is one tab now
-  selectTab(["overview", "tickets", "players", "reports", "words", "audit", ...(summary.owner ? ["dms", "payments"] : []), ...(power >= 100 ? ["ranks", "economy", "promos", "help"] : [])].includes(start) ? start : "overview");
+  selectTab(["overview", "tickets", "players", "reports", "words", "audit", ...(summary.owner ? ["dms", "payments"] : []), ...(power >= 100 ? ["ranks", "economy", "badges", "promos", "help"] : [])].includes(start) ? start : "overview");
 })();

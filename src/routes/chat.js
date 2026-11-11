@@ -1,4 +1,5 @@
 // Chat API: everything the chat page needs, plus the live connection.
+import { badgesFor } from "./badges.js";
 import { isOwner } from "../lib/names.js";
 import { INTEREST_NAME } from "./onboarding.js";
 import { getDb } from "../lib/db.js";
@@ -41,6 +42,7 @@ export async function bootstrap(request, env) {
   ]);
   await sql`UPDATE users SET last_seen_at = now() WHERE id = ${user.id}`;
   const planPriority = await loadPlanPriority(sql);
+  const badgeMap = await badgesFor(env, sql, members.map((m) => ({ id: m.id, username: m.username, plat: m.plat })));
   // staff replies to your support tickets you haven't read yet (shows a dot on the Support channel)
   const [{ ticket_unread: ticketUnread }] = await sql`SELECT coalesce(sum(user_unread), 0)::int AS ticket_unread FROM tickets WHERE user_id = ${user.id}`;
   const [{ dm_unread: dmUnread }] = await sql`
@@ -70,6 +72,7 @@ export async function bootstrap(request, env) {
       plan: m.plan || null, inGame: Boolean(m.in_game), since: m.created_at,
       status: isOwner(env, m.username, m.plat === "bedrock") && m.custom_presence?.title && (!m.custom_presence.until || new Date(m.custom_presence.until) > new Date())
         ? `${m.custom_presence.label && m.custom_presence.label !== "Status" ? `${m.custom_presence.label} ` : ""}${m.custom_presence.title}` : null,
+      badges: badgeMap.get(Number(m.id)) || [],
       bio: m.bio || null, interests: (m.interests || []).map((i) => INTEREST_NAME[i]).filter(Boolean), color: m.profile_color || null,
       // real name (set by staff): everyone sees it unless the member hid it; they and staff always do
       ...(m.real_name && (!m.real_name_hidden || Number(m.id) === Number(user.id) || me.role.power >= 50)

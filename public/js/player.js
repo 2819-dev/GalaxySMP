@@ -1,5 +1,5 @@
 // Full player profile: /player/<gamertag>
-// Everyone sees the game side (rank, stats, badges). Signed-in members also see the social side:
+// Everyone sees the game side (rank, badges, stats, achievements). Signed-in members also see the social side:
 // real name (unless hidden), bio, what they like to play, profile color, activity and a Message button.
 import { iconEl, toast } from "/js/site.js";
 import { h } from "/js/dialog.js";
@@ -7,6 +7,7 @@ import { rankTag, paint } from "/js/rank-paint.js";
 import { money, hours, playerSearch } from "/js/leaderboard.js";
 import { faceSvg } from "/js/face.js";
 import { activityBlock } from "/js/activity.js";
+import { badgeRow } from "/js/badges.js";
 
 // A line icon for each achievement (instead of the emojis the game uses).
 const ACH_ICONS = {
@@ -105,7 +106,8 @@ async function load() {
   const hero = h("section", { class: "panel pp-hero" }, banner,
     h("div", { class: "pp-hero-body" },
       avatarWrap,
-      h("div", { class: "pp-who" }, nameEl, sub.childNodes.length ? sub : null, tags),
+      h("div", { class: "pp-who" }, nameEl, sub.childNodes.length ? sub : null, tags,
+        p.badges?.length ? h("div", { class: "pp-badges" }, badgeRow(p.badges, 40)) : null),
       actions),
     activity);
 
@@ -133,10 +135,10 @@ async function load() {
       stat("scroll", "Quests done", short(s.quests)),
       stat("flame", "Daily streak", `${s.streak} day${s.streak === 1 ? "" : "s"}`, `Best: ${s.bestStreak}`)));
 
-  // ---- badges ----
+  // ---- achievements (earned in game) ----
   const total = p.achievements.length;
   const pct = total ? Math.round((unlocked.length / total) * 100) : 0;
-  const badges = section(`Badges`,
+  const achievements = section("Achievements",
     total ? h("div", { class: "pp-progress" },
       h("div", { class: "pp-progress-bar" }, h("span", { style: `width:${pct}%` })),
       h("span", { class: "text-3 small", text: `${unlocked.length} of ${total} unlocked` })) : null,
@@ -145,11 +147,11 @@ async function load() {
         h("div", { class: `badge${a.unlocked ? "" : " locked"}`, title: a.desc },
           h("span", { class: "e" }, iconEl(a.unlocked ? achIcon(a.id) : "lock")),
           h("div", {}, h("b", { text: a.name }), h("span", { text: a.desc })))))
-      : h("p", { class: "text-3", style: "margin:0", text: "Badges appear once the server has sent them." }),
-    h("p", { class: "text-3 small", style: "margin:12px 0 0" }, "Earn badges with ", h("code", { text: "/achievements" }), ", ", h("code", { text: "/quests" }), " and ", h("code", { text: "/daily" }), " in game. ",
+      : h("p", { class: "text-3", style: "margin:0", text: "Achievements appear once the server has sent them." }),
+    h("p", { class: "text-3 small", style: "margin:12px 0 0" }, "Earn achievements with ", h("code", { text: "/achievements" }), ", ", h("code", { text: "/quests" }), " and ", h("code", { text: "/daily" }), " in game. ",
       h("a", { href: "/leaderboard", text: "See the leaderboards" }), "."));
 
-  box.replaceChildren(hero, h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, stats), h("div", { class: "pp-col" }, badges)));
+  box.replaceChildren(hero, h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, stats), h("div", { class: "pp-col" }, achievements)));
 }
 
 playerSearch($("player-search"), $("player-q"), $("player-suggest"));

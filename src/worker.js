@@ -23,6 +23,7 @@ import * as support from "./routes/support.js";
 import * as panel from "./routes/panel.js";
 import * as onboarding from "./routes/onboarding.js";
 import * as presence from "./routes/presence.js";
+import * as badges from "./routes/badges.js";
 import * as dms from "./routes/dms.js";
 import * as notifyRoutes from "./routes/notify.js";
 import * as account from "./routes/account.js";
@@ -119,6 +120,9 @@ const routes = [
   ["POST", "/api/account/real-name", (req, env) => account.setRealNameVisibility(req, env)],
   ["GET", "/api/onboarding", (req, env) => onboarding.getOnboarding(req, env)],
   ["GET", "/api/presence/:id", presence.getPresence],
+  ["GET", "/api/panel/badges", (req, env) => badges.listBadges(req, env)],
+  ["POST", "/api/panel/badges", (req, env) => badges.createBadge(req, env)],
+  ["POST", "/api/panel/badges/:id", badges.changeBadge],
   ["GET", "/api/panel/presence", (req, env) => presence.getMyPresence(req, env)],
   ["POST", "/api/panel/presence", (req, env) => presence.setMyPresence(req, env)],
   ["POST", "/api/account/activity", (req, env) => presence.setShowActivity(req, env)],

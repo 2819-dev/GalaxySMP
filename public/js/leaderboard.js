@@ -15,7 +15,7 @@ const FORMAT = {
   kills: (v) => plural(v, "mob"),
   quests: (v) => plural(v, "quest"),
   streak: (v) => `${v.toLocaleString()} day${v === 1 ? "" : "s"}`,
-  achievements: (v) => `${v} badge${v === 1 ? "" : "s"}`,
+  achievements: (v) => `${v} achievement${v === 1 ? "" : "s"}`,
 };
 const SHORT = { money: "Money", playtime: "Playtime", mined: "Mining", placed: "Building", kills: "Mobs", quests: "Quests", streak: "Streak", achievements: "Badges" };
 export const profileUrl = (name) => `/player/${encodeURIComponent(name)}`;

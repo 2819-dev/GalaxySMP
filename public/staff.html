@@ -41,6 +41,7 @@
           <button role="tab" data-tab="words" aria-selected="false">Word filter</button>
           <button role="tab" data-tab="ranks" aria-selected="false" hidden>Ranks</button>
           <button role="tab" data-tab="economy" aria-selected="false" hidden>Economy</button>
+          <button role="tab" data-tab="badges" aria-selected="false" hidden>Badges</button>
           <button role="tab" data-tab="promos" aria-selected="false" hidden>Promo codes</button>
           <button role="tab" data-tab="payments" aria-selected="false" hidden>Payments</button>
           <button role="tab" data-tab="help" aria-selected="false" hidden>Help menu</button>
@@ -158,6 +159,17 @@
             </div>
             <p class="text-3 small" style="margin:0 0 6px">Prices are in dollars. Leave Buy or Sell empty to turn it off for that item. Tap a category to edit it. <span id="eco-status"></span></p>
             <div id="eco-shop"></div>
+          </div>
+        </section>
+
+        <section data-panel="badges" hidden>
+          <div class="panel">
+            <div class="voice-head">
+              <h2>Badges</h2>
+              <div class="row-actions"><button class="btn btn-primary btn-sm" type="button" id="badge-new">New badge</button></div>
+            </div>
+            <p class="text-3 small" style="margin:0 0 12px">Special hexagon awards for events and roles (like "GalaxySMP 25th Anniversary"). They show on profiles and profile cards. Achievements are different: players earn those in game.</p>
+            <div id="badge-list"></div>
           </div>
         </section>
 

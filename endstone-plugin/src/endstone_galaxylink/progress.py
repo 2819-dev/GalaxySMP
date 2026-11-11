@@ -5,7 +5,7 @@ Stats      playtime, blocks mined and placed, mobs killed, deaths, money earned 
            then it starts over at day 1. Missing a day restarts the streak.
            Galaxy+ gets 25% more, Galaxy Pro+ 50% more. Days start at midnight (US Eastern).
 /quests    3 new quests every day: one easy, one medium, one hard. Finishing all 3 gives a Common crate key.
-/achievements  milestones with badges (shown on galaxymc.us profiles) and small money rewards.
+/achievements  milestones (shown on galaxymc.us profiles) and small money rewards.
 /stats [player]  someone's stats.
 
 Rewards are kept small on purpose so the economy stays realistic.
@@ -426,7 +426,7 @@ class Progress:
         for aid, name, desc, emoji, cents, test in ACHIEVEMENTS:
             mark = "§a✔" if aid in got else "§8✖"
             lines.append(f"{mark} §{'f' if aid in got else '7'}§l{name}§r§7: {desc}{f' ({dollars(cents)})' if cents else ''}")
-        form = ActionForm(title="§l§dAchievements", content=f"{len(got)}/{len(ACHIEVEMENTS)} unlocked. Your badges show on your galaxymc.us profile.\n\n" + "\n".join(lines))
+        form = ActionForm(title="§l§dAchievements", content=f"{len(got)}/{len(ACHIEVEMENTS)} unlocked. Your achievements show on your galaxymc.us profile.\n\n" + "\n".join(lines))
         form.add_button("§lMy stats", icon="textures/ui/icon_book_writable", on_click=lambda p: self.stats_menu(p, p))
         form.add_button("Close")
         player.send_form(form)
