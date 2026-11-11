@@ -337,6 +337,7 @@ export class VoiceHub extends DurableObject {
         max: Math.max(0, Number(msg.max) || 0),
         version: String(msg.version || "").slice(0, 40),
         plugin: String(msg.plugin || "").slice(0, 20),
+        iconsPack: String(msg.iconsPack || "").slice(0, 20),
       };
       return this.ctx.storage.put("server", info);
     }

@@ -118,7 +118,11 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
       ? h("div", { class: "panel ov-warn" }, h("b", {}, iconEl("alert"), "The server is running an old GalaxyLink plugin"),
         h("p", { class: "text-2 small", style: "margin:4px 0 0", text: `It's on ${d.server.plugin || "an older version"}, but the website is made for ${d.server.latest}. New features (cosmetics, Night Vision, website moderation, heads...) won't work in game until you install the newest plugin file and restart the server.` }))
       : null;
-    box.replaceChildren(...(warn ? [warn] : []), grid, h("div", { class: "ov-cols" }, quick, h("div", { class: "stack", style: "gap:16px" }, online, recent)));
+    const packWarn = d.server.online && d.server.iconsOutdated
+      ? h("div", { class: "panel ov-warn" }, h("b", {}, iconEl("alert"), "The GalaxySMP Icons pack is old or missing"),
+        h("p", { class: "text-2 small", style: "margin:4px 0 0", text: `The world loads Icons ${d.server.iconsPack}, but ${d.server.latestIcons} is needed. Rank icons, voice icons and the pause-menu logo will look wrong until you upload the newest GalaxySMP_Voice_Icons.mcpack to BDS-Addons and restart.` }))
+      : null;
+    box.replaceChildren(...[warn, packWarn].filter(Boolean), grid, h("div", { class: "ov-cols" }, quick, h("div", { class: "stack", style: "gap:16px" }, online, recent)));
   };
 
   // ---------- Tickets ----------

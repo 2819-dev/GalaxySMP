@@ -290,6 +290,9 @@ class VoiceLink:
             try:
                 from endstone_galaxylink.plugin import VERSION
                 info["plugin"] = VERSION
+                from endstone_galaxylink.ranktags import world_packs
+                icons = [v for p, v in world_packs("resource") if p == "6b0f4c3e-2d1a-4a8e-9c5b-1f7e3a9d2c41"]
+                info["iconsPack"] = ".".join(map(str, max(icons))) if icons else "missing"
             except Exception:
                 pass
             try:
