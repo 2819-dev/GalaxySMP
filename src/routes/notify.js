@@ -80,11 +80,14 @@ export async function testPush(request, env) {
 // ---------- sending ----------
 // userIds: an array of user ids, or "all". kind: a KINDS key (null = always, e.g. a test).
 // Returns how many devices got it.
-export async function notify(env, userIds, kind, message) {
+// options.exclude: user ids that never get this one (e.g. whoever made the announcement)
+export async function notify(env, userIds, kind, message, options = {}) {
   if (!env.VAPID_PRIVATE_KEY) return 0;
   const sql = getDb(env);
-  const ids = userIds === "all" ? null : [...new Set(userIds.map(Number).filter(Boolean))];
+  const skip = new Set((options.exclude || []).map(Number));
+  const ids = userIds === "all" ? null : [...new Set(userIds.map(Number).filter((id) => id && !skip.has(id)))];
   if (ids && !ids.length) return 0;
+  const exclude = [...skip];
   const def = kind ? KINDS[kind].default : true;
   const subs = await sql`
     SELECT s.id, s.endpoint, s.p256dh, s.auth FROM push_subscriptions s
@@ -92,8 +95,10 @@ export async function notify(env, userIds, kind, message) {
       LEFT JOIN notification_prefs n ON n.user_id = s.user_id
      WHERE NOT u.banned
        AND (${ids === null} OR s.user_id = ANY(${ids || []}::bigint[]))
+       AND NOT (s.user_id = ANY(${exclude}::bigint[]))
        AND (${kind === null} OR coalesce((n.prefs ->> ${kind || "x"})::boolean, ${def}))
      LIMIT 2000`;
+  if (env.DEBUG_PUSH) console.log("PUSHDEBUG", kind, JSON.stringify(ids), "exclude", JSON.stringify(exclude), "devices", subs.length);
   if (!subs.length) return 0;
   const payload = {
     title: String(message.title || "GalaxySMP").slice(0, 80),

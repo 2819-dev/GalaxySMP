@@ -25,6 +25,10 @@ export class CommunityHub extends DurableObject {
   // ---------- Connections ----------
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname === "/internal/viewing") { // is this member looking at this chat right now?
+      const viewers = this.viewersOf(url.searchParams.get("view") || "");
+      return Response.json({ viewing: viewers.has(Number(url.searchParams.get("user"))) });
+    }
     if (url.pathname === "/internal/broadcast") {
       const event = await request.json();
       this.handleInternal(event);
@@ -42,6 +46,24 @@ export class CommunityHub extends DurableObject {
     this.send(server, { type: "hello", online: this.onlineUserIds() });
     if (!wasOnline) this.broadcast({ type: "presence", userId: user.id, online: true }, server);
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  // Members who have this chat open on screen right now ("chat", "dm:12"...): they don't need a
+  // notification for it. Pages say what they show when it changes, and again every few minutes.
+  viewersOf(view) {
+    const ids = new Set();
+    if (!view) return ids;
+    const fresh = Date.now() - 10 * 60_000;
+    for (const ws of this.ctx.getWebSockets()) {
+      const u = ws.deserializeAttachment();
+      if (u?.viewing === view && (u.viewingAt || 0) > fresh) ids.add(Number(u.id));
+    }
+    return ids;
+  }
+
+  onViewing(ws, user, msg) {
+    const view = typeof msg.view === "string" && /^[a-z0-9:_-]{1,40}$/.test(msg.view) ? msg.view : null;
+    ws.serializeAttachment({ ...user, viewing: view, viewingAt: Date.now() });
   }
 
   socketsFor(userId) {
@@ -145,6 +167,7 @@ export class CommunityHub extends DurableObject {
       else if (msg.type === "react") await this.onReact(ws, user, msg);
       else if (msg.type === "seen") await this.onSeen(user, msg);
       else if (msg.type === "edit") await this.onEdit(ws, user, msg);
+      else if (msg.type === "viewing") this.onViewing(ws, user, msg);
     } catch (e) {
       console.error("hub error", e);
       this.send(ws, { type: "error", nonce: msg.nonce, message: "Something went wrong. Please try again." });
@@ -234,7 +257,8 @@ export class CommunityHub extends DurableObject {
     const [ch] = await sql`SELECT slug, name FROM channels WHERE id = ${channelId}`;
     if (!ch) return;
     if (ch.slug === "announcements") {
-      await notify(this.env, "all", "updates", { title: `New in #${ch.name}`, body: text, url: `/community#${ch.slug}`, tag: `ann-${messageId}`, ttl: 24 * 3600 });
+      await notify(this.env, "all", "updates", { title: `New in #${ch.name}`, body: text, url: `/community#${ch.slug}`, tag: `ann-${messageId}`, ttl: 24 * 3600 },
+        { exclude: [user.id, ...this.viewersOf(ch.slug)] });
       return;
     }
     const lower = text.toLowerCase();
@@ -244,7 +268,8 @@ export class CommunityHub extends DurableObject {
       const ids = everyone ? "all" : [...new Set([...this.onlineUserIds(),
         ...(await sql`SELECT u.id FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE p.online_at > now() - interval '150 seconds'`).map((r) => Number(r.id))])]
         .filter((id) => id !== user.id);
-      await notify(this.env, ids, "mentions", { title: `${user.username} in #${ch.name}`, body: text, url: `/community#${ch.slug}`, tag: `chat-${ch.slug}` });
+      await notify(this.env, ids, "mentions", { title: `${user.username} in #${ch.name}`, body: text, url: `/community#${ch.slug}`, tag: `chat-${ch.slug}` },
+        { exclude: [user.id, ...this.viewersOf(ch.slug)] });
       return;
     }
     const targets = await sql`
@@ -256,7 +281,7 @@ export class CommunityHub extends DurableObject {
     if (targets.length) {
       await notify(this.env, targets.map((t) => t.id), "mentions", {
         title: `${user.username} in #${ch.name}`, body: text, url: `/community#${ch.slug}`, tag: `chat-${ch.slug}`,
-      });
+      }, { exclude: [...this.viewersOf(ch.slug)] });
     }
   }
 

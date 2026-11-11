@@ -218,6 +218,22 @@ function renderChannels() {
   }
 }
 
+// ---------- What's on screen (so you aren't notified about a chat you're already looking at) ----------
+function setView(view) {
+  state.view = view || null;
+  reportView();
+}
+function reportView() {
+  const looking = document.visibilityState === "visible" && document.hasFocus();
+  const view = looking ? state.view : null;
+  if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+  state.ws.send(JSON.stringify({ type: "viewing", view }));
+}
+document.addEventListener("visibilitychange", reportView);
+window.addEventListener("focus", reportView);
+window.addEventListener("blur", reportView);
+setInterval(reportView, 4 * 60_000); // still looking: say so again now and then
+
 async function selectChannel(id) {
   state.channelId = id;
   state.unread.delete(id);
@@ -234,8 +250,9 @@ async function selectChannel(id) {
   $("messages").hidden = special;
   document.querySelector(".composer-wrap").hidden = special;
   $("jump-latest").hidden = true;
+  setView(ch.kind === "dms" ? (state.dmWith ? `dm:${state.dmWith}` : "dms") : ch.slug);
   if (special) {
-    showPanel(ch, { me: state.me, toast, dmWith: state.dmWith, members: state.members });
+    showPanel(ch, { me: state.me, toast, dmWith: state.dmWith, members: state.members, setView });
     state.dmWith = null;
     return;
   }
@@ -724,6 +741,7 @@ function connect() {
     clearInterval(state.pingTimer);
     state.pingTimer = setInterval(() => ws.readyState === WebSocket.OPEN && ws.send("ping"), 25_000);
     if (reconnecting) loadMessages().catch(() => {});
+    reportView();
   });
 
   ws.addEventListener("message", (e) => {

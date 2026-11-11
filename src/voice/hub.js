@@ -334,7 +334,17 @@ export class VoiceHub extends DurableObject {
     }
     if (msg.type === "announcement") { // a staff announcement in game: notify members who want them
       const text = String(msg.text || "").slice(0, 200);
-      if (text) this.ctx.waitUntil(notify(this.env, "all", "announcements", { title: "GalaxySMP announcement", body: text, url: "/", tag: "announcement", ttl: 3 * 3600 }).catch(() => {}));
+      if (text) {
+        const by = String(msg.by || "").toLowerCase().slice(0, 40);
+        this.ctx.waitUntil((async () => {
+          // not the person who made it (their website account, or the account linked to their Minecraft name)
+          const sql = getDb(this.env);
+          const own = by ? await sql`SELECT u.id FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid
+                                     WHERE u.username_lower = ${by} OR lower(p.gamertag) = ${by}` : [];
+          await notify(this.env, "all", "announcements", { title: "GalaxySMP announcement", body: text, url: "/", tag: "announcement", ttl: 3 * 3600 },
+            { exclude: own.map((r) => Number(r.id)) });
+        })().catch(() => {}));
+      }
       return;
     }
     if (msg.type === "chatfilter_state") {

@@ -61,8 +61,9 @@ async function sendDm(env, sql, from, to, text, via) {
   const [msg] = await sql`INSERT INTO dm_messages (thread_id, sender_id, body, via) VALUES (${thread.id}, ${from.id}, ${check.text}, ${via}) RETURNING id, created_at`;
   const out = { id: Number(msg.id), threadId: Number(thread.id), from: Number(from.id), fromName: from.username, to: Number(to.id), body: check.text, at: msg.created_at, via };
   await notify(env, out);
-  try { // phone/computer notification for the recipient
-    await pushNotify(env, [to.id], "dms", { title: `Message from ${from.username}`, body: check.text, url: "/community#messages", tag: `dm-${from.id}` });
+  try { // phone/computer notification for the recipient, unless they have this conversation open right now
+    const r = await hubStub(env).fetch(`https://hub/internal/viewing?user=${Number(to.id)}&view=dm:${Number(from.id)}`).then((x) => x.json()).catch(() => ({}));
+    if (!r.viewing) await pushNotify(env, [to.id], "dms", { title: `Message from ${from.username}`, body: check.text, url: "/community#messages", tag: `dm-${from.id}` });
   } catch { /* best effort */ }
   // in game: show it to the recipient if they're playing (the plugin delivers game-to-game DMs itself)
   if (via === "web" && to.xuid) {

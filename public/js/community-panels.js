@@ -383,6 +383,7 @@ function renderDMs(p) {
 
   async function open(userId) {
     current = userId;
+    ctx.setView?.(`dm:${userId}`);
     wrap.classList.add("has-open");
     side.querySelectorAll(".dm-row").forEach((r) => r.classList.remove("active"));
     let d;
@@ -400,7 +401,7 @@ function renderDMs(p) {
       } }],
     }));
     const head = h("div", { class: "dm-head" },
-      h("button", { class: "btn btn-ghost btn-sm dm-back", type: "button", text: "← Back", onclick: () => { current = null; wrap.classList.remove("has-open"); loadList(); } }),
+      h("button", { class: "btn btn-ghost btn-sm dm-back", type: "button", text: "← Back", onclick: () => { current = null; ctx.setView?.("dms"); wrap.classList.remove("has-open"); loadList(); } }),
       dmFace(d.other.head, d.other.username),
       h("div", { class: "dm-head-main" }, h("b", { text: d.other.username }),
         h("span", { class: "text-3 small", text: d.other.inGame ? "Playing on GalaxySMP: they'll see this in game" : "Not in game right now" })),
