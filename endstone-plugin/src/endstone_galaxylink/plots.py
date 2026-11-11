@@ -878,6 +878,10 @@ class Plots:
     # ---------- /plot ----------
     def command(self, player, args):
         what = " ".join(args).strip().lower()
+        # Operators: /plot shovel <player> or /plot manager <player> gives that player the tool.
+        first, _, rest = what.partition(" ")
+        if rest and first in ("shovel", "claim", "manager", "clock") and getattr(player, "is_op", True):
+            return self.give_to(player, "shovel" if first in ("shovel", "claim") else "manager", rest.strip())
         if what in ("shovel", "claim"):
             if self.has_tool(player, "shovel"):
                 player.send_message("§eYou already have a Plot Claiming Shovel.")
@@ -900,6 +904,22 @@ class Plots:
             player.send_message("\n".join(lines) or "§7No plots yet.")
         else:
             self.open_manager(player)
+
+    def give_to(self, sender, kind, name):
+        """An operator gives another (online) player a Plot Claiming Shovel or Plot Manager."""
+        online = list(self.plugin.server.online_players)
+        target = next((p for p in online if p.name.lower() == name), None) or \
+            next((p for p in online if p.name.lower().startswith(name)), None)
+        tool = "Plot Claiming Shovel" if kind == "shovel" else "Plot Manager"
+        if target is None:
+            return sender.send_message(f"§c{name} isn't online.")
+        if self.has_tool(target, kind):
+            return sender.send_message(f"§e{target.name} already has a {tool}.")
+        if kind == "manager" and not self.owned(target.xuid):
+            return sender.send_message(f"§e{target.name} doesn't have a plot yet.")
+        self.give_tool(target, kind)
+        target.send_message(f"§aYou got a {tool} from {getattr(sender, 'name', 'staff')}. §7If your inventory was full, it's on the ground at your feet.")
+        sender.send_message(f"§aGave {target.name} a {tool}.")
 
     def give_axe(self, player):
         self.give_tool(player, "axe")
