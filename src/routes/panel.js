@@ -13,7 +13,7 @@ import { sendPlans } from "./plans.js";
 import { SHOP_ITEMS, SHOP } from "../store/shop.js";
 
 const MOD = 50;
-export const LATEST_PLUGIN = "2.23.1"; // the GalaxyLink version made for this website
+export const LATEST_PLUGIN = "2.23.2"; // the GalaxyLink version made for this website
 export const LATEST_ICONS = "1.9.0"; // the GalaxySMP Icons resource pack version that goes with it
 const older = (a, b) => { const x = String(a).split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
 const ADMIN = 100;
@@ -193,7 +193,7 @@ const GAME_ACTIONS = { warn: MOD, mute: MOD, unmute: MOD, kick: MOD, ban: ADMIN,
 
 export async function playerAction(request, env, ctx, url, params) {
   const action = String(params.action);
-  const needed = ["givekey", "note-delete", "shopgive"].includes(action) ? ADMIN : GAME_ACTIONS[action] ?? (action === "note" ? MOD : null);
+  const needed = ["givekey", "note-delete", "shopgive", "setop"].includes(action) ? ADMIN : GAME_ACTIONS[action] ?? (action === "note" ? MOD : null);
   if (needed == null) throw new HttpError(400, "Unknown action.");
   const user = await requireStaff(request, env, needed);
   const body = await readJson(request);
@@ -225,6 +225,17 @@ export async function playerAction(request, env, ctx, url, params) {
     if (!sent) throw new HttpError(409, "The Minecraft server isn't connected right now. Try again when it's online.");
     await audit(sql, user.id, "game.givekey", { player: p.gamertag, kind, amount });
     return json({ ok: true });
+  }
+
+  // operator on/off (owner only). Works on operator status left over from a Realm, which /deop can't remove.
+  if (action === "setop") {
+    if (!user.owner) throw new HttpError(403, "Only the owner can change operators.");
+    const op = Boolean(body.op);
+    const sent = await toPlugin(env, { type: "setop", xuid: p.xuid, name: p.gamertag, op, by: user.username });
+    if (!sent) throw new HttpError(409, "The Minecraft server isn't connected right now. Try again when it's online.");
+    await sql`UPDATE players SET is_op = ${op} WHERE xuid = ${p.xuid}`;
+    await audit(sql, user.id, op ? "game.op" : "game.deop", { player: p.gamertag });
+    return json({ ok: true, message: op ? `${p.gamertag} is now an operator.` : `${p.gamertag} is no longer an operator. If they're offline, it happens when they next join.` });
   }
 
   // in-game moderation

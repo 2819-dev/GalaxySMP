@@ -45,7 +45,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.23.1"
+VERSION = "2.23.2"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -260,8 +260,55 @@ class GalaxyLink(Plugin):
                 p.name_tag = self.compose_tag(p, None)
 
     @event_handler
+    # ---------- operator on/off from the website (Control Panel, owner only) ----------
+    # Operator status saved by an old Realm lives in the player's own data, so the server's /deop
+    # can't remove it. Setting it on the player directly does. Offline players get it when they join.
+    def _pending_ops_file(self):
+        from pathlib import Path
+        folder = Path(self.data_folder)
+        folder.mkdir(parents=True, exist_ok=True)
+        return folder / "pending_ops.json"
+
+    def _pending_ops(self):
+        try:
+            return json.loads(self._pending_ops_file().read_text("utf-8"))
+        except Exception:
+            return {}
+
+    def _save_pending_ops(self, data):
+        try:
+            self._pending_ops_file().write_text(json.dumps(data), "utf-8")
+        except Exception as e:
+            self.logger.warning(f"Couldn't save the operator change: {e}")
+
+    def _apply_op(self, player, op):
+        player.is_op = op
+        safe = player.name.replace('"', "")
+        try:  # keep the server's own operator list in step
+            self.server.dispatch_command(self.server.command_sender, f'{"op" if op else "deop"} "{safe}"')
+        except Exception:
+            pass
+        player.send_message("§aYou're now an operator." if op else "§eYou're no longer an operator.")
+
+    def set_operator(self, xuid, name, op, by):
+        player = next((p for p in self.server.online_players if str(p.xuid) == xuid), None)
+        if player:
+            self._apply_op(player, op)
+            self.logger.info(f"[Website] {by} {'made' if op else 'removed'} operator {'' if op else 'from '}{player.name}")
+        else:
+            pending = self._pending_ops()
+            pending[xuid] = op
+            self._save_pending_ops(pending)
+            self.logger.info(f"[Website] {by}: {name} will {'become' if op else 'stop being'} an operator when they next join")
+
     def on_player_join(self, event: PlayerJoinEvent):
         player = event.player
+        pending = self._pending_ops()
+        if str(player.xuid) in pending:
+            try:
+                self._apply_op(player, bool(pending.pop(str(player.xuid))))
+            finally:
+                self._save_pending_ops(pending)
         self.ranks.apply_permissions(player)
         self.server.scheduler.run_task(self, self.ranks.refresh_pictures, delay=40)  # a new gradient name gets its pictures
         self.economy.on_join(player)

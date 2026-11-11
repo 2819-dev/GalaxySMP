@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.23.1",
+                    "User-Agent": "GalaxyLink-Endstone/2.23.2",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -230,6 +230,8 @@ class VoiceLink:
         elif msg.get("type") == "givekey":
             self._on_main(lambda: self.plugin.crates.give_keys(WebActor(msg.get("by")), str(msg.get("name") or ""),
                                                                str(msg.get("kind") or "common"), max(1, min(1000, int(msg.get("amount") or 1)))))
+        elif msg.get("type") == "setop":
+            self._on_main(lambda: self.plugin.set_operator(str(msg.get("xuid") or ""), str(msg.get("name") or ""), bool(msg.get("op")), str(msg.get("by") or "the website")))
         elif msg.get("type") == "icons":
             self.wanted = {k.lower(): v for k, v in (msg.get("icons") or {}).items()}
             self.plugin.server.scheduler.run_task(self.plugin, self._apply_icons)

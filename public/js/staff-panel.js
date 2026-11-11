@@ -28,7 +28,7 @@ const fmt = (d) => (d ? new Date(d).toLocaleString([], { month: "short", day: "n
 const PLAN_NAMES = { plus: "Galaxy+", pro: "Galaxy Pro+" };
 const KIND_WORDS = { warn: "Warned", mute: "Muted", unmute: "Unmuted", kick: "Kicked", ban: "Banned", unban: "Unbanned" };
 const ACTION_WORDS = {
-  "ticket.update": "updated a ticket", "game.announce": "announced in game", "game.givekey": "gave crate keys", "game.warn": "warned a player",
+  "ticket.update": "updated a ticket", "game.announce": "announced in game", "game.givekey": "gave crate keys", "game.op": "made a player operator", "game.deop": "removed an operator", "game.warn": "warned a player",
   "game.mute": "muted a player", "game.unmute": "unmuted a player", "game.kick": "kicked a player", "game.ban": "banned a player", "game.unban": "unbanned a player",
   "rank.assign": "gave a rank", "rank.remove": "removed a rank", "rank.update": "edited a rank", "rank.create": "made a rank", "rank.delete": "deleted a rank",
   "plan.give": "gave a plan", "plan.remove": "removed a plan", "economy.money": "changed money", "economy.shop": "changed shop prices", "promo.create": "made a promo code", "promo.pause": "paused a promo code", "promo.resume": "turned on a promo code", "promo.delete": "deleted a promo code",
@@ -268,7 +268,17 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
         act("Kick", "btn-secondary", gameAction("kick", "Kick", { reasonRequired: true, text: "They're removed from the server but can join again." })),
         p.banned ? act("Unban", "btn-secondary", gameAction("unban", "Unban", { noReason: true }), true)
           : act("Ban", "btn-danger", gameAction("ban", "Ban", { lengths: [...LEN, ["perm", "Permanent"]], defaultLen: "perm", danger: true, reasonRequired: true }), true),
-        act("Give crate keys", "btn-secondary", () => keyDialog(p, xuid, reload), true, "key")),
+        act("Give crate keys", "btn-secondary", () => keyDialog(p, xuid, reload), true, "key"),
+        owner ? act(p.op ? "Remove operator" : "Make operator", p.op ? "btn-danger" : "btn-secondary", () => openDialog({
+          title: p.op ? `Remove operator from ${p.name}?` : `Make ${p.name} an operator?`,
+          body: h("p", { class: "text-2", text: p.op
+            ? "They lose operator commands and creative tools. This also works on operator status left over from the old Realm, which /deop can't remove. If they're offline, it happens when they next join."
+            : "Operators can use every command in game, including /gamemode and /give. Only give this to people you trust." }),
+          actions: [{ label: "Cancel" }, { label: p.op ? "Remove operator" : "Make operator", kind: p.op ? "danger" : "primary", onClick: async () => {
+            const r = await postJson(`/api/mod/players/${xuid}/setop`, { op: !p.op });
+            reload(r.message);
+          } }],
+        }), true) : null),
 
       admin ? h("h4", { text: "Rank, plan and money" }) : null,
       admin ? h("div", { class: "pc-actions" },
