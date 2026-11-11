@@ -12,6 +12,7 @@ import { createCheckout, verifyWebhook, stripe } from "../lib/stripe.js";
 import { giveShopItem } from "./panel.js";
 import { sendPlans, PLANS } from "./plans.js";
 import { isOwner } from "../lib/names.js";
+import { headUrlFor } from "./heads.js";
 import { notify as pushNotify } from "./notify.js";
 
 // What can be bought now ("plans" = subscriptions). The rest show "Coming soon".
@@ -188,7 +189,9 @@ export async function gift(request, env) {
   const cents = Math.round(Number(body.amount) * 100);
   if (!Number.isFinite(cents) || cents < GIFT_MIN) throw new HttpError(400, `Gifts start at ${usd(GIFT_MIN)}.`);
   const name = String(body.to || "").trim().toLowerCase().slice(0, 32);
-  const [to] = name ? await sql`SELECT id, username, banned FROM users WHERE username_lower = ${name}` : [];
+  const toId = Number(body.toId) || 0;
+  const [to] = toId ? await sql`SELECT id, username, banned FROM users WHERE id = ${toId}`
+    : name ? await sql`SELECT id, username, banned FROM users WHERE username_lower = ${name}` : [];
   if (!to || to.banned) throw new HttpError(404, "There's no member with that name.");
   if (Number(to.id) === Number(user.id)) throw new HttpError(400, "You can't gift credits to yourself.");
   if (ownerOf(env, user)) {
@@ -343,4 +346,17 @@ export async function ownerCredits(request, env) {
   }
   await audit(sql, user.id, body.action === "take" ? "credits.take" : "credits.give", { to: to.username, cents });
   return json({ ok: true, credits: (await balance(sql, to.id)) / 100, message: body.action === "take" ? `Took ${usd(cents)} of credits from ${to.username}.` : `Gave ${to.username} ${usd(cents)} of credits.` });
+}
+
+// GET /api/store/members?q=ab : members whose name starts with what was typed (for picking who to gift)
+export async function findMembers(request, env, ctx, url) {
+  const user = await requireUser(request, env);
+  const q = String(url.searchParams.get("q") || "").trim().toLowerCase().slice(0, 32);
+  if (q.length < 2) return json({ ok: true, members: [] });
+  const sql = getDb(env);
+  const rows = await sql`
+    SELECT u.id, u.username, p.xuid, p.head_at, p.gamerpic_at FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid
+     WHERE NOT u.banned AND u.id <> ${user.id} AND u.username_lower LIKE ${q.replace(/[%_\\]/g, "\\$&") + "%"}
+     ORDER BY length(u.username), u.username_lower LIMIT 8`;
+  return json({ ok: true, members: rows.map((r) => ({ id: Number(r.id), username: r.username, head: headUrlFor(r) })) });
 }

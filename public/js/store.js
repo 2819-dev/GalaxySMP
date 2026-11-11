@@ -4,6 +4,7 @@ import { toast, iconEl } from "/js/site.js";
 import { rankTag } from "/js/rank-paint.js";
 import { moneyDollars } from "/js/money.js";
 import { h, openDialog, postJson } from "/js/dialog.js";
+import { faceSvg } from "/js/face.js";
 
 const usd = (n) => `$${Number(n).toFixed(2)}`;
 const PERKS_SHOWN = 6;
@@ -321,23 +322,67 @@ function renderCredits() {
 }
 
 function giftDialog() {
-  const to = h("input", { class: "input", id: "gift-to", placeholder: "Their website name", autocomplete: "off", maxlength: 32 });
+  let chosen = null; // { id, username, head }
+  const search = h("input", { class: "input", id: "gift-to", placeholder: "Type the first letters of their name", autocomplete: "off", maxlength: 32, autocapitalize: "off", spellcheck: "false" });
+  const list = h("div", { class: "gift-list", role: "listbox", "aria-label": "Members" });
+  const picked = h("div", { class: "gift-picked", hidden: true });
   const amount = h("input", { class: "input", id: "gift-amount", type: "number", min: 1, step: "0.01", value: "1.00", inputmode: "decimal" });
+  const face = (m) => {
+    const img = h("img", { class: "gift-face", alt: "", width: 28, height: 28 });
+    img.src = m.head || faceSvg(m.username);
+    img.addEventListener("error", () => { img.src = faceSvg(m.username); }, { once: true });
+    return img;
+  };
+  const pick = (m) => {
+    chosen = m;
+    search.hidden = true;
+    list.replaceChildren();
+    const change = h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Change" });
+    change.addEventListener("click", () => { chosen = null; picked.hidden = true; search.hidden = false; search.value = ""; search.focus(); });
+    picked.replaceChildren(face(m), h("b", { text: m.username }), change);
+    picked.hidden = false;
+    amount.focus();
+  };
+  let timer = null;
+  let asked = "";
+  search.addEventListener("input", () => {
+    clearTimeout(timer);
+    const q = search.value.trim();
+    if (q.length < 2) {
+      list.replaceChildren(q ? h("p", { class: "text-3 small gift-hint", text: "Keep typing…" }) : "");
+      return;
+    }
+    timer = setTimeout(async () => {
+      asked = q;
+      let d;
+      try { d = await (await fetch(`/api/store/members?q=${encodeURIComponent(q)}`, { credentials: "same-origin" })).json(); } catch { return; }
+      if (asked !== q || chosen) return;
+      list.replaceChildren(...(d.members?.length
+        ? d.members.map((m) => {
+          const b = h("button", { class: "gift-option", type: "button", role: "option" }, face(m), h("span", { text: m.username }));
+          b.addEventListener("click", () => pick(m));
+          return b;
+        })
+        : [h("p", { class: "text-3 small gift-hint", text: "No members start with that." })]));
+    }, 200);
+  });
   openDialog({
     title: "Gift credits",
     body: h("div", {},
       h("p", { class: "text-2", style: "margin-top:0", text: me.infinite ? "As the owner your credits are unlimited, so gifts don't cost you anything. They aren't real money." : `You have ${usd(me.credits || 0)} of credits. Gifts can't be undone, so check the name. Up to $50 a day.` }),
-      h("div", { class: "field" }, h("label", { class: "field-label", for: "gift-to", text: "Send to" }), to),
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "gift-to", text: "Send to" }), search, picked, list),
       h("div", { class: "field" }, h("label", { class: "field-label", for: "gift-amount", text: "Amount ($)" }), amount)),
     actions: [{ label: "Cancel" }, {
       label: "Send gift", kind: "primary", onClick: async () => {
-        const r = await postJson("/api/store/gift", { to: to.value, amount: amount.value });
+        if (!chosen) throw new Error("Pick who to send it to from the list.");
+        const r = await postJson("/api/store/gift", { toId: chosen.id, amount: amount.value });
         toast(r.message);
         await refreshMine();
         renderStrip();
       },
     }],
   });
+  setTimeout(() => search.focus(), 50);
 }
 
 function renderAll() {

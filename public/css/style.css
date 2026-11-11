@@ -1564,3 +1564,12 @@ textarea.input.dm-input { resize: none; min-height: 44px; max-height: 140px; ove
 .pay-amount { font-variant-numeric: tabular-nums; }
 .promo-status.bad { background: rgba(255,107,107,.16); color: #ff9b9b; }
 @media (max-width: 640px) { .pay-tiles { grid-template-columns: 1fr 1fr; } }
+
+/* Gift credits: pick a member */
+.gift-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.gift-option { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.gift-option:hover, .gift-option:focus-visible { border-color: var(--accent); }
+.gift-face { width: 28px; height: 28px; border-radius: 7px; image-rendering: pixelated; flex: none; background: var(--surface-3, #232a52); }
+.gift-picked { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(36,87,235,.16); }
+.gift-picked b { flex: 1; }
+.gift-hint { margin: 4px 2px 0; }
