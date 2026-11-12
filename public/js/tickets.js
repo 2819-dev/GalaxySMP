@@ -60,7 +60,7 @@ export function ticketChat(box, id, opts) {
   let lastCount = -1;
   const head = h("div", { class: "tk-head" });
   const log = h("div", { class: "tk-log", role: "log", "aria-live": "polite" });
-  const input = h("textarea", { class: "input tk-input", rows: 2, maxlength: 500, placeholder: staff ? "Reply as staff..." : "Write a message to staff...", "aria-label": "Message" });
+  const input = h("textarea", { class: "input tk-input", rows: 2, maxlength: staff ? 2000 : 500, placeholder: staff ? "Reply as staff..." : "Write a message to staff...", "aria-label": "Message" });
   const send = h("button", { class: "btn btn-primary", type: "button", text: "Send" });
   const composer = h("div", { class: "tk-composer" }, input, send);
   const controls = h("div", { class: "tk-controls" });

@@ -3,6 +3,8 @@
 import config from "../../public/config.js";
 
 export const MAX_LENGTH = 500;
+export const STAFF_MAX_LENGTH = 2000;  // staff (Moderators and up) can write longer messages
+export const maxLengthFor = (power) => (Number(power) >= 50 ? STAFF_MAX_LENGTH : MAX_LENGTH);
 
 const LEET = { "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b", "@": "a", "$": "s", "!": "i", "|": "i", "€": "e" };
 
@@ -110,8 +112,10 @@ export function checkMessage(raw, compiledWords, opts = {}) {
   let text = String(raw ?? "").replace(/\r\n?/g, "\n").replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, "");
   text = text.replace(/\n{3,}/g, "\n\n").trim();
   if (!text) return blocked("empty", "Your message is empty.");
-  if (text.length > MAX_LENGTH) return blocked("length", `Messages can be at most ${MAX_LENGTH} characters.`);
-  if (text.split("\n").length > 20) return blocked("spam", "Please keep messages to 20 lines or fewer.");
+  const max = opts.maxLength || MAX_LENGTH;
+  const maxLines = max > MAX_LENGTH ? 60 : 20;
+  if (text.length > max) return blocked("length", `Messages can be at most ${max.toLocaleString("en-US")} characters.`);
+  if (text.split("\n").length > maxLines) return blocked("spam", `Please keep messages to ${maxLines} lines or fewer.`);
 
   let scan = text.toLowerCase();
   for (const own of OWN_ADDRESSES) scan = scan.split(own).join(" ");

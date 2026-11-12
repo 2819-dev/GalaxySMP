@@ -6,7 +6,7 @@ import { getDb } from "../lib/db.js";
 import { json, HttpError } from "../lib/http.js";
 import { requireUser, publicUser } from "../lib/auth.js";
 import { REACTIONS, loadHistory, rankOf, loadAround, loadPins, searchMessages, loadMessage } from "../chat/messages.js";
-import { MAX_LENGTH } from "../lib/filter.js";
+import { maxLengthFor } from "../lib/filter.js";
 import { headUrlFor } from "./heads.js";
 import { displayRank, loadPlanPriority } from "./ranks.js";
 import { PLANS } from "./plans.js";
@@ -79,7 +79,7 @@ export async function bootstrap(request, env) {
         ? { realName: m.real_name, realNameHidden: Boolean(m.real_name_hidden) } : {}),
     })),
     reactions: REACTIONS,
-    maxLength: MAX_LENGTH,
+    maxLength: maxLengthFor(me.role.power),
     ticketUnread,
     dmUnread,
   });

@@ -123,7 +123,7 @@ export async function getTicket(request, env, ctx, url, params) {
 export async function postMessage(request, env, ctx, url, params) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
-  const text = clean(body.body, 500);
+  const text = clean(body.body, isStaff(user) ? 2000 : 500);  // staff can write longer answers
   if (!text) throw new HttpError(400, "Type a message first.");
   const sql = getDb(env);
   const t = await loadTicket(sql, Number(params.id), user);

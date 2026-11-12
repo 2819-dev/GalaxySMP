@@ -793,7 +793,7 @@ function autosize() {
   const t = $("composer-input");
   t.style.height = "auto";
   t.style.height = Math.min(t.scrollHeight, 160) + "px";
-  const left = 500 - t.value.length;
+  const left = (state.maxLength || 500) - t.value.length;
   $("composer-count").textContent = left < 100 ? `${left} characters left` : "";
 }
 
@@ -1153,6 +1153,8 @@ export async function startChat({ onSignedOut }) {
   state.categories = [{ id: DM_CHANNEL, name: "Messages" }, ...data.categories];
   if (data.dmUnread) state.unread.add(DM_CHANNEL);
   state.reactions = data.reactions;
+  state.maxLength = data.maxLength || 500;  // staff can write longer messages
+  $("composer-input").maxLength = state.maxLength;
   try { setCustomEmoji((await api("/api/emoji")).emoji); } catch { /* no custom emoji */ }
   state.roles = new Map(data.roles.map((r) => [r.key, r]));
   state.members = new Map(data.members.map((m) => [m.id, m]));

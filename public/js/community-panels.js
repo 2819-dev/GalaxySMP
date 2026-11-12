@@ -7,7 +7,7 @@ import { iconEl } from "/js/site.js";
 import { renderMarkdown } from "/js/markdown.js";
 import { faceSvg } from "/js/face.js";
 import * as extra from "/js/community-extra.js";
-import { sendTyping, emojiMenu } from "/js/chat.js";
+import { sendTyping, emojiMenu, chatState } from "/js/chat.js";
 
 const panel = () => document.getElementById("channel-panel");
 const voiceBox = () => document.getElementById("voice-embed");
@@ -313,7 +313,7 @@ function renderDMs(p) {
     try { d = await getJson(`/api/dm/with/${userId}`); } catch (e) { main.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
     if (current !== userId) return;
     const log = h("div", { class: "dm-log", role: "log", "aria-live": "polite" });
-    const input = h("textarea", { class: "input dm-input", rows: 1, maxlength: 500, placeholder: `Message ${d.other.username}`, "aria-label": "Message" });
+    const input = h("textarea", { class: "input dm-input", rows: 1, maxlength: chatState.maxLength || 500, placeholder: `Message ${d.other.username}`, "aria-label": "Message" });
     const send = h("button", { class: "btn btn-primary", type: "button", text: "Send" });
     const blockBtn = h("button", { class: "btn btn-ghost btn-sm", type: "button", text: d.blocked ? "Unblock" : "Block" });
     blockBtn.addEventListener("click", () => openDialog({
@@ -353,7 +353,7 @@ function renderDMs(p) {
     };
     const editDm = (node, m) => {
       if (node.querySelector(".dm-edit")) return;
-      const box = h("textarea", { class: "input dm-edit", rows: 2, maxlength: 500 });
+      const box = h("textarea", { class: "input dm-edit", rows: 2, maxlength: chatState.maxLength || 500 });
       box.value = m.body;
       const save = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Save" });
       const cancel = h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Cancel" });

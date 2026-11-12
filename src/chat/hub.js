@@ -3,7 +3,7 @@
 // Uses the WebSocket Hibernation API, so it costs almost nothing while chat is quiet.
 import { DurableObject } from "cloudflare:workers";
 import { getDb } from "../lib/db.js";
-import { checkMessage, compileWordList } from "../lib/filter.js";
+import { checkMessage, compileWordList, maxLengthFor } from "../lib/filter.js";
 import { REACTIONS, loadMessage, loadReactions } from "./messages.js";
 import { notify } from "../routes/notify.js";
 
@@ -236,7 +236,7 @@ export class CommunityHub extends DurableObject {
     if (!Number.isInteger(channelId)) return reject("Unknown channel.");
 
     // Admins (owners included) may post links; everyone else can't.
-    const check = checkMessage(msg.content, await this.wordList(), { allowLinks: (user.power || 0) >= 100 });
+    const check = checkMessage(msg.content, await this.wordList(), { allowLinks: (user.power || 0) >= 100, maxLength: maxLengthFor(user.power) });
     if (!check.ok) return reject(check.message);
     const limited = this.rateCheck(user.id, check.text);
     if (limited) return reject(limited);
@@ -336,7 +336,7 @@ export class CommunityHub extends DurableObject {
     if (!m || m.deleted_at) return reject("That message no longer exists.");
     if (Number(m.user_id) !== Number(user.id)) return reject("You can only edit your own messages.");
     if (m.seen_at) return reject("Someone has already read this message, so it can't be edited. You can delete it instead.");
-    const check = checkMessage(msg.content, await this.wordList(), { allowLinks: (user.power || 0) >= 100 });
+    const check = checkMessage(msg.content, await this.wordList(), { allowLinks: (user.power || 0) >= 100, maxLength: maxLengthFor(user.power) });
     if (!check.ok) return reject(check.message);
     const [u] = await sql`SELECT banned, muted_until FROM users WHERE id = ${user.id}`;
     if (u?.banned || (u?.muted_until && new Date(u.muted_until) > new Date())) return reject("You can't edit messages right now.");
