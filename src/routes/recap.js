@@ -1,10 +1,8 @@
-// Weekly recap: every Monday (from about 10 AM US Eastern) a post in #Updates with last week's
+// Weekly recap: every Monday (from about 10 AM US Eastern) an Updates post (card) in #Updates with last week's
 // highlights: most playtime, richest players, Bedwars, Build of the Week, new members, server uptime
 // and upcoming events. Posted under the owner's account and marked as automatic.
 import { getDb } from "../lib/db.js";
 import { isOwner } from "../lib/names.js";
-import { loadMessage } from "../chat/messages.js";
-import { hubBroadcast } from "./chat.js";
 import { notify } from "./notify.js";
 
 const money = (c) => {
@@ -38,7 +36,7 @@ export async function buildRecap(sql, { from, to } = lastWeek()) {
     sql`SELECT title, starts_at FROM events WHERE deleted_at IS NULL AND starts_at > now() ORDER BY starts_at LIMIT 3`,
   ]);
   const end = new Date(to.getTime() - 864e5);
-  const lines = [`## Weekly recap: ${utcDay(from)} – ${utcDay(end)}`];
+  const lines = [];
   const medal = ["🥇", "🥈", "🥉"];
   if (play.length) lines.push("", "**Most time played**", ...play.map((p, i) => `${medal[i]} ${p.gamertag}: ${hours(Number(p.secs))}`));
   if (rich.length) lines.push("", "**Richest players**", ...rich.map((p, i) => `${medal[i]} ${p.gamertag}: ${money(p.balance_cents)}`));
@@ -48,9 +46,9 @@ export async function buildRecap(sql, { from, to } = lastWeek()) {
   const upSecs = Number(up[0]?.secs || 0);
   if (upSecs) lines.push("", `**Server:** online ${Math.min(100, Math.round((upSecs / (7 * 86400)) * 100))}% of the week, with up to ${up[0].peak} player${Number(up[0].peak) === 1 ? "" : "s"} at once.`);
   if (events.length) lines.push("", "**Coming up**", ...events.map((e) => `- ${e.title}: ${day(e.starts_at)}`));
-  if (lines.length === 1) return null;  // nothing happened: no post
+  if (!lines.length) return null;  // nothing happened: no post
   lines.push("", "-# Posted automatically every Monday.");
-  return lines.join("\n");
+  return { title: `Weekly recap: ${utcDay(from)} – ${utcDay(end)}`, body: lines.join("\n").trim() };
 }
 
 // Called by the 5-minute timer: posts once per week, on Monday from 15:00 UTC.
@@ -63,14 +61,10 @@ export async function weeklyRecap(env, force = false) {
   if (!force && done?.value === week) return;
   await sql`INSERT INTO economy_config (key, value, updated_by) VALUES ('recap_last', ${JSON.stringify(week)}::jsonb, 'server')
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = 'server'`;
-  const text = await buildRecap(sql);
-  if (!text) return;
-  const [ch] = await sql`SELECT id FROM channels WHERE slug = 'updates'`;
+  const recap = await buildRecap(sql);
+  if (!recap) return;
   const owners = await sql`SELECT id, username, platform FROM users WHERE NOT banned ORDER BY id`;
   const author = owners.find((u) => isOwner(env, u.username, u.platform === "bedrock"));
-  if (!ch || !author) return;
-  const [m] = await sql`INSERT INTO messages (channel_id, user_id, content) VALUES (${ch.id}, ${author.id}, ${text}) RETURNING id`;
-  const message = await loadMessage(sql, Number(m.id));
-  if (message) await hubBroadcast(env, { type: "message", message });
-  await notify(env, "all", "minor", { title: "Weekly recap", body: "Last week's top players, Build of the Week and more in #Updates.", url: "/community#updates", tag: `recap-${week}` });
+  await sql`INSERT INTO news_posts (title, body, tag, author_id) VALUES (${recap.title}, ${recap.body}, 'recap', ${author?.id || null})`;
+  await notify(env, "all", "news", { title: recap.title, body: "Last week's top players, Build of the Week and more in #Updates.", url: "/community#updates", tag: `recap-${week}` });
 }

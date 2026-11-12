@@ -285,11 +285,6 @@ export class CommunityHub extends DurableObject {
   async pushFor(sql, user, channelId, messageId, text) {
     const [ch] = await sql`SELECT slug, name FROM channels WHERE id = ${channelId}`;
     if (!ch) return;
-    if (ch.slug === "updates") { // minor announcements: only members who turned "Minor updates" on
-      await notify(this.env, "all", "minor", { title: "New in #Updates", body: text, url: "/community#updates", tag: `upd-${messageId}`, ttl: 24 * 3600 },
-        { exclude: [user.id, ...this.viewersOf(ch.slug)] });
-      return;
-    }
     if (ch.slug === "announcements") {
       await notify(this.env, "all", "updates", { title: `New in #${ch.name}`, body: text, url: `/community#${ch.slug}`, tag: `ann-${messageId}`, ttl: 24 * 3600 },
         { exclude: [user.id, ...this.viewersOf(ch.slug)] });

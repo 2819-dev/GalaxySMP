@@ -132,13 +132,13 @@ function eventDialog(e, done, toast) {
 // =====================================================================
 // News
 // =====================================================================
-const NEWS_TAGS = { news: "News", update: "Update", event: "Event", store: "Store", fix: "Fix" };
+const NEWS_TAGS = { update: "Update", fix: "Fix", news: "News", event: "Event", store: "Store", recap: "Weekly recap" };
 
 export function renderNews(p, { toast }) {
   const list = h("div", { class: "stack", style: "gap:12px" });
   const more = h("button", { class: "btn btn-secondary", type: "button", text: "Older posts", hidden: true });
-  const add = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "New post", hidden: true });
-  p.append(h("div", { class: "cp-wrap" }, intro("What's new on GalaxySMP: updates, new features and fixes.", h("div", { class: "cx-row" }, add)), list, more));
+  const add = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "New update", hidden: true });
+  p.append(h("div", { class: "cp-wrap" }, intro("What's new on GalaxySMP: new features, fixes and the weekly recap every Monday.", h("div", { class: "cx-row" }, add)), list, more));
   let oldest = null;
   async function load(reset) {
     if (reset) { oldest = null; list.replaceChildren(); }
@@ -146,7 +146,7 @@ export function renderNews(p, { toast }) {
     try { d = await getJson(`/api/community/news${oldest ? `?before=${oldest}` : ""}`); } catch (e) { list.append(h("p", { class: "text-3", text: e.message })); return; }
     add.hidden = !d.canManage;
     add.onclick = () => newsDialog(null, () => load(true), toast);
-    if (reset && !d.posts.length) list.append(h("div", { class: "panel empty", text: "No news yet." }));
+    if (reset && !d.posts.length) list.append(h("div", { class: "panel empty", text: "No updates yet." }));
     for (const n of d.posts) list.append(newsCard(n, d.canManage, () => load(true), toast));
     if (d.posts.length) oldest = Math.min(...d.posts.map((n) => n.id));
     more.hidden = !d.hasMore;
@@ -168,20 +168,20 @@ function newsCard(n, canManage, reload, toast) {
       }) }));
   }
   return h("article", { class: "panel nw-card" },
-    h("div", { class: "nw-tags" }, h("span", { class: `nw-tag ${n.tag}`, text: NEWS_TAGS[n.tag] || "News" }), n.pinned ? h("span", { class: "nw-pin" }, iconEl("pin"), "Pinned") : null),
+    h("div", { class: "nw-tags" }, h("span", { class: `nw-tag ${n.tag}`, text: NEWS_TAGS[n.tag] || "News" }), n.pinned ? h("span", { class: "nw-pin" }, iconEl("pushpin"), "Pinned") : null),
     h("h3", { class: "nw-title", text: n.title }), body, foot);
 }
 
 function newsDialog(n, done, toast) {
   const title = h("input", { class: "input", id: "nw-title", maxlength: 100, value: n?.title || "", placeholder: "e.g. Bedwars is here!" });
-  const tag = select("nw-tag", Object.entries(NEWS_TAGS), n?.tag || "news");
+  const tag = select("nw-tag", Object.entries(NEWS_TAGS), n?.tag || "update");
   const body = h("textarea", { class: "input", id: "nw-body", rows: 8, maxlength: 4000, placeholder: "Write the post. **bold**, *italic*, lists with - and links work." });
   body.value = n?.body || "";
   const pinned = h("input", { type: "checkbox", id: "nw-pin", checked: Boolean(n?.pinned) });
   const tell = h("input", { type: "checkbox", id: "nw-notify", checked: !n });
   const game = h("input", { type: "checkbox", id: "nw-game", checked: !n });
   openDialog({
-    title: n ? "Edit post" : "New post",
+    title: n ? "Edit update" : "New update",
     body: h("div", { class: "form" }, field("Title", title), field("Label", tag), field("Post", body),
       h("label", { class: "check" }, pinned, "Pin to the top"),
       n ? null : h("label", { class: "check" }, tell, "Send a notification to everyone"),

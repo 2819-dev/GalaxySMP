@@ -134,7 +134,7 @@ export async function eventAction(request, env, ctx, url, params) {
 // =====================================================================
 // News
 // =====================================================================
-const NEWS_TAGS = ["news", "update", "event", "store", "fix"];
+const NEWS_TAGS = ["news", "update", "event", "store", "fix", "recap"];
 
 export async function newsList(request, env, ctx, url) {
   const user = await requireUser(request, env);
@@ -145,7 +145,7 @@ export async function newsList(request, env, ctx, url) {
      WHERE n.deleted_at IS NULL AND (${before}::bigint IS NULL OR n.id < ${before})
      ORDER BY CASE WHEN ${before}::bigint IS NULL THEN NOT n.pinned ELSE true END, n.id DESC LIMIT 15`;
   return json({
-    ok: true, canManage: isAdmin(user),
+    ok: true, canManage: isStaff(user),
     posts: rows.map((r) => ({ id: Number(r.id), title: r.title, body: r.body, tag: r.tag, pinned: r.pinned, author: r.author || "GalaxySMP", createdAt: r.created_at, editedAt: r.edited_at })),
     hasMore: rows.length === 15,
   });
@@ -153,11 +153,11 @@ export async function newsList(request, env, ctx, url) {
 
 export async function newsSave(request, env) {
   const user = await requireUser(request, env);
-  if (!isAdmin(user)) throw new HttpError(403, "Only Admins can post news.");
+  if (!isStaff(user)) throw new HttpError(403, "Only staff can post updates.");
   const body = await readJson(request, 32768);
   const title = oneLine(body.title, 100);
   const text = clean(body.body, 4000);
-  const tag = NEWS_TAGS.includes(body.tag) ? body.tag : "news";
+  const tag = NEWS_TAGS.includes(body.tag) ? body.tag : "update";
   if (title.length < 3) throw new HttpError(400, "Give the post a title.");
   if (text.length < 3) throw new HttpError(400, "Write the post first.");
   const sql = getDb(env);
@@ -170,14 +170,14 @@ export async function newsSave(request, env) {
   }
   const [row] = await sql`INSERT INTO news_posts (title, body, tag, pinned, author_id) VALUES (${title}, ${text}, ${tag}, ${Boolean(body.pinned)}, ${user.id}) RETURNING id`;
   await audit(sql, user.id, "news.create", { title });
-  if (body.notify) await notify(env, "all", "news", { title: `News: ${title}`, body: text.replace(/[#*_`>\[\]]/g, "").slice(0, 140), url: "/community#news", tag: `news-${row.id}` });
-  if (body.inGame) { try { await toPlugin(env, { type: "announce", text: `News: ${title}. Read it at galaxymc.us`, by: user.username }); } catch { /* server offline */ } }
+  if (body.notify) await notify(env, "all", "news", { title: `Update: ${title}`, body: text.replace(/[#*_`>\[\]]/g, "").slice(0, 140), url: "/community#updates", tag: `news-${row.id}` });
+  if (body.inGame) { try { await toPlugin(env, { type: "announce", text: `Update: ${title}. Read it at galaxymc.us`, by: user.username }); } catch { /* server offline */ } }
   return json({ ok: true, id: Number(row.id) });
 }
 
 export async function newsDelete(request, env, ctx, url, params) {
   const user = await requireUser(request, env);
-  if (!isAdmin(user)) throw new HttpError(403, "Only Admins can remove news.");
+  if (!isStaff(user)) throw new HttpError(403, "Only staff can remove updates.");
   const sql = getDb(env);
   const [row] = await sql`UPDATE news_posts SET deleted_at = now() WHERE id = ${id(params.id)} AND deleted_at IS NULL RETURNING title`;
   if (!row) throw new HttpError(404, "That post no longer exists.");
