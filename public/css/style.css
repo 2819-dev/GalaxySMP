@@ -544,6 +544,12 @@ textarea.input { height: auto; padding: 10px 14px; resize: vertical; min-height:
 .staff-tabs button { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border: 0; border-radius: 7px; background: transparent; color: var(--text-2); font: 600 .92rem var(--font); cursor: pointer; white-space: nowrap; }
 .staff-tabs button[aria-selected="true"] { background: var(--surface-3); color: var(--text); }
 .staff-tabs .count-badge { margin-left: 0; }
+#lb-tabs button { flex: 1 1 0; justify-content: center; padding: 0 8px; }
+#lb-tabs:has(+ .lb-subtabs:not([hidden])) { margin-bottom: 10px; }
+.lb-subtabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+.lb-subtabs button { height: 34px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-2); font: 600 .85rem var(--font); cursor: pointer; }
+.lb-subtabs button:hover { color: var(--text); border-color: var(--text-3); }
+.lb-subtabs button[aria-selected="true"] { background: var(--surface-3); color: var(--text); border-color: var(--surface-3); }
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 .toolbar .input { flex: 1; min-width: 160px; }
 .toolbar select.input { flex: 0 0 auto; width: auto; }

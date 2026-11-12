@@ -14,8 +14,6 @@ const BOARDS = {
   playtime: { col: "playtime_s", title: "Most Playtime" },
   mined: { col: "mined", title: "Top Miners" },
   placed: { col: "placed", title: "Top Builders" },
-  kills: { col: "kills", title: "Top Mob Hunters" },
-  quests: { col: "quests_done", title: "Most Quests" },
   streak: { col: "best_streak", title: "Longest Daily Streak" },
   achievements: { col: "cardinality(achievements)", title: "Most Achievements" },
   bw_wins: { col: "bw_wins", title: "Bedwars Wins" },

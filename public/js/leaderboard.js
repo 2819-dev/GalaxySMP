@@ -12,28 +12,48 @@ const FORMAT = {
   playtime: hours,
   mined: (v) => plural(v, "block"),
   placed: (v) => plural(v, "block"),
-  kills: (v) => plural(v, "mob"),
-  quests: (v) => plural(v, "quest"),
   streak: (v) => `${v.toLocaleString()} day${v === 1 ? "" : "s"}`,
   achievements: (v) => `${v} achievement${v === 1 ? "" : "s"}`,
   bw_wins: (v) => plural(v, "win"),
   bw_finals: (v) => plural(v, "final kill"),
   bw_beds: (v) => plural(v, "bed") + " broken",
 };
-const SHORT = { money: "Money", playtime: "Playtime", mined: "Mining", placed: "Building", kills: "Mobs", quests: "Quests", streak: "Streak", achievements: "Achievements", bw_wins: "Bedwars wins", bw_finals: "Bedwars final kills", bw_beds: "Bedwars beds" };
+const SHORT = { money: "Money", mined: "Mining", placed: "Building", playtime: "Playtime", streak: "Daily streak", achievements: "Achievements", bw_wins: "Wins", bw_finals: "Final kills", bw_beds: "Beds broken" };
+// The leaderboards in 4 groups: pick a group, then one of its boards.
+const GROUPS = [
+  { key: "economy", name: "Economy", boards: ["money"] },
+  { key: "survival", name: "Survival", boards: ["mined", "placed"] },
+  { key: "activity", name: "Activity", boards: ["playtime", "streak", "achievements"] },
+  { key: "bedwars", name: "Bedwars", boards: ["bw_wins", "bw_finals", "bw_beds"] },
+];
+const groupOf = (key) => GROUPS.find((g) => g.boards.includes(key)) || GROUPS[0];
 export const profileUrl = (name) => `/player/${encodeURIComponent(name)}`;
 
 let board = new URLSearchParams(location.search).get("board") || "money";
+if (!GROUPS.some((g) => g.boards.includes(board))) board = "money";
 
-function tabs(list) {
-  const t = $("lb-tabs");
-  t.replaceChildren(...list.map((b) => {
+function pick(key) {
+  board = key;
+  history.replaceState(null, "", key === "money" ? "/leaderboard" : `/leaderboard?board=${key}`);
+  load();
+}
+
+function tabRow(el, items, selected, onPick) {
+  el.replaceChildren(...items.map(([key, label]) => {
     const btn = document.createElement("button");
-    btn.type = "button"; btn.setAttribute("role", "tab"); btn.textContent = SHORT[b.key] || b.title;
-    btn.setAttribute("aria-selected", String(b.key === board));
-    btn.addEventListener("click", () => { board = b.key; history.replaceState(null, "", b.key === "money" ? "/leaderboard" : `/leaderboard?board=${b.key}`); load(); });
+    btn.type = "button"; btn.setAttribute("role", "tab"); btn.textContent = label;
+    btn.setAttribute("aria-selected", String(key === selected));
+    btn.addEventListener("click", () => onPick(key));
     return btn;
   }));
+}
+
+function tabs() {
+  const group = groupOf(board);
+  tabRow($("lb-tabs"), GROUPS.map((g) => [g.key, g.name]), group.key, (k) => pick(GROUPS.find((g) => g.key === k).boards[0]));
+  const sub = $("lb-subtabs");
+  sub.hidden = group.boards.length < 2;
+  tabRow(sub, group.boards.map((b) => [b, SHORT[b]]), board, pick);
 }
 
 async function load() {
@@ -42,7 +62,7 @@ async function load() {
     const res = await fetch(`/api/leaderboards?board=${encodeURIComponent(board)}`);
     const data = await res.json();
     if (!data.ok) throw new Error();
-    tabs(data.boards);
+    tabs();
     $("lb-players").textContent = data.totals.players.toLocaleString();
     $("lb-online").textContent = data.totals.online.toLocaleString();
     $("lb-total").textContent = money(data.totals.money);
