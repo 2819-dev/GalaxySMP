@@ -1,6 +1,7 @@
 // Weekly recap: every Monday (from about 10 AM US Eastern) an Updates post (card) in #Updates with last week's
 // highlights: most playtime, richest players, Bedwars, Build of the Week, new members, server uptime
 // and upcoming events. Posted under the owner's account and marked as automatic.
+import { postTimeline } from "./feed.js";
 import { getDb } from "../lib/db.js";
 import { isOwner } from "../lib/names.js";
 import { notify } from "./notify.js";
@@ -87,6 +88,7 @@ export async function pickPlayerOfWeek(env, sql, { from, to }) {
      GROUP BY p.xuid, p.gamertag, u.id ORDER BY secs DESC LIMIT 1`;
   if (!top || Number(top.secs) < 3600) return null;
   await sql`INSERT INTO player_of_week (week, xuid, gamertag, secs) VALUES (${week}::date, ${top.xuid}, ${top.gamertag}, ${top.secs}) ON CONFLICT DO NOTHING`;
+  await postTimeline(sql, { kind: "potw", xuid: top.xuid, name: top.gamertag, title: "is Player of the Week", detail: `Played ${hours(Number(top.secs))} last week. Congratulations!`, icon: "star", dedupe: `potw:${week}` });
   if (top.user_id) {
     let [badge] = await sql`SELECT id FROM badges WHERE name = 'Player of the Week' ORDER BY id LIMIT 1`;
     if (!badge) [badge] = await sql`INSERT INTO badges (name, description, icon, style) VALUES ('Player of the Week', 'Played the most in a week on GalaxySMP.', 'star', 'galaxy') RETURNING id`;

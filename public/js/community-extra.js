@@ -362,20 +362,26 @@ function viewer(b, start) {
 }
 
 // Shrinks a photo in the browser before sending it (max 1600 px, WebP or JPEG).
-async function shrink(file) {
+// opts.aspect (width / height) crops the middle to that shape, e.g. 1 for a profile picture, 3 for a banner.
+export async function shrink(file, { max = 1600, aspect = null, limit = 680 * 1024 } = {}) {
   if (!/^image\//.test(file.type)) throw new Error(`${file.name} isn't a photo.`);
   const bmp = await createImageBitmap(file).catch(() => { throw new Error(`${file.name} couldn't be opened.`); });
-  const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
-  const w = Math.round(bmp.width * scale), hgt = Math.round(bmp.height * scale);
+  let sx = 0, sy = 0, sw = bmp.width, sh = bmp.height;
+  if (aspect) {
+    if (sw / sh > aspect) { const nw = Math.round(sh * aspect); sx = Math.round((sw - nw) / 2); sw = nw; }
+    else { const nh = Math.round(sw / aspect); sy = Math.round((sh - nh) / 2); sh = nh; }
+  }
+  const scale = Math.min(1, max / Math.max(sw, sh));
+  const w = Math.round(sw * scale), hgt = Math.round(sh * scale);
   const c = document.createElement("canvas");
   c.width = w; c.height = hgt;
-  c.getContext("2d").drawImage(bmp, 0, 0, w, hgt);
+  c.getContext("2d").drawImage(bmp, sx, sy, sw, sh, 0, 0, w, hgt);
   let blob = null;
-  for (const [type, q] of [["image/webp", 0.82], ["image/jpeg", 0.82], ["image/jpeg", 0.65]]) {
+  for (const [type, q] of [["image/webp", 0.82], ["image/jpeg", 0.82], ["image/jpeg", 0.65], ["image/jpeg", 0.5]]) {
     blob = await new Promise((r) => c.toBlob(r, type, q));
-    if (blob && blob.type === type && blob.size < 680 * 1024) break;
+    if (blob && blob.type === type && blob.size < limit) break;
   }
-  if (!blob || blob.size >= 680 * 1024) throw new Error(`${file.name} is too large.`);
+  if (!blob || blob.size >= limit) throw new Error(`${file.name} is too large.`);
   const data = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.readAsDataURL(blob); });
   return { mime: blob.type, data, width: w, height: hgt, preview: URL.createObjectURL(blob) };
 }

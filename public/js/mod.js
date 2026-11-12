@@ -115,6 +115,13 @@ async function memberDialog(m) {
       } else {
         actions.push({ label: "Mute", onClick: () => { setTimeout(() => muteDialog(m, done)); } });
       }
+      // pictures: remove their banner or picture, or stop them uploading
+      const pics = h("div", { class: "cx-row" }, h("span", { class: "field-label", style: "width:100%", text: "Pictures" }),
+        ...[["remove-banner", "Remove banner"], ["remove-picture", "Remove profile picture"], ["block", "Stop uploads"], ["unblock", "Allow uploads"]].map(([action, label]) =>
+          h("button", { class: "btn btn-ghost btn-sm", type: "button", text: label, onclick: async () => {
+            try { const r = await postJson(`/api/mod/users/${m.id}/uploads`, { action }); toast(r.message); } catch (e) { toast(e.message); }
+          } })));
+      body.append(pics);
       if (myPower() >= ADMIN) {
         if (detail?.xuid) actions.push({ label: "Change ranks", onClick: () => { setTimeout(() => rankDialog(detail, done)); } });
         actions.push({ label: "Ban", kind: "danger", onClick: () => { setTimeout(() => banDialog(m, done)); } });

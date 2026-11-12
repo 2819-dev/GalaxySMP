@@ -110,3 +110,45 @@ export async function saveServerControl(request, env) {
   const sent = await toPlugin(env, await pluginMessage(env, sql));
   return json({ ok: true, sent, message: sent ? message : `${message} The Minecraft server isn't connected right now; it gets this as soon as it connects.` });
 }
+
+// ---------- Allowlist (who can join the Minecraft server) ----------
+async function askAllowlist(env, msg) {
+  const { voiceStub } = await import("./voice.js");
+  return voiceStub(env).fetch("https://voice/internal/ask", { method: "POST", body: JSON.stringify({ type: "allowlist", ...msg }) })
+    .then((r) => r.json()).catch(() => ({ ok: false, message: "The Minecraft server isn't connected right now." }));
+}
+
+// GET /api/panel/allowlist: who's on it (live from the server), and who has played but isn't on it
+export async function getAllowlist(request, env) {
+  await requireOwner(request, env);
+  const sql = getDb(env);
+  const a = await askAllowlist(env, { action: "list" });
+  if (!a.ok) return json({ ok: true, connected: false, message: a.message || "The Minecraft server isn't connected right now.", names: [], missing: [] });
+  const on = new Set((a.names || []).map((n) => n.toLowerCase()));
+  const played = await sql`SELECT gamertag FROM players ORDER BY last_seen DESC LIMIT 500`;
+  return json({ ok: true, connected: true, names: a.names || [], missing: played.map((p) => p.gamertag).filter((g) => !on.has(g.toLowerCase())) });
+}
+
+// POST /api/panel/allowlist { action: "add" | "remove" | "add_played", name }
+export async function changeAllowlist(request, env) {
+  const user = await requireOwner(request, env);
+  const sql = getDb(env);
+  const b = await readJson(request);
+  let msg;
+  if (b.action === "add_played") {
+    const cur = await askAllowlist(env, { action: "list" });
+    if (!cur.ok) throw new HttpError(409, cur.message || "The Minecraft server isn't connected right now.");
+    const on = new Set((cur.names || []).map((n) => n.toLowerCase()));
+    const names = (await sql`SELECT gamertag FROM players ORDER BY last_seen DESC LIMIT 200`).map((p) => p.gamertag).filter((g) => !on.has(g.toLowerCase()));
+    if (!names.length) return json({ ok: true, message: "Everyone who has played is already on the allowlist." });
+    msg = { action: "add_many", names, by: user.username };
+  } else if (b.action === "add" || b.action === "remove") {
+    const name = String(b.name || "").replace(/\s+/g, " ").trim().slice(0, 16);
+    if (!/^[A-Za-z0-9 ]{1,16}$/.test(name)) throw new HttpError(400, "Enter a gamertag (letters, numbers and spaces).");
+    msg = { action: b.action, name, by: user.username };
+  } else throw new HttpError(400, "Unknown action.");
+  const a = await askAllowlist(env, msg);
+  if (!a.ok) throw new HttpError(409, a.message || "That didn't work. Is the Minecraft server online?");
+  await sql`INSERT INTO audit_log (actor_id, action, details) VALUES (${user.id}, ${`allowlist.${b.action}`}, ${JSON.stringify({ name: b.name || null })}::jsonb)`;
+  return json({ ok: true, message: a.message });
+}

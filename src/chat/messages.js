@@ -31,11 +31,12 @@ export function formatMessage(r) {
     reactions: (r.reactions || []).map((x) => ({ emoji: x.emoji, users: x.users.map(Number) })),
     pinned: Boolean(r.pinned_at),
     pollId: r.poll_id ? Number(r.poll_id) : null,
+    image: r.image_id ? { id: Number(r.image_id), w: r.image_w, h: r.image_h } : null,
   };
 }
 
 const SELECT = `
-  SELECT m.id, m.channel_id, m.content, m.created_at, m.reply_to, m.seen_at, m.edited_at, m.pinned_at, m.poll_id,
+  SELECT m.id, m.channel_id, m.content, m.created_at, m.reply_to, m.seen_at, m.edited_at, m.pinned_at, m.poll_id, m.image_id, mi.width AS image_w, mi.height AS image_h,
          u.id AS author_id, u.username, r.key AS role_key, r.color,
          rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient, rk.position AS rank_position,
          p.content AS reply_content, pu.username AS reply_username,
@@ -52,7 +53,8 @@ const SELECT = `
     LEFT JOIN player_top_rank prk ON prk.xuid = pl.xuid
     LEFT JOIN ranks rk ON rk.id = prk.rank_id
     LEFT JOIN messages p ON p.id = m.reply_to
-    LEFT JOIN users pu ON pu.id = p.user_id`;
+    LEFT JOIN users pu ON pu.id = p.user_id
+    LEFT JOIN message_images mi ON mi.id = m.image_id`;
 
 export async function loadHistory(sql, channelId, beforeId) {
   const rows = await sql.query(

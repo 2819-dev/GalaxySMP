@@ -1,6 +1,7 @@
 // Subscriptions: Galaxy Free, Galaxy+ and Galaxy Pro+ (defined in the plugin's plans.json so the
 // website and the server always agree). Paid checkout is "coming soon"; Admins can give plans in
 // Staff Tools > Economy. The server applies the perks and takes the monthly in-game fee.
+import { postTimeline } from "./feed.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -77,6 +78,8 @@ export async function adminSetPlan(request, env) {
     await sql`
       INSERT INTO subscriptions (xuid, plan, expires_at, granted_by) VALUES (${player.xuid}, ${plan}, ${expires}, ${user.username})
       ON CONFLICT (xuid) DO UPDATE SET plan = EXCLUDED.plan, expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by`;
+    await postTimeline(sql, { kind: "plan", xuid: player.xuid, name: player.gamertag, title: `got ${PLANS[plan].name}`, detail: "Thanks for supporting GalaxySMP!", icon: "star",
+      dedupe: `plan:${player.xuid}:${plan}:${new Date().toISOString().slice(0, 10)}` });
   } else {
     await sql`DELETE FROM subscriptions WHERE xuid = ${player.xuid}`;
   }

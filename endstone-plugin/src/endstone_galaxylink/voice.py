@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.31.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.32.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -249,20 +249,48 @@ class VoiceLink:
             self.plugin.server.scheduler.run_task(self.plugin, self._apply_icons)
 
     def _allowlist(self, msg):
-        """Adds a gamertag to the server's allowlist (join request approved on galaxymc.us). Always answers."""
-        name = "".join(c for c in str(msg.get("name") or "") if c.isalnum() or c == " ").strip()[:16]
-        ok, text = False, "That gamertag isn't valid."
-        if name:
+        """The server's allowlist from the website (join requests and Control Panel > Server control).
+        action: add (default), remove, add_many, list. Always answers."""
+        import json as _json
+        from pathlib import Path
+        server = self.plugin.server
+        action = str(msg.get("action") or "add")
+        by = str(msg.get("by") or "The owner")[:32]
+
+        def clean(n):
+            return "".join(c for c in str(n or "") if c.isalnum() or c == " ").strip()[:16]
+
+        def run(cmd):
             try:
-                server = self.plugin.server
-                done = server.dispatch_command(server.command_sender, f'allowlist add "{name}"')
-                ok = done is not False
-                text = f"{name} was added to the allowlist." if ok else "The server couldn't add them to the allowlist."
-                self.plugin.logger.info(f"[Website] {str(msg.get('by') or 'The owner')[:32]} approved {name}'s join request: allowlist add -> {ok}")
+                return server.dispatch_command(server.command_sender, cmd) is not False
             except Exception as e:
-                self.plugin.logger.warning(f"Allowlist add failed: {e}")
-                text = "The server couldn't add them to the allowlist."
-        self.send_json({"type": "answer", "req": msg.get("req"), "ok": ok, "message": text})
+                self.plugin.logger.warning(f"Allowlist command failed ({cmd}): {e}")
+                return False
+
+        ok, text, names = True, "", None
+        if action == "list":
+            try:
+                path = Path("allowlist.json")
+                entries = _json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+                names = sorted({str(e.get("name") or "") for e in entries if isinstance(e, dict) and e.get("name")}, key=str.lower)
+            except Exception as e:
+                ok, text = False, f"The allowlist file couldn't be read: {e}"
+        elif action == "remove":
+            name = clean(msg.get("name"))
+            ok = bool(name) and run(f'allowlist remove "{name}"')
+            text = f"{name} was removed from the allowlist." if ok else "That name couldn't be removed."
+            self.plugin.logger.info(f"[Website] {by}: allowlist remove {name} -> {ok}")
+        else:
+            wanted = [clean(n) for n in (msg.get("names") or [msg.get("name")])][:200]
+            wanted = [n for n in wanted if n]
+            done = [n for n in wanted if run(f'allowlist add "{n}"')]
+            ok = bool(done) or not wanted
+            text = (f"{done[0]} was added to the allowlist." if len(done) == 1 else f"{len(done)} players were added to the allowlist.") if done else "That gamertag isn't valid."
+            self.plugin.logger.info(f"[Website] {by}: allowlist add {', '.join(done)} -> {ok}")
+        reply = {"type": "answer", "req": msg.get("req"), "ok": ok, "message": text}
+        if names is not None:
+            reply["names"] = names
+        self.send_json(reply)
 
     def _mod_action(self, msg):
         """Warn / mute / unmute / kick / ban / unban from the staff panel on the website."""

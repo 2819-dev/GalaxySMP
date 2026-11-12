@@ -1,4 +1,6 @@
 // Player stats (sent by the server), leaderboards and public player profiles.
+import { bannerUrl } from "./uploads.js";
+import { postTimeline } from "./feed.js";
 import { badgesFor } from "./badges.js";
 import { rankOf } from "../chat/messages.js";
 import { displayRank, loadPlanPriority } from "./ranks.js";
@@ -28,6 +30,9 @@ export async function recordStats(env, list, online) {
   const players = (Array.isArray(list) ? list : []).filter((p) => p && /^\d{1,20}$/.test(String(p.xuid || ""))).slice(0, 500);
   const onlineIds = (Array.isArray(online) ? online : []).map(String).filter((x) => /^\d{1,20}$/.test(x)).slice(0, 500);
   const sql = getDb(env);
+  // achievements they didn't have before go on #Timeline
+  const before = new Map((await sql`SELECT xuid, achievements FROM players WHERE xuid = ANY(${players.map((p) => String(p.xuid))})`)
+    .map((r) => [r.xuid, new Set(r.achievements || [])]));
   for (let i = 0; i < players.length; i += 100) {
     await sql.transaction(players.slice(i, i + 100).map((p) => {
       const ach = (Array.isArray(p.achievements) ? p.achievements : []).map((a) => String(a).slice(0, 40)).slice(0, 200);
@@ -53,6 +58,21 @@ export async function recordStats(env, list, online) {
                                  online_at = now() WHERE xuid = ANY(${onlineIds})`;
   }
   await recordHistory(sql, players.map((p) => String(p.xuid)), onlineIds).catch((e) => console.error("history failed", e));
+  const defs = new Map((await achievementDefs(sql)).map((a) => [a.id, a]));
+  for (const p of players) {
+    const had = before.get(String(p.xuid));
+    if (!had) continue;  // first time we hear about them: their first join is posted instead
+    const fresh = (Array.isArray(p.achievements) ? p.achievements : []).map(String).filter((a) => !had.has(a) && a !== "welcome" && defs.has(a));
+    if (!fresh.length) continue;
+    const name = String(p.name || "A player").slice(0, 32);
+    if (fresh.length === 1) {
+      const a = defs.get(fresh[0]);
+      await postTimeline(sql, { kind: "achievement", xuid: String(p.xuid), name, title: `unlocked ${a.name}`, detail: a.desc || "", icon: "trophy2", dedupe: `ach:${p.xuid}:${a.id}` });
+    } else {
+      await postTimeline(sql, { kind: "achievement", xuid: String(p.xuid), name, title: `unlocked ${fresh.length} achievements`,
+        detail: fresh.map((x) => defs.get(x).name).join(", "), icon: "trophy2", dedupe: `ach:${p.xuid}:${fresh.sort().join(",")}` });
+    }
+  }
 }
 
 // Timeline and charts: one stats row per player per day, play sessions, and server uptime.
@@ -236,7 +256,7 @@ export async function socialProfile(request, env, ctx, url, params) {
   const name = String(params.name || "").trim().replace(/^\./, "").toLowerCase().slice(0, 32);
   const sql = getDb(env);
   const [u] = await sql`
-    SELECT u.id, u.username, u.created_at, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color
+    SELECT u.id, u.username, u.created_at, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color, u.banner_at, (u.banner IS NOT NULL) AS has_banner
       FROM players p JOIN users u ON u.mc_uuid = p.uuid
      WHERE lower(p.gamertag) = ${name} AND NOT u.banned
      ORDER BY p.last_seen DESC LIMIT 1`;
@@ -249,6 +269,7 @@ export async function socialProfile(request, env, ctx, url, params) {
       id: Number(u.id), username: u.username, since: u.created_at, isMe: me,
       realName: u.real_name && (!u.real_name_hidden || me || staff) ? u.real_name : null, realNameHidden: Boolean(u.real_name_hidden),
       bio: u.bio || null, interests: (u.interests || []).map((i) => INTEREST_NAME[i]).filter(Boolean), color: u.profile_color || null,
+      banner: bannerUrl(u),
     },
   }, 200, { "Cache-Control": "no-store" });
 }

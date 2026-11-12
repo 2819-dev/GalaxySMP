@@ -235,10 +235,14 @@ export class CommunityHub extends DurableObject {
     const channelId = Number(msg.channelId);
     if (!Number.isInteger(channelId)) return reject("Unknown channel.");
 
+    // A picture (uploaded first with POST /api/chat/images) can be sent on its own or with text.
+    const imageId = Number.isInteger(Number(msg.imageId)) && Number(msg.imageId) > 0 ? Number(msg.imageId) : null;
     // Admins (owners included) may post links; everyone else can't.
-    const check = checkMessage(msg.content, await this.wordList(), { allowLinks: (user.power || 0) >= 100, maxLength: maxLengthFor(user.power) });
+    const check = imageId && !String(msg.content || "").trim()
+      ? { ok: true, text: "" }
+      : checkMessage(msg.content, await this.wordList(), { allowLinks: (user.power || 0) >= 100, maxLength: maxLengthFor(user.power) });
     if (!check.ok) return reject(check.message);
-    const limited = this.rateCheck(user.id, check.text);
+    const limited = this.rateCheck(user.id, check.text || `[picture ${imageId}]`);
     if (limited) return reject(limited);
 
     const replyTo = msg.replyTo ? Number(msg.replyTo) : null;
@@ -252,9 +256,11 @@ export class CommunityHub extends DurableObject {
       ), ch AS (
         SELECT id, min_post_power FROM channels WHERE id = ${channelId} AND kind = 'text' AND NOT hidden
       ), ins AS (
-        INSERT INTO messages (channel_id, user_id, content, reply_to)
+        INSERT INTO messages (channel_id, user_id, content, reply_to, image_id)
         SELECT ch.id, who.id, ${check.text},
-               (SELECT id FROM messages WHERE id = ${replyTo} AND channel_id = ${channelId} AND deleted_at IS NULL)
+               (SELECT id FROM messages WHERE id = ${replyTo} AND channel_id = ${channelId} AND deleted_at IS NULL),
+               (SELECT i.id FROM message_images i WHERE i.id = ${imageId} AND i.user_id = who.id
+                   AND NOT EXISTS (SELECT 1 FROM messages x WHERE x.image_id = i.id))
           FROM who, ch
          WHERE NOT who.banned
            AND (who.muted_until IS NULL OR who.muted_until <= now())
@@ -278,7 +284,7 @@ export class CommunityHub extends DurableObject {
     const message = await loadMessage(sql, r.id);
     this.send(ws, { type: "sent", nonce: msg.nonce, id: message.id });
     this.broadcast({ type: "message", message });
-    this.ctx.waitUntil(this.pushFor(sql, user, channelId, r.id, check.text).catch((e) => console.error("push failed", e)));
+    this.ctx.waitUntil(this.pushFor(sql, user, channelId, r.id, check.text || "📷 Sent a picture").catch((e) => console.error("push failed", e)));
   }
 
   // Phone/computer notifications: #announcements posts (Updates), and @mentions / replies.

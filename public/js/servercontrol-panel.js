@@ -13,8 +13,38 @@ export function setupServerControl({ loaders, toast }) {
   loaders.serverctl = async () => {
     let d;
     try { d = await getJson("/api/panel/server-control"); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
-    box.replaceChildren(maintenancePanel(d), restartPanel(d), kitPanel(d));
+    box.replaceChildren(allowlistPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d));
   };
+
+  // ---------- allowlist (who can join the Minecraft server) ----------
+  function allowlistPanel() {
+    const list = h("div", { class: "al-list" }, h("p", { class: "text-3", text: "Asking the server…" }));
+    const name = h("input", { class: "input", id: "al-name", maxlength: 16, placeholder: "Gamertag, e.g. Steve1234" });
+    const add = h("button", { class: "btn btn-primary btn-sm", type: "submit", text: "Add" });
+    const form = h("form", { class: "al-add" }, name, add);
+    const extra = h("div", { class: "cx-row" });
+    const call = async (body) => { try { const r = await postJson("/api/panel/allowlist", body); toast(r.message); draw(); } catch (e) { toast(e.message); } };
+    form.addEventListener("submit", (e) => { e.preventDefault(); if (name.value.trim()) { call({ action: "add", name: name.value }); name.value = ""; } });
+    async function draw() {
+      let d;
+      try { d = await getJson("/api/panel/allowlist"); } catch (e) { list.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
+      if (!d.connected) { list.replaceChildren(h("p", { class: "note warn small", text: `${d.message} The list shows when the server is online.` })); extra.replaceChildren(); return; }
+      list.replaceChildren(...(d.names.length ? d.names.map((n) => h("span", { class: "al-chip" }, h("span", { text: n }),
+        h("button", { type: "button", "aria-label": `Remove ${n}`, title: `Remove ${n}`, onclick: () => openDialog({
+          title: `Remove ${n} from the allowlist?`, body: h("p", { class: "text-2", text: "They won't be able to join until you add them again." }),
+          actions: [{ label: "Cancel" }, { label: "Remove", kind: "danger", onClick: () => call({ action: "remove", name: n }) }],
+        }) }, "×")))
+        : [h("p", { class: "text-3", text: "Nobody is on the allowlist yet." })]));
+      extra.replaceChildren(d.missing.length
+        ? h("button", { class: "btn btn-secondary btn-sm", type: "button", text: `Add everyone who has played (${d.missing.length})`, onclick: () => call({ action: "add_played" }) })
+        : h("span", { class: "text-3 small", text: "Everyone who has played is on the allowlist." }));
+    }
+    draw();
+    return h("section", { class: "panel sc-card" },
+      h("div", { class: "sc-head" }, h("h2", { text: "Allowlist" })),
+      h("p", { class: "text-2", text: "Who can join the Minecraft server (when allow-list is on in server.properties). Approving a join request adds them here too." }),
+      form, list, extra);
+  }
 
   // ---------- maintenance ----------
   function maintenancePanel(d) {

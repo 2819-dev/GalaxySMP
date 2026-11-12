@@ -75,6 +75,7 @@ async function load() {
   // ---- hero ----
   const banner = h("div", { class: "pp-banner" });
   banner.style.background = color ? `linear-gradient(120deg, ${color}, ${color}55 70%, transparent)` : "linear-gradient(120deg, #2457eb, #8A5CFF 60%, #4FEBFD)";
+  if (social?.banner) { banner.style.background = `url("${social.banner}") center / cover no-repeat`; banner.classList.add("has-pic"); }
   const face = h("img", { class: "pp-avatar", alt: "", width: 112, height: 112 });
   face.src = p.head || faceSvg(p.name);
   face.addEventListener("error", () => { face.src = faceSvg(p.name); }, { once: true });

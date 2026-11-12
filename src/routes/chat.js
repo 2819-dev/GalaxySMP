@@ -1,4 +1,5 @@
 // Chat API: everything the chat page needs, plus the live connection.
+import { bannerUrl } from "./uploads.js";
 import { badgesFor } from "./badges.js";
 import { isOwner } from "../lib/names.js";
 import { INTEREST_NAME } from "./onboarding.js";
@@ -30,7 +31,7 @@ export async function bootstrap(request, env) {
     sql`SELECT u.id, u.username, r.key AS role, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color, u.custom_presence, u.platform AS plat,
                rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon,
                rk.gradient AS rank_gradient, rk.position AS rank_position, rk.priority AS rank_priority,
-               pl.xuid, pl.head_at, pl.gamerpic_at, (pl.online_at > now() - interval '150 seconds') AS in_game, u.created_at,
+               pl.xuid, pl.head_at, pl.gamerpic_at, (pl.online_at > now() - interval '150 seconds') AS in_game, u.created_at, u.banner_at, (u.banner IS NOT NULL) AS has_banner,
                (SELECT s.plan FROM subscriptions s WHERE s.xuid = pl.xuid AND (s.expires_at IS NULL OR s.expires_at > now())) AS plan
           FROM users u JOIN roles r ON r.id = u.role_id
           LEFT JOIN players pl ON pl.uuid = u.mc_uuid
@@ -69,7 +70,7 @@ export async function bootstrap(request, env) {
       id: Number(m.id), username: m.username, role: m.role, rank: displayRank(rankOf(m), m.plan, planPriority, PLANS),
       // Minecraft head picture (if the server has sent it), plan, and when they joined the community
       head: headUrlFor(m),
-      plan: m.plan || null, inGame: Boolean(m.in_game), since: m.created_at,
+      plan: m.plan || null, inGame: Boolean(m.in_game), since: m.created_at, banner: bannerUrl(m),
       status: isOwner(env, m.username, m.plat === "bedrock") && m.custom_presence?.title && (!m.custom_presence.until || new Date(m.custom_presence.until) > new Date())
         ? `${m.custom_presence.label && m.custom_presence.label !== "Status" ? `${m.custom_presence.label} ` : ""}${m.custom_presence.title}` : null,
       badges: badgeMap.get(Number(m.id)) || [],

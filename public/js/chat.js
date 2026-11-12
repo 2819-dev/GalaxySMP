@@ -1,5 +1,6 @@
 // GalaxySMP community chat (browser side).
 // All text is inserted with textContent, never as HTML, so nothing a user types can run as code.
+import { attachChannelSuggest } from "/js/channel-suggest.js";
 import { badgeRow } from "/js/badges.js";
 import { activityBlock } from "/js/activity.js";
 import { icon, toast } from "/js/site.js";
@@ -107,6 +108,7 @@ function openProfile(member, anchor) {
   card.setAttribute("aria-label", `${member.username}'s profile`);
   const banner = el("div", "pc-banner");
   banner.style.background = member.color ? `linear-gradient(120deg, ${member.color}, ${member.color}88)` : rankCss(rank) || "linear-gradient(90deg, #4FEBFD, #3DAAF4, #2149DD)";
+  if (member.banner) banner.style.background = `url("${member.banner}") center / cover no-repeat`;
   const pic = el("div", "pc-avatar" + (online ? " online" : ""));
   const big = avatar(member.username, false, member);
   pic.append(big);
@@ -421,6 +423,7 @@ function mdContext() {
   return {
     members: state.mdMembers, meName: state.me?.username,
     onMention: (member, node) => openProfile(state.members.get(member.id) || member, node),
+    channels: state.channels, onChannel: (ch) => { selectChannel(ch.id); closeDrawers(); },
   };
 }
 
@@ -521,6 +524,12 @@ function renderMessage(m, prev) {
     if (!wasActive) row.classList.add("active");
   });
   return row;
+}
+
+// Channels for the "#" list (typing # in a message box).
+export function channelChoices() {
+  const cats = new Map((state.categories || []).map((c) => [c.id, c.name]));
+  return (state.channels || []).filter((c) => c.kind !== "dms").map((c) => ({ slug: c.slug, name: c.name, category: cats.get(c.categoryId) || "" }));
 }
 
 // Stage D adds staff actions (report, delete) through this hook.
@@ -800,15 +809,17 @@ function autosize() {
 function submit() {
   const input = $("composer-input");
   const text = input.value.trim();
-  if (!text) return;
+  const picture = state.pendingImage;  // a picture added with the picture button (already uploaded)
+  if (!text && !picture) return;
   if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
     note("You're offline. Your message will be ready to send when you reconnect.");
     return;
   }
   const nonce = Math.random().toString(36).slice(2);
   state.pending.set(nonce, text);
-  send({ type: "send", channelId: state.channelId, content: text, replyTo: state.replyTo?.id || null, nonce });
+  send({ type: "send", channelId: state.channelId, content: text, replyTo: state.replyTo?.id || null, nonce, imageId: picture?.id || null });
   input.value = "";
+  if (picture) { state.pendingImage = null; for (const hook of composerHooks) hook(currentChannel(), true); }
   state.replyTo = null;
   renderReplyBar();
   autosize();
@@ -1127,6 +1138,7 @@ function wireUi() {
   });
   $("open-search").addEventListener("click", searchDialog);
   $("composer-emoji").addEventListener("click", (e) => emojiMenu(e.currentTarget, $("composer-input")));
+  attachChannelSuggest($("composer-input"), channelChoices);
   $("open-pins").addEventListener("click", pinsDialog);
 }
 

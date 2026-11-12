@@ -147,14 +147,37 @@ export function ticketChat(box, id, opts) {
   return () => { stopped = true; off(); clearInterval(timer); };
 }
 
-export function newTicketDialog(toast, done) {
+export function newTicketDialog(toast, done, quick = null) {
   const subject = h("input", { class: "input", id: "tk-subject", maxlength: 80, placeholder: "e.g. I lost my items after a crash" });
+  if (quick?.subject) subject.value = quick.subject;
   const label = h("select", { class: "input", id: "tk-label" });
   for (const [k, l] of Object.entries(LABELS)) label.append(h("option", { value: k, text: l.name }));
+  if (quick?.label) label.value = quick.label;
   const body = h("textarea", { class: "input", id: "tk-body", maxlength: 500, rows: 5, placeholder: "Explain what happened. Staff will answer here." });
+  // answers from the Help Center that match what they're typing (they may not need a ticket at all)
+  const tips = h("div", { class: "hc-tips", hidden: true, "aria-live": "polite" });
+  let timer = null;
+  const suggest = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      try {
+        const { helpData, matchArticles } = await import("/js/help-center.js");
+        const d = await helpData();
+        const found = matchArticles(d.articles, `${subject.value} ${body.value}`, 3);
+        tips.hidden = !found.length;
+        tips.replaceChildren(h("b", { class: "hc-tips-head", text: "Maybe this helps:" }), ...found.map((a) => {
+          const ans = h("div", { class: "hc-answer" });
+          import("/js/markdown.js").then((m) => ans.append(m.renderMarkdown(a.answer)));
+          return h("details", { class: "hc-item" }, h("summary", { text: a.question }), ans);
+        }));
+      } catch { /* the Help Center is optional here */ }
+    }, 350);
+  };
+  subject.addEventListener("input", suggest);
+  body.addEventListener("input", suggest);
   openDialog({
-    title: "Contact staff",
-    body: h("div", { class: "form" }, field("Title", subject), field("What's it about?", label), field("Message", body),
+    title: quick?.title || "Contact staff",
+    body: h("div", { class: "form" }, field("Title", subject), field("What's it about?", label), field("Message", body), tips,
       h("p", { class: "text-3 small", text: "Only you and the staff team can see this ticket. Never share passwords." })),
     actions: [{ label: "Cancel" }, {
       label: "Open ticket", kind: "primary",

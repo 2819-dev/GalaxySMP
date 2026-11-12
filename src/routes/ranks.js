@@ -1,6 +1,7 @@
 // In-game ranks: managed by website Admins (Staff Tools → Ranks) and by server
 // operators in game (/ranks, through the GalaxyLink plugin). Stored here, sent to
 // the server instantly over GalaxyLink's live connection.
+import { postTimeline } from "./feed.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -132,7 +133,7 @@ async function validRank(env, sql, body) {
 // The owners are always Admins.
 async function syncWebsiteRole(env, sql, xuid) {
   const rows = await sql`
-    SELECT u.id, u.username, u.platform, u.role_id, u.muted_until,
+    SELECT u.id, u.username, u.platform, u.role_id, u.role_from_rank, u.muted_until,
            (SELECT max(r.website_role::int) FROM player_ranks x JOIN ranks r ON r.id = x.rank_id WHERE x.xuid = p.xuid) AS website_role,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon,
            rk.gradient AS rank_gradient, rk.position AS rank_position, rk.priority AS rank_priority
@@ -144,7 +145,9 @@ async function syncWebsiteRole(env, sql, xuid) {
   const u = rows[0];
   if (!u) return;
   const owner = isOwner(env, u.username, u.platform === "bedrock");
-  const target = owner ? 4 : STAFF_POWERS[u.website_role] ? Number(u.website_role) : 1;
+  let target = owner ? 4 : STAFF_POWERS[u.website_role] ? Number(u.website_role) : 1;
+  // a role given by hand (Control Panel, or an accepted Moderator application) isn't taken away by rank changes
+  if (!owner && !u.role_from_rank && Number(u.role_id) > target) target = Number(u.role_id);
   const changed = target !== Number(u.role_id);
   if (changed) await sql`UPDATE users SET role_id = ${target}, role_from_rank = ${target !== 1} WHERE id = ${u.id}`;
   const r = await sql`SELECT key FROM roles WHERE id = ${target}`;
@@ -262,6 +265,10 @@ async function applyAction(env, sql, action, body, actor) {
       await sql`INSERT INTO player_ranks (xuid, rank_id, assigned_by) VALUES (${xuid}, ${id}, ${actor.label}) ON CONFLICT DO NOTHING`;
     }
     for (const id of added) await audit(sql, actor.id, "rank.assign", { by: actor.label, player: player.gamertag, rank: byId.get(id).name });
+    for (const id of added) {
+      await postTimeline(sql, { kind: "rank", xuid, name: player.gamertag, title: `is now ${byId.get(id).name}`, detail: "Congratulations!", icon: "crown",
+        dedupe: `rank:${xuid}:${id}:${new Date().toISOString().slice(0, 10)}` });
+    }
     for (const id of removed) await audit(sql, actor.id, "rank.remove", { by: actor.label, player: player.gamertag, rank: byId.get(id).name });
     await syncWebsiteRole(env, sql, xuid);
     await changed(env);
@@ -340,9 +347,14 @@ export async function recordPlayers(env, list) {
     .slice(0, 100);
   if (!players.length) return;
   const sql = getDb(env);
-  await sql.transaction(players.map((p) => sql`
+  const results = await sql.transaction(players.map((p) => sql`
     INSERT INTO players (xuid, uuid, gamertag) VALUES (${String(p.xuid)}, ${String(p.uuid || "") || null}::uuid, ${String(p.name).slice(0, 32)})
-    ON CONFLICT (xuid) DO UPDATE SET gamertag = EXCLUDED.gamertag, uuid = coalesce(EXCLUDED.uuid, players.uuid), last_seen = now()`));
+    ON CONFLICT (xuid) DO UPDATE SET gamertag = EXCLUDED.gamertag, uuid = coalesce(EXCLUDED.uuid, players.uuid), last_seen = now()
+    RETURNING xuid, gamertag, (xmax = 0) AS inserted`));
+  // brand-new players go on #Timeline
+  for (const [row] of results) {
+    if (row?.inserted) await postTimeline(sql, { kind: "first_join", xuid: row.xuid, name: row.gamertag, title: "joined GalaxySMP for the first time", detail: "Say hi and welcome them!", icon: "sparkles", dedupe: `join:${row.xuid}` });
+  }
 }
 
 // When someone links with /link after already having a rank, give them its website role.

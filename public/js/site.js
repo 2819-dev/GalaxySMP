@@ -98,6 +98,9 @@ const ICONS = {
   book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>',
   activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
   poll: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
+  contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   bag: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>',
   mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/>',
   trophy: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
@@ -155,6 +158,7 @@ function renderHeader() {
         <div class="nav-actions">${chip}<a class="btn btn-primary btn-sm" href="/community">Community</a></div>
       </nav>
       <a class="btn btn-primary btn-sm nav-community" href="/community">Community</a>
+      <button class="theme-btn" type="button" id="theme-btn"></button>
       <div class="acct-slot" id="acct-slot"></div>
     </div>
   </header>
@@ -318,6 +322,39 @@ export function startStatus(onData) {
   setInterval(() => { if (document.visibilityState === "visible") update(); }, 60_000);
 }
 
+// ---------- Light / dark mode: Auto (follows the device), Light or Dark. Saved in this browser. ----------
+const THEMES = ["auto", "light", "dark"];
+function themePref() { try { return localStorage.getItem("gx_theme") || "auto"; } catch { return "auto"; } }
+function applyTheme() {
+  const pref = themePref();
+  const light = pref === "light" || (pref === "auto" && window.matchMedia?.("(prefers-color-scheme: light)").matches);
+  document.documentElement.dataset.theme = light ? "light" : "dark";
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", light ? "#f4f6fc" : "#0a0c1b");
+  const b = document.getElementById("theme-btn");
+  if (b) {
+    const label = { auto: "Theme: Auto (follows your device)", light: "Theme: Light", dark: "Theme: Dark" }[pref];
+    b.innerHTML = icon(pref === "light" ? "sun" : pref === "dark" ? "moon" : "contrast");
+    b.title = `${label}. Tap to change.`;
+    b.setAttribute("aria-label", b.title);
+  }
+}
+export function setTheme(pref) {
+  try { localStorage.setItem("gx_theme", pref); } catch { /* still applies for this visit */ }
+  applyTheme();
+}
+applyTheme();
+window.matchMedia?.("(prefers-color-scheme: light)").addEventListener?.("change", applyTheme);
+function wireThemeButton() {
+  const b = document.getElementById("theme-btn");
+  if (!b) return;
+  applyTheme();
+  b.addEventListener("click", () => {
+    const next = THEMES[(THEMES.indexOf(themePref()) + 1) % THEMES.length];
+    setTheme(next);
+    toast({ auto: "Theme: Auto (follows your device)", light: "Light mode", dark: "Dark mode" }[next]);
+  });
+}
+
 // A banner under the header on every page: maintenance mode (the owner's message) or a restart coming up.
 async function renderNotice() {
   let d;
@@ -350,6 +387,7 @@ else {
   renderHeader();
   renderFooter();
   renderNotice();
+  wireThemeButton();
   if (!EMBED) import("/js/account-menu.js").then((m) => m.renderAccountButton(document.getElementById("acct-slot"))).catch(() => {});
 }
 fillConfig();

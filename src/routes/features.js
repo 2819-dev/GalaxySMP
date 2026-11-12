@@ -1,6 +1,7 @@
 // Community features: Events calendar, News, Polls, Builds gallery and the Suggestions upgrades
 // (comments, staff responses, similar-suggestion check). Plus the 5-minute timer that sends event
 // reminders, announces events in game and picks the Build of the Week.
+import { postTimeline } from "./feed.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -579,6 +580,11 @@ async function buildOfTheWeek(env, sql) {
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = 'server'`;
   if (!winner) return;
   await sql`UPDATE builds SET botw_week = ${week}::date WHERE id = ${winner.id}`;
+  {
+    const [who] = await sql`SELECT u.username, p.xuid, p.gamertag FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${winner.user_id}`;
+    await postTimeline(sql, { kind: "botw", xuid: who?.xuid || null, name: who?.gamertag || who?.username || "A builder", title: "won Build of the Week",
+      detail: `"${winner.title}" got the most likes last week.`, icon: "castle", buildId: winner.id, dedupe: `botw:${week}` });
+  }
   let [badge] = await sql`SELECT id FROM badges WHERE name = 'Build of the Week' ORDER BY id LIMIT 1`;
   if (!badge) [badge] = await sql`INSERT INTO badges (name, description, icon, style) VALUES ('Build of the Week', 'Posted the most liked build of the week in #Builds.', 'castle', 'gold') RETURNING id`;
   await sql`INSERT INTO user_badges (user_id, badge_id) VALUES (${winner.user_id}, ${badge.id}) ON CONFLICT DO NOTHING`;

@@ -58,6 +58,50 @@ function editProfileCard() {
   return card("Edit profile", "What people see on your profile card and full profile.", wrap);
 }
 
+// Profile banner (Galaxy+ and Galaxy Pro+) and your own profile picture (Galaxy Pro+).
+function picturesCard() {
+  const wrap = h("div", { class: "stack", style: "gap:16px" }, h("p", { class: "text-3", style: "margin:0", text: "Loading…" }));
+  const pick = (opts, done) => {
+    const f = h("input", { type: "file", accept: "image/*", hidden: true });
+    f.addEventListener("change", async () => {
+      if (!f.files[0]) return;
+      try {
+        const { shrink } = await import("/js/community-extra.js");
+        const img = await shrink(f.files[0], opts);
+        await done({ mime: img.mime, data: img.data, width: img.width, height: img.height });
+      } catch (e) { toast(e.message); }
+    });
+    document.body.append(f);
+    f.click();
+    setTimeout(() => f.remove(), 60000);
+  };
+  async function draw() {
+    let r;
+    try { r = await getJson("/api/uploads/rights"); } catch (e) { wrap.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
+    const upsell = (text) => h("p", { class: "text-3 small", style: "margin:0" }, text, " ", h("a", { href: "/store", text: "See plans" }));
+    const preview = h("div", { class: "acc-banner" });
+    if (r.bannerUrl) preview.style.backgroundImage = `url("${r.bannerUrl}")`;
+    const bannerBlock = h("div", { class: "field" }, h("span", { class: "field-label", text: "Profile banner" }), preview,
+      r.banner ? h("div", { class: "cx-row" },
+        h("button", { class: "btn btn-secondary btn-sm", type: "button", text: r.bannerUrl ? "Change banner" : "Upload banner", onclick: () => pick({ max: 1500, aspect: 3, limit: 600 * 1024 }, async (image) => {
+          await postJson("/api/account/banner", { image }); toast("Banner saved."); draw();
+        }) }),
+        r.bannerUrl ? h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: async () => { await postJson("/api/account/banner", { remove: true }); toast("Banner removed."); draw(); } }) : null)
+        : r.blocked ? h("p", { class: "text-3 small", text: "Staff turned off picture uploads for your account." }) : upsell("Banners are a Galaxy+ and Galaxy Pro+ perk."));
+    const SRC = [["auto", "Automatic (Minecraft head, or Xbox picture)"], ["xbox", "My Xbox picture"], ["head", "My Minecraft head"], ["custom", "My own picture"]];
+    const picBlock = h("div", { class: "field" }, h("span", { class: "field-label", text: "Profile picture" }),
+      !r.linked ? h("p", { class: "text-3 small", style: "margin:0", text: "Link your Minecraft account first." }) : h("div", { class: "cx-row" },
+        ...SRC.filter(([k]) => k !== "custom" || r.hasPicture).map(([k, label]) => h("button", { class: `btn btn-sm ${r.picSource === k ? "btn-primary" : "btn-ghost"}`, type: "button", text: label,
+          onclick: async () => { try { await postJson("/api/account/picture", { source: k }); toast("Picture updated."); location.reload(); } catch (e) { toast(e.message); } } }))),
+      r.linked && r.picture ? h("div", {}, h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Upload my own picture", onclick: () => pick({ max: 400, aspect: 1, limit: 280 * 1024 }, async (image) => {
+        await postJson("/api/account/picture", { image }); toast("Profile picture saved."); location.reload();
+      }) })) : r.linked && !r.blocked ? upsell("Uploading your own profile picture is a Galaxy Pro+ perk.") : null);
+    wrap.replaceChildren(bannerBlock, picBlock);
+  }
+  draw();
+  return card("Pictures", "Your banner shows at the top of your profile and profile card. Pictures must follow the rules: staff can remove them.", wrap);
+}
+
 const SECTIONS = {
   profile() {
     const p = data.profile;
@@ -83,6 +127,7 @@ const SECTIONS = {
         row("Last in game", p.inGame ? "Now" : fmtDate(p.lastSeen)),
         p.mutedUntil ? row("Chat", `Muted until ${new Date(p.mutedUntil).toLocaleString()}`) : null),
       h("p", { class: "text-3 small", text: "Your profile picture is your Minecraft head (or your Xbox picture until your head arrives). Your name and rank come from the game." }),
+      picturesCard(),
       editProfileCard(),
     ];
   },

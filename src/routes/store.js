@@ -2,6 +2,7 @@
 // or straight with a card. Card payments go through Stripe Checkout once its keys are in Cloudflare
 // (STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET); Stripe then calls /api/store/stripe-webhook and
 // the item or credit is delivered. What can be bought: the Shop's cosmetics (the rest says "Coming soon").
+import { postTimeline } from "./feed.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser, getUser } from "../lib/auth.js";
@@ -101,6 +102,8 @@ async function grantPlan(env, sql, player, prod, by, source) {
             ON CONFLICT (xuid) DO UPDATE SET plan = EXCLUDED.plan, expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by`;
   await sql`INSERT INTO shop_orders (xuid, item, option, price_cents, source, given_by) VALUES (${player.xuid}, ${"plan:" + prod.key}, ${`${PLAN_DAYS} days`}, ${prod.price}, ${source}, ${by.username})`;
   const sent = await sendPlans(env, sql).catch(() => false);
+  if (!keep) await postTimeline(sql, { kind: "plan", xuid: player.xuid, name: player.gamertag, title: `got ${prod.name || (prod.key === "pro" ? "Galaxy Pro+" : "Galaxy+")}`,
+    detail: "Thanks for supporting GalaxySMP!", icon: "star", dedupe: `plan:${player.xuid}:${prod.key}:${new Date().toISOString().slice(0, 10)}` });
   return { ok: true, sent, expires };
 }
 

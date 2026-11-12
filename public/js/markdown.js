@@ -3,7 +3,7 @@
 //
 //   **bold**  *italic* / _italic_  ***bold italic***  __underline__  ~~strikethrough~~  ||spoiler||
 //   `code`  ```code block```  # Heading  ## Heading  ### Heading  -# small text  > quote
-//   - list / * list / 1. list   [text](https://link)   links   @mentions  @everyone  @here
+//   - list / * list / 1. list   [text](https://link)   links   @mentions  @everyone  @here  #channel
 
 const el = (tag, cls) => {
   const e = document.createElement(tag);
@@ -123,6 +123,8 @@ const RULES = [
   { re: /\*([^*\s](?:[^*\n]*?[^*\s])?)\*/, make: (m, ctx) => wrap("em", inline(m[1], ctx)) },
   { re: /(?<![A-Za-z0-9_])_([^_\s](?:[^_\n]*?[^_\s])?)_(?![A-Za-z0-9_])/, make: (m, ctx) => wrap("em", inline(m[1], ctx)) },
   { re: /:([a-z0-9_]{2,24}):/, make: (m) => emojiNode(m[1]) || document.createTextNode(m[0]) },  // custom emoji
+  // #channel mentions, like Discord: a chip that opens the channel (only for channels that exist)
+  { re: /(?<![\w&/#])#([a-z0-9][a-z0-9-]{1,39})\b/i, make: (m, ctx) => channelChip(m, ctx) },
   { re: /@/, make: null }, // mentions: handled below (they need the member list)
 ];
 
@@ -165,6 +167,17 @@ function link(href, label) {
   a.target = "_blank";
   a.rel = "noopener noreferrer nofollow ugc";
   if (label !== href) a.title = href;
+  return a;
+}
+
+function channelChip(m, ctx) {
+  const ch = (ctx.channels || []).find((c) => c.slug === m[1].toLowerCase());
+  if (!ch) return document.createTextNode(m[0]);
+  const a = el("a", "channel-mention");
+  a.href = `/community#${ch.slug}`;
+  a.textContent = `#${ch.name}`;
+  a.title = `Open #${ch.name}`;
+  a.addEventListener("click", (e) => { e.stopPropagation(); if (ctx.onChannel) { e.preventDefault(); ctx.onChannel(ch); } });
   return a;
 }
 

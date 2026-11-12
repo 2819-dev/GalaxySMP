@@ -35,6 +35,10 @@ import * as trades from "./routes/trades.js";
 import * as shops from "./routes/shops.js";
 import * as joinreq from "./routes/joinrequests.js";
 import * as serverctl from "./routes/servercontrol.js";
+import * as feed from "./routes/feed.js";
+import * as team from "./routes/team.js";
+import * as helpcenter from "./routes/helpcenter.js";
+import * as uploads from "./routes/uploads.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -74,8 +78,34 @@ const routes = [
   ["GET", "/api/shops", (req, env) => shops.listShops(req, env)],
   ["POST", "/api/join-requests", (req, env) => joinreq.createJoinRequest(req, env)],
   ["GET", "/api/site-notice", (req, env) => serverctl.siteNotice(req, env)],
+  ["GET", "/api/feed", feed.listFeed],
+  ["GET", "/api/team", (req, env) => team.listTeam(req, env)],
+  ["GET", "/api/help-center", (req, env) => helpcenter.helpCenter(req, env)],
+  ["GET", "/api/uploads/rights", (req, env) => uploads.rights(req, env)],
+  ["POST", "/api/chat/images", (req, env) => uploads.uploadChatImage(req, env)],
+  ["GET", "/api/chat/images/:id", uploads.chatImage],
+  ["POST", "/api/account/banner", (req, env) => uploads.saveBanner(req, env)],
+  ["GET", "/api/banner/:id", uploads.banner],
+  ["POST", "/api/account/picture", (req, env) => uploads.savePicture(req, env)],
+  ["POST", "/api/mod/users/:id/uploads", uploads.modUploads],
+  ["POST", "/api/help-center", (req, env) => helpcenter.saveArticle(req, env)],
+  ["POST", "/api/help-center/:id/delete", helpcenter.deleteArticle],
+  ["POST", "/api/team/bio", (req, env) => team.saveBio(req, env)],
+  ["GET", "/api/applications", team.listApplications],
+  ["POST", "/api/applications", (req, env) => team.createApplication(req, env)],
+  ["POST", "/api/applications/withdraw", (req, env) => team.withdrawApplication(req, env)],
+  ["GET", "/api/applications/:id", team.getApplication],
+  ["POST", "/api/applications/:id/messages", team.appMessage],
+  ["POST", "/api/applications/:id/decide", team.decideApplication],
+  ["POST", "/api/feed/comments/:id/delete", feed.deleteComment],
+  ["POST", "/api/feed/:id/like", feed.likePost],
+  ["GET", "/api/feed/:id/comments", feed.listComments],
+  ["POST", "/api/feed/:id/comments", feed.addComment],
+  ["POST", "/api/feed/:id/delete", feed.deletePost],
   ["GET", "/api/panel/server-control", (req, env) => serverctl.getServerControl(req, env)],
   ["POST", "/api/panel/server-control", (req, env) => serverctl.saveServerControl(req, env)],
+  ["GET", "/api/panel/allowlist", (req, env) => serverctl.getAllowlist(req, env)],
+  ["POST", "/api/panel/allowlist", (req, env) => serverctl.changeAllowlist(req, env)],
   ["GET", "/api/join-requests/:token", joinreq.getJoinRequest],
   ["POST", "/api/join-requests/:token/messages", joinreq.postJoinMessage],
   ["GET", "/api/panel/join-requests", joinreq.listJoinRequests],

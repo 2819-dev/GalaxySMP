@@ -7,7 +7,11 @@ import { iconEl } from "/js/site.js";
 import { renderMarkdown } from "/js/markdown.js";
 import { faceSvg } from "/js/face.js";
 import * as extra from "/js/community-extra.js";
-import { sendTyping, emojiMenu, chatState } from "/js/chat.js";
+import { sendTyping, emojiMenu, chatState, channelChoices } from "/js/chat.js";
+import { attachChannelSuggest } from "/js/channel-suggest.js";
+import { renderTimeline } from "/js/community-feed.js";
+import { helpCenterBlock } from "/js/help-center.js";
+import { renderTeam, renderApplications } from "/js/community-team.js";
 
 const panel = () => document.getElementById("channel-panel");
 const voiceBox = () => document.getElementById("voice-embed");
@@ -45,6 +49,7 @@ export function showPanel(channel, context) {
     info: renderInfo, auction: renderAuction, suggestions: renderSuggestions, support: renderSupport, dms: renderDMs,
     events: (el) => extra.renderEvents(el, helpers), news: (el) => extra.renderNews(el, helpers),
     polls: (el) => extra.renderPolls(el, helpers), builds: (el) => extra.renderBuilds(el, helpers),
+    timeline: (el) => renderTimeline(el, helpers), team: (el) => renderTeam(el, helpers), applications: (el) => renderApplications(el, helpers),
   }[channel.kind];
   if (render) render(p);
 }
@@ -225,14 +230,8 @@ function renderSupport(p, openId) {
   const staff = (ctx.me?.role?.power || 0) >= 50;
   const list = h("div", { class: "stack", style: "gap:10px" });
   wrap.append(
-    h("section", { class: "panel tk-hero" },
-      h("div", { class: "tk-hero-icon" }, iconEl("lifebuoy")),
-      h("div", {},
-        h("h2", { text: "Need help?" }),
-        h("p", { class: "text-2", text: "Open a ticket to chat privately with the staff team: questions, bugs, lost items, reports or appeals. Only you and staff can see it." }),
-        h("div", { class: "cp-toolbar" },
-          h("button", { class: "btn btn-primary", type: "button", text: "Contact staff", onclick: () => newTicketDialog(ctx.toast, (id) => renderSupport(p, id)) }),
-          staff ? h("a", { class: "btn btn-ghost", href: "/staff#tickets", text: "Answer tickets (staff)" }) : null))),
+    helpCenterBlock({ toast: ctx.toast, onAsk: (qk) => newTicketDialog(ctx.toast, (id) => renderSupport(p, id), qk) }),
+    staff ? h("div", { class: "cp-toolbar", style: "margin:10px 0" }, h("a", { class: "btn btn-ghost btn-sm", href: "/staff#tickets", text: "Answer tickets (staff)" })) : null,
     h("h3", { class: "tk-list-title", text: "Your tickets" }),
     list);
 
@@ -314,6 +313,7 @@ function renderDMs(p) {
     if (current !== userId) return;
     const log = h("div", { class: "dm-log", role: "log", "aria-live": "polite" });
     const input = h("textarea", { class: "input dm-input", rows: 1, maxlength: chatState.maxLength || 500, placeholder: `Message ${d.other.username}`, "aria-label": "Message" });
+    attachChannelSuggest(input, channelChoices);
     const send = h("button", { class: "btn btn-primary", type: "button", text: "Send" });
     const blockBtn = h("button", { class: "btn btn-ghost btn-sm", type: "button", text: d.blocked ? "Unblock" : "Block" });
     blockBtn.addEventListener("click", () => openDialog({
@@ -332,7 +332,7 @@ function renderDMs(p) {
     const meId = ctx.me?.id;
     const fill = (node, m) => {
       const text = node.querySelector(".dm-text");
-      text.replaceChildren(renderMarkdown(m.body));
+      text.replaceChildren(renderMarkdown(m.body, { channels: chatState.channels }));
       node.querySelector(".dm-meta").textContent = `${dmTime(m.at)}${m.via === "game" ? " · from the game" : ""}${m.editedAt ? " · edited" : ""}${m.from === meId ? (m.read ? " · Read" : " · Sent") : ""}`;
       node.querySelector(".dm-edit-btn")?.remove();
       if (m.from === meId && !m.read) { // your message they haven't read yet: you can still edit it
