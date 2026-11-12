@@ -200,7 +200,9 @@ function renderSide() {
 
 async function refresh() {
   try {
-    const d = await fetch("/api/map/info").then((r) => r.json());
+    const res = await fetch("/api/map/info");
+    const d = await res.json();
+    if (res.status === 401) { comingSoon(true); return; }
     if (!d.ok) return;
     if (!d.enabled) { comingSoon(); return; }
     info = d;
@@ -222,9 +224,15 @@ async function refresh() {
 
 // The map is switched off (Control Panel): show the Coming soon page instead.
 let soon = false;
-function comingSoon() {
+function comingSoon(signIn = false) {
   if (soon) return;
   soon = true;
+  if (signIn) {  // the map is on, but it's for signed-in members
+    const card = document.querySelector("#map-soon .map-soon-card");
+    card.querySelector(".pill-soon").textContent = "Members only";
+    card.querySelector("p").textContent = "Sign in to see the live map of the GalaxySMP world: the land from above, plots, shops and where your friends are playing.";
+    card.querySelector(".map-soon-actions").innerHTML = '<a class="btn btn-primary" href="/community">Sign in</a><a class="btn btn-secondary" href="/join">How to join</a>';
+  }
   document.body.classList.remove("map-page");
   document.querySelector(".map-shell").hidden = true;
   $("map-soon").hidden = false;

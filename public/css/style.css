@@ -2120,3 +2120,22 @@ img.emoji-big { width: 44px; height: 44px; vertical-align: middle; margin: 2px 4
 .potw-k { font-size: .78rem; font-weight: 700; color: #ffd76a; text-transform: uppercase; letter-spacing: .04em; }
 .potw-name { font-size: 1.15rem; }
 .potw-sub { font-size: .85rem; color: var(--text-2); }
+
+/* ---------- Join requests (How to Join + Control Panel) ---------- */
+.jr-panel { margin-top: 16px; }
+.jr-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+.jr-chat { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: var(--surface); }
+.jr-chat .jr-log, .jr-pane .jr-log { max-height: 420px; min-height: 160px; }
+.jr-from { font-size: .72rem; font-weight: 700; color: var(--text-2); margin-bottom: 2px; }
+.jr-composer { padding: 10px; }
+.jr-layout { display: grid; grid-template-columns: 280px 1fr; gap: 14px; align-items: start; }
+.jr-list { display: flex; flex-direction: column; gap: 8px; }
+.jr-row { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 10px 12px; text-align: left; font: inherit; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; }
+.jr-row:hover, .jr-row.active { border-color: var(--accent, #6d8bff); }
+.jr-row-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.jr-row-last { color: var(--text-2); font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jr-row-meta { color: var(--text-3); font-size: .75rem; }
+.jr-pane { display: flex; flex-direction: column; gap: 10px; padding: 14px; min-width: 0; }
+.jr-pane .jr-log { border: 1px solid var(--border); border-radius: 12px; }
+@media (max-width: 760px) { .jr-layout { grid-template-columns: 1fr; } }

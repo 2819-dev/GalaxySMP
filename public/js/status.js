@@ -68,7 +68,13 @@ async function loadTimeline() {
     fact("online", d.uptime.length ? `${Math.round((up / span) * 100)}%` : "–"),
     fact(d.players.length === 1 ? "player" : "players", String(d.players.length)),
     fact("most at once", String(peak)));
-  box.replaceChildren(timelineChart({ data: d, onName: (n) => `/player/${encodeURIComponent(n)}` }));
+  box.replaceChildren(timelineChart({ data: d, onName: (n) => (d.signedIn ? `/player/${encodeURIComponent(n)}` : "/community") }));
+  if (!d.signedIn) {
+    const note = document.createElement("p");
+    note.className = "text-3 small";
+    note.innerHTML = 'Player names are hidden. <a href="/community">Sign in</a> to see who played when.';
+    box.append(note);
+  }
   const hrs = busiestHours(d);
   const lbl = (h) => new Date(2000, 0, 1, h).toLocaleTimeString([], { hour: "numeric" });
   $("tl-hours").replaceChildren(d.players.length ? barChart({ title: "Busiest hours (average players online, your time)", height: 140, width: $("tl-hours").clientWidth || 600,

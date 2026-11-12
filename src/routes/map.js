@@ -2,6 +2,7 @@
 // 16 x 16 per chunk; we keep them and serve 256 x 256 block regions as raw RGBA for the page to draw.
 // Who is online (and where) and the markers (spawn, plots, shops) come live from the plugin.
 import { Buffer } from "node:buffer";
+import { requireUser } from "../lib/auth.js";
 import { getDb } from "../lib/db.js";
 import { json } from "../lib/http.js";
 import { voiceStub } from "./voice.js";
@@ -24,6 +25,7 @@ export async function mapInfo(request, env) {
   const sql = getDb(env);
   const [on] = await sql`SELECT value FROM economy_config WHERE key = 'map_enabled'`;
   if (on?.value !== true) return json({ ok: true, enabled: false }, 200, { "Cache-Control": "no-store" });
+  await requireUser(request, env);  // the map shows where players are: members only
   const [regions, live] = await Promise.all([
     sql`SELECT floor(cx::numeric / ${REGION})::int AS rx, floor(cz::numeric / ${REGION})::int AS rz, count(*)::int AS n, extract(epoch FROM max(updated_at))::bigint AS at
           FROM map_chunks WHERE dim = 'overworld' GROUP BY 1, 2`,
@@ -39,6 +41,7 @@ export async function mapInfo(request, env) {
 
 // GET /api/map/region/:rx/:rz  → 256 x 256 RGBA (transparent where nothing is drawn yet)
 export async function mapRegion(request, env, ctx, url, params) {
+  await requireUser(request, env);
   const rx = Number(params.rx), rz = Number(params.rz);
   if (!Number.isInteger(rx) || !Number.isInteger(rz) || Math.abs(rx) > 1e5 || Math.abs(rz) > 1e5) return new Response("Bad region", { status: 400 });
   const sql = getDb(env);
@@ -60,5 +63,5 @@ export async function mapRegion(request, env, ctx, url, params) {
     }
   }
   // The page adds ?v=<last update>, so a region can be cached until it changes.
-  return new Response(out, { headers: { "Content-Type": "application/octet-stream", "Cache-Control": url.searchParams.get("v") ? "public, max-age=86400" : "no-store" } });
+  return new Response(out, { headers: { "Content-Type": "application/octet-stream", "Cache-Control": url.searchParams.get("v") ? "private, max-age=86400" : "no-store" } });
 }

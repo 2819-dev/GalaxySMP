@@ -4,7 +4,7 @@ import { rankOf } from "../chat/messages.js";
 import { displayRank, loadPlanPriority } from "./ranks.js";
 import PLANS from "../../endstone-plugin/src/endstone_galaxylink/plans.json";
 import { INTEREST_NAME } from "./onboarding.js";
-import { requireUser } from "../lib/auth.js";
+import { requireUser, getUser } from "../lib/auth.js";
 import { getDb } from "../lib/db.js";
 import { json, HttpError } from "../lib/http.js";
 import { headUrlFor } from "./heads.js";
@@ -88,6 +88,7 @@ async function recordHistory(sql, changed, onlineIds) {
 
 // GET /api/players/:name/history: daily playtime, money, mined and placed (last 60 days).
 export async function playerHistory(request, env, ctx, url, params) {
+  await requireUser(request, env);  // profiles are for signed-in members
   const sql = getDb(env);
   const rows = await sql`
     SELECT d.day, d.playtime_s, d.balance_cents, d.mined, d.placed FROM player_stats_daily d JOIN players p ON p.xuid = d.xuid
@@ -98,6 +99,7 @@ export async function playerHistory(request, env, ctx, url, params) {
 
 // GET /api/timeline?days=7: server uptime, who played when, and busiest hours (like a Realm's timeline).
 export async function timeline(request, env, ctx, url) {
+  const signedIn = Boolean(await getUser(request, env));
   const days = Math.min(14, Math.max(1, Number(url.searchParams.get("days")) || 7));
   const sql = getDb(env);
   const [uptime, sessions] = await Promise.all([
@@ -116,8 +118,10 @@ export async function timeline(request, env, ctx, url) {
   return json({
     ok: true, now: Date.now(), from: Date.now() - days * 864e5,
     uptime: uptime.map((u) => [new Date(u.started_at).getTime(), Math.max(new Date(u.started_at).getTime() + 60e3, new Date(u.ended_at).getTime()), u.peak]),
-    players: [...players.values()].sort((x, y) => y.total - x.total).slice(0, 40),
-  });
+    // Who played when is for signed-in members only; others get the same bars without names.
+    signedIn,
+    players: [...players.values()].sort((x, y) => y.total - x.total).slice(0, 40).map((p, i) => (signedIn ? p : { ...p, name: `Player ${i + 1}` })),
+  }, 200, { "Cache-Control": "private, no-store" });
 }
 
 export async function recordAchievementDefs(env, list) {
@@ -137,6 +141,7 @@ async function achievementDefs(sql) {
 
 // ---------- public ----------
 export async function leaderboards(request, env, ctx, url) {
+  const signedIn = Boolean(await getUser(request, env));
   const key = url.searchParams.get("board") || "money";
   const board = BOARDS[key];
   if (!board) throw new HttpError(400, "Unknown leaderboard.");
@@ -154,14 +159,16 @@ export async function leaderboards(request, env, ctx, url) {
                             WHERE w.week > now()::date - 14 ORDER BY w.week DESC LIMIT 1`;
   return json({
     ok: true, board: key, title: board.title,
-    potw: potw ? { name: potw.gamertag, secs: Number(potw.secs), week: potw.week, head: headUrlFor(potw) } : null,
+    signedIn,
+    potw: potw && signedIn ? { name: potw.gamertag, secs: Number(potw.secs), week: potw.week, head: headUrlFor(potw) } : null,
     boards: Object.entries(BOARDS).map(([k, b]) => ({ key: k, title: b.title })),
-    players: rows.map((r) => ({ name: r.gamertag, value: Number(r.value), online: Boolean(r.online) })),
+    players: signedIn ? rows.map((r) => ({ name: r.gamertag, value: Number(r.value), online: Boolean(r.online) })) : [],
     totals: { players: totals.players, money: Number(totals.money), playtime: Number(totals.playtime), mined: Number(totals.mined), online: totals.online },
-  }, 200, { "Cache-Control": "public, max-age=30" });
+  }, 200, { "Cache-Control": "private, no-store" });
 }
 
 export async function profile(request, env, ctx, url, params) {
+  await requireUser(request, env);  // profiles are for signed-in members
   const name = String(params.name || "").trim().replace(/^\./, "").toLowerCase().slice(0, 32);
   if (!name) throw new HttpError(404, "No player with that name.");
   const sql = getDb(env);
@@ -209,10 +216,11 @@ export async function profile(request, env, ctx, url, params) {
       potw: potw.length ? { times: potw.length, current: Date.now() - new Date(potw[0].week).getTime() < 14 * 864e5, week: potw[0].week, secs: Number(potw[0].secs) } : null,
       badges: p.user_id ? (await badgesFor(env, sql, [{ id: p.user_id, username: p.user_name, platform: p.user_platform }])).get(Number(p.user_id)) : [],
     },
-  }, 200, { "Cache-Control": "public, max-age=30" });
+  }, 200, { "Cache-Control": "private, no-store" });
 }
 
 export async function searchPlayers(request, env, ctx, url) {
+  await requireUser(request, env);  // profiles are for signed-in members
   const q = String(url.searchParams.get("q") || "").trim().replace(/^\./, "").toLowerCase().slice(0, 32);
   if (q.length < 2) return json({ ok: true, players: [] });
   const sql = getDb(env);

@@ -54,6 +54,10 @@ async function load() {
       fetch(`/api/players/${encodeURIComponent(name)}/social`, { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ]);
     data = res;
+    if (res.error && /sign in/i.test(res.error)) {
+      box.replaceChildren(h("div", { class: "panel empty" }, "Player profiles are for members. ", h("a", { href: "/community", text: "Sign in" }), " to see stats, badges and achievements."));
+      return;
+    }
     if (!data.ok) throw new Error(data.error);
     social = soc?.member || null;
     signedIn = Boolean(soc?.ok);

@@ -48,6 +48,7 @@
           </div>
           <div class="cp-group">
             <h2 class="cp-group-name">Players</h2>
+            <button type="button" data-tab="joins" aria-selected="false" hidden>Join requests <span class="count-badge" id="tab-joins-count"></span></button>
             <button type="button" data-tab="players" aria-selected="false">Members</button>
             <button type="button" data-tab="ranks" aria-selected="false" hidden>Ranks</button>
             <button type="button" data-tab="badges" aria-selected="false" hidden>Badges</button>
@@ -246,6 +247,22 @@
           <div class="toolbar"><input class="input" id="dm-owner-search" type="search" placeholder="Search by member name" autocomplete="off"></div>
           <div id="dm-owner-list" class="panel" style="padding:0"></div>
           <div id="dm-owner-view" hidden></div>
+        </section>
+
+        <section data-panel="joins" hidden>
+          <div class="cx-row" style="justify-content:space-between;margin-bottom:12px">
+            <div class="tabs-mini" id="joins-filter" role="group" aria-label="Show">
+              <button type="button" data-status="open" aria-pressed="true">Waiting</button>
+              <button type="button" data-status="approved" aria-pressed="false">Approved</button>
+              <button type="button" data-status="declined" aria-pressed="false">Declined</button>
+            </div>
+            <a class="text-3 small" href="/join#join-request" target="_blank" rel="noopener">The page people use</a>
+          </div>
+          <p class="text-3 small" style="margin:0 0 12px">Only you can see these. Approve adds the gamertag to the server's allowlist and tells them how to join.</p>
+          <div class="jr-layout">
+            <div id="joins-list" class="jr-list"></div>
+            <div id="joins-chat" class="panel jr-pane"><p class="text-3" style="margin:0">Pick a request to read it and reply.</p></div>
+          </div>
         </section>
 
         <section data-panel="appeals" hidden>

@@ -77,7 +77,11 @@ function render() {
 }
 
 async function load() {
-  try { data = await getJson("/api/shops"); } catch (e) { $("sh-list").replaceChildren(h("div", { class: "panel empty", text: e.message || "Shops couldn't be loaded." })); return; }
+  try { data = await getJson("/api/shops"); } catch (e) {
+    if (/sign in/i.test(e.message)) {
+      $("sh-list").replaceChildren(h("div", { class: "panel empty" }, "Player Shops are for members. ", h("a", { href: "/community", text: "Sign in" }), " to see shops and buy."));
+      return;
+    } $("sh-list").replaceChildren(h("div", { class: "panel empty", text: e.message || "Shops couldn't be loaded." })); return; }
   render();
 }
 

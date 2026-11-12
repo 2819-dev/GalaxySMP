@@ -4,7 +4,7 @@
 // items in their inventory (the next time they join, if they're offline).
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
-import { requireUser, getUser } from "../lib/auth.js";
+import { requireUser } from "../lib/auth.js";
 import { limit as rateLimit } from "../lib/ratelimit.js";
 import { voiceStub } from "./voice.js";
 
@@ -24,7 +24,7 @@ async function listed(env, sql) {
 // GET /api/shops
 export async function listShops(request, env) {
   const sql = getDb(env);
-  const user = await getUser(request, env);
+  const user = await requireUser(request, env);  // shop owners and locations: members only
   const { at, shops } = await listed(env, sql);
   let me = null;
   if (user) {

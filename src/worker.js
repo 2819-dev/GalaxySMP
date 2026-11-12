@@ -33,6 +33,7 @@ import * as livemap from "./routes/map.js";
 import * as emoji from "./routes/emoji.js";
 import * as trades from "./routes/trades.js";
 import * as shops from "./routes/shops.js";
+import * as joinreq from "./routes/joinrequests.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -70,6 +71,13 @@ const routes = [
   ["POST", "/api/trades", (req, env) => trades.createTrade(req, env)],
   ["POST", "/api/trades/:id/:action", trades.tradeAction],
   ["GET", "/api/shops", (req, env) => shops.listShops(req, env)],
+  ["POST", "/api/join-requests", (req, env) => joinreq.createJoinRequest(req, env)],
+  ["GET", "/api/join-requests/:token", joinreq.getJoinRequest],
+  ["POST", "/api/join-requests/:token/messages", joinreq.postJoinMessage],
+  ["GET", "/api/panel/join-requests", joinreq.listJoinRequests],
+  ["GET", "/api/panel/join-requests/:id", joinreq.getJoinRequestOwner],
+  ["POST", "/api/panel/join-requests/:id/messages", joinreq.ownerJoinMessage],
+  ["POST", "/api/panel/join-requests/:id/decide", joinreq.decideJoinRequest],
   ["POST", "/api/shops/:id/buy", shops.buyFromShop],
   ["GET", "/api/emoji/:name", emoji.emojiImage],
   ["POST", "/api/panel/emoji", (req, env) => emoji.addEmoji(req, env)],

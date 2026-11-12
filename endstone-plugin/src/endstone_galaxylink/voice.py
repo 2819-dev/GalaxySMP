@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.29.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.30.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -209,6 +209,8 @@ class VoiceLink:
             self._on_main(lambda: self.plugin.chatfilter.set_enabled(msg.get("enabled"), msg.get("by") or "staff on the website"))
         elif msg.get("type") == "trade":  # trades started on the website (galaxymc.us/trades)
             self._on_main(lambda: self.plugin.trades.from_website(msg))
+        elif msg.get("type") == "allowlist":  # owner approved a join request on the website
+            self._on_main(lambda: self._allowlist(msg))
         elif msg.get("type") == "shopchest_buy":  # Buy on galaxymc.us/shops
             self._on_main(lambda: self.plugin.shopchests.from_website(msg))
         elif msg.get("type") == "ah_buy":
@@ -243,6 +245,22 @@ class VoiceLink:
         elif msg.get("type") == "icons":
             self.wanted = {k.lower(): v for k, v in (msg.get("icons") or {}).items()}
             self.plugin.server.scheduler.run_task(self.plugin, self._apply_icons)
+
+    def _allowlist(self, msg):
+        """Adds a gamertag to the server's allowlist (join request approved on galaxymc.us). Always answers."""
+        name = "".join(c for c in str(msg.get("name") or "") if c.isalnum() or c == " ").strip()[:16]
+        ok, text = False, "That gamertag isn't valid."
+        if name:
+            try:
+                server = self.plugin.server
+                done = server.dispatch_command(server.command_sender, f'allowlist add "{name}"')
+                ok = done is not False
+                text = f"{name} was added to the allowlist." if ok else "The server couldn't add them to the allowlist."
+                self.plugin.logger.info(f"[Website] {str(msg.get('by') or 'The owner')[:32]} approved {name}'s join request: allowlist add -> {ok}")
+            except Exception as e:
+                self.plugin.logger.warning(f"Allowlist add failed: {e}")
+                text = "The server couldn't add them to the allowlist."
+        self.send_json({"type": "answer", "req": msg.get("req"), "ok": ok, "message": text})
 
     def _mod_action(self, msg):
         """Warn / mute / unmute / kick / ban / unban from the staff panel on the website."""

@@ -67,6 +67,13 @@ async function load() {
     $("lb-online").textContent = data.totals.online.toLocaleString();
     $("lb-total").textContent = money(data.totals.money);
     list.replaceChildren();
+    if (!data.signedIn) {  // names and positions are for signed-in members
+      const li = document.createElement("li");
+      li.className = "empty";
+      li.innerHTML = 'Sign in to see who\'s on top. <a href="/community">Sign in</a>';
+      list.append(li);
+      return;
+    }
     if (!data.players.length) {
       const li = document.createElement("li");
       li.className = "empty";
