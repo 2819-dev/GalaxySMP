@@ -1781,3 +1781,28 @@ textarea.input.dm-input { resize: none; min-height: 44px; max-height: 140px; ove
 .rank-pick-name { flex: 1; min-width: 0; color: var(--text-2); font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rank-pick-shown { flex: none; font-size: .72rem; font-weight: 700; color: var(--accent, #6d8bff); }
 .rank-player-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+
+/* Control Panel: grouped sidebar (computers), group row + page buttons (phones) */
+.cp-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 28px; align-items: start; }
+.cp-nav { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 18px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+.cp-group { display: flex; flex-direction: column; gap: 2px; }
+.cp-group-name { margin: 0 0 4px; padding: 0 10px; font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.cp-nav button { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 38px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-2); font: 600 .92rem var(--font); text-align: left; cursor: pointer; }
+.cp-nav button:hover { background: var(--surface-2); color: var(--text); }
+.cp-nav button[aria-current="page"] { background: var(--surface-3); color: var(--text); box-shadow: inset 3px 0 0 var(--accent, #6d8bff); }
+.cp-nav button[hidden], .cp-group[hidden] { display: none; }
+.cp-mobile { display: none; }
+.cp-mobile .staff-tabs button[aria-current="true"], .cp-mobile .lb-subtabs button[aria-current="page"] { background: var(--surface-3); color: var(--text); }
+.cp-mobile .lb-subtabs button[aria-current="page"] { border-color: var(--surface-3); }
+.cp-mobile .lb-subtabs button { display: inline-flex; align-items: center; gap: 6px; }
+.cp-mobile .count-badge { margin-left: 0; }
+#cp-groups { gap: 2px; }
+#cp-groups button { flex: 1 1 auto; justify-content: center; gap: 4px; padding: 0 5px; font-size: .82rem; }
+#cp-groups .count-badge { min-width: 16px; height: 16px; padding: 0 4px; font-size: .65rem; }
+#cp-groups:has(+ .lb-subtabs:not([hidden])) { margin-bottom: 10px; }
+@media (max-width: 860px) {
+  .cp-layout { display: block; }
+  .cp-nav { display: none; }
+  .cp-mobile { display: block; }
+}
+

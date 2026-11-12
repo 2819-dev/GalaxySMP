@@ -19,13 +19,48 @@ const fmt = (d) => new Date(d).toLocaleString([], { month: "short", day: "numeri
 
 // ---------- Tabs ----------
 const loaders = {};
+let currentTab = "overview";
 function selectTab(name) {
-  document.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+  currentTab = name;
+  document.querySelectorAll("#cp-nav [data-tab]").forEach((b) => b.setAttribute("aria-current", b.dataset.tab === name ? "page" : "false"));
   document.querySelectorAll("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== name));
   if (location.hash.slice(1).split("/")[0] !== name) history.replaceState(null, "", "#" + name);
+  drawNav();
   loaders[name]?.();
 }
-document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => selectTab(b.dataset.tab)));
+document.querySelectorAll("#cp-nav [data-tab]").forEach((b) => b.addEventListener("click", () => selectTab(b.dataset.tab)));
+
+// The sidebar (computers) groups the pages under headings. Phones get the same groups as a row,
+// with the open group's pages as buttons underneath. Groups with no pages you can use are hidden.
+function navGroups() {
+  return [...document.querySelectorAll("#cp-nav .cp-group")].map((g) => ({
+    el: g,
+    name: g.querySelector(".cp-group-name")?.textContent || "Home",
+    pages: [...g.querySelectorAll("[data-tab]")].filter((b) => !b.hidden),
+  }));
+}
+function drawNav() {
+  const groups = navGroups();
+  for (const g of groups) if (g.el.hidden !== !g.pages.length) g.el.hidden = !g.pages.length;
+  const usable = groups.filter((g) => g.pages.length);
+  const open = usable.find((g) => g.pages.some((b) => b.dataset.tab === currentTab)) || usable[0];
+  const count = (g) => g.pages.reduce((n, b) => n + Number(b.querySelector(".count-badge")?.dataset.n || 0), 0);
+  const row = $("cp-groups");
+  row.replaceChildren(...usable.map((g) => {
+    const n = count(g);
+    return h("button", { type: "button", "aria-current": g === open ? "true" : "false", onclick: () => selectTab(g.pages[0].dataset.tab) },
+      g.name, n ? h("span", { class: "count-badge", text: String(n), "data-n": String(n) }) : null);
+  }));
+  const pages = $("cp-pages");
+  pages.hidden = !open || open.pages.length < 2;
+  pages.replaceChildren(...(open ? open.pages : []).map((b) => {
+    const n = Number(b.querySelector(".count-badge")?.dataset.n || 0);
+    return h("button", { type: "button", "aria-current": b.dataset.tab === currentTab ? "page" : "false", onclick: () => selectTab(b.dataset.tab) },
+      b.firstChild.textContent.trim(), n ? h("span", { class: "count-badge", text: String(n), "data-n": String(n) }) : null);
+  }));
+}
+// Pages are shown or hidden by role (and counts change) after start-up: keep both menus in step.
+new MutationObserver(() => drawNav()).observe($("cp-nav"), { subtree: true, attributes: true, attributeFilter: ["hidden", "data-n"] });
 
 function setBadge(name, n) {
   const b = $(`tab-${name}-count`);

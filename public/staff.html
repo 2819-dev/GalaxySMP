@@ -21,7 +21,7 @@
   <div id="site-header" class="site-header-slot"></div>
 
   <main id="main">
-    <div class="container" style="max-width:960px">
+    <div class="container" style="max-width:1240px">
       <header class="page-head" style="padding-bottom:20px">
         <h1 id="panel-title">Staff Panel</h1>
         <p id="staff-intro">Loading…</p>
@@ -33,21 +33,41 @@
       </div>
 
       <div id="staff-app" hidden>
-        <div class="staff-tabs" role="tablist">
-          <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
-          <button role="tab" data-tab="tickets" aria-selected="false">Tickets <span class="count-badge" id="tab-tickets-count"></span></button>
-          <button role="tab" data-tab="reports" aria-selected="false">Reports <span class="count-badge" id="tab-reports-count"></span></button>
-          <button role="tab" data-tab="players" aria-selected="false">Members</button>
-          <button role="tab" data-tab="words" aria-selected="false">Word filter</button>
-          <button role="tab" data-tab="ranks" aria-selected="false" hidden>Ranks</button>
-          <button role="tab" data-tab="economy" aria-selected="false" hidden>Economy</button>
-          <button role="tab" data-tab="badges" aria-selected="false" hidden>Badges</button>
-          <button role="tab" data-tab="promos" aria-selected="false" hidden>Promo codes</button>
-          <button role="tab" data-tab="payments" aria-selected="false" hidden>Payments</button>
-          <button role="tab" data-tab="help" aria-selected="false" hidden>Help menu</button>
-          <button role="tab" data-tab="dms" aria-selected="false" hidden>Messages</button>
-          <button role="tab" data-tab="audit" aria-selected="false">Audit log</button>
+        <div class="cp-layout">
+        <nav class="cp-nav" id="cp-nav" aria-label="Control Panel sections">
+          <div class="cp-group">
+            <button type="button" data-tab="overview" aria-selected="true">Overview</button>
+          </div>
+          <div class="cp-group">
+            <h2 class="cp-group-name">Moderation</h2>
+            <button type="button" data-tab="reports" aria-selected="false">Reports <span class="count-badge" id="tab-reports-count"></span></button>
+            <button type="button" data-tab="tickets" aria-selected="false">Tickets <span class="count-badge" id="tab-tickets-count"></span></button>
+            <button type="button" data-tab="words" aria-selected="false">Word filter</button>
+            <button type="button" data-tab="audit" aria-selected="false">Audit log</button>
+          </div>
+          <div class="cp-group">
+            <h2 class="cp-group-name">Players</h2>
+            <button type="button" data-tab="players" aria-selected="false">Members</button>
+            <button type="button" data-tab="ranks" aria-selected="false" hidden>Ranks</button>
+            <button type="button" data-tab="badges" aria-selected="false" hidden>Badges</button>
+            <button type="button" data-tab="dms" aria-selected="false" hidden>Messages</button>
+          </div>
+          <div class="cp-group">
+            <h2 class="cp-group-name">Store</h2>
+            <button type="button" data-tab="payments" aria-selected="false" hidden>Payments</button>
+            <button type="button" data-tab="promos" aria-selected="false" hidden>Promo codes</button>
+          </div>
+          <div class="cp-group">
+            <h2 class="cp-group-name">Server</h2>
+            <button type="button" data-tab="economy" aria-selected="false" hidden>Economy</button>
+            <button type="button" data-tab="help" aria-selected="false" hidden>Help menu</button>
+          </div>
+        </nav>
+        <div class="cp-mobile" id="cp-mobile" aria-label="Control Panel sections">
+          <div class="staff-tabs" id="cp-groups"></div>
+          <div class="lb-subtabs" id="cp-pages" hidden></div>
         </div>
+        <div class="cp-main">
 
         <section data-panel="overview">
           <div id="my-presence" class="panel" hidden></div>
@@ -229,6 +249,8 @@
           <div class="panel" style="padding:0" id="audit-list"></div>
           <button class="btn btn-secondary" type="button" id="audit-more" style="margin-top:12px" hidden>Load older entries</button>
         </section>
+        </div>
+        </div>
       </div>
     </div>
   </main>
