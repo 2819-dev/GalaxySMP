@@ -34,7 +34,7 @@ export async function bootstrap(request, env) {
                (SELECT s.plan FROM subscriptions s WHERE s.xuid = pl.xuid AND (s.expires_at IS NULL OR s.expires_at > now())) AS plan
           FROM users u JOIN roles r ON r.id = u.role_id
           LEFT JOIN players pl ON pl.uuid = u.mc_uuid
-          LEFT JOIN player_ranks prk ON prk.xuid = pl.xuid
+          LEFT JOIN player_top_rank prk ON prk.xuid = pl.xuid
           LEFT JOIN ranks rk ON rk.id = prk.rank_id
          WHERE NOT u.banned
          ORDER BY (rk.id IS NULL), rk.position, lower(u.username)

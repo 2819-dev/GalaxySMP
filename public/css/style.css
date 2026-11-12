@@ -1770,3 +1770,14 @@ textarea.input.dm-input { resize: none; min-height: 44px; max-height: 140px; ove
 .bd-pick { background: none; border: 2px solid transparent; border-radius: 12px; padding: 2px; cursor: pointer; }
 .bd-pick[aria-pressed="true"] { border-color: var(--accent); background: rgba(36,87,235,.15); }
 .promo-chip.off { opacity: .55; text-decoration: line-through; }
+
+/* Ranks for a player (several at once) */
+.rank-pick { display: flex; flex-direction: column; gap: 6px; }
+.rank-pick-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.rank-pick-row:hover { border-color: var(--text-3); }
+.rank-pick-row.on { border-color: var(--accent, #6d8bff); }
+.rank-pick-box { width: 20px; height: 20px; flex: none; display: grid; place-items: center; border: 2px solid var(--text-3); border-radius: 6px; font-size: .8rem; font-weight: 800; }
+.rank-pick-row.on .rank-pick-box { background: var(--accent, #6d8bff); border-color: var(--accent, #6d8bff); color: #fff; }
+.rank-pick-name { flex: 1; min-width: 0; color: var(--text-2); font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-pick-shown { flex: none; font-size: .72rem; font-weight: 700; color: var(--accent, #6d8bff); }
+.rank-player-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }

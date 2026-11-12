@@ -23,7 +23,7 @@ async function profileRow(sql, userId) {
            s.plan, s.expires_at AS plan_expires
       FROM users u JOIN roles r ON r.id = u.role_id
       LEFT JOIN players p ON p.uuid = u.mc_uuid
-      LEFT JOIN player_ranks pr ON pr.xuid = p.xuid LEFT JOIN ranks rk ON rk.id = pr.rank_id
+      LEFT JOIN player_top_rank pr ON pr.xuid = p.xuid LEFT JOIN ranks rk ON rk.id = pr.rank_id
       LEFT JOIN subscriptions s ON s.xuid = p.xuid AND (s.expires_at IS NULL OR s.expires_at > now())
      WHERE u.id = ${userId}`;
   return u;

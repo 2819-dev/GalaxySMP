@@ -3,6 +3,7 @@ import { money, moneyExact } from "/js/money.js";
 import { toast, iconEl } from "/js/site.js";
 import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, voiceMuteDialog, select, field } from "/js/dialog.js";
 import { setupPanel } from "/js/staff-panel.js";
+import { ranksDialog } from "/js/rank-picker.js";
 import { setupPromos } from "/js/promos-panel.js";
 import { setupBadges } from "/js/badges-panel.js";
 import { setupPayments } from "/js/payments-panel.js";
@@ -151,24 +152,9 @@ async function resolve(r, outcome) {
 // Website accounts are part of the Members tab now (player cards in staff-panel.js).
 loaders.members = () => loaders.players?.();
 
-// Admins: give a member a rank (the same ranks as in game).
-async function memberRankDialog(m, done) {
-  let ranks;
-  try { ranks = (await getJson("/api/mod/ranks")).ranks; } catch (e) { toast(e.message); return; }
-  const sel = select("member-rank", [["", "No rank"], ...ranks.map((r) => [String(r.id), `[${r.prefix}] ${r.name}`])], m.rankId ? String(m.rankId) : "");
-  openDialog({
-    title: `Rank for ${m.username}`,
-    body: h("div", { class: "form" },
-      field("Rank", sel, "Ranks are the same on the website and in game: tag, colors, commands and staff powers."),
-      ranks.length ? null : h("p", { class: "text-3 small", style: "margin:0", text: "No ranks yet. Create them in the Ranks tab." })),
-    actions: [{ label: "Cancel" }, {
-      label: "Save", kind: "primary",
-      onClick: async () => {
-        await postJson("/api/mod/ranks/assign", { xuid: m.xuid, rankId: sel.value || null });
-        done(sel.value ? `Rank given to ${m.username}.` : `Rank removed from ${m.username}.`);
-      },
-    }],
-  });
+// Admins: give a member ranks (the same ranks as in game).
+function memberRankDialog(m, done) {
+  ranksDialog({ name: m.username, xuid: m.xuid, rankIds: m.rankIds || (m.rankId ? [m.rankId] : []), onSaved: done });
 }
 
 function memberRow(m) {
@@ -202,7 +188,7 @@ function memberRow(m) {
       if (m.power < 50) {
         actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", text: m.globalMic ? "Take Global Mic" : "Give Global Mic", onclick: async () => { try { await postJson(`/api/mod/members/${m.id}/global-mic`, { allowed: !m.globalMic }); refresh(m.globalMic ? "Global Mic removed." : "Global Mic given."); } catch (e) { toast(e.message); } } }));
       }
-      if (m.xuid) actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Rank", onclick: () => memberRankDialog(m, refresh) }));
+      if (m.xuid) actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Ranks", onclick: () => memberRankDialog(m, refresh) }));
       if (m.banned) {
         actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Unban", onclick: async () => { try { await postJson(`/api/mod/members/${m.id}/unban`); refresh("Member unbanned."); } catch (e) { toast(e.message); } } }));
       } else {
@@ -492,21 +478,14 @@ function renderRankPlayers() {
   box.replaceChildren();
   if (!rankData.players.length) { box.append(h("div", { class: "empty", text: "No players found." })); return; }
   for (const p of rankData.players) {
-    const sel = h("select", { class: "input", "aria-label": `Rank for ${p.gamertag}`, style: "width:auto;min-width:170px" });
-    sel.append(h("option", { value: "", text: "No rank" }));
-    for (const r of rankData.ranks) sel.append(h("option", { value: r.id, text: `[${r.prefix}] ${r.name}`, selected: r.id === p.rankId }));
-    sel.addEventListener("change", async () => {
-      sel.disabled = true;
-      try {
-        await postJson("/api/mod/ranks/assign", { xuid: p.xuid, rankId: sel.value || null });
-        toast(sel.value ? `Rank given to ${p.gamertag}.` : `Rank removed from ${p.gamertag}.`);
-        loaders.ranks();
-      } catch (e) { toast(e.message); sel.disabled = false; }
-    });
+    const mine = rankData.ranks.filter((r) => p.rankIds.includes(r.id));
+    const tags = h("span", { class: "rank-player-tags" }, ...(mine.length ? mine.map((r) => rankTag(r)) : [h("span", { class: "text-3", text: "No rank" })]));
+    const edit = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Ranks",
+      onclick: () => ranksDialog({ name: p.gamertag, xuid: p.xuid, rankIds: p.rankIds, onSaved: (msg) => { toast(msg); loaders.ranks(); } }) });
     box.append(h("div", { class: "member-row" },
       h("div", { class: "info" }, h("strong", {}, p.gamertag, p.linked ? h("span", { class: "pill-status owner", text: "Website account" }) : null),
-        h("span", { text: `Last seen ${fmt(p.lastSeen)}` })),
-      sel));
+        h("span", { text: `Last seen ${fmt(p.lastSeen)}` }), tags),
+      edit));
   }
 }
 

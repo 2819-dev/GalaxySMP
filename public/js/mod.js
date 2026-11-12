@@ -6,6 +6,7 @@ import {
 } from "/js/chat.js";
 import { h, openDialog, postJson, getJson, field, select, REPORT_REASONS, MUTE_LABELS, muteDialog, banDialog } from "/js/dialog.js";
 import { rankTag } from "/js/rank-paint.js";
+import { ranksDialog } from "/js/rank-picker.js";
 
 const STAFF = 50;
 const ADMIN = 100;
@@ -99,7 +100,7 @@ async function memberDialog(m) {
         actions.push({ label: "Mute", onClick: () => { setTimeout(() => muteDialog(m, done)); } });
       }
       if (myPower() >= ADMIN) {
-        if (detail?.xuid) actions.push({ label: "Change rank", onClick: () => { setTimeout(() => rankDialog(detail, done)); } });
+        if (detail?.xuid) actions.push({ label: "Change ranks", onClick: () => { setTimeout(() => rankDialog(detail, done)); } });
         actions.push({ label: "Ban", kind: "danger", onClick: () => { setTimeout(() => banDialog(m, done)); } });
       }
     }
@@ -107,22 +108,9 @@ async function memberDialog(m) {
   openDialog({ title: m.username, body, actions });
 }
 
-// Admins: give a member a rank (the same ranks as in game).
-async function rankDialog(member, done) {
-  let ranks;
-  try { ranks = (await getJson("/api/mod/ranks")).ranks; } catch (e) { toast(e.message); return; }
-  const sel = select("chat-member-rank", [["", "No rank"], ...ranks.map((r) => [String(r.id), `[${r.prefix}] ${r.name}`])], member.rankId ? String(member.rankId) : "");
-  openDialog({
-    title: `Rank for ${member.username}`,
-    body: h("div", { class: "form" }, field("Rank", sel, "The same rank shows in game and on the website.")),
-    actions: [{ label: "Cancel" }, {
-      label: "Save", kind: "primary",
-      onClick: async () => {
-        await postJson("/api/mod/ranks/assign", { xuid: member.xuid, rankId: sel.value || null });
-        done(sel.value ? `Rank given to ${member.username}.` : `Rank removed from ${member.username}.`);
-      },
-    }],
-  });
+// Admins: give a member ranks (the same ranks as in game).
+function rankDialog(member, done) {
+  ranksDialog({ name: member.username, xuid: member.xuid, rankIds: member.rankIds || (member.rankId ? [member.rankId] : []), onSaved: done });
 }
 
 // ---------- Live updates from staff actions ----------

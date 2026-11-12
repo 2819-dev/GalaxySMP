@@ -206,11 +206,12 @@ export async function searchMembers(request, env, ctx, url) {
            u.created_at, u.last_seen_at, r.key AS role, r.power,
            pl.xuid, rk.id AS rank_id, rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color,
            rk.icon AS rank_icon, rk.gradient AS rank_gradient, rk.position AS rank_position,
+           (SELECT array_agg(x.rank_id) FROM player_ranks x WHERE x.xuid = pl.xuid) AS rank_ids,
            (SELECT count(*)::int FROM messages m WHERE m.user_id = u.id AND m.deleted_at IS NULL) AS messages,
            (SELECT count(*)::int FROM reports rp JOIN messages m ON m.id = rp.message_id WHERE m.user_id = u.id) AS reported
       FROM users u JOIN roles r ON r.id = u.role_id
       LEFT JOIN players pl ON pl.uuid = u.mc_uuid
-      LEFT JOIN player_ranks prk ON prk.xuid = pl.xuid
+      LEFT JOIN player_top_rank prk ON prk.xuid = pl.xuid
       LEFT JOIN ranks rk ON rk.id = prk.rank_id
      WHERE (${q} = '' OR u.username_lower LIKE '%' || ${q} || '%')
        AND (${filter} = 'all'
@@ -230,6 +231,7 @@ export async function searchMembers(request, env, ctx, url) {
       power: Number(u.power),
       xuid: u.xuid || null,
       rankId: u.rank_id ? Number(u.rank_id) : null,
+      rankIds: (u.rank_ids || []).map(Number),
       rank: rankOf(u),
       owner: isOwner(env, u.username, u.platform === "bedrock"),
       banned: u.banned,

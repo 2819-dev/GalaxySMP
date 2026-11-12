@@ -5,6 +5,7 @@ import { moneyDollars } from "/js/money.js";
 import { h, openDialog, postJson, getJson, select, field, muteDialog, banDialog, voiceMuteDialog, MUTE_LABELS } from "/js/dialog.js";
 import { ticketChat, chip, when, LABELS, PRIORITIES, ticketEvent } from "/js/tickets.js";
 import { iconEl } from "/js/site.js";
+import { ranksDialog } from "/js/rank-picker.js";
 
 const $ = (id) => document.getElementById(id);
 // a button with a line icon in front of its text
@@ -282,7 +283,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
 
       admin ? h("h4", { text: "Rank, plan and money" }) : null,
       admin ? h("div", { class: "pc-actions" },
-        act("Change rank", "btn-secondary", () => rankDialog(p, xuid, reload)),
+        act("Change ranks", "btn-secondary", () => rankDialog(p, xuid, reload)),
         act("Change plan", "btn-secondary", () => planDialog(p, xuid, reload)),
         act("Change money", "btn-secondary", () => moneyDialog(p, xuid, reload)),
         act("Give a Shop item", "btn-secondary", () => shopDialog(p, d.shop, xuid, reload), false, "cart")) : null,
@@ -347,14 +348,8 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
     document.querySelectorAll("dialog.dialog").forEach((d) => { try { d.close(); } catch { /* already closed */ } d.remove(); });
   }
 
-  async function rankDialog(p, xuid, reload) {
-    if (!ranksCache) ranksCache = (await getJson("/api/mod/ranks?q=%20%20none%20%20")).ranks;
-    const sel = select("pa-rank", [["", "No rank"], ...ranksCache.map((r) => [r.id, r.name])], p.rankId ?? "");
-    openDialog({
-      title: `Rank for ${p.name}`,
-      body: h("div", { class: "form" }, field("Rank", sel, "Ranks with Staff powers also make them a Moderator or Admin on the website.")),
-      actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: async () => { await postJson("/api/mod/ranks/assign", { xuid, rankId: sel.value === "" ? null : Number(sel.value) }); reload("Rank updated."); } }],
-    });
+  function rankDialog(p, xuid, reload) {
+    ranksDialog({ name: p.name, xuid, rankIds: p.rankIds || (p.rankId ? [p.rankId] : []), onSaved: (msg) => reload(msg) });
   }
   function planDialog(p, xuid, reload) {
     const plan = select("pa-plan", [["", "Galaxy Free (no plan)"], ["plus", "Galaxy+"], ["pro", "Galaxy Pro+"]], p.plan || "");

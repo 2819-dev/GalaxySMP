@@ -13,7 +13,7 @@ import { sendPlans } from "./plans.js";
 import { SHOP_ITEMS, SHOP } from "../store/shop.js";
 
 const MOD = 50;
-export const LATEST_PLUGIN = "2.24.3"; // the GalaxyLink version made for this website
+export const LATEST_PLUGIN = "2.25.0"; // the GalaxyLink version made for this website
 export const LATEST_ICONS = "1.9.0"; // the GalaxySMP Icons resource pack version that goes with it
 const older = (a, b) => { const x = String(a).split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
 const ADMIN = 100;
@@ -105,7 +105,7 @@ export async function searchPlayers(request, env, ctx, url) {
            (SELECT kind FROM game_punishments g WHERE g.xuid = p.xuid AND g.kind IN ('ban', 'unban') ORDER BY g.id DESC LIMIT 1) AS ban_state,
            (SELECT count(*)::int FROM game_punishments g WHERE g.xuid = p.xuid AND g.kind = 'warn') AS warns
       FROM players p
-      LEFT JOIN player_ranks pr ON pr.xuid = p.xuid LEFT JOIN ranks rk ON rk.id = pr.rank_id
+      LEFT JOIN player_top_rank pr ON pr.xuid = p.xuid LEFT JOIN ranks rk ON rk.id = pr.rank_id
       LEFT JOIN subscriptions s ON s.xuid = p.xuid AND (s.expires_at IS NULL OR s.expires_at > now())
       LEFT JOIN users u ON u.mc_uuid = p.uuid
      WHERE (${q} = '' OR lower(p.gamertag) LIKE ${like} OR lower(coalesce(u.username, '')) LIKE ${like})
@@ -137,12 +137,13 @@ export async function playerCard(request, env, ctx, url, params) {
   const sql = getDb(env);
   const xuid = String(params.xuid);
   const rows = await sql`
-    SELECT p.*, rk.name AS rank_name, rk.color AS rank_color, rk.id AS rank_id, pr.assigned_by, s.plan, s.expires_at,
+    SELECT p.*, rk.name AS rank_name, rk.color AS rank_color, rk.id AS rank_id, pr.assigned_by,
+           (SELECT array_agg(x.rank_id ORDER BY r2.priority, r2.position) FROM player_ranks x JOIN ranks r2 ON r2.id = x.rank_id WHERE x.xuid = p.xuid) AS rank_ids, s.plan, s.expires_at,
            u.id AS user_id, u.username, u.banned, u.ban_reason, u.muted_until, u.mute_reason, u.voice_muted_until, u.voice_mute_reason, u.global_mic, u.created_at AS joined_site, r.name AS role_name, r.power AS role_power,
            (SELECT kind FROM game_punishments g WHERE g.xuid = p.xuid AND g.kind IN ('ban', 'unban') ORDER BY g.id DESC LIMIT 1) AS ban_state,
            (SELECT count(*)::int FROM game_punishments g WHERE g.xuid = p.xuid AND g.kind = 'warn') AS warns
       FROM players p
-      LEFT JOIN player_ranks pr ON pr.xuid = p.xuid LEFT JOIN ranks rk ON rk.id = pr.rank_id
+      LEFT JOIN player_top_rank pr ON pr.xuid = p.xuid LEFT JOIN ranks rk ON rk.id = pr.rank_id
       LEFT JOIN subscriptions s ON s.xuid = p.xuid AND (s.expires_at IS NULL OR s.expires_at > now())
       LEFT JOIN users u ON u.mc_uuid = p.uuid LEFT JOIN roles r ON r.id = u.role_id
      WHERE p.xuid = ${xuid}`;
@@ -159,7 +160,7 @@ export async function playerCard(request, env, ctx, url, params) {
     ok: true,
     player: {
       ...rowOut(p),
-      rankId: p.rank_id ? Number(p.rank_id) : null, rankBy: p.assigned_by || null,
+      rankId: p.rank_id ? Number(p.rank_id) : null, rankIds: (p.rank_ids || []).map(Number), rankBy: p.assigned_by || null,
       firstSeen: p.first_seen, extraPlots: p.extra_plots,
       stats: { playtimeH: Math.round(Number(p.playtime_s || 0) / 360) / 10, mined: Number(p.mined || 0), placed: Number(p.placed || 0), kills: Number(p.kills || 0), deaths: Number(p.deaths || 0), quests: p.quests_done, streak: p.streak, achievements: (p.achievements || []).length },
       account: p.user_id ? {
@@ -201,7 +202,7 @@ export async function playerAction(request, env, ctx, url, params) {
   const [p] = await sql`
     SELECT p.xuid, p.gamertag, p.is_op, u.username, u.platform, rk.website_role
       FROM players p LEFT JOIN users u ON u.mc_uuid = p.uuid
-      LEFT JOIN player_ranks pr ON pr.xuid = p.xuid LEFT JOIN ranks rk ON rk.id = pr.rank_id
+      LEFT JOIN player_top_rank pr ON pr.xuid = p.xuid LEFT JOIN ranks rk ON rk.id = pr.rank_id
      WHERE p.xuid = ${String(params.xuid)}`;
   if (!p) throw new HttpError(404, "That player hasn't joined the server yet.");
 

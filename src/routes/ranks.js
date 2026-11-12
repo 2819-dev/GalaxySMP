@@ -82,12 +82,16 @@ export async function loadPlanPriority(sql) {
 export async function loadRanksState(sql) {
   const [ranks, assigned] = await Promise.all([
     sql`SELECT * FROM ranks ORDER BY priority, position, lower(name)`,
-    sql`SELECT xuid, rank_id FROM player_ranks`,
+    sql`SELECT pr.xuid, pr.rank_id FROM player_ranks pr JOIN ranks r ON r.id = pr.rank_id ORDER BY pr.xuid, r.priority, r.position, r.id`,
   ]);
+  const sets = {};
+  for (const a of assigned) (sets[a.xuid] ||= []).push(a.rank_id);
   return {
     planPriority: await loadPlanPriority(sql),
     ranks: ranks.map(formatRank),
-    assignments: Object.fromEntries(assigned.map((a) => [a.xuid, a.rank_id])),
+    // assignments = each player's top rank (what plugins before 2.25 read); rankSets = all of them, top first
+    assignments: Object.fromEntries(Object.entries(sets).map(([x, ids]) => [x, ids[0]])),
+    rankSets: sets,
   };
 }
 
@@ -128,12 +132,13 @@ async function validRank(env, sql, body) {
 // The owners are always Admins.
 async function syncWebsiteRole(env, sql, xuid) {
   const rows = await sql`
-    SELECT u.id, u.username, u.platform, u.role_id, u.muted_until, rk.website_role,
+    SELECT u.id, u.username, u.platform, u.role_id, u.muted_until,
+           (SELECT max(r.website_role::int) FROM player_ranks x JOIN ranks r ON r.id = x.rank_id WHERE x.xuid = p.xuid) AS website_role,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon,
-           rk.gradient AS rank_gradient, rk.position AS rank_position
+           rk.gradient AS rank_gradient, rk.position AS rank_position, rk.priority AS rank_priority
       FROM players p
       JOIN users u ON u.mc_uuid = p.uuid
-      LEFT JOIN player_ranks pr ON pr.xuid = p.xuid
+      LEFT JOIN player_top_rank pr ON pr.xuid = p.xuid
       LEFT JOIN ranks rk ON rk.id = pr.rank_id
      WHERE p.xuid = ${xuid}`;
   const u = rows[0];
@@ -231,25 +236,36 @@ async function applyAction(env, sql, action, body, actor) {
     await changed(env);
     return {};
   }
-  if (action === "assign") {
+  if (action === "assign" || action === "give" || action === "take") {
     const xuid = String(body.xuid || "");
     const [player] = await sql`SELECT xuid, gamertag FROM players WHERE xuid = ${xuid}`;
     if (!player) throw new HttpError(404, "That player hasn't joined the server yet.");
-    let rankName = null;
-    if (body.rankId == null || body.rankId === "") {
-      await sql`DELETE FROM player_ranks WHERE xuid = ${xuid}`;
+    const all = await sql`SELECT id, name FROM ranks`;
+    const byId = new Map(all.map((r) => [Number(r.id), r]));
+    const have = (await sql`SELECT rank_id FROM player_ranks WHERE xuid = ${xuid}`).map((r) => Number(r.rank_id));
+    let next;
+    if (action === "give" || action === "take") {
+      const id = body.rankId == null || body.rankId === "" ? null : Number(body.rankId);
+      if (id != null && !byId.has(id)) throw new HttpError(404, "That rank no longer exists.");
+      next = action === "give" ? [...new Set([...have, id])].filter((x) => x != null) : id == null ? [] : have.filter((x) => x !== id);
+    } else if (Array.isArray(body.rankIds)) {
+      next = [...new Set(body.rankIds.map(Number))];
+      if (next.some((id) => !byId.has(id))) throw new HttpError(404, "One of those ranks no longer exists. Reload and try again.");
     } else {
-      const [rank] = await sql`SELECT id, name FROM ranks WHERE id = ${Number(body.rankId)}`;
-      if (!rank) throw new HttpError(404, "That rank no longer exists.");
-      rankName = rank.name;
-      await sql`
-        INSERT INTO player_ranks (xuid, rank_id, assigned_by) VALUES (${xuid}, ${rank.id}, ${actor.label})
-        ON CONFLICT (xuid) DO UPDATE SET rank_id = EXCLUDED.rank_id, assigned_by = EXCLUDED.assigned_by, assigned_at = now()`;
+      next = body.rankId == null || body.rankId === "" ? [] : [Number(body.rankId)];  // older in-game menus: one rank
+      if (next.length && !byId.has(next[0])) throw new HttpError(404, "That rank no longer exists.");
     }
-    await audit(sql, actor.id, rankName ? "rank.assign" : "rank.remove", { by: actor.label, player: player.gamertag, rank: rankName });
+    const added = next.filter((id) => !have.includes(id));
+    const removed = have.filter((id) => !next.includes(id));
+    if (removed.length) await sql`DELETE FROM player_ranks WHERE xuid = ${xuid} AND rank_id = ANY(${removed})`;
+    for (const id of added) {
+      await sql`INSERT INTO player_ranks (xuid, rank_id, assigned_by) VALUES (${xuid}, ${id}, ${actor.label}) ON CONFLICT DO NOTHING`;
+    }
+    for (const id of added) await audit(sql, actor.id, "rank.assign", { by: actor.label, player: player.gamertag, rank: byId.get(id).name });
+    for (const id of removed) await audit(sql, actor.id, "rank.remove", { by: actor.label, player: player.gamertag, rank: byId.get(id).name });
     await syncWebsiteRole(env, sql, xuid);
     await changed(env);
-    return {};
+    return { rankIds: next };
   }
   throw new HttpError(400, "Unknown action.");
 }
@@ -267,22 +283,21 @@ export async function listRanks(request, env, ctx, url) {
   const sql = getDb(env);
   const state = await loadRanksState(sql);
   const players = await sql`
-    SELECT p.xuid, p.gamertag, p.last_seen, pr.rank_id, u.username AS linked
+    SELECT p.xuid, p.gamertag, p.last_seen, u.username AS linked
       FROM players p
-      LEFT JOIN player_ranks pr ON pr.xuid = p.xuid
       LEFT JOIN users u ON u.mc_uuid = p.uuid
      WHERE (${q} = '' OR lower(p.gamertag) LIKE '%' || ${q} || '%')
-     ORDER BY (pr.rank_id IS NULL), p.last_seen DESC
+     ORDER BY NOT EXISTS (SELECT 1 FROM player_ranks x WHERE x.xuid = p.xuid), p.last_seen DESC
      LIMIT 200`;
   const counts = {};
-  for (const id of Object.values(state.assignments)) counts[id] = (counts[id] || 0) + 1;
+  for (const ids of Object.values(state.rankSets)) for (const id of ids) counts[id] = (counts[id] || 0) + 1;
   return json({
     ok: true,
     ranks: state.ranks.map((r) => ({ ...r, players: counts[r.id] || 0 })),
     planPriority: state.planPriority,
     icons: ICONS,
     gradients: GRADIENTS,
-    players: players.map((p) => ({ xuid: p.xuid, gamertag: p.gamertag, lastSeen: p.last_seen, rankId: p.rank_id, linked: Boolean(p.linked) })),
+    players: players.map((p) => ({ xuid: p.xuid, gamertag: p.gamertag, lastSeen: p.last_seen, rankIds: state.rankSets[p.xuid] || [], linked: Boolean(p.linked) })),
   });
 }
 

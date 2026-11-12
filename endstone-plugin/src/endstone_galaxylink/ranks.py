@@ -205,7 +205,7 @@ class RankManager:
     def __init__(self, plugin):
         self.plugin = plugin
         self.ranks = {}        # id -> rank
-        self.assign = {}       # xuid -> rank id
+        self.assign = {}       # xuid -> [rank ids], top of the Rank order first
         self.attachments = {}  # player uuid -> PermissionAttachment
         self.plan_priority = {"pro": 50, "plus": 60}  # Galaxy+ / Pro+ tags on the same 1-255 scale as ranks
 
@@ -215,7 +215,11 @@ class RankManager:
         self.ranks = {r["id"]: r for r in msg.get("ranks", [])}
         if isinstance(msg.get("planPriority"), dict):
             self.plan_priority = {k: int(v) for k, v in msg["planPriority"].items()}
-        self.assign = {str(k): v for k, v in (msg.get("assignments") or {}).items()}
+        sets = msg.get("rankSets")
+        if isinstance(sets, dict):  # several ranks per player (website 2.25+)
+            self.assign = {str(k): [i for i in v if i is not None] for k, v in sets.items() if isinstance(v, list)}
+        else:
+            self.assign = {str(k): [v] for k, v in (msg.get("assignments") or {}).items() if v is not None}
         self.plugin.server.scheduler.run_task(self.plugin, self.apply_all)
         self.plugin.server.scheduler.run_task(self.plugin, self.refresh_pictures)
 
@@ -239,8 +243,8 @@ class RankManager:
         for p in self.plugin.server.online_players:
             names[str(p.xuid)] = p.name
         out = []
-        for xuid, rid in self.assign.items():
-            r = self.ranks.get(rid)
+        for xuid in self.assign:
+            r = self.top_rank(xuid)
             name = names.get(xuid) or lookup(xuid)
             if r and r.get("gradient") and name:
                 out.append({"text": name, "stops": GRADIENT_HEX.get(r["gradient"])})
@@ -263,8 +267,18 @@ class RankManager:
             except Exception as e:
                 self.plugin.logger.warning(f"Couldn't build the rank tag pictures: {e}")
 
+    def ranks_of(self, xuid):
+        """Every rank a player has, top of the Rank order first."""
+        mine = [self.ranks[i] for i in self.assign.get(str(xuid), []) if i in self.ranks]
+        return sorted(mine, key=lambda r: (r.get("priority", 100), r.get("position", 0), r["name"].lower()))
+
+    def top_rank(self, xuid):
+        mine = self.ranks_of(xuid)
+        return mine[0] if mine else None
+
     def rank_for(self, player):
-        return self.ranks.get(self.assign.get(str(player.xuid)))
+        """The one rank that shows (tag, name color): the highest in the Rank order."""
+        return self.top_rank(player.xuid)
 
     def ordered(self):
         return sorted(self.ranks.values(), key=lambda r: (r.get("priority", 100), r.get("position", 0), r["name"].lower()))
@@ -296,10 +310,10 @@ class RankManager:
                 old.remove()
             except Exception:
                 pass
-        rank = self.rank_for(player)
-        if rank and rank.get("permissions"):
+        perms = {perm for rank in self.ranks_of(player.xuid) for perm in rank.get("permissions") or []}
+        if perms:  # commands from every rank the player has
             att = player.add_attachment(self.plugin)
-            for perm in rank["permissions"]:
+            for perm in sorted(perms):
                 att.set_permission(perm, True)
             self.attachments[key] = att
         try:
@@ -348,37 +362,56 @@ class RankManager:
         form.add_button("Create a rank", on_click=lambda p: self.rank_form(p, None))
         player.send_form(form)
 
+    def rank_names(self, xuid):
+        mine = self.ranks_of(xuid)
+        return ", ".join(r["name"] for r in mine) if mine else "No rank"
+
     def menu_give(self, player):
         if not self.ranks:
             player.send_message("§eThere are no ranks yet. Create one first.")
             return
-        form = ActionForm(title="Give a rank", content="Choose a player.")
+        form = ActionForm(title="Give a rank", content="Choose a player. Players can have several ranks: they get the commands of all of them, and only the highest one shows.")
         for target in self.plugin.server.online_players:
-            rank = self.rank_for(target)
-            label = f"{target.name}\n§8{rank['name'] if rank else 'No rank'}"
-            form.add_button(label, on_click=lambda p, t=(str(target.xuid), target.name): self.menu_pick_rank(p, t))
+            form.add_button(f"{target.name}\n§8{self.rank_names(target.xuid)}",
+                            on_click=lambda p, t=(str(target.xuid), target.name): self.menu_pick_rank(p, t))
         player.send_form(form)
 
     def menu_pick_rank(self, player, target):
         xuid, name = target
-        form = ActionForm(title=f"Rank for {name}", content="Choose a rank.")
-        for rank in self.ordered():
+        have = set(self.assign.get(xuid, []))
+        choices = [r for r in self.ordered() if r["id"] not in have]
+        if not choices:
+            player.send_message(f"§e{name} already has every rank.")
+            return
+        form = ActionForm(title=f"Give {name} a rank", content=f"{name} has: {self.rank_names(xuid)}")
+        for rank in choices:
             form.add_button(f"{tag_text(rank)}§r {rank['name']}",
-                            on_click=lambda p, r=rank: self.send(p, {"action": "assign", "xuid": xuid, "rankId": r["id"]},
+                            on_click=lambda p, r=rank: self.send(p, {"action": "give", "xuid": xuid, "rankId": r["id"]},
                                                                  f"Gave {name} the rank {r['name']}."))
         player.send_form(form)
 
     def menu_remove(self, player):
-        holders = [t for t in self.plugin.server.online_players if self.rank_for(t)]
+        holders = [t for t in self.plugin.server.online_players if self.ranks_of(t.xuid)]
         if not holders:
             player.send_message("§eNo online players have a rank. Use the website to manage offline players.")
             return
         form = ActionForm(title="Remove a rank", content="Choose a player.")
         for target in holders:
-            rank = self.rank_for(target)
-            form.add_button(f"{target.name}\n§8{rank['name']}",
-                            on_click=lambda p, t=(str(target.xuid), target.name): self.send(
-                                p, {"action": "assign", "xuid": t[0], "rankId": None}, f"Removed the rank from {t[1]}."))
+            form.add_button(f"{target.name}\n§8{self.rank_names(target.xuid)}",
+                            on_click=lambda p, t=(str(target.xuid), target.name): self.menu_pick_remove(p, t))
+        player.send_form(form)
+
+    def menu_pick_remove(self, player, target):
+        xuid, name = target
+        mine = self.ranks_of(xuid)
+        form = ActionForm(title=f"Remove a rank from {name}", content="Choose the rank to take away.")
+        for rank in mine:
+            form.add_button(f"{tag_text(rank)}§r {rank['name']}",
+                            on_click=lambda p, r=rank: self.send(p, {"action": "take", "xuid": xuid, "rankId": r["id"]},
+                                                                 f"Removed the rank {r['name']} from {name}."))
+        if len(mine) > 1:
+            form.add_button("§cRemove all ranks", on_click=lambda p: self.send(p, {"action": "take", "xuid": xuid, "rankId": None},
+                                                                               f"Removed all ranks from {name}."))
         player.send_form(form)
 
     def menu_edit(self, player):

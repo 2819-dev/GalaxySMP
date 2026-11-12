@@ -104,7 +104,7 @@ export async function profile(request, env, ctx, url, params) {
            rk.position AS rank_position, rk.priority AS rank_priority, p.bw_games, p.bw_wins, p.bw_kills, p.bw_finals, p.bw_beds,
            s.plan, s.expires_at, u.id AS user_id, u.username AS user_name, u.platform AS user_platform
       FROM players p
-      LEFT JOIN player_ranks pr ON pr.xuid = p.xuid LEFT JOIN ranks rk ON rk.id = pr.rank_id
+      LEFT JOIN player_top_rank pr ON pr.xuid = p.xuid LEFT JOIN ranks rk ON rk.id = pr.rank_id
       LEFT JOIN subscriptions s ON s.xuid = p.xuid AND (s.expires_at IS NULL OR s.expires_at > now())
       LEFT JOIN users u ON u.mc_uuid = p.uuid
      WHERE lower(p.gamertag) = ${name}
