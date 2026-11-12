@@ -123,3 +123,121 @@ export function renderReports(root, { toast, setTimer }) {
   load();
   setTimer(setInterval(load, 30_000));
 }
+
+// ---------- #Shifts (like Melonly): clock in / break / clock out, weekly quota, leave of absence ----------
+const dur = (secs) => { const m = Math.max(0, Math.round(secs / 60)); return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`; };
+const day = (d) => new Date(`${String(d).slice(0, 10)}T12:00:00Z`).toLocaleDateString([], { month: "short", day: "numeric" });
+
+export function renderShifts(root, { toast, setTimer }) {
+  const wrap = h("div", { class: "cp-wrap sh-wrap" });
+  root.append(wrap);
+  let data = null;
+  let ticker = null;
+
+  const act = async (action) => {
+    try { const r = await postJson("/api/shifts/action", { action }); toast(r.message); await load(); } catch (e) { toast(e.message); }
+  };
+
+  function loaDialog() {
+    const today = new Date().toISOString().slice(0, 10);
+    const starts = h("input", { class: "input", id: "loa-start", type: "date", min: today, value: today });
+    const ends = h("input", { class: "input", id: "loa-end", type: "date", min: today, value: today });
+    const reason = h("textarea", { class: "input", id: "loa-reason", rows: 3, maxlength: 300, placeholder: "e.g. Family trip, exams, being sick" });
+    openDialog({
+      title: "Ask for time off",
+      body: h("div", { class: "form" }, h("div", { class: "sh-dates" }, field("First day", starts), field("Last day", ends)), field("Reason", reason),
+        h("p", { class: "text-3 small", style: "margin:0", text: "While your leave is approved, your weekly quota doesn't count." })),
+      actions: [{ label: "Cancel" }, { label: "Send request", kind: "primary", onClick: async () => {
+        await postJson("/api/shifts/loa", { starts: starts.value, ends: ends.value, reason: reason.value });
+        toast("Request sent. You'll get a notification when it's answered."); load();
+      } }],
+    });
+  }
+
+  function decide(l) {
+    const note = h("input", { class: "input", id: "loa-note", maxlength: 200, placeholder: "Optional note" });
+    openDialog({
+      title: `${l.username}: ${day(l.starts)} to ${day(l.ends)}`,
+      body: h("div", { class: "form" }, h("p", { class: "text-2", text: l.reason }), field("Note", note)),
+      actions: [{ label: "Cancel" },
+        { label: "Decline", kind: "danger", onClick: async () => { await postJson(`/api/shifts/loa/${l.id}`, { status: "declined", note: note.value }); toast("Declined."); load(); } },
+        { label: "Approve", kind: "primary", onClick: async () => { await postJson(`/api/shifts/loa/${l.id}`, { status: "approved", note: note.value }); toast("Approved."); load(); } }],
+    });
+  }
+
+  const loaRow = (l, mine) => h("div", { class: "sh-row" },
+    h("div", { class: "sh-row-main" }, h("b", { text: mine ? `${day(l.starts)} to ${day(l.ends)}` : `${l.username} · ${day(l.starts)} to ${day(l.ends)}` }),
+      h("div", { class: "text-3 small", text: l.reason }), l.note ? h("div", { class: "text-3 small", text: `Note: ${l.note}` }) : null),
+    h("span", { class: `sh-status ${l.status}`, text: { open: "Waiting", approved: "Approved", declined: "Declined", cancelled: "Cancelled" }[l.status] }),
+    mine && ["open", "approved"].includes(l.status) && l.ends >= new Date().toISOString().slice(0, 10)
+      ? h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Cancel", onclick: async () => { try { await postJson(`/api/shifts/loa/${l.id}`, { status: "cancelled" }); load(); } catch (e) { toast(e.message); } } })
+      : !mine && l.status === "open" ? h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Answer", onclick: () => decide(l) }) : null);
+
+  function draw() {
+    const d = data, me = d.me, s = me.shift;
+    const clock = h("div", { class: "sh-clock", text: s ? dur(s.secs) : "Off duty" });
+    const state = s ? (s.onBreak ? "On a break" : "On shift") : "Not on shift";
+    const buttons = h("div", { class: "sh-buttons" }, ...(s
+      ? [s.onBreak ? h("button", { class: "btn btn-primary", type: "button", text: "End break", onclick: () => act("resume") })
+                   : h("button", { class: "btn btn-secondary", type: "button", text: "Take a break", onclick: () => act("break") }),
+         h("button", { class: "btn btn-danger", type: "button", text: "Clock out", onclick: () => act("end") })]
+      : [h("button", { class: "btn btn-primary", type: "button", text: "Clock in", onclick: () => act("start") })]));
+    const q = me.quotaMin * 60;
+    const pct = q ? Math.min(100, Math.round((me.weekSecs / q) * 100)) : 0;
+    const bar = h("div", { class: "sh-bar" }, h("span", { style: `width:${pct}%` }));
+    const card = h("section", { class: `sh-card${s ? (s.onBreak ? " break" : " on") : ""}` },
+      h("div", { class: "sh-top" }, h("div", {}, h("div", { class: "sh-state", text: state }), clock), buttons),
+      h("div", { class: "sh-week" },
+        h("div", { class: "sh-week-line" }, h("b", { text: `This week: ${dur(me.weekSecs)}` }),
+          me.loaUntil ? h("span", { class: "sh-status approved", text: `On leave until ${day(me.loaUntil)}` })
+            : q ? h("span", { class: "text-3 small", text: `Quota ${dur(q)} · ${pct >= 100 ? "done ✓" : `${dur(Math.max(0, q - me.weekSecs))} to go`}` }) : h("span", { class: "text-3 small", text: "No weekly quota" })),
+        q ? bar : null),
+      h("p", { class: "text-3 small", style: "margin:8px 0 0", text: "In game: /shift on, /shift break, /shift back, /shift off" }));
+    ticker = s && !s.onBreak ? { el: clock, base: s.secs, at: Date.now() } : null;
+
+    const duty = h("section", { class: "sh-panel" }, h("h3", { text: `On duty · ${d.onDuty.length}` }),
+      d.onDuty.length ? h("div", { class: "sh-list" }, ...d.onDuty.map((x) => h("div", { class: "sh-row" },
+        h("span", { class: `sh-dot ${x.onBreak ? "break" : "on"}` }), h("div", { class: "sh-row-main" }, h("b", { text: x.username }),
+          h("div", { class: "text-3 small", text: `${x.onBreak ? "On a break" : "On shift"} · since ${new Date(x.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}${x.source === "game" ? " · in game" : ""}` })))))
+        : h("p", { class: "text-3", text: "Nobody is on shift right now." }));
+
+    const leave = h("section", { class: "sh-panel" },
+      h("div", { class: "sh-head" }, h("h3", { text: "My leave" }), h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Ask for time off", onclick: loaDialog })),
+      d.loa.length ? h("div", { class: "sh-list" }, ...d.loa.map((l) => loaRow(l, true))) : h("p", { class: "text-3", text: "No leave requests." }));
+
+    const recent = h("section", { class: "sh-panel" }, h("h3", { text: "My recent shifts" }),
+      d.recent.length ? h("div", { class: "sh-list" }, ...d.recent.map((x) => h("div", { class: "sh-row" },
+        h("div", { class: "sh-row-main" }, h("b", { text: new Date(x.startedAt).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) }),
+          h("div", { class: "text-3 small", text: `${dur(x.secs)}${x.source === "game" ? " · in game" : ""}${x.endedBy === "auto" ? " · closed automatically after 10 hours" : ""}` })))))
+        : h("p", { class: "text-3", text: "No shifts yet." }));
+
+    const parts = [h("div", { class: "tl-intro" }, h("h2", { text: "Shifts" }),
+      h("p", { class: "text-3", text: "Clock in when you're helping out, take breaks, and clock out when you're done. Weeks start on Monday." })), card, duty];
+    if (d.manager) {
+      const team = h("section", { class: "sh-panel" }, h("h3", { text: "Team this week" }),
+        h("div", { class: "sh-list" }, ...d.team.map((m) => {
+          const tq = m.quotaMin * 60, ok = !tq || m.weekSecs >= tq;
+          return h("div", { class: "sh-row" }, h("span", { class: `sh-dot ${m.status}` }),
+            h("div", { class: "sh-row-main" }, h("b", { text: m.username }),
+              h("div", { class: "text-3 small", text: `${dur(m.weekSecs)}${tq ? ` of ${dur(tq)}` : ""}` })),
+            m.loaUntil ? h("span", { class: "sh-status approved", text: "On leave" })
+              : tq ? h("span", { class: `sh-status ${ok ? "approved" : "open"}`, text: ok ? "Quota met" : "Behind" }) : null);
+        })));
+      const reqs = h("section", { class: "sh-panel" }, h("h3", { text: "Leave requests" }),
+        d.requests.length ? h("div", { class: "sh-list" }, ...d.requests.map((l) => loaRow(l, false))) : h("p", { class: "text-3", text: "No requests." }));
+      parts.push(team, reqs);
+    }
+    parts.push(leave, recent);
+    wrap.replaceChildren(...parts);
+  }
+
+  async function load() {
+    try { data = await getJson("/api/shifts"); draw(); } catch (e) { wrap.replaceChildren(h("p", { class: "text-3", text: e.message })); }
+  }
+  load();
+  let n = 0;
+  setTimer(setInterval(() => {  // the clock moves every 15 seconds; everything reloads every minute
+    if (++n % 4 === 0) load();
+    else if (ticker) ticker.el.textContent = dur(ticker.base + (Date.now() - ticker.at) / 1000);
+  }, 15_000));
+}

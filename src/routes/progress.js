@@ -155,7 +155,7 @@ export async function recordAchievementDefs(env, list) {
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = 'server'`;
 }
 
-async function achievementDefs(sql) {
+export async function achievementDefs(sql) {
   const rows = await sql`SELECT value FROM economy_config WHERE key = 'achievements'`;
   return rows[0]?.value || [];
 }
@@ -260,7 +260,8 @@ export async function socialProfile(request, env, ctx, url, params) {
   const name = String(params.name || "").trim().replace(/^\./, "").toLowerCase().slice(0, 32);
   const sql = getDb(env);
   const [u] = await sql`
-    SELECT u.id, u.username, u.created_at, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color, u.banner_at, (u.banner IS NOT NULL) AS has_banner
+    SELECT u.id, u.username, u.created_at, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color, u.banner_at, (u.banner IS NOT NULL) AS has_banner,
+           u.showcase
       FROM players p JOIN users u ON u.mc_uuid = p.uuid
      WHERE lower(p.gamertag) = ${name} AND NOT u.banned
      ORDER BY p.last_seen DESC LIMIT 1`;
@@ -274,6 +275,7 @@ export async function socialProfile(request, env, ctx, url, params) {
       realName: u.real_name && (!u.real_name_hidden || me || staff) ? u.real_name : null, realNameHidden: Boolean(u.real_name_hidden),
       bio: u.bio || null, interests: (u.interests || []).map((i) => INTEREST_NAME[i]).filter(Boolean), color: u.profile_color || null,
       banner: bannerUrl(u),
+      showcase: await (await import("./showcase.js")).showcaseFor(sql, u.id, u.showcase),
     },
   }, 200, { "Cache-Control": "no-store" });
 }

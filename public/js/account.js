@@ -102,6 +102,45 @@ function picturesCard() {
   return card("Pictures", "Your banner shows at the top of your profile and profile card. Pictures must follow the rules: staff can remove them.", wrap);
 }
 
+// Invite friends: your link, who joined with it, and (in your first week) who invited you.
+function inviteCard() {
+  const body = h("div", { class: "stack", style: "gap:10px" }, h("p", { class: "text-3", text: "Loading…" }));
+  const box = card("Invite friends", null, body);
+  box.id = "invite";
+  getJson("/api/referrals").then((d) => {
+    const link = h("input", { class: "input", id: "invite-link", readonly: true, value: d.link });
+    const copy = h("button", { class: "btn btn-primary btn-sm", type: "button" }, iconEl("copy"), "Copy");
+    copy.addEventListener("click", async () => {
+      try {
+        if (navigator.share && matchMedia("(pointer: coarse)").matches) await navigator.share({ title: "Join me on GalaxySMP", url: d.link });
+        else { await navigator.clipboard.writeText(d.link); toast("Invite link copied."); }
+      } catch { /* cancelled */ }
+    });
+    const parts = [
+      h("p", { class: "text-2", style: "margin:0" }, `When a friend makes an account with your link and plays for ${d.rewards.hours} hour, you get `,
+        h("b", { text: moneyDollars(d.rewards.inviter / 100) }), " and they get ", h("b", { text: moneyDollars(d.rewards.friend / 100) }), ` in game. Invite ${d.rewards.badgeAt} friends who play to earn the Recruiter badge.`),
+      h("div", { class: "acc-invite" }, link, copy),
+      h("div", { class: "acc-invite-stats" },
+        h("div", {}, h("b", { text: String(d.friends.length) }), h("span", { class: "text-3 small", text: "joined with your link" })),
+        h("div", {}, h("b", { text: String(d.qualified) }), h("span", { class: "text-3 small", text: "played their first hour" })),
+        h("div", {}, h("b", { text: d.badge ? "Earned ✓" : `${Math.max(0, d.rewards.badgeAt - d.qualified)} to go` }), h("span", { class: "text-3 small", text: "Recruiter badge" }))),
+    ];
+    if (d.friends.length) parts.push(h("div", { class: "stack", style: "gap:4px" }, ...d.friends.slice(0, 20).map((f) =>
+      row(f.name, f.done ? "Played 1 hour ✓" : `${f.minutes} of 60 min played`))));
+    if (d.invitedBy) parts.push(h("p", { class: "text-3 small", style: "margin:0", text: `You were invited by ${d.invitedBy}.` }));
+    else if (d.canSetInviter) {
+      const who = h("input", { class: "input", id: "inviter-name", maxlength: 32, placeholder: "Their name" });
+      const save = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Save" });
+      save.addEventListener("click", async () => {
+        try { const r = await postJson("/api/referrals/inviter", { name: who.value }); toast(r.message); box.replaceWith(inviteCard()); } catch (e) { toast(e.message); }
+      });
+      parts.push(h("div", { class: "stack", style: "gap:6px" }, h("span", { class: "text-3 small", text: "Did a friend invite you? Tell us who (only in your first week):" }), h("div", { class: "acc-invite" }, who, save)));
+    }
+    body.replaceChildren(...parts);
+  }).catch((e) => body.replaceChildren(h("p", { class: "text-3", text: e.message })));
+  return box;
+}
+
 const SECTIONS = {
   profile() {
     const p = data.profile;
@@ -127,6 +166,7 @@ const SECTIONS = {
         row("Last in game", p.inGame ? "Now" : fmtDate(p.lastSeen)),
         p.mutedUntil ? row("Chat", `Muted until ${new Date(p.mutedUntil).toLocaleString()}`) : null),
       h("p", { class: "text-3 small", text: "Your profile picture is your Minecraft head (or your Xbox picture until your head arrives). Your name and rank come from the game." }),
+      inviteCard(),
       picturesCard(),
       editProfileCard(),
     ];

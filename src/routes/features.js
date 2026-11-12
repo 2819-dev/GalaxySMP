@@ -141,7 +141,7 @@ export async function eventAction(request, env, ctx, url, params) {
 // =====================================================================
 // News
 // =====================================================================
-const NEWS_TAGS = ["news", "update", "event", "store", "fix", "recap"];
+const NEWS_TAGS = ["news", "update", "event", "store", "fix", "recap", "release"];
 
 export async function newsList(request, env, ctx, url) {
   const user = await requireUser(request, env);
@@ -568,6 +568,13 @@ export async function tick(env) {
   await buildOfTheWeek(env, sql);
   await expireTrades(env, sql).catch((e) => console.error("trade expiry failed", e));
   await weeklyRecap(env).catch((e) => console.error("weekly recap failed", e));
+  const jobs = [
+    ["referrals", () => import("./referrals.js").then((m) => m.checkReferrals(env, sql))],
+    ["goals", () => import("./goals.js").then((m) => m.goalsTick(env, sql))],
+    ["shifts", () => import("./shifts.js").then((m) => m.shiftsTick(env, sql))],
+    ["rewards", () => import("./rewards.js").then((m) => m.sendRewards(env, sql))],
+  ];
+  for (const [name, run] of jobs) await run().catch((e) => console.error(`${name} job failed`, e));
 }
 
 async function buildOfTheWeek(env, sql) {

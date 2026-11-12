@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.33.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.34.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -217,6 +217,10 @@ class VoiceLink:
             self._on_main(lambda: self.plugin.shopchests.from_website(msg))
         elif msg.get("type") == "ah_buy":
             self._on_main(lambda: self.plugin.auction.from_website(msg))
+        elif msg.get("type") == "goal":  # the server-wide goal and its progress (website, every few minutes)
+            self._on_main(lambda: self.plugin.goals.from_website(msg))
+        elif msg.get("type") == "rewards":  # referrals, season pass, server goals
+            self._on_main(lambda: self.plugin.rewards.from_website(msg))
         elif msg.get("type") == "eco":
             self._on_main(lambda: self.plugin.economy.from_website(msg))
         elif msg.get("type") == "announce":

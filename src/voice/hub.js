@@ -298,6 +298,7 @@ export class VoiceHub extends DurableObject {
       this.sendIcons();
       this.ctx.waitUntil(this.sendRanks());
       this.ctx.waitUntil(this.sendShop());
+      this.ctx.waitUntil(import("../routes/rewards.js").then((m) => m.sendRewards(this.env, undefined, (msg) => { this.send(server, msg); return true; })).catch(() => {}));
       this.ctx.waitUntil(this.sendMapSetting());
       return new Response(null, { status: 101, webSocket: client });
     }
@@ -400,6 +401,9 @@ export class VoiceHub extends DurableObject {
         })().catch(() => {}));
       }
       return;
+    }
+    if (msg.type === "rewards_done") {  // the plugin gave these rewards (money, crate keys)
+      return import("../routes/rewards.js").then((m) => m.rewardsDone(this.env, msg.ids)).catch((e) => console.error("rewards done failed", e));
     }
     if (msg.type === "chatfilter_state") {
       return this.ctx.storage.put("chatfilter", { enabled: Boolean(msg.enabled), at: Date.now() });

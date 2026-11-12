@@ -46,3 +46,24 @@ fetch("/api/leaderboards?board=playtime").then((r) => r.json()).then((d) => {
     potw.hidden = false;
   }
 }).catch(() => {});
+
+// The server-wide goal (Control Panel > Server control), with a progress bar.
+fetch("/api/goals/current", { credentials: "same-origin" }).then((r) => r.json()).then((d) => {
+  const g = d.goal;
+  const box = document.getElementById("home-goal");
+  if (!g || !box) return;
+  const pct = Math.min(100, Math.floor((g.progress / g.target) * 100));
+  const el = (tag, cls, text) => { const x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; };
+  const head = el("div", "goal-head");
+  head.append(el("span", "goal-k", g.finished ? "Goal reached!" : g.closed ? "Last goal" : "Server goal"), el("b", "goal-title", g.title));
+  const bar = el("div", "goal-bar");
+  const fill = el("span");
+  fill.style.width = `${pct}%`;
+  bar.append(fill);
+  const info = el("div", "goal-info");
+  info.append(el("span", "", `${g.progress.toLocaleString()} of ${g.target.toLocaleString()} ${g.unit} · ${pct}%`),
+    el("span", "", g.finished ? "Thanks, everyone!" : g.closed ? "Time ran out" : `${g.endsIn} left${g.rewardCents ? ` · $${Math.round(g.rewardCents / 100).toLocaleString()} for each helper` : ""}`));
+  box.replaceChildren(head, bar, info);
+  if (g.top?.length) box.append(el("p", "goal-top", `Top helpers: ${g.top.slice(0, 3).map((t) => t.name).join(", ")}`));
+  box.hidden = false;
+}).catch(() => {});

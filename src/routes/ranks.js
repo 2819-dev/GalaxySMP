@@ -33,7 +33,7 @@ export const GRADIENTS = ["galaxy", "gold", "sunset", "fire", "ocean", "forest",
 // that allows the whole command, so "time" also allows "/time set day".
 // Same rules as the plugin (endstone_galaxylink/ranks.py).
 const ENDSTONE_COMMANDS = new Set(["ban", "banip", "banlist", "plugins", "reload", "seed", "status", "unban", "unbanip", "version"]);
-const PLUGIN_COMMANDS = new Set(["link", "ranks", "money", "pay", "baltop", "setmoney", "addmoney", "takemoney", "shop", "sell", "ah", "shopnpc",
+const PLUGIN_COMMANDS = new Set(["shift", "whois", "warp", "setwarp", "delwarp", "goal", "link", "ranks", "money", "pay", "baltop", "setmoney", "addmoney", "takemoney", "shop", "sell", "ah", "shopnpc",
   "guide", "tpa", "tpahere", "tpaccept", "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd", "chatfilter", "announce", "report", "mod", "modban", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates", "givekey", "elevator", "bedwars", "leave", "trade"]);
 const ALIASES = { tp: "teleport", msg: "tell", w: "tell", bal: "money", balance: "money", auction: "ah", menu: "guide", tpyes: "tpaccept", plots: "plot", minigame: "minigames", mg: "minigames", tpno: "tpdeny", "ban-ip": "banip", "unban-ip": "unbanip", pardon: "unban" };
 
@@ -57,6 +57,7 @@ function formatRank(r) {
     gradient: r.gradient || null,
     permissions: r.permissions || [],
     webPerms: r.web_perms || [],
+    shiftQuotaMin: Number(r.shift_quota_min || 0),
     position: r.position,
     priority: r.priority ?? 100,
   };
@@ -124,7 +125,10 @@ async function validRank(env, sql, body) {
   // missing = keep the rank's current priority (the in-game /ranks menu doesn't send one); new ranks get 100
   const priority = body.priority == null || body.priority === "" ? null : Number(body.priority);
   if (priority !== null && (!Number.isInteger(priority) || priority < 1 || priority > 255)) throw new HttpError(400, "Priority must be a whole number from 1 (highest) to 255 (lowest).");
-  return { name, prefix, color, icon, gradient, permissions: perms, webPerms, priority };
+  // weekly shift quota in minutes (missing = keep the current one)
+  const quota = body.shiftQuotaMin == null || body.shiftQuotaMin === "" ? null : Math.round(Number(body.shiftQuotaMin));
+  if (quota !== null && (!Number.isInteger(quota) || quota < 0 || quota > 100 * 60)) throw new HttpError(400, "The weekly shift quota must be 0 to 100 hours.");
+  return { name, prefix, color, icon, gradient, permissions: perms, webPerms, priority, shiftQuotaMin: quota };
 }
 
 // Gives or removes the website role that comes with a player's rank (if they linked an account).
@@ -173,14 +177,15 @@ async function applyAction(env, sql, action, body, actor) {
     try {
       if (action === "create") {
         [rank] = await sql`
-          INSERT INTO ranks (name, prefix, color, icon, gradient, permissions, web_perms, priority, position)
-          VALUES (${r.name}, ${r.prefix}, ${r.color}, ${r.icon}, ${r.gradient}, ${r.permissions}, ${r.webPerms || []}, ${r.priority ?? 100},
+          INSERT INTO ranks (name, prefix, color, icon, gradient, permissions, web_perms, priority, shift_quota_min, position)
+          VALUES (${r.name}, ${r.prefix}, ${r.color}, ${r.icon}, ${r.gradient}, ${r.permissions}, ${r.webPerms || []}, ${r.priority ?? 100}, ${r.shiftQuotaMin ?? 0},
                   (SELECT coalesce(max(position), 0) + 1 FROM ranks))
           RETURNING *`;
       } else {
         [rank] = await sql`
           UPDATE ranks SET name = ${r.name}, prefix = ${r.prefix}, color = ${r.color}, icon = ${r.icon}, gradient = ${r.gradient}, permissions = ${r.permissions},
-                 web_perms = coalesce(${r.webPerms}::text[], web_perms), priority = coalesce(${r.priority}::smallint, priority), updated_at = now()
+                 web_perms = coalesce(${r.webPerms}::text[], web_perms), priority = coalesce(${r.priority}::smallint, priority),
+                 shift_quota_min = coalesce(${r.shiftQuotaMin}::int, shift_quota_min), updated_at = now()
            WHERE id = ${Number(body.id)} RETURNING *`;
         if (!rank) throw new HttpError(404, "That rank no longer exists.");
       }

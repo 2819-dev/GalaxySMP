@@ -132,7 +132,7 @@ function eventDialog(e, done, toast) {
 // =====================================================================
 // News
 // =====================================================================
-const NEWS_TAGS = { update: "Update", fix: "Fix", news: "News", event: "Event", store: "Store", recap: "Weekly recap" };
+const NEWS_TAGS = { update: "Update", fix: "Fix", news: "News", event: "Event", store: "Store", recap: "Weekly recap", release: "Release notes" };
 
 export function renderNews(p, { toast }) {
   const list = h("div", { class: "stack", style: "gap:12px" });

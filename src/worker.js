@@ -14,6 +14,11 @@ import { headImage } from "./routes/heads.js";
 import { bootstrap, history, connect, search as chatSearch, pins as chatPins, pin as chatPin } from "./routes/chat.js";
 import * as mod from "./routes/mod.js";
 import * as staffroom from "./routes/staffroom.js";
+import * as shifts from "./routes/shifts.js";
+import * as seasonRoutes from "./routes/season.js";
+import * as goals from "./routes/goals.js";
+import * as referrals from "./routes/referrals.js";
+import * as showcase from "./routes/showcase.js";
 import { voiceConnect, voiceServer } from "./routes/voice.js";
 import * as ranks from "./routes/ranks.js";
 import * as economy from "./routes/economy.js";
@@ -142,6 +147,20 @@ const routes = [
   ["POST", "/api/mod/chatfilter", (req, env) => mod.chatFilterSet(req, env)],
   ["GET", "/api/mod/audit", mod.listAudit],
   ["GET", "/api/staff-room/logs", staffroom.staffLogs],
+  ["GET", "/api/shifts", (req, env) => shifts.overview(req, env)],
+  ["POST", "/api/shifts/action", (req, env) => shifts.action(req, env)],
+  ["POST", "/api/shifts/loa", (req, env) => shifts.requestLoa(req, env)],
+  ["POST", "/api/shifts/loa/:id", shifts.decideLoa],
+  ["POST", "/api/plugin/shift", (req, env) => shifts.pluginShift(req, env)],
+  ["GET", "/api/season", (req, env) => seasonRoutes.season(req, env)],
+  ["POST", "/api/season/claim", (req, env) => seasonRoutes.claim(req, env)],
+  ["GET", "/api/goals/current", (req, env) => goals.current(req, env)],
+  ["GET", "/api/mod/goals", (req, env) => goals.manage(req, env)],
+  ["POST", "/api/mod/goals", (req, env) => goals.manage(req, env)],
+  ["GET", "/api/referrals", (req, env) => referrals.mine(req, env)],
+  ["POST", "/api/referrals/inviter", (req, env) => referrals.setInviter(req, env)],
+  ["GET", "/api/showcase/options", (req, env) => showcase.options(req, env)],
+  ["POST", "/api/showcase", (req, env) => showcase.save(req, env)],
   ["GET", "/api/voice/connect", (req, env) => voiceConnect(req, env)],
   ["GET", "/api/voice/server", (req, env) => voiceServer(req, env)],
   ["POST", "/api/mod/members/:id/voice-mute", mod.voiceMute],

@@ -2,7 +2,7 @@
 // Everyone sees the game side (rank, badges, stats, achievements). Signed-in members also see the social side:
 // real name (unless hidden), bio, what they like to play, profile color, activity and a Message button.
 import { iconEl, toast } from "/js/site.js";
-import { h, reportPlayerDialog, postJson } from "/js/dialog.js";
+import { h, reportPlayerDialog, postJson, getJson, openDialog } from "/js/dialog.js";
 import { rankTag, paint } from "/js/rank-paint.js";
 import { money, hours, playerSearch } from "/js/leaderboard.js";
 import { faceSvg } from "/js/face.js";
@@ -207,7 +207,23 @@ async function load() {
     h("p", { class: "text-3 small", style: "margin:12px 0 0" }, "Earn achievements with ", h("code", { text: "/achievements" }), ", ", h("code", { text: "/quests" }), " and ", h("code", { text: "/daily" }), " in game. ",
       h("a", { href: "/leaderboard", text: "See the leaderboards" }), "."));
 
-  box.replaceChildren(hero, h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, stats, bedwars, charts), h("div", { class: "pp-col" }, achievements)));
+  // ---- showcase: up to 3 pinned achievements or builds ----
+  let showcase = null;
+  if (social?.showcase?.length || social?.isMe) {
+    const items = social.showcase || [];
+    showcase = h("section", { class: "panel pp-showcase" },
+      h("div", { class: "pp-sc-head" }, h("h2", { text: "Showcase" }),
+        social.isMe ? h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => editShowcase() }, iconEl("pencil"), items.length ? "Edit" : "Pick") : null),
+      items.length ? h("div", { class: "pp-sc-grid" }, ...items.map((it) => it.type === "build"
+        ? h("a", { class: "pp-sc-card build", href: "/community#builds" },
+          it.image ? h("img", { src: it.image, alt: "", loading: "lazy" }) : h("span", { class: "pp-sc-ic" }, iconEl("castle")),
+          h("div", {}, h("span", { class: "pp-sc-kind", text: "Build" }), h("b", { text: it.name })))
+        : h("div", { class: "pp-sc-card" }, h("span", { class: "pp-sc-ic" }, iconEl(achIcon(it.id))),
+          h("div", {}, h("span", { class: "pp-sc-kind", text: "Achievement" }), h("b", { text: it.name }), it.description ? h("span", { class: "text-3 small", text: it.description }) : null))))
+        : h("p", { class: "text-3", style: "margin:0", text: "Pin up to 3 of your achievements or builds here for everyone to see." }));
+  }
+
+  box.replaceChildren(...[hero, showcase].filter(Boolean), h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, stats, bedwars, charts), h("div", { class: "pp-col" }, achievements)));
 }
 
 // Playtime per day (bars) and money over the last 30 days (line), from the daily history.
@@ -241,3 +257,37 @@ async function loadCharts(name, box) {
 
 playerSearch($("player-search"), $("player-q"), $("player-suggest"));
 load();
+
+// Pick up to 3 achievements or builds for the showcase.
+async function editShowcase() {
+  let d;
+  try { d = await getJson("/api/showcase/options"); } catch (e) { toast(e.message); return; }
+  const chosen = d.chosen.map((c) => `${c.type}:${c.id}`);
+  const count = h("p", { class: "text-3 small", style: "margin:0" });
+  const boxes = [];
+  const row = (it) => {
+    const cb = h("input", { type: "checkbox", value: `${it.type}:${it.id}`, checked: chosen.includes(`${it.type}:${it.id}`) });
+    boxes.push(cb);
+    cb.addEventListener("change", () => {
+      const n = boxes.filter((b) => b.checked).length;
+      if (n > d.max) { cb.checked = false; toast(`You can pick up to ${d.max}.`); }
+      count.textContent = `${boxes.filter((b) => b.checked).length} of ${d.max} picked`;
+    });
+    return h("label", { class: "check pp-sc-pick" }, cb, h("span", {}, h("b", { text: it.name }), it.description ? h("span", { class: "text-3 small", text: ` · ${it.description}` }) : null));
+  };
+  count.textContent = `${chosen.length} of ${d.max} picked`;
+  openDialog({
+    title: "Your showcase",
+    body: h("div", { class: "form pp-sc-form" }, count,
+      h("div", { class: "field-label", text: "Achievements" }),
+      d.achievements.length ? h("div", { class: "stack", style: "gap:4px" }, ...d.achievements.map(row)) : h("p", { class: "text-3 small", text: "No achievements yet. Earn them in game with /achievements." }),
+      h("div", { class: "field-label", text: "Builds" }),
+      d.builds.length ? h("div", { class: "stack", style: "gap:4px" }, ...d.builds.map(row)) : h("p", { class: "text-3 small", text: "No builds yet. Share one in Community > #Builds." })),
+    actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: async () => {
+      const items = boxes.filter((b) => b.checked).map((b) => { const [type, ...id] = b.value.split(":"); return { type, id: id.join(":") }; });
+      await postJson("/api/showcase", { items });
+      toast("Showcase saved.");
+      location.reload();
+    } }],
+  });
+}

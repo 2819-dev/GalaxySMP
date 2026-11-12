@@ -13,7 +13,7 @@ export function setupServerControl({ loaders, toast }) {
   loaders.serverctl = async () => {
     let d;
     try { d = await getJson("/api/panel/server-control"); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
-    box.replaceChildren(allowlistPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d));
+    box.replaceChildren(allowlistPanel(), goalPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d));
   };
 
   // ---------- allowlist (who can join the Minecraft server) ----------
@@ -116,5 +116,45 @@ export function setupServerControl({ loaders, toast }) {
         action: "kit", enabled: enabled.checked, money: Number(money.value) || 0, message: msg.value,
         items: [...rows.children].map((r) => ({ id: r.children[0].value, count: Number(r.children[1].value) })).filter((x) => x.id.trim()),
       }).catch((e) => toast(e.message)) })));
+  }
+
+  // ---------- server-wide goal ----------
+  function goalPanel() {
+    const wrap = h("section", { class: "panel sc-card" }, h("div", { class: "sc-head" }, h("h2", { text: "Server goal" })), h("p", { class: "text-3", text: "Loading…" }));
+    getJson("/api/mod/goals").then((d) => {
+      const cur = d.goals.find((g) => !g.closed);
+      const parts = [h("div", { class: "sc-head" }, h("h2", { text: "Server goal" }))];
+      if (cur) {
+        const pct = Math.min(100, Math.floor((cur.progress / cur.target) * 100));
+        parts.push(h("p", { class: "text-2" }, h("b", { text: cur.title }), ` · ${cur.progress.toLocaleString()} of ${cur.target.toLocaleString()} ${cur.unit} (${pct}%) · ${cur.endsIn || "ending"} left`),
+          h("div", { class: "sh-bar" }, h("span", { style: `width:${pct}%` })),
+          cur.top?.length ? h("p", { class: "text-3 small", text: `Top helpers: ${cur.top.map((t) => `${t.name} (${t.value.toLocaleString()})`).join(", ")}` }) : null,
+          h("div", {}, h("button", { class: "btn btn-danger btn-sm", type: "button", text: "End this goal now", onclick: () => openDialog({
+            title: "End the goal now?", body: h("p", { class: "text-2", text: "It stops without rewards. Players can't finish it any more." }),
+            actions: [{ label: "Cancel" }, { label: "End goal", kind: "danger", onClick: async () => { await postJson("/api/mod/goals", { action: "end" }); toast("Goal ended."); loaders.serverctl(); } }],
+          }) })));
+      } else {
+        const title = h("input", { class: "input", id: "goal-title", maxlength: 80, placeholder: "e.g. Mine a million blocks together" });
+        const stat = h("select", { class: "input", id: "goal-stat" }, ...d.stats.map((s) => h("option", { value: s.key, text: s.unit[0].toUpperCase() + s.unit.slice(1) })));
+        const target = h("input", { class: "input", id: "goal-target", type: "number", min: 1, value: "100000" });
+        const days = h("input", { class: "input", id: "goal-days", type: "number", min: 1, max: 60, value: "7" });
+        const reward = h("input", { class: "input", id: "goal-reward", type: "number", min: 0, value: "1000" });
+        parts.push(h("p", { class: "text-2", text: "Everyone works together on one big number. Players see it on the home page and with /goal; the server hears about it at 25%, 50%, 75% and when it's done. Everyone who helped gets the reward." }),
+          field("Title", title),
+          h("div", { class: "grid grid-2", style: "gap:12px" }, field("What counts", stat), field("Target", target, "For hours played, the target is in hours.")),
+          h("div", { class: "grid grid-2", style: "gap:12px" }, field("Days to do it", days), field("Reward for each helper ($ in game)", reward)),
+          h("div", {}, h("button", { class: "btn btn-primary", type: "button", text: "Start goal", onclick: async () => {
+            try {
+              await postJson("/api/mod/goals", { action: "create", title: title.value, stat: stat.value, target: Number(target.value), days: Number(days.value), rewardDollars: Number(reward.value) || 0 });
+              toast("Goal started! The server announced it."); loaders.serverctl();
+            } catch (e) { toast(e.message); }
+          } })));
+      }
+      const past = d.goals.filter((g) => g.closed).slice(0, 5);
+      if (past.length) parts.push(h("details", {}, h("summary", { class: "text-3 small", text: "Past goals" }),
+        ...past.map((g) => h("p", { class: "text-3 small", text: `${g.finished ? "✓" : "✗"} ${g.title}: ${g.progress.toLocaleString()} of ${g.target.toLocaleString()} ${g.unit}` }))));
+      wrap.replaceChildren(...parts.filter(Boolean));
+    }).catch((e) => wrap.replaceChildren(h("p", { class: "text-3", text: e.message })));
+    return wrap;
   }
 }

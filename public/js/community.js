@@ -1,4 +1,4 @@
-import { toast, config } from "/js/site.js";
+import { toast, config, inviteRef } from "/js/site.js";
 import { startChat, stopChat } from "/js/chat.js";
 import "/js/mod.js";
 import "/js/chat-polls.js";
@@ -76,7 +76,7 @@ $("form-signup").addEventListener("submit", async (e) => {
   if (password !== $("su-pass2").value) return (err.textContent = "The passwords do not match.");
   busy(form, true);
   try {
-    const data = await api("/api/auth/link/start", { username, password, platform });
+    const data = await api("/api/auth/link/start", { username, password, platform, ref: inviteRef() });
     form.reset();
     startWaiting(data);
   } catch (ex) {

@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.33.0"
+VERSION = "2.34.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -114,6 +114,12 @@ class GalaxyLink(Plugin):
         "dm": _cmd("Send a direct message to a community member (website and game).", "/dm <player: message>", "galaxylink.command.dm", ["msgweb"]),
         "r": _cmd("Reply to your last direct message.", "/r <message: message>", "galaxylink.command.dm", ["reply"]),
         "report": _cmd("Report a player who is breaking the rules.", "/report [player: message]", "galaxylink.command.report"),
+        "shift": _cmd("Staff shifts: /shift on, break, back, off or status.", "/shift [action: message]", "galaxylink.command.shift"),
+        "whois": _cmd("See a player's card: rank, plan, playtime and more.", "/whois [player: message]", "galaxylink.command.whois"),
+        "warp": _cmd("Visit a player's warp (Galaxy Pro+ members make them).", "/warp [name: message]", "galaxylink.command.warp"),
+        "setwarp": _cmd("Galaxy Pro+: set your public warp where you stand.", "/setwarp <name: message>", "galaxylink.command.setwarp"),
+        "delwarp": _cmd("Delete your warp (staff: any warp).", "/delwarp [name: message]", "galaxylink.command.delwarp"),
+        "goal": _cmd("See the server-wide goal and how close everyone is.", "/goal", "galaxylink.command.goal"),
         "mod": _cmd("Staff moderation panel: warn, mute, kick, ban, reports and block logs.", "/mod", "galaxylink.command.mod"),
         "modban": _cmd("Ban a player (staff).", "/modban <player: message>", "galaxylink.command.modban"),
         "inspect": _cmd("Turn the block inspector on or off: see who placed or broke blocks.", "/inspect", "galaxylink.command.inspect"),
@@ -159,6 +165,12 @@ class GalaxyLink(Plugin):
         "galaxylink.command.bedwars": _perm("Allows /bedwars and /leave.", True),
         "galaxylink.command.trade": _perm("Allows /trade.", True),
         "galaxylink.command.report": _perm("Allows /report.", True),
+        "galaxylink.command.shift": _perm("Allows /shift (the website decides who is staff).", True),
+        "galaxylink.command.whois": _perm("Allows /whois.", True),
+        "galaxylink.command.warp": _perm("Allows /warp.", True),
+        "galaxylink.command.setwarp": _perm("Allows /setwarp (Galaxy Pro+ only).", True),
+        "galaxylink.command.delwarp": _perm("Allows /delwarp (your own warp; staff: any).", True),
+        "galaxylink.command.goal": _perm("Allows /goal.", True),
         "galaxylink.command.dm": _perm("Allows /dm and /r.", True),
         "galaxylink.command.ranktags": _perm("Allows /ranktags (operators).", "op"),
         "galaxylink.command.elevator": _perm("Allows /elevator (plans decide who can build).", True),
@@ -214,6 +226,16 @@ class GalaxyLink(Plugin):
         from endstone_galaxylink.cosmetics import Cosmetics, TRAIL_TICKS
         self.cosmetics = Cosmetics(self)
         self.ranktags = RankTags(self)
+        from endstone_galaxylink.rewards import Rewards
+        self.rewards = Rewards(self)  # money and keys from the website (referrals, season pass, server goals)
+        from endstone_galaxylink.shifts import Shifts
+        self.shifts = Shifts(self)    # /shift for staff
+        from endstone_galaxylink.cards import PlayerCards
+        self.cards = PlayerCards(self)  # /whois and sneak + tap a player
+        from endstone_galaxylink.warps import Warps
+        self.warps = Warps(self)      # Galaxy Pro+ public warps
+        from endstone_galaxylink.goals import Goals
+        self.goals = Goals(self)      # server-wide goals from the website
         from endstone_galaxylink.bedwars import Bedwars
         self.bedwars = Bedwars(self)
         from endstone_galaxylink.livemap import LiveMap
@@ -406,6 +428,8 @@ class GalaxyLink(Plugin):
     def on_interact_actor(self, event: PlayerInteractActorEvent):
         if self.bedwars.on_interact_actor(event):  # Bedwars Item Shop
             return
+        if self.cards.on_interact(event):  # crouch + tap a player: their card
+            return
         self.npcs.on_interact(event)
 
     @event_handler
@@ -557,7 +581,8 @@ class GalaxyLink(Plugin):
         name = command.name
         player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "guide", "tpa", "tpahere", "tpaccept",
                        "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd",
-                       "report", "mod", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates", "elevator"}
+                       "report", "mod", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates", "elevator",
+                       "shift", "whois", "warp", "setwarp", "delwarp", "goal"}
         if name in player_only and not isinstance(sender, Player):
             sender.send_message(f"/{name} can only be used in game.")
             return True
@@ -606,6 +631,12 @@ class GalaxyLink(Plugin):
             "chatfilter": lambda: self.chatfilter.command(sender, args),
             "announcement": lambda: self.announcements.command(sender, args),
             "report": lambda: self.moderation.report_command(sender, args),
+            "shift": lambda: self.shifts.command(sender, args),
+            "whois": lambda: self.cards.command(sender, args),
+            "warp": lambda: self.warps.warp(sender, args),
+            "setwarp": lambda: self.warps.set_warp(sender, args),
+            "delwarp": lambda: self.warps.del_warp(sender, args),
+            "goal": lambda: self.goals.show(sender),
             "dm": lambda: self.dms.command(sender, args),
             "r": lambda: self.dms.reply(sender, args),
             "daily": lambda: self.progress.daily_menu(sender),

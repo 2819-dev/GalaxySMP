@@ -630,6 +630,8 @@ function rankDialog(rank) {
   const icon = choiceGrid("Icon", [["", "No icon"], ...rankData.icons.map((i) => [i, i[0].toUpperCase() + i.slice(1)])], r.icon || "",
     (v) => (v ? h("img", { src: `/img/ranks/rank_${v}.png`, alt: "" }) : h("span", { text: "None" })));
   const webPerms = webPermPicker(rankData.webPerms || [], r.webPerms || []);
+  const quota = h("input", { class: "input", id: "rank-quota", type: "number", min: 0, max: 100, step: 0.5, inputmode: "decimal",
+    value: r.shiftQuotaMin ? String(Math.round((r.shiftQuotaMin / 60) * 10) / 10) : "", placeholder: "No quota" });
   const cmds = commandChips(commands);
   const orderList = rankOrderList(rank ? `rank:${rank.id}` : "new", Object.assign(() => name.value.trim() || "New rank", { prefix: () => prefix.value.trim() || "NEW" }));
   const advanced = h("input", { class: "input", id: "rank-other", placeholder: "someplugin.permission, another.one", value: other.join(", ") });
@@ -645,18 +647,19 @@ function rankDialog(rank) {
     body: h("div", { class: "form" },
       preview,
       field("Rank name", name),
-      field("Prefix", prefix, "Shown as [PREFIX] in chat and above heads."),
+      field("Prefix", prefix, "The name on the rank badge, in chat and above heads."),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Rank order" }), orderList.el,
         h("p", { class: "hint", text: "Move this rank up or down. Higher wins: a player with this rank and a Galaxy+ or Pro+ plan shows whichever tag is higher in this list." })),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Color" }), color.el),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Gradient (optional)" }), gradient.el,
-        h("p", { class: "hint", text: "A smooth gradient on the tag and name above the player's head in game (and on the website). In game chat the tag uses one solid color from the gradient." })),
+        h("p", { class: "hint", text: "The badge's background. In game the player's name is one color from it; on the website the name shows the whole gradient." })),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Icon" }), icon.el,
-        h("p", { class: "hint", text: "Shown before the prefix in game (players need the GalaxySMP Icons pack, which the server sends automatically)." })),
+        h("p", { class: "hint", text: "Shown in white inside the badge, before the prefix." })),
       h("div", { class: "field" }, h("label", { class: "field-label", for: "rank-commands", text: "Commands this rank can use" }), cmds.el,
         h("p", { class: "hint", text: "Type a command name and press Enter, for example time, weather, gamemode or tp. A command includes everything after it: time also allows /time set day. Players don't need to be operators." })),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Website permissions" }), webPerms.el,
         h("p", { class: "hint", text: "What players with this rank can do on galaxymc.us. Separate from the in-game commands above. Players get the permissions of every rank they have." })),
+      field("Weekly shift quota (hours)", quota, "For staff ranks: hours on shift each week (Community > #Shifts). Empty = no quota."),
       h("label", { class: "check" }, mgStaff, "Minigame Staff ", h("span", { class: "text-3 small", text: "(can accept or decline minigame host requests at the Minigame Computers)" })),
       h("details", {}, h("summary", { class: "text-3 small", text: "Advanced: other permission nodes" }),
         field("Permission nodes", advanced, "For other plugins' permissions, separated by commas."))),
@@ -665,7 +668,7 @@ function rankDialog(rank) {
       onClick: async () => {
         const res = await postJson(`/api/mod/ranks/${rank ? "update" : "create"}`, {
           id: rank?.id, name: name.value, prefix: prefix.value, color: color.value(), gradient: gradient.value() || null, icon: icon.value() || null,
-          webPerms: webPerms.value(), commands: cmds.value(),
+          webPerms: webPerms.value(), commands: cmds.value(), shiftQuotaMin: Math.round((Number(quota.value) || 0) * 60),
           permissions: advanced.value.split(",").map((s) => s.trim()).filter((x) => x && x !== MG).concat(mgStaff.checked ? [MG] : []),
         });
         if (orderList.changed() || !rank) {

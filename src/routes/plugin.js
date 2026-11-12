@@ -53,9 +53,9 @@ export async function pluginLink(request, env) {
     // If someone else used to have this name (they renamed), free it up.
     sql`UPDATE users SET username_lower = username_lower || '#' || id
          WHERE username_lower = lower(${name}) AND mc_uuid <> ${uuid}::uuid`,
-    sql`INSERT INTO users (mc_uuid, username, username_lower, platform, password_hash, role_id)
+    sql`INSERT INTO users (mc_uuid, username, username_lower, platform, password_hash, role_id, referred_by)
         SELECT ${uuid}::uuid, ${name}, lower(${name}), ${platform}, password_hash,
-               ${owner ? ADMIN_ROLE : MEMBER_ROLE}
+               ${owner ? ADMIN_ROLE : MEMBER_ROLE}, ref_user_id
           FROM link_codes WHERE id = ${row.id}
         ON CONFLICT (mc_uuid) DO UPDATE SET
           username = EXCLUDED.username,

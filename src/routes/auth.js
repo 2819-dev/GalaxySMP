@@ -1,5 +1,6 @@
 // Accounts: create (via in-game /link code), sign in, sign out, who am I.
 import { stopActing } from "./actas.js";
+import { inviterFor } from "./referrals.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { linkCode, formatCode, randomToken, sha256 } from "../lib/crypto.js";
@@ -33,15 +34,16 @@ export async function linkStart(request, env) {
      WHERE lower(requested_name) = lower(${parsed.name}) AND created_at > now() - interval '10 minutes'`;
   if (recent >= 5) throw new HttpError(429, "Too many codes have been requested for this username. Please wait 10 minutes.");
 
+  const inviter = body.ref ? await inviterFor(sql, body.ref) : null;  // invite link (referrals)
   const pollToken = randomToken(24);
   const pollHash = await sha256(pollToken);
   for (let attempt = 0; attempt < 3; attempt++) {
     const code = linkCode();
     try {
       const rows = await sql`
-        INSERT INTO link_codes (code, requested_name, password_hash, expires_at, poll_token_hash)
+        INSERT INTO link_codes (code, requested_name, password_hash, expires_at, poll_token_hash, ref_user_id)
         VALUES (${code}, ${parsed.name}, crypt(${password}, gen_salt('bf', ${BCRYPT_COST})),
-                now() + make_interval(mins => ${CODE_MINUTES}), ${pollHash})
+                now() + make_interval(mins => ${CODE_MINUTES}), ${pollHash}, ${inviter})
         RETURNING expires_at`;
       // Tidy up old codes now and then.
       if (Math.random() < 0.1) await sql`DELETE FROM link_codes WHERE expires_at < now() - interval '1 day'`;
