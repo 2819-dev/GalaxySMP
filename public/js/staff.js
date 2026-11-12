@@ -481,12 +481,12 @@ loaders.ranks = async () => {
   if (!rankData.ranks.length) list.append(h("div", { class: "empty", text: "No ranks yet. Select New rank to create one." }));
   const place = currentOrder();
   for (const r of rankData.ranks) {
-    const role = STAFF_POWERS.find((x) => x[0] === String(r.websiteRole || ""))?.[1] || "None";
+    const wp = r.webPerms || [];
     const { commands } = splitPerms(r.permissions);
     list.append(h("div", { class: "member-row" },
       h("div", { class: "info" },
         h("strong", {}, rankPreview(r.prefix, r.color, r.name, r.icon, null, r.gradient)),
-        h("span", { text: `#${place.indexOf(`rank:${r.id}`) + 1} in rank order · ${r.players} player${r.players === 1 ? "" : "s"} · ${commands.length ? "Commands: " + commands.map((c) => "/" + c).join(" ") : "No commands"} · Staff powers: ${role}` })),
+        h("span", { text: `#${place.indexOf(`rank:${r.id}`) + 1} in rank order · ${r.players} player${r.players === 1 ? "" : "s"} · ${commands.length ? "Commands: " + commands.map((c) => "/" + c).join(" ") : "No commands"} · ${wp.length ? `${wp.length} website permission${wp.length === 1 ? "" : "s"}` : "No website permissions"}` })),
       h("div", { class: "row-actions" },
         h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Edit", onclick: () => rankDialog(r) }),
         h("button", { class: "btn btn-danger btn-sm", type: "button", text: "Delete", onclick: () => deleteRank(r) }))));
@@ -577,8 +577,42 @@ function commandChips(initial) {
   return { el: box, value: () => { if (input.value.trim()) add(); return [...list]; } };
 }
 
+// Website permissions for a rank: a searchable list of switches, grouped (Community, Moderation, Admin Panel).
+function webPermPicker(all, selected) {
+  const on = new Set(selected);
+  const search = h("input", { class: "input", type: "search", id: "rank-perm-search", placeholder: "Search permissions, e.g. pin, ban, Meet The Team", autocomplete: "off" });
+  const count = h("span", { class: "text-3 small" });
+  const list = h("div", { class: "wp-list" });
+  const draw = () => {
+    const q = search.value.trim().toLowerCase();
+    const groups = new Map();
+    for (const p of all) {
+      if (q && !`${p.label} ${p.hint || ""} ${p.group}`.toLowerCase().includes(q)) continue;
+      if (!groups.has(p.group)) groups.set(p.group, []);
+      groups.get(p.group).push(p);
+    }
+    list.replaceChildren(...[...groups].map(([g, items]) => h("div", { class: "wp-group" },
+      h("div", { class: "wp-group-head" }, h("b", { text: g }),
+        h("button", { class: "btn btn-ghost btn-sm", type: "button", text: items.every((p) => on.has(p.key)) ? "Clear all" : "Select all", onclick: () => {
+          const all = items.every((p) => on.has(p.key));
+          items.forEach((p) => (all ? on.delete(p.key) : on.add(p.key)));
+          draw();
+        } })),
+      ...items.map((p) => {
+        const box = h("input", { type: "checkbox", checked: on.has(p.key) });
+        box.addEventListener("change", () => { box.checked ? on.add(p.key) : on.delete(p.key); count.textContent = `${on.size} selected`; });
+        return h("label", { class: "wp-item" }, box, h("span", {}, h("span", { class: "wp-label", text: p.label }), p.hint ? h("span", { class: "wp-hint", text: p.hint }) : null));
+      }))));
+    if (!groups.size) list.replaceChildren(h("p", { class: "text-3 small", text: "No permissions match that." }));
+    count.textContent = `${on.size} selected`;
+  };
+  search.addEventListener("input", draw);
+  draw();
+  return { el: h("div", { class: "wp" }, h("div", { class: "wp-top" }, search, count), list), value: () => [...on] };
+}
+
 function rankDialog(rank) {
-  const r = rank || { name: "", prefix: "", color: "f", icon: null, gradient: null, permissions: [], websiteRole: null };
+  const r = rank || { name: "", prefix: "", color: "f", icon: null, gradient: null, permissions: [], webPerms: [] };
   const { commands, other: allOther } = splitPerms(r.permissions);
   const MG = "galaxylink.minigames.staff";
   const other = allOther.filter((x) => x !== MG);
@@ -594,7 +628,7 @@ function rankDialog(rank) {
   });
   const icon = choiceGrid("Icon", [["", "No icon"], ...rankData.icons.map((i) => [i, i[0].toUpperCase() + i.slice(1)])], r.icon || "",
     (v) => (v ? h("img", { src: `/img/ranks/rank_${v}.png`, alt: "" }) : h("span", { text: "None" })));
-  const role = select("rank-role", STAFF_POWERS, STAFF_POWERS.some((x) => x[0] === String(r.websiteRole || "")) ? String(r.websiteRole || "") : "");
+  const webPerms = webPermPicker(rankData.webPerms || [], r.webPerms || []);
   const cmds = commandChips(commands);
   const orderList = rankOrderList(rank ? `rank:${rank.id}` : "new", Object.assign(() => name.value.trim() || "New rank", { prefix: () => prefix.value.trim() || "NEW" }));
   const advanced = h("input", { class: "input", id: "rank-other", placeholder: "someplugin.permission, another.one", value: other.join(", ") });
@@ -620,7 +654,8 @@ function rankDialog(rank) {
         h("p", { class: "hint", text: "Shown before the prefix in game (players need the GalaxySMP Icons pack, which the server sends automatically)." })),
       h("div", { class: "field" }, h("label", { class: "field-label", for: "rank-commands", text: "Commands this rank can use" }), cmds.el,
         h("p", { class: "hint", text: "Type a command name and press Enter, for example time, weather, gamemode or tp. A command includes everything after it: time also allows /time set day. Players don't need to be operators." })),
-      field("Staff powers", role, "What players with this rank can do on the website: Moderators can delete messages, mute and handle reports; Admins can also ban and manage ranks, the economy and the Help menu. The rank itself shows the same on the website and in game."),
+      h("div", { class: "field" }, h("span", { class: "field-label", text: "Website permissions" }), webPerms.el,
+        h("p", { class: "hint", text: "What players with this rank can do on galaxymc.us. Separate from the in-game commands above. Players get the permissions of every rank they have." })),
       h("label", { class: "check" }, mgStaff, "Minigame Staff ", h("span", { class: "text-3 small", text: "(can accept or decline minigame host requests at the Minigame Computers)" })),
       h("details", {}, h("summary", { class: "text-3 small", text: "Advanced: other permission nodes" }),
         field("Permission nodes", advanced, "For other plugins' permissions, separated by commas."))),
@@ -629,7 +664,7 @@ function rankDialog(rank) {
       onClick: async () => {
         const res = await postJson(`/api/mod/ranks/${rank ? "update" : "create"}`, {
           id: rank?.id, name: name.value, prefix: prefix.value, color: color.value(), gradient: gradient.value() || null, icon: icon.value() || null,
-          websiteRole: role.value || null, commands: cmds.value(),
+          webPerms: webPerms.value(), commands: cmds.value(),
           permissions: advanced.value.split(",").map((s) => s.trim()).filter((x) => x && x !== MG).concat(mgStaff.checked ? [MG] : []),
         });
         if (orderList.changed() || !rank) {
@@ -897,20 +932,24 @@ $("help-reset").addEventListener("click", () => openDialog({
   }
   me = user;
   power = user.role.power;
+  // what this person's ranks allow (the owner can do everything)
+  const has = (k) => Boolean(user.owner || (user.perms || []).includes(k));
+  const TAB_PERMS = { ranks: "manage_ranks", economy: "manage_economy", badges: "manage_badges", promos: "promo_codes", help: "help_menu", emoji: "custom_emoji", rooms: "voice_rooms",
+    tickets: "answer_tickets", appeals: "review_appeals", reports: "handle_reports" };
   let summary = {};
   try { summary = await getJson("/api/mod/summary"); } catch { /* use defaults */ }
   const panelName = summary.panel || (power >= 100 ? "Admin Panel" : "Staff Panel");
   $("panel-title").textContent = panelName;
   document.title = `${panelName} · GalaxySMP`;
-  $("staff-intro").textContent = `Signed in as ${user.username}. ${summary.owner ? "You have full control of everything here." : power >= 100 ? "You can use every tool on this page." : "Banning, ranks, plans and money are reserved for Admins."}`;
+  $("staff-intro").textContent = `Signed in as ${user.username}. ${summary.owner ? "You have full control of everything here." : "You see the tools your rank's permissions allow."}`;
   $("staff-app").hidden = false;
   setBadge("tickets", summary.openTickets);
   setupPanel({ loaders, power, owner: Boolean(summary.owner), selectTab, toast, setBadge });
   setupAppeals({ loaders, toast, setBadge });
-  if (power >= 100) setupPromos({ loaders, toast });
-  if (power >= 100) setupEmoji({ loaders, toast });
-  if (power >= 100) setupRooms({ loaders, toast });
-  if (power >= 100) setupBadges({ loaders, toast });
+  if (has("promo_codes")) setupPromos({ loaders, toast });
+  if (has("custom_emoji")) setupEmoji({ loaders, toast });
+  if (has("voice_rooms")) setupRooms({ loaders, toast });
+  if (has("manage_badges")) setupBadges({ loaders, toast });
   if (summary.owner) {
     setupPayments({ loaders });
     setupJoins({ loaders, toast, setBadge });
@@ -921,7 +960,11 @@ $("help-reset").addEventListener("click", () => openDialog({
     document.querySelector('[data-tab="payments"]').hidden = false;
   }
   let start = location.hash.slice(1).split("/")[0];
-  if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"], [data-tab="badges"], [data-tab="promos"], [data-tab="help"], [data-tab="emoji"], [data-tab="rooms"]').forEach((t) => (t.hidden = false));
+  for (const [tab, perm] of Object.entries(TAB_PERMS)) {
+    const t = document.querySelector(`[data-tab="${tab}"]`);
+    if (t) t.hidden = !has(perm);
+  }
   if (start === "members") { start = "players"; history.replaceState(null, "", "#players"); } // old link: Members is one tab now
-  selectTab(["overview", "tickets", "appeals", "players", "reports", "words", "audit", ...(summary.owner ? ["dms", "payments", "joins", "serverctl"] : []), ...(power >= 100 ? ["ranks", "economy", "badges", "promos", "help", "emoji", "rooms"] : [])].includes(start) ? start : "overview");
+  const allowed = ["overview", "players", "words", "audit", ...(summary.owner ? ["dms", "payments", "joins", "serverctl"] : []), ...Object.keys(TAB_PERMS).filter((t) => has(TAB_PERMS[t]))];
+  selectTab(allowed.includes(start) ? start : "overview");
 })();

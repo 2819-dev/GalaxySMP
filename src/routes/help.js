@@ -1,6 +1,7 @@
 // The in-game Help menu (/guide): Server Information, Rules and Commands.
 // Admins edit it in Staff Tools > Help menu; the server gets a copy over GalaxyLink's live
 // connection. The website's Rules page shows the same rules.
+import { can } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -45,7 +46,7 @@ export async function getHelp(request, env) {
 
 async function requireAdmin(request, env) {
   const user = await requireUser(request, env);
-  if (Number(user.role_power) < ADMIN) throw new HttpError(403, "Only Admins can edit the Help menu.");
+  if (!can(user, "help_menu")) throw new HttpError(403, "Your rank can't edit the Help menu.");
   return user;
 }
 

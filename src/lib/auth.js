@@ -3,6 +3,8 @@
 import { getDb } from "./db.js";
 import { randomToken, sha256 } from "./crypto.js";
 import { HttpError } from "./http.js";
+import { isOwner } from "./names.js";
+import { ALL_PERMS, PERM_KEYS, tierFor } from "./perms.js";
 
 const COOKIE = "gsmp_session";
 const SESSION_DAYS = 30;
@@ -46,13 +48,20 @@ export async function getUser(request, env) {
   const sql = getDb(env);
   const rows = await sql`
     SELECT u.id, u.username, u.platform, u.banned, u.ban_reason, u.muted_until, u.mute_reason,
-           r.key AS role_key, r.name AS role_name, r.color AS role_color, r.power AS role_power
+           r.key AS role_key, r.name AS role_name, r.color AS role_color, r.power AS role_power,
+           (SELECT coalesce(array_agg(DISTINCT pm), '{}') FROM players pl JOIN player_ranks x ON x.xuid = pl.xuid JOIN ranks rk ON rk.id = x.rank_id,
+                   unnest(rk.web_perms) pm WHERE pl.uuid = u.mc_uuid) AS web_perms
       FROM sessions s
       JOIN users u ON u.id = s.user_id
       JOIN roles r ON r.id = u.role_id
      WHERE s.token_hash = ${await sha256(token)} AND s.expires_at > now()`;
   const u = rows[0];
   if (!u || u.banned) return null;
+  // Website permissions come from the member's ranks (the owner has all). role_power is worked out from them
+  // (Admin Panel = 100, Mod Panel = 50) so every page agrees with the ranks.
+  u.owner = isOwner(env, u.username, u.platform === "bedrock");
+  u.perms = u.owner ? ALL_PERMS : (u.web_perms || []).filter((p) => PERM_KEYS.has(p));
+  u.role_power = u.owner ? 100 : Math.max(tierFor(u.perms), Number(u.role_power) < 50 ? Number(u.role_power) : 10);
   return u;
 }
 
@@ -68,6 +77,7 @@ export function publicUser(u) {
     username: u.username,
     platform: u.platform,
     role: { key: u.role_key, name: u.role_name, color: u.role_color, power: Number(u.role_power) },
+    perms: u.perms || [], owner: Boolean(u.owner),
     mutedUntil: u.muted_until && new Date(u.muted_until) > new Date() ? u.muted_until : null,
   };
 }

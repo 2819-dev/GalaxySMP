@@ -1,6 +1,7 @@
 // Ban appeals: a banned player (game, website or both) explains on /appeal without signing in.
 // Staff answer in the Control Panel (Moderation > Appeals); accepting can lift the ban.
 // The person keeps a private link (random token) to check the answer.
+import { can } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -61,7 +62,7 @@ export async function getAppeal(request, env, ctx, url, params) {
 // ---------- staff ----------
 async function requireStaff(request, env, power = STAFF) {
   const user = await requireUser(request, env);
-  if (Number(user.role_power) < power) throw new HttpError(403, power >= ADMIN ? "Only Admins can do that." : "Only staff can see appeals.");
+  if (!can(user, "review_appeals")) throw new HttpError(403, "Your rank can't review ban appeals.");
   return user;
 }
 
@@ -78,7 +79,7 @@ export async function listAppeals(request, env, ctx, url) {
      WHERE a.status = ${status} ORDER BY a.id DESC LIMIT 100`;
   const [{ n }] = await sql`SELECT count(*)::int AS n FROM appeals WHERE status = 'open'`;
   return json({
-    ok: true, open: n, canDecide: Number(user.role_power) >= ADMIN,
+    ok: true, open: n, canDecide: can(user, "review_appeals"),
     appeals: rows.map((a) => ({ id: Number(a.id), gamertag: a.gamertag, xuid: a.xuid, which: a.which, message: a.message, status: a.status,
       reply: a.staff_reply, handledBy: a.handled_name, createdAt: a.created_at, answeredAt: a.handled_at,
       gameBan: a.game_reason || a.game_by ? { reason: a.game_reason, by: a.game_by } : null })),

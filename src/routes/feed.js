@@ -1,5 +1,6 @@
 // #Timeline: a feed of what's happening on GalaxySMP (new players, achievements, Player/Build of the Week,
 // rank-ups and Galaxy+), shown as cards with likes and comments. Members only.
+import { can } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -26,7 +27,7 @@ const out = (p, me) => ({
   profile: p.xuid ? `/player/${encodeURIComponent(p.name)}` : null,
   image: p.image_id ? `/api/community/builds/image/${p.image_id}` : null,
   likes: Number(p.likes), liked: Boolean(p.liked), comments: Number(p.comments),
-  canDelete: Number(me.role_power) >= STAFF,
+  canDelete: can(me, "remove_timeline"),
 });
 
 // GET /api/feed?before=<id>
@@ -72,7 +73,7 @@ export async function listComments(request, env, ctx, url, params) {
     SELECT c.id, c.body, c.created_at, c.user_id, u.username FROM timeline_comments c JOIN users u ON u.id = c.user_id
      WHERE c.post_id = ${params.id} AND c.deleted_at IS NULL ORDER BY c.id LIMIT 200`;
   return json({ ok: true, comments: rows.map((c) => ({ id: Number(c.id), body: c.body, at: c.created_at, author: c.username,
-    canDelete: Number(c.user_id) === Number(me.id) || Number(me.role_power) >= STAFF })) });
+    canDelete: Number(c.user_id) === Number(me.id) || can(me, "remove_timeline") })) });
 }
 
 // POST /api/feed/:id/comments { body }
@@ -83,7 +84,7 @@ export async function addComment(request, env, ctx, url, params) {
   const sql = getDb(env);
   await post(sql, params.id);
   const check = checkMessage(String((await readJson(request)).body || "").slice(0, 300), compileWordList(await sql`SELECT word, match FROM filter_words`),
-    { allowLinks: Number(me.role_power) >= 100 });
+    { allowLinks: can(me, "post_links") });
   if (!check.ok) throw new HttpError(400, check.message);
   await sql`INSERT INTO timeline_comments (post_id, user_id, body) VALUES (${params.id}, ${me.id}, ${check.text})`;
   return json({ ok: true });
@@ -94,7 +95,7 @@ export async function deleteComment(request, env, ctx, url, params) {
   const me = await requireUser(request, env);
   const sql = getDb(env);
   const [c] = await sql`UPDATE timeline_comments SET deleted_at = now()
-                         WHERE id = ${Number(params.id) || 0} AND deleted_at IS NULL AND (user_id = ${me.id} OR ${Number(me.role_power) >= STAFF})
+                         WHERE id = ${Number(params.id) || 0} AND deleted_at IS NULL AND (user_id = ${me.id} OR ${can(me, "remove_timeline")})
                          RETURNING id`;
   if (!c) throw new HttpError(404, "That comment can't be removed.");
   return json({ ok: true });
@@ -103,7 +104,7 @@ export async function deleteComment(request, env, ctx, url, params) {
 // POST /api/feed/:id/delete  (staff)
 export async function deletePost(request, env, ctx, url, params) {
   const me = await requireUser(request, env);
-  if (Number(me.role_power) < STAFF) throw new HttpError(403, "Only staff can remove timeline posts.");
+  if (!can(me, "remove_timeline")) throw new HttpError(403, "Your rank can't remove timeline posts.");
   const sql = getDb(env);
   await sql`UPDATE timeline_posts SET deleted_at = now() WHERE id = ${Number(params.id) || 0}`;
   return json({ ok: true });

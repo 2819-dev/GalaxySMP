@@ -7,6 +7,7 @@
 //   Admins:     everything, including bans and role changes
 // Staff can only act on people with a LOWER role than their own, and the owners listed in
 // OWNER_USERNAMES can never be muted, banned or demoted from the website.
+import { can } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -23,11 +24,11 @@ export const MUTE_OPTIONS = [10, 60, 1440, 10080, 43200]; // 10 min, 1 h, 1 day,
 export const REPORT_REASONS = ["Bad language", "Bullying or harassment", "Personal information", "Spam", "Inappropriate content", "Other"];
 const ROLE_IDS = { member: 1, vip: 2, moderator: 3, admin: 4 };
 
-async function requireStaff(request, env, power = MOD) {
+// need: a website permission (e.g. "mute_members"), or MOD / ADMIN for "Mod Panel" / "Admin Panel" access.
+async function requireStaff(request, env, need = MOD) {
   const user = await requireUser(request, env);
-  if (Number(user.role_power) < power) {
-    throw new HttpError(403, power >= ADMIN ? "Only Admins can do that." : "Only staff can do that.");
-  }
+  const key = need === MOD ? "mod_panel" : need === ADMIN ? "admin_panel" : need;
+  if (!can(user, key)) throw new HttpError(403, "Your rank doesn't have permission to do that.");
   return user;
 }
 
@@ -99,7 +100,7 @@ export async function deleteMessage(request, env, ctx, url, params) {
   const m = rows[0];
   const own = Number(m.user_id) === Number(user.id);
   if (!own) {
-    if (Number(user.role_power) < MOD) throw new HttpError(403, "You can only delete your own messages.");
+    if (!can(user, "delete_messages")) throw new HttpError(403, "You can only delete your own messages.");
     assertCanAct(env, user, { id: m.user_id, username: m.username, platform: m.platform, power: m.power });
   }
   const reason = cleanReason(body.reason);
@@ -130,7 +131,7 @@ async function memberUpdated(env, sql, userId) {
 }
 
 export async function mute(request, env, ctx, url, params) {
-  const actor = await requireStaff(request, env);
+  const actor = await requireStaff(request, env, "mute_members");
   const body = await readJson(request);
   const minutes = Number(body.minutes);
   if (!MUTE_OPTIONS.includes(minutes)) throw new HttpError(400, "Choose a mute length.");
@@ -147,7 +148,7 @@ export async function mute(request, env, ctx, url, params) {
 }
 
 export async function unmute(request, env, ctx, url, params) {
-  const actor = await requireStaff(request, env);
+  const actor = await requireStaff(request, env, "mute_members");
   const sql = getDb(env);
   const target = await loadTarget(sql, Number(params.id));
   assertCanAct(env, actor, target);
@@ -160,7 +161,7 @@ export async function unmute(request, env, ctx, url, params) {
 }
 
 export async function ban(request, env, ctx, url, params) {
-  const actor = await requireStaff(request, env, ADMIN);
+  const actor = await requireStaff(request, env, "ban_members");
   const body = await readJson(request);
   const sql = getDb(env);
   const target = await loadTarget(sql, Number(params.id));
@@ -179,7 +180,7 @@ export async function ban(request, env, ctx, url, params) {
 }
 
 export async function unban(request, env, ctx, url, params) {
-  const actor = await requireStaff(request, env, ADMIN);
+  const actor = await requireStaff(request, env, "ban_members");
   const sql = getDb(env);
   const target = await loadTarget(sql, Number(params.id));
   assertCanAct(env, actor, target);
@@ -294,7 +295,7 @@ export async function voiceKick(request, env, ctx, url, params) {
 }
 
 export async function setGlobalMic(request, env, ctx, url, params) {
-  const actor = await requireStaff(request, env, ADMIN);
+  const actor = await requireStaff(request, env, "admin_panel");
   const body = await readJson(request);
   const allowed = Boolean(body.allowed);
   const sql = getDb(env);
@@ -312,7 +313,7 @@ export async function setGlobalMic(request, env, ctx, url, params) {
 
 // ---------- Staff: reports ----------
 export async function listReports(request, env, ctx, url) {
-  await requireStaff(request, env);
+  await requireStaff(request, env, "handle_reports");
   const sql = getDb(env);
   const open = await sql`
     SELECT m.id AS message_id, m.content, m.created_at AS message_at, (m.deleted_at IS NOT NULL) AS deleted,
@@ -368,7 +369,7 @@ export async function listReports(request, env, ctx, url) {
 }
 
 export async function resolveReport(request, env, ctx, url, params) {
-  const actor = await requireStaff(request, env);
+  const actor = await requireStaff(request, env, "handle_reports");
   const body = await readJson(request);
   const messageId = Number(params.id);
   const outcome = body.outcome === "dismissed" ? "dismissed" : "resolved";

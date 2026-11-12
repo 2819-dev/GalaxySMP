@@ -2,6 +2,7 @@
 // Balances live on the Minecraft server (GalaxyLink keeps them, so the economy works even if
 // the website is down). The server sends them here for the leaderboard; changes made here are
 // sent to the server over GalaxyLink's live connection.
+import { can } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -15,7 +16,7 @@ const ICON = /^(textures\/[A-Za-z0-9_./-]{1,100})?$/;
 
 async function requireAdmin(request, env) {
   const user = await requireUser(request, env);
-  if (Number(user.role_power) < ADMIN) throw new HttpError(403, "Only Admins can manage the economy.");
+  if (!can(user, "manage_economy")) throw new HttpError(403, "Your rank can't manage the economy.");
   return user;
 }
 

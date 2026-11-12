@@ -1,4 +1,5 @@
 // Chat API: everything the chat page needs, plus the live connection.
+import { can } from "../lib/perms.js";
 import { bannerUrl } from "./uploads.js";
 import { badgesFor } from "./badges.js";
 import { isOwner } from "../lib/names.js";
@@ -63,7 +64,7 @@ export async function bootstrap(request, env) {
       name: c.name,
       topic: c.topic,
       kind: c.kind,
-      canPost: c.kind === "text" && me.role.power >= c.min_post_power,
+      canPost: c.kind === "text" && (c.min_post_power <= 10 || can(user, "post_staff_channels")),
     })),
     roles: roles.map((r) => ({ key: r.key, name: r.name, color: r.color, power: r.power })),
     members: members.map((m) => ({
@@ -76,11 +77,11 @@ export async function bootstrap(request, env) {
       badges: badgeMap.get(Number(m.id)) || [],
       bio: m.bio || null, interests: (m.interests || []).map((i) => INTEREST_NAME[i]).filter(Boolean), color: m.profile_color || null,
       // real name (set by staff): everyone sees it unless the member hid it; they and staff always do
-      ...(m.real_name && (!m.real_name_hidden || Number(m.id) === Number(user.id) || me.role.power >= 50)
+      ...(m.real_name && (!m.real_name_hidden || Number(m.id) === Number(user.id) || can(user, "see_real_names"))
         ? { realName: m.real_name, realNameHidden: Boolean(m.real_name_hidden) } : {}),
     })),
     reactions: REACTIONS,
-    maxLength: maxLengthFor(me.role.power),
+    maxLength: maxLengthFor(user),
     ticketUnread,
     dmUnread,
   });
@@ -119,7 +120,7 @@ export async function pins(request, env, ctx, url, params) {
 // POST /api/chat/messages/:id/pin { pinned } (staff)
 export async function pin(request, env, ctx, url, params) {
   const user = await requireUser(request, env);
-  if (Number(user.role_power) < 50) throw new HttpError(403, "Only staff can pin messages.");
+  if (!can(user, "pin_messages")) throw new HttpError(403, "Your rank can't pin messages.");
   const body = await request.json().catch(() => ({}));
   const sql = getDb(env);
   const id = Number(params.id);
@@ -146,6 +147,6 @@ export async function connect(request, env) {
   if (!origin || new URL(origin).host !== new URL(request.url).host) throw new HttpError(403, "Forbidden.");
   const user = await requireUser(request, env);
   const headers = new Headers(request.headers);
-  headers.set("X-GSMP-User", JSON.stringify({ id: Number(user.id), username: user.username, power: Number(user.role_power) }));
+  headers.set("X-GSMP-User", JSON.stringify({ id: Number(user.id), username: user.username, power: Number(user.role_power), perms: user.perms || [], owner: Boolean(user.owner) }));
   return hubStub(env).fetch(new Request(request.url, { headers }));
 }

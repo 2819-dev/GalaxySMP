@@ -1,6 +1,7 @@
 // The staff panel (Control Panel for owners, Admin Panel for admins, Staff Panel for staff):
 // the Overview tab (live numbers + quick controls) and player management (one card per player
 // with everything about them, staff notes and in-game actions).
+import { can } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -20,9 +21,11 @@ const ADMIN = 100;
 const KEY_KINDS = ["common", "rare", "galaxy"];
 const clean = (v, max) => String(v ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max);
 
-async function requireStaff(request, env, power = MOD) {
+// need: a website permission, or MOD / ADMIN for Mod Panel / Admin Panel access.
+async function requireStaff(request, env, need = MOD) {
   const user = await requireUser(request, env);
-  if (Number(user.role_power) < power) throw new HttpError(403, power >= ADMIN ? "Only Admins can do that." : "Only staff can do that.");
+  const key = need === MOD ? "mod_panel" : need === ADMIN ? "admin_panel" : need;
+  if (!can(user, key)) throw new HttpError(403, "Your rank doesn't have permission to do that.");
   user.owner = isOwner(env, user.username, user.platform === "bedrock");
   return user;
 }
@@ -88,7 +91,7 @@ export async function overview(request, env) {
 
 // Voice rooms (Admins): GET lists them; POST { action: add|rename|move|delete, id, name, description, dir }
 export async function voiceRooms(request, env) {
-  const user = await requireStaff(request, env, ADMIN);
+  const user = await requireStaff(request, env, "voice_rooms");
   const init = request.method === "POST" ? { method: "POST", body: JSON.stringify(await readJson(request)) } : {};
   const data = await voiceStub(env).fetch("https://voice/internal/rooms", init).then((r) => r.json());
   if (!data.ok) throw new HttpError(400, data.error || "That didn't work.");
@@ -107,7 +110,7 @@ export async function publicVoiceRooms(request, env) {
 
 // POST /api/panel/map { enabled } (Admins): show the server map on the website and let the server draw it.
 export async function setMap(request, env) {
-  const user = await requireStaff(request, env, ADMIN);
+  const user = await requireStaff(request, env, "server_map");
   const body = await readJson(request);
   const enabled = Boolean(body.enabled);
   const sql = getDb(env);
@@ -230,7 +233,7 @@ export async function playerCard(request, env, ctx, url, params) {
   });
 }
 
-const GAME_ACTIONS = { warn: MOD, mute: MOD, unmute: MOD, kick: MOD, ban: ADMIN, unban: ADMIN };
+const GAME_ACTIONS = { warn: MOD, mute: "mute_members", unmute: "mute_members", kick: MOD, ban: "ban_members", unban: "ban_members" };
 
 export async function playerAction(request, env, ctx, url, params) {
   const action = String(params.action);

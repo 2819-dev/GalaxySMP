@@ -1,6 +1,8 @@
 // CommunityHub: one Cloudflare Durable Object that every open chat tab connects to.
 // It checks and saves each new message, then sends it to everyone instantly.
 // Uses the WebSocket Hibernation API, so it costs almost nothing while chat is quiet.
+// a permission of a chat user ({ perms, owner } from the website when they connected)
+const hubCan = (u, key) => Boolean(u && (u.owner || (Array.isArray(u.perms) && u.perms.includes(key))));
 import { DurableObject } from "cloudflare:workers";
 import { getDb } from "../lib/db.js";
 import { checkMessage, compileWordList, maxLengthFor } from "../lib/filter.js";
@@ -159,7 +161,7 @@ export class CommunityHub extends DurableObject {
       const text = JSON.stringify(event);
       for (const ws of this.ctx.getWebSockets()) {
         const u = ws.deserializeAttachment();
-        if (u && ((u.power || 0) >= 50 || Number(u.id) === Number(event.ownerId))) {
+        if (u && (hubCan(u, "answer_tickets") || Number(u.id) === Number(event.ownerId))) {
           try { ws.send(text); } catch { /* gone */ }
         }
       }
@@ -172,7 +174,7 @@ export class CommunityHub extends DurableObject {
     if (event.staffOnly) {
       const text = JSON.stringify(event);
       for (const ws of this.ctx.getWebSockets()) {
-        if ((ws.deserializeAttachment()?.power || 0) >= 50) {
+        if (hubCan(ws.deserializeAttachment(), "mod_panel")) {
           try { ws.send(text); } catch { /* gone */ }
         }
       }
@@ -240,7 +242,7 @@ export class CommunityHub extends DurableObject {
     // Admins (owners included) may post links; everyone else can't.
     const check = imageId && !String(msg.content || "").trim()
       ? { ok: true, text: "" }
-      : checkMessage(msg.content, await this.wordList(), { allowLinks: (user.power || 0) >= 100, maxLength: maxLengthFor(user.power) });
+      : checkMessage(msg.content, await this.wordList(), { allowLinks: hubCan(user, "post_links"), maxLength: maxLengthFor(user) });
     if (!check.ok) return reject(check.message);
     const limited = this.rateCheck(user.id, check.text || `[picture ${imageId}]`);
     if (limited) return reject(limited);
@@ -264,7 +266,7 @@ export class CommunityHub extends DurableObject {
           FROM who, ch
          WHERE NOT who.banned
            AND (who.muted_until IS NULL OR who.muted_until <= now())
-           AND who.power >= ch.min_post_power
+           AND (ch.min_post_power <= 10 OR ${hubCan(user, "post_staff_channels")})
         RETURNING id
       )
       SELECT (SELECT id FROM ins) AS id,
@@ -279,7 +281,7 @@ export class CommunityHub extends DurableObject {
         return reject(`You are muted until ${new Date(r.muted_until).toUTCString().replace(" GMT", " UTC")}.`);
       }
       if (r.min_post_power == null) return reject("Unknown channel.");
-      return reject("Only staff can post in this channel.");
+      return reject("Your rank can't post in this channel.");
     }
     const message = await loadMessage(sql, r.id);
     this.send(ws, { type: "sent", nonce: msg.nonce, id: message.id });
@@ -298,7 +300,7 @@ export class CommunityHub extends DurableObject {
     }
     const lower = text.toLowerCase();
     // staff: @everyone pings every member, @here everyone online (website or in game)
-    if ((user.power || 0) >= 50 && /@(everyone|here)\b/.test(lower)) {
+    if (hubCan(user, "mention_everyone") && /@(everyone|here)\b/.test(lower)) {
       const everyone = /@everyone\b/.test(lower);
       const ids = everyone ? "all" : [...new Set([...this.onlineUserIds(),
         ...(await sql`SELECT u.id FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE p.online_at > now() - interval '150 seconds'`).map((r) => Number(r.id))])]
@@ -342,7 +344,7 @@ export class CommunityHub extends DurableObject {
     if (!m || m.deleted_at) return reject("That message no longer exists.");
     if (Number(m.user_id) !== Number(user.id)) return reject("You can only edit your own messages.");
     if (m.seen_at) return reject("Someone has already read this message, so it can't be edited. You can delete it instead.");
-    const check = checkMessage(msg.content, await this.wordList(), { allowLinks: (user.power || 0) >= 100, maxLength: maxLengthFor(user.power) });
+    const check = checkMessage(msg.content, await this.wordList(), { allowLinks: hubCan(user, "post_links"), maxLength: maxLengthFor(user) });
     if (!check.ok) return reject(check.message);
     const [u] = await sql`SELECT banned, muted_until FROM users WHERE id = ${user.id}`;
     if (u?.banned || (u?.muted_until && new Date(u.muted_until) > new Date())) return reject("You can't edit messages right now.");

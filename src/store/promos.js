@@ -5,6 +5,7 @@
 //            "cat:cosmetics", "item:trail_hearts". Empty = everything.
 //   members: only these website accounts can use it (they get a "you have a promo code" pop-up when buying).
 //            NULL = anyone who knows the code.
+import { can } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -135,7 +136,7 @@ export async function checkRoute(request, env) {
 // ---------- Control Panel routes (Admins) ----------
 async function requireAdmin(request, env) {
   const user = await requireUser(request, env);
-  if (Number(user.role_power) < ADMIN) throw new HttpError(403, "Only Admins can manage promo codes.");
+  if (!can(user, "promo_codes")) throw new HttpError(403, "Your rank can't manage promo codes.");
   user.owner = isOwner(env, user.username, user.platform === "bedrock");
   return user;
 }

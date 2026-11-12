@@ -2,6 +2,7 @@
 //   /report (players)  -> game_reports, shown in Staff Tools > Reports and in the in-game /mod panel
 //   /mod (staff)       -> warnings, mutes, kicks and bans, saved in game_punishments and the audit log
 // The Minecraft server enforces mutes and bans itself; the website keeps the shared record.
+import { can } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -120,7 +121,7 @@ export async function pluginPunish(request, env) {
 // ---------- Staff Tools ----------
 async function requireMod(request, env) {
   const user = await requireUser(request, env);
-  if (Number(user.role_power) < 50) throw new HttpError(403, "Only staff can do that.");
+  if (!can(user, "handle_reports")) throw new HttpError(403, "Your rank can't handle reports.");
   return user;
 }
 

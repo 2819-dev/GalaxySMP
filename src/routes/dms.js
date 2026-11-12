@@ -1,6 +1,7 @@
 // Direct messages between community members. They also work in game: a DM shows in the player's
 // game chat when they're online, and /dm <player> <message> in game sends one.
 // The server owners can read DMs for safety (stated in the privacy policy).
+import { permsOfUser } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -42,7 +43,8 @@ async function sendDm(env, sql, from, to, text, via) {
   const body = clean(text);
   if (!body) throw new HttpError(400, "Type a message first.");
   const words = compileWordList(await sql`SELECT word, match FROM filter_words`);
-  const check = checkMessage(body, words, { allowLinks: Number(from.power) >= 100, maxLength: maxLengthFor(from.power) });
+  const fromPerms = { perms: await permsOfUser(env, sql, from.id) };
+  const check = checkMessage(body, words, { allowLinks: fromPerms.perms.includes("post_links"), maxLength: maxLengthFor(fromPerms) });
   if (!check.ok) throw new HttpError(400, check.message);
   const [blocked] = await sql`SELECT 1 FROM dm_blocks WHERE (user_id = ${to.id} AND blocked_id = ${from.id}) OR (user_id = ${from.id} AND blocked_id = ${to.id})`;
   if (blocked) throw new HttpError(403, "You can't message this member.");
@@ -220,7 +222,8 @@ export async function editMessage(request, env, ctx, url, params) {
   const text = clean(body.body);
   if (!text) throw new HttpError(400, "Type a message first.");
   const words = compileWordList(await sql`SELECT word, match FROM filter_words`);
-  const check = checkMessage(text, words, { allowLinks: Number(from.power) >= 100, maxLength: maxLengthFor(from.power) });
+  const fromPerms = { perms: await permsOfUser(env, sql, from.id) };
+  const check = checkMessage(text, words, { allowLinks: fromPerms.perms.includes("post_links"), maxLength: maxLengthFor(fromPerms) });
   if (!check.ok) throw new HttpError(400, check.message);
   const [done] = await sql`UPDATE dm_messages SET body = ${check.text}, edited_at = now() WHERE id = ${m.id} AND read_at IS NULL RETURNING id, edited_at`;
   if (!done) throw new HttpError(409, "They've just read this message, so it can't be edited any more.");

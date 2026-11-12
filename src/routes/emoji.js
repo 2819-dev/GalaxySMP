@@ -1,5 +1,6 @@
 // Custom server emoji (:creeper:, :diamond:...). Admins add them in the Control Panel; members use
 // them in community chat, DMs and reactions (written as :name:).
+import { can } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -31,7 +32,7 @@ export async function emojiImage(request, env, ctx, url, params) {
 
 async function requireAdmin(request, env) {
   const user = await requireUser(request, env);
-  if (Number(user.role_power) < 100) throw new HttpError(403, "Only Admins can manage emoji.");
+  if (!can(user, "custom_emoji")) throw new HttpError(403, "Your rank can't manage emoji.");
   return user;
 }
 

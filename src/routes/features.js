@@ -1,6 +1,7 @@
 // Community features: Events calendar, News, Polls, Builds gallery and the Suggestions upgrades
 // (comments, staff responses, similar-suggestion check). Plus the 5-minute timer that sends event
 // reminders, announces events in game and picks the Build of the Week.
+import { can } from "../lib/perms.js";
 import { postTimeline } from "./feed.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
@@ -18,7 +19,10 @@ import { hubBroadcast } from "./chat.js";
 
 const STAFF = 50;
 const ADMIN = 100;
-const isStaff = (u) => Number(u.role_power) >= STAFF;
+// Posting in #Updates, #Events and #Polls (and running them) is the "Post in staff-only channels" permission;
+// moderating builds, suggestions and comments goes with "Delete other people's messages".
+const isStaff = (u) => can(u, "post_staff_channels");
+const isMod = (u) => can(u, "delete_messages");
 const isAdmin = (u) => Number(u.role_power) >= ADMIN;
 
 function clean(v, max) {
@@ -230,14 +234,14 @@ async function loadPoll(sql, pid, user) {
   return {
     id: Number(p.id), question: p.question, multi: p.multi, author: p.author || "Staff", closesAt: p.closes_at,
     closed: Boolean(p.is_closed), voters: Number(p.voters),
-    canClose: !p.is_closed && (isStaff(user) || Number(p.author_id) === Number(user.id)),
+    canClose: !p.is_closed && (isMod(user) || Number(p.author_id) === Number(user.id)),
     options: options.map((o) => ({ id: Number(o.id), label: o.label, votes: Number(o.votes), mine: o.mine })),
   };
 }
 
 // Galaxy+ and Galaxy Pro+ members (and staff) can make polls in chat channels.
 async function canMakeChatPoll(sql, user) {
-  if (isStaff(user)) return true;
+  if (can(user, "chat_polls")) return true;
   const [row] = await sql`SELECT s.plan FROM users u JOIN players p ON p.uuid = u.mc_uuid JOIN subscriptions s ON s.xuid = p.xuid
                            WHERE u.id = ${user.id} AND (s.expires_at IS NULL OR s.expires_at > now())`;
   return row?.plan === "plus" || row?.plan === "pro";
@@ -375,7 +379,7 @@ export async function buildsList(request, env, ctx, url) {
      LIMIT 60`;
   const [botw] = await sql`SELECT b.id FROM builds b WHERE b.botw_week IS NOT NULL AND b.deleted_at IS NULL ORDER BY b.botw_week DESC LIMIT 1`;
   return json({
-    ok: true, canModerate: isStaff(user), me: Number(user.id), botwId: botw ? Number(botw.id) : null,
+    ok: true, canModerate: isMod(user), me: Number(user.id), botwId: botw ? Number(botw.id) : null,
     builds: rows.map((b) => ({
       id: Number(b.id), title: b.title, description: b.description, location: b.location, createdAt: b.created_at,
       author: b.author, mine: Number(b.user_id) === Number(user.id), likes: Number(b.likes), liked: b.liked,
@@ -445,7 +449,7 @@ export async function buildAction(request, env, ctx, url, params) {
   }
   if (params.action === "delete") {
     const own = Number(b.user_id) === Number(user.id);
-    if (!own && !isStaff(user)) throw new HttpError(403, "You can only delete your own builds.");
+    if (!own && !isMod(user)) throw new HttpError(403, "You can only delete your own builds.");
     await sql`UPDATE builds SET deleted_at = now() WHERE id = ${bid}`;
     if (!own) await audit(sql, user.id, "build.delete", { title: b.title });
     return json({ ok: true });
@@ -462,7 +466,7 @@ export async function suggestionComments(request, env, ctx, url, params) {
   const rows = await sql`
     SELECT c.id, c.body, c.created_at, c.user_id, u.username FROM suggestion_comments c JOIN users u ON u.id = c.user_id
      WHERE c.suggestion_id = ${id(params.id)} AND c.deleted_at IS NULL ORDER BY c.id LIMIT 200`;
-  return json({ ok: true, canModerate: isStaff(user),
+  return json({ ok: true, canModerate: isMod(user),
     comments: rows.map((c) => ({ id: Number(c.id), body: c.body, author: c.username, mine: Number(c.user_id) === Number(user.id), createdAt: c.created_at })) });
 }
 
@@ -490,7 +494,7 @@ export async function suggestionCommentDelete(request, env, ctx, url, params) {
   const sql = getDb(env);
   const [c] = await sql`SELECT id, user_id FROM suggestion_comments WHERE id = ${id(params.id)} AND deleted_at IS NULL`;
   if (!c) throw new HttpError(404, "That comment no longer exists.");
-  if (Number(c.user_id) !== Number(user.id) && !isStaff(user)) throw new HttpError(403, "You can only delete your own comments.");
+  if (Number(c.user_id) !== Number(user.id) && !isMod(user)) throw new HttpError(403, "You can only delete your own comments.");
   await sql`UPDATE suggestion_comments SET deleted_at = now() WHERE id = ${c.id}`;
   return json({ ok: true });
 }

@@ -1,6 +1,7 @@
 // Subscriptions: Galaxy Free, Galaxy+ and Galaxy Pro+ (defined in the plugin's plans.json so the
 // website and the server always agree). Paid checkout is "coming soon"; Admins can give plans in
 // Staff Tools > Economy. The server applies the perks and takes the monthly in-game fee.
+import { can } from "../lib/perms.js";
 import { postTimeline } from "./feed.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
@@ -59,7 +60,7 @@ export async function sendPlans(env, sql) {
 // Admins: give, change or remove a player's plan.
 export async function adminSetPlan(request, env) {
   const user = await requireUser(request, env);
-  if (Number(user.role_power) < 100) throw new HttpError(403, "Only Admins can give plans.");
+  if (!can(user, "give_plans")) throw new HttpError(403, "Your rank can't give plans.");
   const body = await readJson(request);
   const sql = getDb(env);
   const [player] = await sql`SELECT xuid, gamertag FROM players WHERE xuid = ${String(body.xuid || "")}`;

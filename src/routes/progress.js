@@ -1,4 +1,5 @@
 // Player stats (sent by the server), leaderboards and public player profiles.
+import { can } from "../lib/perms.js";
 import { bannerUrl } from "./uploads.js";
 import { postTimeline } from "./feed.js";
 import { badgesFor } from "./badges.js";
@@ -262,7 +263,7 @@ export async function socialProfile(request, env, ctx, url, params) {
      ORDER BY p.last_seen DESC LIMIT 1`;
   if (!u) return json({ ok: true, member: null });
   const me = Number(u.id) === Number(viewer.id);
-  const staff = Number(viewer.role_power) >= 50;
+  const staff = can(viewer, "see_real_names");
   return json({
     ok: true,
     member: {

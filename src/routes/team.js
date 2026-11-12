@@ -1,6 +1,8 @@
 // #Meet The Team: the staff (Moderators, Admins and the owner) with their picture, role and a bio they write.
 // #Applications: members apply to become a Moderator; only the owner sees applications, chats with the
 // applicant, and accepts (they become a Moderator on the website) or declines.
+import { can, tierFor, permsOfUser } from "../lib/perms.js";
+import { syncWebsiteRole, ranksChanged } from "./ranks.js";
 import { rankOf } from "../chat/messages.js";
 import { displayRank, loadPlanPriority } from "./ranks.js";
 import { PLANS } from "./plans.js";
@@ -17,7 +19,8 @@ import { voiceEvent } from "./voice.js";
 import { postTimeline } from "./feed.js";
 
 const STAFF = 50;
-const MOD_ROLE_ID = 3;
+const MODERATOR_PERMS = ["mod_panel", "delete_messages", "handle_reports", "answer_tickets", "mute_members", "ban_members", "review_appeals",
+  "remove_pictures", "remove_timeline", "see_real_names", "team_listed", "pin_messages", "long_messages"];
 export const QUESTIONS = [
   { id: "why", q: "Why do you want to be a Moderator on GalaxySMP?", min: 40 },
   { id: "time", q: "How much do you play each week, and at what times (your time zone)?", min: 5 },
@@ -42,17 +45,23 @@ export async function listTeam(request, env) {
   const me = await requireUser(request, env);
   const sql = getDb(env);
   const rows = await sql`
-    SELECT u.id, u.username, u.platform, u.team_bio, u.created_at, r.power, r.name AS role_name, r.color AS role_color,
+    SELECT u.id, u.username, u.platform, u.team_bio, u.created_at,
            pl.xuid, pl.head_at, pl.gamerpic_at, pl.gamertag, (pl.online_at > now() - interval '150 seconds') AS in_game,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient,
            rk.position AS rank_position, rk.priority AS rank_priority,
-           (SELECT s.plan FROM subscriptions s WHERE s.xuid = pl.xuid AND (s.expires_at IS NULL OR s.expires_at > now())) AS plan
-      FROM users u JOIN roles r ON r.id = u.role_id LEFT JOIN players pl ON pl.uuid = u.mc_uuid
+           (SELECT s.plan FROM subscriptions s WHERE s.xuid = pl.xuid AND (s.expires_at IS NULL OR s.expires_at > now())) AS plan,
+           (SELECT coalesce(array_agg(DISTINCT pm), '{}') FROM player_ranks x JOIN ranks r2 ON r2.id = x.rank_id, unnest(r2.web_perms) pm WHERE x.xuid = pl.xuid) AS perms
+      FROM users u LEFT JOIN players pl ON pl.uuid = u.mc_uuid
       LEFT JOIN player_top_rank prk ON prk.xuid = pl.xuid LEFT JOIN ranks rk ON rk.id = prk.rank_id
-     WHERE NOT u.banned AND r.power >= ${STAFF} ORDER BY r.power DESC, rk.priority NULLS LAST, u.created_at`;
+     WHERE NOT u.banned AND (pl.xuid IS NOT NULL OR u.platform IS NOT NULL)
+     ORDER BY rk.priority NULLS LAST, u.created_at`;
+  // On the team page: the owner, and everyone whose rank has "Listed on #Meet The Team". Their (hidden) staff
+  // level only decides the order.
+  const listed = rows.filter((u) => ownerOf(env, u) || (u.perms || []).includes("team_listed"))
+    .map((u) => ({ ...u, power: ownerOf(env, u) ? 1000 : tierFor(u.perms) }));
   const planPriority = await loadPlanPriority(sql);
   const meOwner = ownerOf(env, me);
-  const team = rows.map((u) => {
+  const team = listed.map((u) => {
     const owner = ownerOf(env, u);
     return {
       // the rank tag they show in chat (their top rank); the staff level itself isn't shown, it only orders the list
@@ -72,8 +81,8 @@ export async function saveBio(request, env) {
   const target = Number(b.userId) || Number(me.id);
   if (target !== Number(me.id) && !ownerOf(env, me)) throw new HttpError(403, "You can only edit your own bio.");
   const sql = getDb(env);
-  const [u] = await sql`SELECT u.id, r.power FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ${target}`;
-  if (!u || (Number(u.power) < STAFF && !ownerOf(env, me))) throw new HttpError(403, "Only staff are on the team page.");
+  const targetPerms = await permsOfUser(env, sql, target);
+  if (!targetPerms.includes("team_listed") && !ownerOf(env, me)) throw new HttpError(403, "Only people listed on #Meet The Team have a team bio.");
   const bio = clean(b.bio, await words(sql), 400);
   await sql`UPDATE users SET team_bio = ${bio || null} WHERE id = ${target}`;
   return json({ ok: true });
@@ -106,7 +115,7 @@ export async function listApplications(request, env, ctx, url) {
   }
   const [mine] = await sql`SELECT * FROM staff_applications WHERE user_id = ${me.id} ORDER BY id DESC LIMIT 1`;
   if (mine?.user_unread) await sql`UPDATE staff_applications SET user_unread = 0 WHERE id = ${mine.id}`;
-  const staff = Number(me.role_power) >= STAFF;
+  const staff = can(me, "mod_panel");
   const waitDays = mine && mine.status === "declined" ? Math.ceil(14 - (Date.now() - new Date(mine.decided_at)) / 864e5) : 0;
   return json({
     ok: true, owner: false, questions: QUESTIONS, staff,
@@ -119,7 +128,7 @@ export async function listApplications(request, env, ctx, url) {
 // POST /api/applications { answers: { why, time, situation, experience, extra } }
 export async function createApplication(request, env) {
   const me = await requireUser(request, env);
-  if (Number(me.role_power) >= STAFF) throw new HttpError(400, "You're already on the staff team.");
+  if (can(me, "mod_panel")) throw new HttpError(400, "You're already on the staff team.");
   if (me.muted_until && new Date(me.muted_until) > new Date()) throw new HttpError(403, "You can't apply while you're muted.");
   await rateLimit(env, "AUTH_LIMITER", `apply:${me.id}`);
   const sql = getDb(env);
@@ -182,8 +191,10 @@ export async function decideApplication(request, env, ctx, url, params) {
   if (!ownerOf(env, me)) throw new HttpError(403, "Only the owner can decide applications.");
   const sql = getDb(env);
   const a = await loadApp(sql, params.id);
-  if (a.status !== "open") throw new HttpError(409, "This application was already answered.");
   const b = await readJson(request);
+  const b0 = () => b;
+  if (a.status !== "open") throw new HttpError(409, "This application was already answered.");
+  if (b0().status === "accepted" && !a.xuid) throw new HttpError(409, `${a.username} needs to link their Minecraft account first (Account > Link), so they can get the Moderator rank.`);
   const status = b.status === "accepted" ? "accepted" : b.status === "declined" ? "declined" : null;
   if (!status) throw new HttpError(400, "Accept or decline the application.");
   const note = String(b.message || "").replace(/\r/g, "").trim().slice(0, 2000)
@@ -195,9 +206,15 @@ export async function decideApplication(request, env, ctx, url, params) {
     sql`INSERT INTO audit_log (actor_id, action, details) VALUES (${me.id}, ${`application.${status}`}, ${JSON.stringify({ user: a.username })}::jsonb)`,
   ]);
   if (status === "accepted") {
-    await sql`UPDATE users SET role_id = ${MOD_ROLE_ID}, role_from_rank = false WHERE id = ${a.user_id} AND role_id < ${MOD_ROLE_ID}`;
-    await hubBroadcast(env, { type: "member_updated", member: { id: Number(a.user_id), username: a.username, role: "moderator" } }).catch(() => {});
-    await voiceEvent(env, { type: "role_changed", userId: Number(a.user_id) }).catch(() => {});
+    // They get the "Moderator" rank (made the first time with the Moderation permissions; edit it in Ranks).
+    let [modRank] = await sql`SELECT id FROM ranks WHERE lower(name) = 'moderator' LIMIT 1`;
+    if (!modRank) {
+      [modRank] = await sql`INSERT INTO ranks (name, prefix, color, permissions, web_perms, priority, position)
+                            VALUES ('Moderator', 'MOD', 'a', '{}', ${MODERATOR_PERMS}, 40, (SELECT coalesce(max(position), 0) + 1 FROM ranks)) RETURNING id`;
+    }
+    await sql`INSERT INTO player_ranks (xuid, rank_id, assigned_by) VALUES (${a.xuid}, ${modRank.id}, ${me.username}) ON CONFLICT DO NOTHING`;
+    await syncWebsiteRole(env, sql, a.xuid);
+    await ranksChanged(env);
     await postTimeline(sql, { kind: "rank", xuid: a.xuid || null, name: a.gamertag || a.username, title: "joined the staff team as a Moderator",
       detail: "Welcome to the team!", icon: "shield", dedupe: `mod:${a.user_id}:${a.id}` });
   }

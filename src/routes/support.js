@@ -2,6 +2,7 @@
 // Players open tickets from the Support channel; staff handle them in the panel's Tickets tab,
 // set status (open / waiting / resolved / closed), priority (low / normal / high / urgent),
 // a label (question, bug, report, appeal, store, other) and who's handling it.
+import { can } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -15,7 +16,7 @@ const STATUSES = ["open", "waiting", "resolved", "closed"];
 const PRIORITIES = ["low", "normal", "high", "urgent"];
 const LABELS = ["question", "bug", "report", "appeal", "store", "other"];
 const clean = (v, max) => String(v ?? "").replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, " ").trim().slice(0, max);
-const isStaff = (u) => Number(u.role_power) >= STAFF;
+const isStaff = (u) => can(u, "answer_tickets");  // answering tickets is a rank permission
 
 async function filterText(sql, text) {
   const words = await sql`SELECT word, match FROM filter_words`;

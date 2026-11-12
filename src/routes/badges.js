@@ -1,6 +1,7 @@
 // Badges: special hexagon awards for events and roles (achievements are the in-game milestones).
 // The Owner badge is built in and belongs to the owner automatically; the rest are made and given
 // by Admins in the Control Panel > Badges.
+import { can } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -29,7 +30,7 @@ export async function badgesFor(env, sql, users) {
 // ---------- Control Panel (Admins) ----------
 async function requireAdmin(request, env) {
   const user = await requireUser(request, env);
-  if (Number(user.role_power) < 100) throw new HttpError(403, "Only Admins can manage badges.");
+  if (!can(user, "manage_badges")) throw new HttpError(403, "Your rank can't manage badges.");
   return user;
 }
 async function audit(sql, actorId, action, details) {

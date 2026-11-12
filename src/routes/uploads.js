@@ -3,6 +3,7 @@
 //   profile banner - staff, Galaxy+ and Galaxy Pro+ (the picture at the top of their profile)
 //   profile picture - Galaxy Pro+ (and Admins)
 // They show right away. Staff can remove any of them and stop a member from uploading.
+import { can } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -34,14 +35,14 @@ export async function uploadRights(sql, user) {
   const [r] = await sql`SELECT u.uploads_blocked, p.xuid,
                                (SELECT s.plan FROM subscriptions s WHERE s.xuid = p.xuid AND (s.expires_at IS NULL OR s.expires_at > now())) AS plan
                           FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${user.id}`;
-  const staff = Number(user.role_power) >= STAFF;
+  const staff = false;  // pictures are a rank permission (or a Galaxy+ / Pro+ perk)
   const plan = r?.plan || null;
   const blocked = Boolean(r?.uploads_blocked);
   return {
     plan, blocked, xuid: r?.xuid || null,
-    chat: !blocked && (staff || plan === "plus" || plan === "pro"),
-    banner: !blocked && (staff || plan === "plus" || plan === "pro"),
-    picture: !blocked && Boolean(r?.xuid) && (plan === "pro" || Number(user.role_power) >= ADMIN),
+    chat: !blocked && (can(user, "chat_pictures") || plan === "plus" || plan === "pro"),
+    banner: !blocked && (can(user, "chat_pictures") || plan === "plus" || plan === "pro"),
+    picture: !blocked && Boolean(r?.xuid) && (plan === "pro" || user.owner),
   };
 }
 
@@ -141,7 +142,7 @@ export async function savePicture(request, env) {
 // POST /api/mod/users/:id/uploads { action: "remove-banner" | "remove-picture" | "block" | "unblock" }
 export async function modUploads(request, env, ctx, url, params) {
   const me = await requireUser(request, env);
-  if (Number(me.role_power) < STAFF) throw new HttpError(403, "Only staff can do that.");
+  if (!can(me, "remove_pictures")) throw new HttpError(403, "Your rank can't remove pictures.");
   const sql = getDb(env);
   const id = Number(params.id) || 0;
   const { action } = await readJson(request);

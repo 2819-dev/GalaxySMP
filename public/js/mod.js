@@ -11,14 +11,16 @@ import { ranksDialog } from "/js/rank-picker.js";
 const STAFF = 50;
 const ADMIN = 100;
 const myPower = () => state.me?.role.power || 0;
+// rank permissions (the owner has all)
+const has = (k) => Boolean(state.me && (state.me.owner || (state.me.perms || []).includes(k)));
 
 // ---------- Message actions: Report and Delete ----------
 messageActionHooks.push((m, actions, actionBtn) => {
   const mine = m.author.id === state.me.id;
   if (!mine) actions.append(actionBtn("flag", "Report", () => reportDialog(m)));
-  const canDelete = mine || (myPower() >= STAFF && myPower() > roleOf(m.author.role).power);
+  const canDelete = mine || (has("delete_messages") && myPower() > roleOf(m.author.role).power);
   if (canDelete) actions.append(actionBtn("trash", "Delete", () => deleteDialog(m, mine)));
-  if (myPower() >= STAFF) {
+  if (has("pin_messages")) {
     actions.append(actionBtn("pushpin", m.pinned ? "Unpin" : "Pin to the channel", async () => {
       try { await postJson(`/api/chat/messages/${m.id}/pin`, { pinned: !m.pinned }); toast(m.pinned ? "Unpinned." : "Pinned. Everyone can find it under the pin button at the top."); }
       catch (e) { toast(e.message); }
@@ -73,7 +75,7 @@ function deleteDialog(m, mine) {
 // Staff: a "Moderate" button on everyone's profile card (click a name, picture or member).
 // Everyone: "Report" on other members' cards (staff use Moderate instead).
 profileActionHooks.push((m, actions, close) => {
-  if (!state.me || m.id === state.me.id || myPower() >= STAFF) return;
+  if (!state.me || m.id === state.me.id || has("mod_panel")) return;
   const b = h("button", { class: "btn btn-ghost btn-sm", type: "button", title: "Report this player to staff" });
   b.innerHTML = icon("flag");
   b.append(" Report");
@@ -82,7 +84,7 @@ profileActionHooks.push((m, actions, close) => {
 });
 
 profileActionHooks.push((m, actions, close) => {
-  if (myPower() < STAFF || m.id === state.me.id) return;
+  if (!has("mod_panel") || m.id === state.me.id) return;
   const b = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Moderate" });
   b.addEventListener("click", () => { close(); memberDialog(m); });
   actions.append(b);
@@ -95,7 +97,7 @@ async function memberDialog(m) {
     m.rank ? rankTag(m.rank) : h("span", { class: "text-3", text: "No rank" })));
 
   const actions = [{ label: "Close" }];
-  const canAct = myPower() >= STAFF && myPower() > role.power && m.id !== state.me.id;
+  const canAct = has("mod_panel") && myPower() > role.power && m.id !== state.me.id;
   if (canAct) {
     let detail = null;
     try {
@@ -110,7 +112,7 @@ async function memberDialog(m) {
         if (detail.mutedUntil) body.append(h("p", { class: "note small", text: `Muted until ${new Date(detail.mutedUntil).toLocaleString()}${detail.muteReason ? ` (${detail.muteReason})` : ""}` }));
       }
       const done = (msg) => { toast(msg); };
-      if (detail?.mutedUntil) {
+      if (!has("mute_members")) { /* their rank can't mute */ } else if (detail?.mutedUntil) {
         actions.push({ label: "Unmute", onClick: async () => { await postJson(`/api/mod/members/${m.id}/unmute`); done("Member unmuted."); } });
       } else {
         actions.push({ label: "Mute", onClick: () => { setTimeout(() => muteDialog(m, done)); } });
@@ -121,11 +123,9 @@ async function memberDialog(m) {
           h("button", { class: "btn btn-ghost btn-sm", type: "button", text: label, onclick: async () => {
             try { const r = await postJson(`/api/mod/users/${m.id}/uploads`, { action }); toast(r.message); } catch (e) { toast(e.message); }
           } })));
-      body.append(pics);
-      if (myPower() >= ADMIN) {
-        if (detail?.xuid) actions.push({ label: "Change ranks", onClick: () => { setTimeout(() => rankDialog(detail, done)); } });
-        actions.push({ label: "Ban", kind: "danger", onClick: () => { setTimeout(() => banDialog(m, done)); } });
-      }
+      if (has("remove_pictures")) body.append(pics);
+      if (has("manage_ranks") && detail?.xuid) actions.push({ label: "Change ranks", onClick: () => { setTimeout(() => rankDialog(detail, done)); } });
+      if (has("ban_members")) actions.push({ label: "Ban", kind: "danger", onClick: () => { setTimeout(() => banDialog(m, done)); } });
     }
   }
   openDialog({ title: m.username, body, actions });
@@ -156,7 +156,7 @@ eventHooks.push((data) => {
     state.members.delete(data.userId);
     state.online.delete(data.userId);
     renderMembers();
-  } else if (data.type === "reports_open" || (data.type === "ticket" && myPower() >= STAFF)) {
+  } else if (data.type === "reports_open" || (data.type === "ticket" && has("answer_tickets"))) {
     getJson("/api/mod/summary").then((d) => setReportBadge((d.openReports || 0) + (d.openTickets || 0))).catch(() => {});
   }
 });
@@ -171,12 +171,12 @@ function setReportBadge(n) {
 
 const observer = new MutationObserver(() => {
   if (!state.me || document.getElementById("staff-link")) return;
-  if (myPower() < STAFF) return;
+  if (!has("mod_panel")) return;
   const panel = document.querySelector("#chat-side .me-panel");
   if (!panel) return;
   const link = h("a", { class: "btn btn-secondary btn-sm staff-link", id: "staff-link", href: "/staff" });
   link.innerHTML = icon("shield");
-  const label = h("span", { text: myPower() >= 100 ? "Admin Panel" : "Staff Panel" });
+  const label = h("span", { text: state.me.owner ? "Control Panel" : has("admin_panel") ? "Admin Panel" : "Staff Panel" });
   link.append(label, h("span", { class: "count-badge", id: "staff-badge" }));
   panel.before(link);
   getJson("/api/mod/summary").then((d) => {

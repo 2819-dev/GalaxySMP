@@ -1,5 +1,6 @@
 // #Support > Help Center: answers to common questions (Admins add and edit them right in #Support) plus every
 // player command from the in-game Help menu. The new-ticket form suggests matching answers while you type.
+import { can } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -42,7 +43,7 @@ export async function helpCenter(request, env) {
   const sql = getDb(env);
   const [list, help] = await Promise.all([articles(sql), loadHelp(sql)]);
   return json({
-    ok: true, canEdit: Number(me.role_power) >= ADMIN, articles: list,
+    ok: true, canEdit: can(me, "help_menu"), articles: list,
     commands: (help.help.commands || []).filter((c) => !c.staff).map((c) => ({ command: c.command, description: c.description, example: c.example || "" })),
   });
 }
@@ -52,7 +53,7 @@ const clean = (v, max) => String(v ?? "").replace(/\r/g, "").trim().slice(0, max
 // POST /api/help-center { id?, category, question, answer, keywords }  (Admins)
 export async function saveArticle(request, env) {
   const me = await requireUser(request, env);
-  if (Number(me.role_power) < ADMIN) throw new HttpError(403, "Only Admins can edit the Help Center.");
+  if (!can(me, "help_menu")) throw new HttpError(403, "Your rank can't edit the Help Center.");
   const b = await readJson(request);
   const category = clean(b.category, 40) || "General";
   const question = clean(b.question, 160);
@@ -75,7 +76,7 @@ export async function saveArticle(request, env) {
 // POST /api/help-center/:id/delete  (Admins)
 export async function deleteArticle(request, env, ctx, url, params) {
   const me = await requireUser(request, env);
-  if (Number(me.role_power) < ADMIN) throw new HttpError(403, "Only Admins can edit the Help Center.");
+  if (!can(me, "help_menu")) throw new HttpError(403, "Your rank can't edit the Help Center.");
   await getDb(env)`DELETE FROM help_articles WHERE id = ${Number(params.id) || 0}`;
   return json({ ok: true });
 }

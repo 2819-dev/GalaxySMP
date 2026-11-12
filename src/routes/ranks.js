@@ -2,6 +2,7 @@
 // operators in game (/ranks, through the GalaxyLink plugin). Stored here, sent to
 // the server instantly over GalaxyLink's live connection.
 import { postTimeline } from "./feed.js";
+import { tierFor, PERM_KEYS, PERMS, can } from "../lib/perms.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -15,8 +16,7 @@ import { voiceEvent } from "./voice.js";
 const ADMIN = 100;
 // Java colors 0-f plus Bedrock-only colors (two extra golds, copper, resin and mineral colors).
 const COLORS = "0123456789abcdefgpnvmqstuhij";
-// A rank's staff powers on the website (stored in ranks.website_role): 3 = Moderator, 4 = Admin.
-const STAFF_POWERS = { 3: "Moderator", 4: "Admin" };
+// Website permissions per rank live in ranks.web_perms (see src/lib/perms.js).
 
 // Rank icons (drawn by the GalaxySMP Icons resource pack; pictures in /img/ranks/).
 export const ICONS = ["crown", "star", "shield", "sword", "gem", "heart", "hammer", "flame", "bolt", "rocket", "planet", "leaf",
@@ -56,7 +56,7 @@ function formatRank(r) {
     icon: r.icon || null,
     gradient: r.gradient || null,
     permissions: r.permissions || [],
-    websiteRole: r.website_role ? Number(r.website_role) : null,
+    webPerms: r.web_perms || [],
     position: r.position,
     priority: r.priority ?? 100,
   };
@@ -119,22 +119,22 @@ async function validRank(env, sql, body) {
   const gradient = body.gradient ? String(body.gradient) : null;
   if (gradient && !GRADIENTS.includes(gradient)) throw new HttpError(400, "Unknown gradient.");
   if (perms.length > 40 || perms.some((p) => !/^[a-z0-9_.-]{3,60}$/.test(p))) throw new HttpError(400, "One of the permissions isn't valid.");
-  const role = body.websiteRole == null || body.websiteRole === "" ? null : Number(body.websiteRole);
-  if (role !== null && !STAFF_POWERS[role]) throw new HttpError(400, "Staff powers must be None, Moderator or Admin.");
+  // website permissions (Control Panel); missing = keep the rank's current ones (the in-game /ranks menu doesn't send them)
+  const webPerms = Array.isArray(body.webPerms) ? [...new Set(body.webPerms.map(String).filter((k) => PERM_KEYS.has(k)))] : null;
   // missing = keep the rank's current priority (the in-game /ranks menu doesn't send one); new ranks get 100
   const priority = body.priority == null || body.priority === "" ? null : Number(body.priority);
   if (priority !== null && (!Number.isInteger(priority) || priority < 1 || priority > 255)) throw new HttpError(400, "Priority must be a whole number from 1 (highest) to 255 (lowest).");
-  return { name, prefix, color, icon, gradient, permissions: perms, websiteRole: role, priority };
+  return { name, prefix, color, icon, gradient, permissions: perms, webPerms, priority };
 }
 
 // Gives or removes the website role that comes with a player's rank (if they linked an account).
 // Ranks are the only roles: a player's website account follows their rank. The rank's
 // "Staff powers" (None, Moderator or Admin) decide what they can do on the website.
 // The owners are always Admins.
-async function syncWebsiteRole(env, sql, xuid) {
+export async function syncWebsiteRole(env, sql, xuid) {
   const rows = await sql`
     SELECT u.id, u.username, u.platform, u.role_id, u.role_from_rank, u.muted_until,
-           (SELECT max(r.website_role::int) FROM player_ranks x JOIN ranks r ON r.id = x.rank_id WHERE x.xuid = p.xuid) AS website_role,
+           (SELECT coalesce(array_agg(DISTINCT pm), '{}') FROM player_ranks x JOIN ranks r ON r.id = x.rank_id, unnest(r.web_perms) pm WHERE x.xuid = p.xuid) AS web_perms,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon,
            rk.gradient AS rank_gradient, rk.position AS rank_position, rk.priority AS rank_priority
       FROM players p
@@ -145,9 +145,9 @@ async function syncWebsiteRole(env, sql, xuid) {
   const u = rows[0];
   if (!u) return;
   const owner = isOwner(env, u.username, u.platform === "bedrock");
-  let target = owner ? 4 : STAFF_POWERS[u.website_role] ? Number(u.website_role) : 1;
-  // a role given by hand (Control Panel, or an accepted Moderator application) isn't taken away by rank changes
-  if (!owner && !u.role_from_rank && Number(u.role_id) > target) target = Number(u.role_id);
+  // The stored website role follows the rank permissions: Admin Panel access = 4, Mod Panel access = 3, otherwise 1.
+  const tier = tierFor(u.web_perms || []);
+  const target = owner ? 4 : tier >= 100 ? 4 : tier >= 50 ? 3 : 1;
   const changed = target !== Number(u.role_id);
   if (changed) await sql`UPDATE users SET role_id = ${target}, role_from_rank = ${target !== 1} WHERE id = ${u.id}`;
   const r = await sql`SELECT key FROM roles WHERE id = ${target}`;
@@ -160,6 +160,7 @@ async function audit(sql, actorId, action, details) {
   await sql`INSERT INTO audit_log (actor_id, action, details) VALUES (${actorId}, ${action}, ${JSON.stringify(details)}::jsonb)`;
 }
 
+export async function ranksChanged(env) { return changed(env); }
 async function changed(env) {
   await voiceEvent(env, { type: "ranks_changed" });
 }
@@ -172,14 +173,14 @@ async function applyAction(env, sql, action, body, actor) {
     try {
       if (action === "create") {
         [rank] = await sql`
-          INSERT INTO ranks (name, prefix, color, icon, gradient, permissions, website_role, priority, position)
-          VALUES (${r.name}, ${r.prefix}, ${r.color}, ${r.icon}, ${r.gradient}, ${r.permissions}, ${r.websiteRole}, ${r.priority ?? 100},
+          INSERT INTO ranks (name, prefix, color, icon, gradient, permissions, web_perms, priority, position)
+          VALUES (${r.name}, ${r.prefix}, ${r.color}, ${r.icon}, ${r.gradient}, ${r.permissions}, ${r.webPerms || []}, ${r.priority ?? 100},
                   (SELECT coalesce(max(position), 0) + 1 FROM ranks))
           RETURNING *`;
       } else {
         [rank] = await sql`
           UPDATE ranks SET name = ${r.name}, prefix = ${r.prefix}, color = ${r.color}, icon = ${r.icon}, gradient = ${r.gradient}, permissions = ${r.permissions},
-                 website_role = ${r.websiteRole}, priority = coalesce(${r.priority}::smallint, priority), updated_at = now()
+                 web_perms = coalesce(${r.webPerms}::text[], web_perms), priority = coalesce(${r.priority}::smallint, priority), updated_at = now()
            WHERE id = ${Number(body.id)} RETURNING *`;
         if (!rank) throw new HttpError(404, "That rank no longer exists.");
       }
@@ -280,7 +281,7 @@ async function applyAction(env, sql, action, body, actor) {
 // ---------- website (Admins) ----------
 async function requireAdmin(request, env) {
   const user = await requireUser(request, env);
-  if (Number(user.role_power) < ADMIN) throw new HttpError(403, "Only Admins can manage ranks.");
+  if (!can(user, "manage_ranks")) throw new HttpError(403, "Your rank can't manage ranks.");
   return { id: Number(user.id), label: user.username };
 }
 
@@ -304,6 +305,7 @@ export async function listRanks(request, env, ctx, url) {
     planPriority: state.planPriority,
     icons: ICONS,
     gradients: GRADIENTS,
+    webPerms: PERMS,
     players: players.map((p) => ({ xuid: p.xuid, gamertag: p.gamertag, lastSeen: p.last_seen, rankIds: state.rankSets[p.xuid] || [], linked: Boolean(p.linked) })),
   });
 }

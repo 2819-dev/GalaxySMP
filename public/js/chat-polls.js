@@ -9,7 +9,7 @@ const cache = new Map();  // poll id -> latest poll data, so re-drawn messages s
 
 function canPoll() {
   if (!state.me) return false;
-  if ((state.me.role?.power || 0) >= 50) return true;
+  if (state.me.owner || (state.me.perms || []).includes("chat_polls")) return true;
   const plan = state.members.get(state.me.id)?.plan;
   return plan === "plus" || plan === "pro";
 }

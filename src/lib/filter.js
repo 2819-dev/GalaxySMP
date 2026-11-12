@@ -4,7 +4,8 @@ import config from "../../public/config.js";
 
 export const MAX_LENGTH = 500;
 export const STAFF_MAX_LENGTH = 2000;  // staff (Moderators and up) can write longer messages
-export const maxLengthFor = (power) => (Number(power) >= 50 ? STAFF_MAX_LENGTH : MAX_LENGTH);
+// user: a signed-in user (perms) or a hub user ({ perms, owner }). Longer messages are a rank permission.
+export const maxLengthFor = (user) => (user && (user.owner || (Array.isArray(user.perms) && user.perms.includes("long_messages"))) ? STAFF_MAX_LENGTH : MAX_LENGTH);
 
 const LEET = { "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b", "@": "a", "$": "s", "!": "i", "|": "i", "€": "e" };
 
