@@ -21,6 +21,7 @@ import { planMessage } from "../routes/plans.js";
 import { hubStub } from "../routes/chat.js";
 import { notify } from "../routes/notify.js";
 import { recordChunks } from "../routes/map.js";
+import { tradeFromGame } from "../routes/trades.js";
 
 const DOWN_AFTER_MS = 3 * 60 * 1000; // quick restarts (under 3 minutes) don't send notifications
 
@@ -90,6 +91,7 @@ export class VoiceHub extends DurableObject {
   publicGroups() {
     return Object.values(this.groups).map((g) => ({
       id: g.id, name: g.name, locked: Boolean(g.passwordHash), saved: Boolean(g.saved), owner: g.createdBy,
+      room: Boolean(g.room), position: g.position ?? 0, description: g.description || "",
       members: (g.members || []).map((m) => ({ id: m.id, username: m.username })),
     }));
   }
@@ -159,7 +161,7 @@ export class VoiceHub extends DurableObject {
     const used = new Set([...this.members().values()].map(({ a }) => a.groupId).filter(Boolean));
     let changed = false;
     for (const id of Object.keys(this.groups)) {
-      if (!used.has(id) && !this.groups[id].saved) { delete this.groups[id]; changed = true; } // saved groups stay
+      if (!used.has(id) && !this.groups[id].saved && !this.groups[id].room) { delete this.groups[id]; changed = true; } // saved groups and rooms stay
     }
     if (changed) await this.saveGroups();
   }
@@ -205,6 +207,43 @@ export class VoiceHub extends DurableObject {
     }
     if (url.pathname === "/internal/events") {
       return Response.json((await this.ctx.storage.get("events")) || { events: [], at: null });
+    }
+    if (url.pathname === "/internal/rooms") {
+      // Voice rooms made by Admins (Control Panel): permanent groups anyone can join.
+      if (request.method === "POST") {
+        const body = await request.json();
+        const rooms = Object.values(this.groups).filter((g) => g.room);
+        if (body.action === "add") {
+          if (rooms.length >= 12) return Response.json({ ok: false, error: "You can have up to 12 rooms." });
+          const name = String(body.name || "").trim().replace(/\s+/g, " ").slice(0, 24);
+          if (name.length < 2) return Response.json({ ok: false, error: "Room names need at least 2 characters." });
+          const id = `room-${crypto.randomUUID().slice(0, 6)}`;
+          this.groups[id] = { id, name, description: String(body.description || "").trim().slice(0, 80), room: true, passwordHash: null, createdBy: null,
+            position: rooms.length ? Math.max(...rooms.map((r) => r.position || 0)) + 1 : 1 };
+        } else {
+          const g = this.groups[String(body.id)];
+          if (!g?.room) return Response.json({ ok: false, error: "That room no longer exists." });
+          if (body.action === "rename") {
+            const name = String(body.name || "").trim().replace(/\s+/g, " ").slice(0, 24);
+            if (name.length < 2) return Response.json({ ok: false, error: "Room names need at least 2 characters." });
+            g.name = name;
+            g.description = String(body.description ?? g.description ?? "").trim().slice(0, 80);
+          } else if (body.action === "move") {
+            const list = rooms.sort((x, y) => (x.position || 0) - (y.position || 0));
+            const i = list.indexOf(g), j = i + (body.dir < 0 ? -1 : 1);
+            if (j >= 0 && j < list.length) [list[i], list[j]] = [list[j], list[i]];
+            list.forEach((r, k) => { r.position = k + 1; });
+          } else if (body.action === "delete") {
+            for (const { ws, a } of this.members().values()) if (a.groupId === g.id) this.update(ws, { groupId: null });
+            delete this.groups[g.id];
+          } else return Response.json({ ok: false, error: "Unknown action." });
+        }
+        await this.saveGroups();
+        this.sendRoster();
+      }
+      const list = Object.values(this.groups).filter((g) => g.room).sort((x, y) => (x.position || 0) - (y.position || 0))
+        .map((g) => ({ id: g.id, name: g.name, description: g.description || "", inRoom: [...this.members().values()].filter(({ a }) => a.groupId === g.id).length }));
+      return Response.json({ ok: true, rooms: list });
     }
     if (url.pathname === "/internal/map") {
       const [live, marks] = await Promise.all([this.ctx.storage.get("map_live"), this.ctx.storage.get("map_markers")]);
@@ -252,6 +291,7 @@ export class VoiceHub extends DurableObject {
       this.sendIcons();
       this.ctx.waitUntil(this.sendRanks());
       this.ctx.waitUntil(this.sendShop());
+      this.ctx.waitUntil(this.sendMapSetting());
       return new Response(null, { status: 101, webSocket: client });
     }
 
@@ -360,6 +400,9 @@ export class VoiceHub extends DurableObject {
     if (msg.type === "events") {
       const events = (Array.isArray(msg.events) ? msg.events : []).slice(0, 50);
       return this.ctx.storage.put("events", { events, at: Date.now() });
+    }
+    if (msg.type === "trade_update") {  // accepted / declined / cancelled with /trade in game
+      return tradeFromGame(this.env, msg).catch((e) => console.error("trade update failed", e));
     }
     if (msg.type === "map_chunks") {
       return recordChunks(this.env, msg).catch((e) => console.error("map chunks failed", e));
@@ -544,6 +587,7 @@ export class VoiceHub extends DurableObject {
         return reply({ ok: true });
       }
       case "group.invite": {
+        if (this.groups[String(msg.id)]?.room) throw new Error("Rooms are open to everyone: no invites needed.");
         // The group's creator invites a member by name: the group is saved so they can join any time.
         const g = this.groups[String(msg.id)];
         if (!g) throw new Error("That group no longer exists.");
@@ -590,6 +634,7 @@ export class VoiceHub extends DurableObject {
       case "group.delete": {
         const g = this.groups[String(msg.id)];
         if (!g) throw new Error("That group no longer exists.");
+        if (g.room) throw new Error("Rooms are managed in the Control Panel.");
         if (g.createdBy !== a.id && (a.power || 0) < 100) throw new Error("Only the person who made this group can delete it.");
         for (const { ws, a: other } of this.members().values()) if (other.groupId === g.id) this.update(ws, { groupId: null });
         delete this.groups[g.id];
@@ -603,6 +648,18 @@ export class VoiceHub extends DurableObject {
         this.sendRoster();
         return reply({ ok: true });
       }
+    }
+  }
+
+  // The server map is drawn only while it's switched on (Control Panel > Overview).
+  async sendMapSetting() {
+    const plugin = this.pluginSocket();
+    if (!plugin) return;
+    try {
+      const [row] = await getDb(this.env)`SELECT value FROM economy_config WHERE key = 'map_enabled'`;
+      this.send(plugin, { type: "map", enabled: row?.value === true });
+    } catch (e) {
+      console.error("map setting failed", e);
     }
   }
 

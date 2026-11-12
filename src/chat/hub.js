@@ -354,8 +354,17 @@ export class CommunityHub extends DurableObject {
 
   async onReact(ws, user, msg) {
     const messageId = Number(msg.messageId);
-    if (!Number.isInteger(messageId) || !REACTIONS.includes(msg.emoji)) return;
+    if (!Number.isInteger(messageId) || typeof msg.emoji !== "string") return;
     const sql = getDb(this.env);
+    if (!REACTIONS.includes(msg.emoji)) {  // a custom emoji: ":name:" that exists
+      const name = /^:([a-z0-9_]{2,24}):$/.exec(msg.emoji)?.[1];
+      if (!name) return;
+      if (!this.emojiAt || Date.now() - this.emojiAt > 60_000) {
+        this.emojiSet = new Set((await sql`SELECT name FROM emoji`).map((r) => r.name));
+        this.emojiAt = Date.now();
+      }
+      if (!this.emojiSet.has(name)) return;
+    }
     const removed = await sql`
       DELETE FROM reactions WHERE message_id = ${messageId} AND user_id = ${user.id} AND emoji = ${msg.emoji}
       RETURNING message_id`;

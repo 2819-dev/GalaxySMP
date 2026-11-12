@@ -10,6 +10,8 @@ import { voiceStub } from "./voice.js";
 import { notify } from "./notify.js";
 import { toPlugin } from "./economy.js";
 import { Buffer } from "node:buffer";
+import { expireTrades } from "./trades.js";
+import { weeklyRecap } from "./recap.js";
 
 const STAFF = 50;
 const ADMIN = 100;
@@ -480,6 +482,8 @@ export async function tick(env) {
     if (sent) await sql`UPDATE events SET announced = true WHERE id = ${e.id}`;
   }
   await buildOfTheWeek(env, sql);
+  await expireTrades(env, sql).catch((e) => console.error("trade expiry failed", e));
+  await weeklyRecap(env).catch((e) => console.error("weekly recap failed", e));
 }
 
 async function buildOfTheWeek(env, sql) {

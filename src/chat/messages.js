@@ -29,11 +29,12 @@ export function formatMessage(r) {
         }
       : null,
     reactions: (r.reactions || []).map((x) => ({ emoji: x.emoji, users: x.users.map(Number) })),
+    pinned: Boolean(r.pinned_at),
   };
 }
 
 const SELECT = `
-  SELECT m.id, m.channel_id, m.content, m.created_at, m.reply_to, m.seen_at, m.edited_at,
+  SELECT m.id, m.channel_id, m.content, m.created_at, m.reply_to, m.seen_at, m.edited_at, m.pinned_at,
          u.id AS author_id, u.username, r.key AS role_key, r.color,
          rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient, rk.position AS rank_position,
          p.content AS reply_content, pu.username AS reply_username,
@@ -59,6 +60,35 @@ export async function loadHistory(sql, channelId, beforeId) {
     [channelId, beforeId ?? null]
   );
   return rows.reverse().map(formatMessage);
+}
+
+// The messages around one message (for "jump to" from search and pins): 25 before, 25 after.
+export async function loadAround(sql, channelId, id) {
+  const before = await sql.query(`${SELECT} WHERE m.channel_id = $1 AND m.deleted_at IS NULL AND m.id <= $2 ORDER BY m.id DESC LIMIT 26`, [channelId, id]);
+  const after = await sql.query(`${SELECT} WHERE m.channel_id = $1 AND m.deleted_at IS NULL AND m.id > $2 ORDER BY m.id LIMIT 25`, [channelId, id]);
+  return { messages: [...before.reverse(), ...after].map(formatMessage), hasMore: before.length >= 26, hasNewer: after.length >= 25 };
+}
+
+export async function loadPins(sql, channelId) {
+  const rows = await sql.query(`${SELECT} WHERE m.channel_id = $1 AND m.deleted_at IS NULL AND m.pinned_at IS NOT NULL ORDER BY m.pinned_at DESC LIMIT 50`, [channelId]);
+  return rows.map(formatMessage);
+}
+
+// Search the text channels the member can see: words in the message, optionally by one person or in one channel.
+export async function searchMessages(sql, { q, channelId, from, limit = 30 }) {
+  const words = String(q || "").toLowerCase().split(/\s+/).filter((w) => w.length >= 2).slice(0, 5)
+    .map((w) => `%${w.replace(/[%_\\]/g, "\\$&")}%`);
+  if (!words.length && !from) return [];
+  const rows = await sql.query(
+    `${SELECT}
+      JOIN channels ch ON ch.id = m.channel_id
+     WHERE m.deleted_at IS NULL AND ch.kind = 'text' AND NOT ch.hidden
+       AND ($1::int IS NULL OR m.channel_id = $1)
+       AND ($2::text IS NULL OR u.username_lower = lower($2))
+       AND (SELECT bool_and(m.content ILIKE w) FROM unnest($3::text[]) w)
+     ORDER BY m.id DESC LIMIT ${Math.min(50, limit)}`,
+    [channelId ?? null, from || null, words.length ? words : ["%"]]);
+  return rows.map(formatMessage);
 }
 
 export async function loadMessage(sql, id) {

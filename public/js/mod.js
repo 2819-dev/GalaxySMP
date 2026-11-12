@@ -18,6 +18,12 @@ messageActionHooks.push((m, actions, actionBtn) => {
   if (!mine) actions.append(actionBtn("flag", "Report", () => reportDialog(m)));
   const canDelete = mine || (myPower() >= STAFF && myPower() > roleOf(m.author.role).power);
   if (canDelete) actions.append(actionBtn("trash", "Delete", () => deleteDialog(m, mine)));
+  if (myPower() >= STAFF) {
+    actions.append(actionBtn("pushpin", m.pinned ? "Unpin" : "Pin to the channel", async () => {
+      try { await postJson(`/api/chat/messages/${m.id}/pin`, { pinned: !m.pinned }); toast(m.pinned ? "Unpinned." : "Pinned. Everyone can find it under the pin button at the top."); }
+      catch (e) { toast(e.message); }
+    }));
+  }
 });
 
 function reportDialog(m) {

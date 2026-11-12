@@ -53,6 +53,11 @@
         </div>
         <button class="btn btn-primary btn-lg" type="button" id="v-join-btn">Join voice</button>
         <p class="form-error" id="v-join-error" role="alert"></p>
+        <div id="v-join-rooms" class="v-join-rooms" hidden>
+          <h3>Rooms</h3>
+          <p class="text-3 small" style="margin:0 0 8px">Join voice, then pick a room: everyone in it hears each other at full volume, wherever they are in game.</p>
+          <div id="v-join-rooms-list" class="vgroups"></div>
+        </div>
       </section>
 
       <!-- How it works (shown until you join) -->
@@ -104,6 +109,12 @@
               <h2>In voice <span class="text-3" id="v-count"></span></h2>
             </div>
             <div id="v-roster" class="vroster"></div>
+          </section>
+
+          <section class="panel" id="v-rooms-box" hidden>
+            <div class="voice-head"><h2>Rooms</h2></div>
+            <p class="text-3 small" style="margin:0 0 12px">Open to everyone. Everyone in a room hears each other at full volume, wherever they are in game.</p>
+            <div id="v-rooms" class="vgroups"></div>
           </section>
 
           <section class="panel">

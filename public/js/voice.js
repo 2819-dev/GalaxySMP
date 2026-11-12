@@ -466,14 +466,36 @@ function renderRoster() {
   $("v-count").textContent = `· ${users.length}`;
 }
 
+function renderRooms(rooms) {
+  const box = $("v-rooms");
+  const me = S.users.get(S.myId);
+  $("v-rooms-box").hidden = !rooms.length;
+  box.replaceChildren(...rooms.map((g) => {
+    const members = [...S.users.values()].filter((u) => u.group === g.id);
+    const mine = me?.group === g.id;
+    const ic = h("span", { class: "vstate" });
+    ic.innerHTML = vicon("group");
+    return h("div", { class: "vrow" + (mine ? " mine" : "") }, ic,
+      h("div", { class: "vinfo" },
+        h("div", { class: "vname" }, g.name, members.length ? h("span", { class: "vtag", text: `${members.length} here` }) : null),
+        h("div", { class: "vdetail", text: members.length ? members.map((m) => m.username).join(", ") : (g.description || "Nobody here yet.") })),
+      h("div", { class: "vgroup-actions" }, mine
+        ? h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Leave", onclick: () => request("group.leave").catch((e) => toast(e.message)) })
+        : h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Join", onclick: () => request("group.join", { id: g.id }).catch((e) => toast(e.message)) })));
+  }));
+}
+
 function renderGroups() {
   const box = $("v-groups");
   const me = S.users.get(S.myId);
   box.replaceChildren();
-  if (!S.groups.length) box.append(h("p", { class: "text-3 small", style: "margin:0", text: "No groups right now. Make one, then invite players: you can talk to them even when one of you isn't in game." }));
+  const rooms = S.groups.filter((g) => g.room).sort((a, b) => (a.position || 0) - (b.position || 0));
+  renderRooms(rooms);
+  const groups = S.groups.filter((g) => !g.room);
+  if (!groups.length) box.append(h("p", { class: "text-3 small", style: "margin:0", text: "No groups right now. Make one, then invite players: you can talk to them even when one of you isn't in game." }));
   // your saved groups and groups you're invited to first
   const rank = (g) => (g.owner === S.myId ? 0 : g.members?.some((x) => x.id === S.myId) ? 1 : 2);
-  for (const g of [...S.groups].sort((a, b) => rank(a) - rank(b))) {
+  for (const g of [...groups].sort((a, b) => rank(a) - rank(b))) {
     const members = [...S.users.values()].filter((u) => u.group === g.id);
     const mine = me?.group === g.id;
     const owner = g.owner === S.myId;
@@ -790,6 +812,23 @@ function leave() {
 
 // ---------- Wire up controls ----------
 $("v-join-btn").addEventListener("click", join);
+
+// Rooms are listed on the Join screen too, so people see where others are before joining.
+async function showJoinRooms() {
+  try {
+    const d = await (await fetch("/api/voice/rooms", { credentials: "same-origin" })).json();
+    if (!d.ok || !d.rooms.length) return;
+    $("v-join-rooms").hidden = false;
+    $("v-join-rooms-list").replaceChildren(...d.rooms.map((r) => {
+      const ic = h("span", { class: "vstate" });
+      ic.innerHTML = vicon("group");
+      return h("div", { class: "vrow" }, ic, h("div", { class: "vinfo" },
+        h("div", { class: "vname" }, r.name, r.inRoom ? h("span", { class: "vtag", text: `${r.inRoom} here` }) : null),
+        h("div", { class: "vdetail", text: r.description || (r.inRoom ? "People are talking here." : "Nobody here yet.") })));
+    }));
+  } catch { /* rooms are optional */ }
+}
+showJoinRooms();
 $("v-leave").addEventListener("click", leave);
 $("v-mic").addEventListener("click", () => {
   S.micOn = !S.micOn;

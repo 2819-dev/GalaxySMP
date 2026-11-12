@@ -5,6 +5,8 @@ import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, v
 import { setupPanel } from "/js/staff-panel.js";
 import { ranksDialog } from "/js/rank-picker.js";
 import { setupAppeals } from "/js/appeals-panel.js";
+import { setupEmoji } from "/js/emoji-panel.js";
+import { setupRooms } from "/js/rooms-panel.js";
 import { setupPromos } from "/js/promos-panel.js";
 import { setupBadges } from "/js/badges-panel.js";
 import { setupPayments } from "/js/payments-panel.js";
@@ -903,6 +905,8 @@ $("help-reset").addEventListener("click", () => openDialog({
   setupPanel({ loaders, power, owner: Boolean(summary.owner), selectTab, toast, setBadge });
   setupAppeals({ loaders, toast, setBadge });
   if (power >= 100) setupPromos({ loaders, toast });
+  if (power >= 100) setupEmoji({ loaders, toast });
+  if (power >= 100) setupRooms({ loaders, toast });
   if (power >= 100) setupBadges({ loaders, toast });
   if (summary.owner) {
     setupPayments({ loaders });
@@ -910,7 +914,7 @@ $("help-reset").addEventListener("click", () => openDialog({
     document.querySelector('[data-tab="payments"]').hidden = false;
   }
   let start = location.hash.slice(1).split("/")[0];
-  if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"], [data-tab="badges"], [data-tab="promos"], [data-tab="help"]').forEach((t) => (t.hidden = false));
+  if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"], [data-tab="badges"], [data-tab="promos"], [data-tab="help"], [data-tab="emoji"], [data-tab="rooms"]').forEach((t) => (t.hidden = false));
   if (start === "members") { start = "players"; history.replaceState(null, "", "#players"); } // old link: Members is one tab now
-  selectTab(["overview", "tickets", "appeals", "players", "reports", "words", "audit", ...(summary.owner ? ["dms", "payments"] : []), ...(power >= 100 ? ["ranks", "economy", "badges", "promos", "help"] : [])].includes(start) ? start : "overview");
+  selectTab(["overview", "tickets", "appeals", "players", "reports", "words", "audit", ...(summary.owner ? ["dms", "payments"] : []), ...(power >= 100 ? ["ranks", "economy", "badges", "promos", "help", "emoji", "rooms"] : [])].includes(start) ? start : "overview");
 })();

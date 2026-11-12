@@ -6,9 +6,10 @@ import { icon, toast } from "/js/site.js";
 import { paint, rankTag, roleIcon, rankCss } from "/js/rank-paint.js";
 import { showPanel, hidePanel, dmEvent } from "/js/community-panels.js";
 import { ticketEvent } from "/js/tickets.js";
-import { renderMarkdown, plainText } from "/js/markdown.js";
+import { renderMarkdown, plainText, setCustomEmoji, customEmoji, emojiNode } from "/js/markdown.js";
 import { setupMentions } from "/js/mentions.js";
 import { faceSvg } from "/js/face.js";
+import { openDialog, h } from "/js/dialog.js";
 
 // A member's current rank (live updates win over what an older message recorded).
 const rankFor = (id, fallback) => (state.members.has(id) ? state.members.get(id).rank : fallback) || null;
@@ -260,6 +261,7 @@ setInterval(reportView, 4 * 60_000); // still looking: say so again now and then
 
 async function selectChannel(id) {
   state.channelId = id;
+  state.viewingOld = false;
   renderTyping();
   state.unread.delete(id);
   state.replyTo = null;
@@ -486,6 +488,12 @@ function renderMessage(m, prev) {
   t.dateTime = m.createdAt;
   t.title = new Date(m.createdAt).toLocaleString();
   head.append(t);
+  if (m.pinned) {
+    const pinTag = el("span", "msg-pinned");
+    pinTag.innerHTML = icon("pushpin");
+    pinTag.append("Pinned");
+    head.append(pinTag);
+  }
   const text = el("div", "msg-text");
   text.append(renderMarkdown(m.content, mdContext()));
   if (m.editedAt) {
@@ -533,7 +541,8 @@ function renderReactions(m) {
     if (!r.users.length) continue;
     const b = el("button", "reaction" + (r.users.includes(state.me.id) ? " mine" : ""));
     b.type = "button";
-    b.append(el("span", "", r.emoji), el("span", "", String(r.users.length)));
+    const custom = /^:([a-z0-9_]{2,24}):$/.exec(r.emoji);
+    b.append(custom ? (emojiNode(custom[1]) || el("span", "", r.emoji)) : el("span", "", r.emoji), el("span", "", String(r.users.length)));
     b.title = r.users.map((id) => state.members.get(id)?.username || "someone").slice(0, 10).join(", ");
     b.addEventListener("click", () => send({ type: "react", messageId: m.id, emoji: r.emoji }));
     wrap.append(b);
@@ -556,8 +565,122 @@ function openPicker(row, m, e) {
     });
     p.append(b);
   }
+  for (const { name } of customEmoji()) {
+    const b = el("button", "picker-custom");
+    b.type = "button";
+    b.setAttribute("aria-label", `React :${name}:`);
+    b.append(emojiNode(name));
+    b.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      send({ type: "react", messageId: m.id, emoji: `:${name}:` });
+      p.remove();
+    });
+    p.append(b);
+  }
   row.append(p);
   setTimeout(() => document.addEventListener("click", () => p.remove(), { once: true }), 0);
+}
+
+// Open a channel at one message (from search or pins), loading the messages around it.
+export async function openAt(channelId, id) {
+  if (state.channelId !== channelId) await selectChannel(channelId);
+  if (state.messages.has(id)) return jumpTo(id);
+  const data = await api(`/api/chat/channels/${channelId}/messages?around=${id}`);
+  if (state.channelId !== channelId) return;
+  state.messages.clear();
+  for (const m of data.messages) state.messages.set(m.id, m);
+  state.hasMore = data.hasMore;
+  renderMessages();
+  $("jump-latest").hidden = !data.hasNewer;
+  state.viewingOld = Boolean(data.hasNewer);
+  requestAnimationFrame(() => jumpTo(id));
+}
+
+// A grid of the server's custom emoji; picking one types :name: into the box.
+export function emojiMenu(anchor, input) {
+  document.querySelectorAll(".emoji-menu").forEach((x) => x.remove());
+  const list = customEmoji();
+  const menu = el("div", "emoji-menu");
+  menu.setAttribute("role", "dialog");
+  menu.setAttribute("aria-label", "Server emoji");
+  if (!list.length) menu.append(el("p", "text-3 small", "No server emoji yet. Admins add them in the Control Panel."));
+  for (const { name } of list) {
+    const b = el("button", "");
+    b.type = "button";
+    b.title = `:${name}:`;
+    b.setAttribute("aria-label", `:${name}:`);
+    b.append(emojiNode(name));
+    b.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const at = input.selectionStart ?? input.value.length;
+      const before = input.value.slice(0, at), after = input.value.slice(input.selectionEnd ?? at);
+      const add = `${before && !/\s$/.test(before) ? " " : ""}:${name}: `;
+      input.value = before + add + after;
+      input.focus();
+      input.selectionStart = input.selectionEnd = before.length + add.length;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      menu.remove();
+    });
+    menu.append(b);
+  }
+  (anchor.closest(".composer-wrap, .dm-chat") || document.body).append(menu);
+  setTimeout(() => document.addEventListener("click", (ev) => { if (!menu.contains(ev.target)) menu.remove(); }, { once: true }), 0);
+}
+
+function messageRow(m, onOpen) {
+  const ch = state.channels.find((c) => c.id === m.channelId);
+  const b = h("button", { type: "button", class: "found-msg" },
+    h("div", { class: "found-head" }, h("b", { text: m.author.username }),
+      h("span", { class: "text-3 small", text: `${ch ? `#${ch.name} · ` : ""}${new Date(m.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` })),
+    h("div", { class: "found-text", text: plainText(m.content).slice(0, 220) }));
+  b.addEventListener("click", onOpen);
+  return b;
+}
+
+function searchDialog() {
+  const q = h("input", { class: "input", id: "search-q", type: "search", placeholder: "Search messages", autocomplete: "off", "aria-label": "Search messages" });
+  const from = h("input", { class: "input", id: "search-from", placeholder: "From (optional)", autocomplete: "off", "aria-label": "From a member" });
+  const here = h("input", { type: "checkbox", id: "search-here" });
+  const ch = currentChannel();
+  const list = h("div", { class: "found-list", role: "list" });
+  const status = h("p", { class: "text-3 small", style: "margin:0" });
+  let t = null, dlg = null;
+  const run = async () => {
+    if (q.value.trim().length < 2 && !from.value.trim()) { list.replaceChildren(); status.textContent = "Type at least 2 letters."; return; }
+    status.textContent = "Searching…";
+    const params = new URLSearchParams({ q: q.value.trim() });
+    if (from.value.trim()) params.set("from", from.value.trim());
+    if (here.checked && ch && ch.kind === "text") params.set("channel", ch.id);
+    try {
+      const d = await api(`/api/chat/search?${params}`);
+      status.textContent = d.messages.length ? `${d.messages.length}${d.messages.length >= 30 ? "+" : ""} result${d.messages.length === 1 ? "" : "s"}` : "No messages found.";
+      list.replaceChildren(...d.messages.map((m) => messageRow(m, () => { dlg?.close(); dlg?.remove(); openAt(m.channelId, m.id).catch((e) => toast(e.message)); })));
+    } catch (e) { status.textContent = e.message; }
+  };
+  const later = () => { clearTimeout(t); t = setTimeout(run, 300); };
+  [q, from].forEach((x) => x.addEventListener("input", later));
+  here.addEventListener("change", run);
+  const res = openDialog({
+    title: "Search messages",
+    body: h("div", { class: "form" }, h("div", { class: "search-row" }, q, from),
+      ch && ch.kind === "text" ? h("label", { class: "check" }, here, `Only in #${ch.name}`) : null, status, list),
+    actions: [{ label: "Close" }],
+  });
+  dlg = res?.dialog || document.querySelector("dialog.dialog:last-of-type");
+  setTimeout(() => q.focus(), 50);
+}
+
+async function pinsDialog() {
+  const ch = currentChannel();
+  if (!ch || ch.kind !== "text") return toast("Pinned messages are in chat channels.");
+  const list = h("div", { class: "found-list" }, h("p", { class: "text-3 small", text: "Loading…" }));
+  const res = openDialog({ title: `Pinned in #${ch.name}`, body: list, actions: [{ label: "Close" }] });
+  const dlg = res?.dialog || document.querySelector("dialog.dialog:last-of-type");
+  try {
+    const d = await api(`/api/chat/channels/${ch.id}/pins`);
+    list.replaceChildren(...(d.messages.length ? d.messages.map((m) => messageRow(m, () => { dlg?.close(); dlg?.remove(); openAt(m.channelId, m.id).catch((e) => toast(e.message)); }))
+      : [h("p", { class: "text-3", style: "margin:0", text: (state.me?.role?.power || 0) >= 50 ? "Nothing pinned yet. Pin a message from its menu." : "Nothing pinned yet." })]));
+  } catch (e) { list.replaceChildren(h("p", { class: "text-3", text: e.message })); }
 }
 
 function jumpTo(id) {
@@ -991,12 +1114,16 @@ function wireUi() {
     submit();
   });
   $("messages").addEventListener("scroll", () => {
-    if (nearBottom()) $("jump-latest").hidden = true;
+    if (nearBottom() && !state.viewingOld) $("jump-latest").hidden = true;
   });
   $("jump-latest").addEventListener("click", () => {
-    $("messages").scrollTop = $("messages").scrollHeight;
     $("jump-latest").hidden = true;
+    if (state.viewingOld) { state.viewingOld = false; loadMessages(); return; }  // was looking at an older part of the channel
+    $("messages").scrollTop = $("messages").scrollHeight;
   });
+  $("open-search").addEventListener("click", searchDialog);
+  $("composer-emoji").addEventListener("click", (e) => emojiMenu(e.currentTarget, $("composer-input")));
+  $("open-pins").addEventListener("click", pinsDialog);
 }
 
 // ---------- Start / stop ----------
@@ -1022,6 +1149,7 @@ export async function startChat({ onSignedOut }) {
   state.categories = [{ id: DM_CHANNEL, name: "Messages" }, ...data.categories];
   if (data.dmUnread) state.unread.add(DM_CHANNEL);
   state.reactions = data.reactions;
+  try { setCustomEmoji((await api("/api/emoji")).emoji); } catch { /* no custom emoji */ }
   state.roles = new Map(data.roles.map((r) => [r.key, r]));
   state.members = new Map(data.members.map((m) => [m.id, m]));
 

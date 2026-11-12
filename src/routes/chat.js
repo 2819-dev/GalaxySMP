@@ -5,7 +5,7 @@ import { INTEREST_NAME } from "./onboarding.js";
 import { getDb } from "../lib/db.js";
 import { json, HttpError } from "../lib/http.js";
 import { requireUser, publicUser } from "../lib/auth.js";
-import { REACTIONS, loadHistory, rankOf } from "../chat/messages.js";
+import { REACTIONS, loadHistory, rankOf, loadAround, loadPins, searchMessages, loadMessage } from "../chat/messages.js";
 import { MAX_LENGTH } from "../lib/filter.js";
 import { headUrlFor } from "./heads.js";
 import { displayRank, loadPlanPriority } from "./ranks.js";
@@ -91,8 +91,51 @@ export async function history(request, env, ctx, url, params) {
   const before = url.searchParams.get("before");
   if (!Number.isInteger(channelId)) throw new HttpError(400, "Unknown channel.");
   const sql = getDb(env);
+  const around = Number(url.searchParams.get("around"));
+  if (Number.isInteger(around) && around > 0) return json({ ok: true, ...(await loadAround(sql, channelId, around)) });
   const messages = await loadHistory(sql, channelId, before ? Number(before) : null);
   return json({ ok: true, messages, hasMore: messages.length >= 50 });
+}
+
+// GET /api/chat/search?q=words&channel=ID&from=username
+export async function search(request, env, ctx, url) {
+  await requireUser(request, env);
+  const q = String(url.searchParams.get("q") || "").slice(0, 100);
+  const channelId = Number(url.searchParams.get("channel")) || null;
+  const from = String(url.searchParams.get("from") || "").replace(/^@/, "").trim().slice(0, 32) || null;
+  const sql = getDb(env);
+  return json({ ok: true, messages: await searchMessages(sql, { q, channelId, from }) });
+}
+
+// GET /api/chat/channels/:id/pins
+export async function pins(request, env, ctx, url, params) {
+  await requireUser(request, env);
+  const channelId = Number(params.id);
+  if (!Number.isInteger(channelId)) throw new HttpError(400, "Unknown channel.");
+  return json({ ok: true, messages: await loadPins(getDb(env), channelId) });
+}
+
+// POST /api/chat/messages/:id/pin { pinned } (staff)
+export async function pin(request, env, ctx, url, params) {
+  const user = await requireUser(request, env);
+  if (Number(user.role_power) < 50) throw new HttpError(403, "Only staff can pin messages.");
+  const body = await request.json().catch(() => ({}));
+  const sql = getDb(env);
+  const id = Number(params.id);
+  const [m] = await sql`UPDATE messages SET pinned_at = ${body.pinned ? new Date().toISOString() : null}, pinned_by = ${body.pinned ? user.id : null}
+                         WHERE id = ${id} AND deleted_at IS NULL RETURNING id, channel_id`;
+  if (!m) throw new HttpError(404, "That message no longer exists.");
+  if (body.pinned) {
+    const [{ n }] = await sql`SELECT count(*)::int AS n FROM messages WHERE channel_id = ${m.channel_id} AND pinned_at IS NOT NULL AND deleted_at IS NULL`;
+    if (n > 50) {
+      await sql`UPDATE messages SET pinned_at = NULL WHERE id = ${id}`;
+      throw new HttpError(409, "A channel can have up to 50 pinned messages. Unpin one first.");
+    }
+  }
+  await sql`INSERT INTO audit_log (actor_id, action, details) VALUES (${user.id}, ${body.pinned ? "message.pin" : "message.unpin"}, ${JSON.stringify({ messageId: id })}::jsonb)`;
+  const message = await loadMessage(sql, id);
+  await hubBroadcast(env, { type: "message_updated", message });
+  return json({ ok: true });
 }
 
 // Opens the live connection. Only signed-in members from our own site may connect.

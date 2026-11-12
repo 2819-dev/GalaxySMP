@@ -22,13 +22,15 @@ export async function recordChunks(env, msg) {
 // GET /api/map/info: which regions have land, and the live players + markers.
 export async function mapInfo(request, env) {
   const sql = getDb(env);
+  const [on] = await sql`SELECT value FROM economy_config WHERE key = 'map_enabled'`;
+  if (on?.value !== true) return json({ ok: true, enabled: false }, 200, { "Cache-Control": "no-store" });
   const [regions, live] = await Promise.all([
     sql`SELECT floor(cx::numeric / ${REGION})::int AS rx, floor(cz::numeric / ${REGION})::int AS rz, count(*)::int AS n, extract(epoch FROM max(updated_at))::bigint AS at
           FROM map_chunks WHERE dim = 'overworld' GROUP BY 1, 2`,
     voiceStub(env).fetch("https://voice/internal/map").then((r) => r.json()).catch(() => ({})),
   ]);
   return json({
-    ok: true, regionSize: REGION * 16,
+    ok: true, enabled: true, regionSize: REGION * 16,
     regions: regions.map((r) => ({ rx: r.rx, rz: r.rz, chunks: r.n, v: Number(r.at) })),
     players: live.players || [], playersAt: live.playersAt || null,
     markers: live.markers || [], plots: live.plots || [],

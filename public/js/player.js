@@ -87,6 +87,7 @@ async function load() {
 
   const actions = h("div", { class: "pp-actions" });
   if (social && !social.isMe) actions.append(h("a", { class: "btn btn-primary btn-sm", href: `/community#dm-${social.id}` }, iconEl("message"), "Message"));
+  if (social && !social.isMe) actions.append(h("a", { class: "btn btn-secondary btn-sm", href: `/trades?to=${encodeURIComponent(p.name)}` }, iconEl("handshake"), "Trade"));
   if (social?.isMe) actions.append(h("a", { class: "btn btn-primary btn-sm", href: "/account" }, iconEl("pencil"), "Edit profile"));
   const share = h("button", { class: "btn btn-secondary btn-sm", type: "button" }, iconEl("share"), "Share");
   share.addEventListener("click", async () => {

@@ -11,7 +11,7 @@ import { pluginPing, pluginLink } from "./routes/plugin.js";
 import * as gamemod from "./routes/gamemod.js";
 import * as progress from "./routes/progress.js";
 import { headImage } from "./routes/heads.js";
-import { bootstrap, history, connect } from "./routes/chat.js";
+import { bootstrap, history, connect, search as chatSearch, pins as chatPins, pin as chatPin } from "./routes/chat.js";
 import * as mod from "./routes/mod.js";
 import { voiceConnect, voiceServer } from "./routes/voice.js";
 import * as ranks from "./routes/ranks.js";
@@ -30,6 +30,8 @@ import * as account from "./routes/account.js";
 import * as features from "./routes/features.js";
 import * as appeals from "./routes/appeals.js";
 import * as livemap from "./routes/map.js";
+import * as emoji from "./routes/emoji.js";
+import * as trades from "./routes/trades.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -59,6 +61,17 @@ const routes = [
   ["POST", "/api/plugin/link", (req, env) => pluginLink(req, env)],
   ["GET", "/api/chat/bootstrap", (req, env) => bootstrap(req, env)],
   ["GET", "/api/chat/channels/:id/messages", history],
+  ["GET", "/api/chat/channels/:id/pins", chatPins],
+  ["GET", "/api/chat/search", chatSearch],
+  ["GET", "/api/emoji", (req, env) => emoji.listEmoji(req, env)],
+  ["GET", "/api/trades", (req, env) => trades.listTrades(req, env)],
+  ["GET", "/api/trades/inventory", (req, env) => trades.inventory(req, env)],
+  ["POST", "/api/trades", (req, env) => trades.createTrade(req, env)],
+  ["POST", "/api/trades/:id/:action", trades.tradeAction],
+  ["GET", "/api/emoji/:name", emoji.emojiImage],
+  ["POST", "/api/panel/emoji", (req, env) => emoji.addEmoji(req, env)],
+  ["POST", "/api/panel/emoji/:name/delete", emoji.deleteEmoji],
+  ["POST", "/api/chat/messages/:id/pin", chatPin],
   ["GET", "/api/chat/connect", (req, env) => connect(req, env)],
   ["POST", "/api/reports", (req, env) => mod.createReport(req, env)],
   ["POST", "/api/messages/:id/delete", mod.deleteMessage],
@@ -101,6 +114,10 @@ const routes = [
   ["GET", "/api/players/:name/history", progress.playerHistory],
   ["GET", "/api/timeline", progress.timeline],
   ["GET", "/api/map/info", (req, env) => livemap.mapInfo(req, env)],
+  ["POST", "/api/panel/map", (req, env) => panel.setMap(req, env)],
+  ["GET", "/api/panel/voice-rooms", (req, env) => panel.voiceRooms(req, env)],
+  ["GET", "/api/voice/rooms", (req, env) => panel.publicVoiceRooms(req, env)],
+  ["POST", "/api/panel/voice-rooms", (req, env) => panel.voiceRooms(req, env)],
   ["GET", "/api/map/region/:rx/:rz", livemap.mapRegion],
   ["POST", "/api/appeals", (req, env) => appeals.createAppeal(req, env)],
   ["GET", "/api/appeals/:token", appeals.getAppeal],
@@ -221,6 +238,8 @@ async function health(env) {
 export default {
   // Daily notifications (reward reminder, daily summary): see "triggers" in wrangler.jsonc.
   async scheduled(event, env, ctx) {
+    // Local testing only (DEBUG_PUSH is set in .dev.vars, never on the live site): post the recap now.
+    if (env.DEBUG_PUSH && event.cron === "recap-test") return ctx.waitUntil(import("./routes/recap.js").then((m) => m.weeklyRecap(env, true)));
     if (event.cron === "*/5 * * * *") ctx.waitUntil(features.tick(env).catch((e) => console.error("5-minute jobs failed", e)));
     else ctx.waitUntil(notifyRoutes.daily(env, event.cron).catch((e) => console.error("daily notifications failed", e)));
   },

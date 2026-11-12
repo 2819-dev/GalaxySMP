@@ -133,14 +133,21 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
     const m = d.map || {};
     const ago = (t) => { const s = Math.max(0, (Date.now() - new Date(t)) / 1000); return s < 90 ? "just now" : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} days ago`; };
     const mapSilent = d.server.online && (!m.liveAt || Date.now() - new Date(m.liveAt) > 120_000);
-    const mapWarn = d.server.online && (m.error || mapSilent)
+    const mapWarn = m.enabled && d.server.online && (m.error || mapSilent)
       ? h("div", { class: "panel ov-warn" }, h("b", {}, iconEl("alert"), "The server map isn't getting updates"),
         h("p", { class: "text-2 small", style: "margin:4px 0 0", text: m.error
           ? `The server reported: ${m.error}`
           : `The server is online but hasn't sent anything for the map. The map needs GalaxyLink ${d.server.latest} (the server has ${d.server.plugin || "an older version"}). Install the newest plugin file and restart.` }))
       : null;
-    const mapLine = h("p", { class: "text-3 small", style: "margin:0" }, iconEl("map"), " Server map: ",
-      m.chunks ? `${m.chunks.toLocaleString()} chunks mapped, last drawn ${ago(m.lastChunk)}.` : "nothing mapped yet.", " ", h("a", { href: "/map", text: "Open the map" }));
+    const mapToggle = admin ? h("button", { class: "btn btn-secondary btn-sm", type: "button", text: m.enabled ? "Turn the map off" : "Turn the map on",
+      onclick: async (e) => {
+        e.target.disabled = true;
+        try { await postJson("/api/panel/map", { enabled: !m.enabled }); toast(m.enabled ? "The map is off: galaxymc.us/map says Coming soon." : "The map is on: the server starts drawing it."); loaders.overview(); }
+        catch (err) { toast(err.message); e.target.disabled = false; }
+      } }) : null;
+    const mapLine = h("div", { class: "ov-mapline" }, h("p", { class: "text-3 small", style: "margin:0" }, iconEl("map"), " Server map: ",
+      m.enabled ? (m.chunks ? `on · ${m.chunks.toLocaleString()} chunks mapped, last drawn ${ago(m.lastChunk)}. ` : "on · nothing mapped yet. ") : "off · galaxymc.us/map shows Coming soon. ",
+      m.enabled ? h("a", { href: "/map", text: "Open the map" }) : null), mapToggle);
     box.replaceChildren(...[warn, packWarn, conflicts, mapWarn].filter(Boolean), grid, mapLine, h("div", { class: "ov-cols" }, quick, h("div", { class: "stack", style: "gap:16px" }, online, recent)));
   };
 

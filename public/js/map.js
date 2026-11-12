@@ -202,6 +202,7 @@ async function refresh() {
   try {
     const d = await fetch("/api/map/info").then((r) => r.json());
     if (!d.ok) return;
+    if (!d.enabled) { comingSoon(); return; }
     info = d;
     if (firstLoad) {
       firstLoad = false;
@@ -217,6 +218,17 @@ async function refresh() {
     renderSide();
     dirty = true;
   } catch { /* try again next time */ }
+}
+
+// The map is switched off (Control Panel): show the Coming soon page instead.
+let soon = false;
+function comingSoon() {
+  if (soon) return;
+  soon = true;
+  document.body.classList.remove("map-page");
+  document.querySelector(".map-shell").hidden = true;
+  $("map-soon").hidden = false;
+  clearInterval(refreshTimer);
 }
 
 // ---------- input ----------
@@ -295,5 +307,5 @@ $("map-toggle").addEventListener("click", () => {
 new ResizeObserver(resize).observe(canvas);
 resize();
 refresh();
-setInterval(refresh, 5000);
+const refreshTimer = setInterval(refresh, 5000);
 requestAnimationFrame(loop);

@@ -62,6 +62,8 @@
             <h2 class="cp-group-name">Server</h2>
             <button type="button" data-tab="economy" aria-selected="false" hidden>Economy</button>
             <button type="button" data-tab="help" aria-selected="false" hidden>Help menu</button>
+            <button type="button" data-tab="emoji" aria-selected="false" hidden>Emoji</button>
+            <button type="button" data-tab="rooms" aria-selected="false" hidden>Voice rooms</button>
           </div>
         </nav>
         <div class="cp-mobile" id="cp-mobile" aria-label="Control Panel sections">
@@ -256,6 +258,26 @@
             <a class="text-3 small" href="/appeal" target="_blank" rel="noopener">The appeal page players use</a>
           </div>
           <div id="appeal-list" class="stack" style="gap:10px"></div>
+        </section>
+        <section data-panel="emoji" hidden>
+          <div class="panel">
+            <div class="cx-row" style="justify-content:space-between;margin-bottom:12px">
+              <div><h2 style="font-size:1.15rem;margin:0">Server emoji</h2>
+                <p class="text-3 small" style="margin:4px 0 0">Members use them in community chat, DMs and reactions by typing :name: or tapping the emoji button.</p></div>
+              <button class="btn btn-primary btn-sm" type="button" id="emoji-new">Add emoji</button>
+            </div>
+            <div id="emoji-list"></div>
+          </div>
+        </section>
+        <section data-panel="rooms" hidden>
+          <div class="panel">
+            <div class="cx-row" style="justify-content:space-between;margin-bottom:12px">
+              <div><h2 style="font-size:1.15rem;margin:0">Voice rooms</h2>
+                <p class="text-3 small" style="margin:4px 0 0">Permanent rooms on the Voice page. Anyone can join; everyone in a room hears each other at full volume, wherever they are in game.</p></div>
+              <button class="btn btn-primary btn-sm" type="button" id="rooms-new">New room</button>
+            </div>
+            <div id="rooms-list"></div>
+          </div>
         </section>
         <section data-panel="audit" hidden>
           <div class="panel" style="padding:0" id="audit-list"></div>

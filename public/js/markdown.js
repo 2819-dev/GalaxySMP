@@ -14,6 +14,15 @@ const el = (tag, cls) => {
 // ctx: { members: [{ id, username }], meName, onMention(member, node) }
 export function renderMarkdown(text, ctx = {}) {
   const root = document.createDocumentFragment();
+  // Only 1 to 3 custom emoji and nothing else: show them big, like Discord.
+  const only = String(text).trim().match(/^(?::[a-z0-9_]{2,24}:\s*){1,3}$/);
+  if (only) {
+    const names = [...String(text).matchAll(/:([a-z0-9_]{2,24}):/g)].map((x) => x[1]);
+    if (names.every((n) => CUSTOM_EMOJI.has(n))) {
+      for (const n of names) root.append(emojiNode(n, true));
+      return root;
+    }
+  }
   const lines = String(text).split("\n");
   let i = 0;
   let list = null;
@@ -113,8 +122,32 @@ const RULES = [
   { re: /~~([^~\n](?:[\s\S]*?[^~\n])?)~~/, make: (m, ctx) => wrap("s", inline(m[1], ctx)) },
   { re: /\*([^*\s](?:[^*\n]*?[^*\s])?)\*/, make: (m, ctx) => wrap("em", inline(m[1], ctx)) },
   { re: /(?<![A-Za-z0-9_])_([^_\s](?:[^_\n]*?[^_\s])?)_(?![A-Za-z0-9_])/, make: (m, ctx) => wrap("em", inline(m[1], ctx)) },
+  { re: /:([a-z0-9_]{2,24}):/, make: (m) => emojiNode(m[1]) || document.createTextNode(m[0]) },  // custom emoji
   { re: /@/, make: null }, // mentions: handled below (they need the member list)
 ];
+
+// Custom server emoji (:creeper:, :diamond:...), added by Admins. The chat page loads the list.
+const CUSTOM_EMOJI = new Map();  // name -> image url
+export function setCustomEmoji(list) {
+  CUSTOM_EMOJI.clear();
+  for (const e of list || []) CUSTOM_EMOJI.set(e.name, e.url);
+}
+export function customEmoji() {
+  return [...CUSTOM_EMOJI].map(([name, url]) => ({ name, url }));
+}
+export function emojiNode(name, big) {
+  const url = CUSTOM_EMOJI.get(name);
+  if (!url) return null;
+  const img = document.createElement("img");
+  img.className = big ? "emoji emoji-big" : "emoji";
+  img.src = url;
+  img.alt = `:${name}:`;
+  img.title = `:${name}:`;
+  img.width = big ? 44 : 22;
+  img.height = big ? 44 : 22;
+  img.loading = "lazy";
+  return img;
+}
 
 function wrap(tag, child) {
   const e = document.createElement(tag);

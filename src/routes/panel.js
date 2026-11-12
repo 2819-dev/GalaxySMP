@@ -13,7 +13,7 @@ import { sendPlans } from "./plans.js";
 import { SHOP_ITEMS, SHOP } from "../store/shop.js";
 
 const MOD = 50;
-export const LATEST_PLUGIN = "2.27.0"; // the GalaxyLink version made for this website
+export const LATEST_PLUGIN = "2.28.0"; // the GalaxyLink version made for this website
 export const LATEST_ICONS = "1.9.0"; // the GalaxySMP Icons resource pack version that goes with it
 const older = (a, b) => { const x = String(a).split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
 const ADMIN = 100;
@@ -61,9 +61,10 @@ export async function overview(request, env) {
   ]);
   const online = await sql`SELECT xuid, gamertag, head_at, gamerpic_at FROM players WHERE online_at > now() - interval '3 minutes' ORDER BY gamertag LIMIT 60`;
   // Server map health: chunks stored, and what the plugin last reported.
-  const [[mapRow], mapLive] = await Promise.all([
+  const [[mapRow], mapLive, [mapOn]] = await Promise.all([
     sql`SELECT count(*)::int AS chunks, max(updated_at) AS last FROM map_chunks`,
     voiceStub(env).fetch("https://voice/internal/map").then((r) => r.json()).catch(() => ({})),
+    sql`SELECT value FROM economy_config WHERE key = 'map_enabled'`,
   ]);
   return json({
     ok: true,
@@ -80,9 +81,41 @@ export async function overview(request, env) {
       reports: counts.game_reports + counts.chat_reports, punishmentsWeek: counts.punishments_week, plans: counts.plans,
     },
     online: online.map((p) => ({ xuid: p.xuid, name: p.gamertag, head: headUrl(p) })),
-    map: { chunks: mapRow.chunks, lastChunk: mapRow.last, liveAt: mapLive.playersAt || null, error: mapLive.status?.error || null, reportAt: mapLive.statusAt || null },
+    map: { enabled: mapOn?.value === true, chunks: mapRow.chunks, lastChunk: mapRow.last, liveAt: mapLive.playersAt || null, error: mapLive.status?.error || null, reportAt: mapLive.statusAt || null },
     recent: recent.map((r) => ({ action: r.action, details: r.details, at: r.created_at, actor: r.actor || "System" })),
   });
+}
+
+// Voice rooms (Admins): GET lists them; POST { action: add|rename|move|delete, id, name, description, dir }
+export async function voiceRooms(request, env) {
+  const user = await requireStaff(request, env, ADMIN);
+  const init = request.method === "POST" ? { method: "POST", body: JSON.stringify(await readJson(request)) } : {};
+  const data = await voiceStub(env).fetch("https://voice/internal/rooms", init).then((r) => r.json());
+  if (!data.ok) throw new HttpError(400, data.error || "That didn't work.");
+  if (request.method === "POST") {
+    await getDb(env)`INSERT INTO audit_log (actor_id, action, details) VALUES (${user.id}, 'voice.rooms', ${JSON.stringify({ action: JSON.parse(init.body).action })}::jsonb)`;
+  }
+  return json(data);
+}
+
+// GET /api/voice/rooms (members): the rooms, for the Voice page's Join screen.
+export async function publicVoiceRooms(request, env) {
+  await requireUser(request, env);
+  const data = await voiceStub(env).fetch("https://voice/internal/rooms").then((r) => r.json()).catch(() => ({ ok: true, rooms: [] }));
+  return json({ ok: true, rooms: data.rooms || [] });
+}
+
+// POST /api/panel/map { enabled } (Admins): show the server map on the website and let the server draw it.
+export async function setMap(request, env) {
+  const user = await requireStaff(request, env, ADMIN);
+  const body = await readJson(request);
+  const enabled = Boolean(body.enabled);
+  const sql = getDb(env);
+  await sql`INSERT INTO economy_config (key, value, updated_by) VALUES ('map_enabled', ${JSON.stringify(enabled)}::jsonb, ${user.username})
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = EXCLUDED.updated_by`;
+  await sql`INSERT INTO audit_log (actor_id, action, details) VALUES (${user.id}, ${enabled ? "map.on" : "map.off"}, '{}'::jsonb)`;
+  try { await toPlugin(env, { type: "map", enabled }); } catch { /* server offline: it's told when it connects */ }
+  return json({ ok: true, enabled });
 }
 
 export async function announce(request, env) {

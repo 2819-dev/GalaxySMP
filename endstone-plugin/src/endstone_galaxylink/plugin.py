@@ -46,7 +46,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.27.0"
+VERSION = "2.28.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -122,6 +122,7 @@ class GalaxyLink(Plugin):
         "minigames": _cmd("The Minigame Center: host, join or watch minigames.", "/minigames", "galaxylink.command.minigames", ["minigame", "mg"]),
         "bedwars": _cmd("Play Bedwars.", "/bedwars [action: message]", "galaxylink.command.bedwars", ["bw"]),
         "leave": _cmd("Leave Bedwars and get your own items back.", "/leave", "galaxylink.command.bedwars"),
+        "trade": _cmd("See trade offers to you (offer items at galaxymc.us/trades).", "/trade", "galaxylink.command.trade"),
         "tpd": _cmd("Teleport where you've been sent (e.g. to the staff member who accepted your minigame).", "/tpd", "galaxylink.command.tpd"),
         "plotaxe": _cmd("Get the Plot Axe to make plots and protected areas.", "/plotaxe", "galaxylink.command.plotaxe"),
     }
@@ -155,6 +156,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.plotaxe": _perm("Allows /plotaxe (server operators).", "op"),
         "galaxylink.command.minigames": _perm("Allows /minigames.", True),
         "galaxylink.command.bedwars": _perm("Allows /bedwars and /leave.", True),
+        "galaxylink.command.trade": _perm("Allows /trade.", True),
         "galaxylink.command.report": _perm("Allows /report.", True),
         "galaxylink.command.dm": _perm("Allows /dm and /r.", True),
         "galaxylink.command.ranktags": _perm("Allows /ranktags (operators).", "op"),
@@ -186,6 +188,8 @@ class GalaxyLink(Plugin):
         self.plans = Plans(self)
         self.shop = Shop(self)
         self.auction = AuctionHouse(self)
+        from endstone_galaxylink.trades import Trades
+        self.trades = Trades(self)
         self.npcs = NpcManager(self)
         self.help = HelpMenu(self)
         self.teleports = Teleports(self)
@@ -340,6 +344,7 @@ class GalaxyLink(Plugin):
         self.elevators.check_tool(player)
         self.cosmetics.on_join(player)
         self.bedwars.on_join(player)  # items from a Bedwars game they disconnected from come back
+        self.trades.on_join(player)   # trade items bought or returned while they were offline
         player.send_message("§7Need help? Type §e/guide§7 for server info, rules and commands.")
         self.refresh_tags()
         if self._voice:
@@ -581,6 +586,7 @@ class GalaxyLink(Plugin):
             "minigames": lambda: self.minigames.open(sender),
             "bedwars": lambda: self.bedwars.command(sender, args),
             "leave": lambda: self.bedwars.leave(sender),
+            "trade": lambda: self.trades.command(sender),
             "chatfilter": lambda: self.chatfilter.command(sender, args),
             "announcement": lambda: self.announcements.command(sender, args),
             "report": lambda: self.moderation.report_command(sender, args),

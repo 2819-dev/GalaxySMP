@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.27.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.28.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -207,6 +207,8 @@ class VoiceLink:
             self._on_main(lambda: self.plugin.chatfilter.update_words(msg.get("words")))
         elif msg.get("type") == "chatfilter":
             self._on_main(lambda: self.plugin.chatfilter.set_enabled(msg.get("enabled"), msg.get("by") or "staff on the website"))
+        elif msg.get("type") == "trade":  # trades started on the website (galaxymc.us/trades)
+            self._on_main(lambda: self.plugin.trades.from_website(msg))
         elif msg.get("type") == "ah_buy":
             self._on_main(lambda: self.plugin.auction.from_website(msg))
         elif msg.get("type") == "eco":
@@ -232,6 +234,10 @@ class VoiceLink:
                                                                str(msg.get("kind") or "common"), max(1, min(1000, int(msg.get("amount") or 1)))))
         elif msg.get("type") == "setop":
             self._on_main(lambda: self.plugin.set_operator(str(msg.get("xuid") or ""), str(msg.get("name") or ""), bool(msg.get("op")), str(msg.get("by") or "the website")))
+        elif msg.get("type") == "map":  # server map switched on/off in the Control Panel
+            lm = getattr(self.plugin, "livemap", None)
+            if lm is not None:
+                self._on_main(lambda: lm.set_enabled(bool(msg.get("enabled"))))
         elif msg.get("type") == "icons":
             self.wanted = {k.lower(): v for k, v in (msg.get("icons") or {}).items()}
             self.plugin.server.scheduler.run_task(self.plugin, self._apply_icons)

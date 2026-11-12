@@ -16,6 +16,7 @@ export const KINDS = {
   reward: { name: "Daily reward reminder", hint: "Around noon (US Eastern) if you haven't claimed /daily yet", default: true },
   events: { name: "Events", hint: "New events, and a reminder 15 minutes before events you asked to be reminded about", default: true },
   news: { name: "News & polls", hint: "New posts in #News and new polls", default: true },
+  trades: { name: "Trades", hint: "Trade offers to you, and answers to your offers", default: true },
   community: { name: "Suggestions & builds", hint: "Replies to your suggestions, and Build of the Week", default: true },
   summary: { name: "Daily summary", hint: "Each evening: who played today, your money and streak", default: true },
 };

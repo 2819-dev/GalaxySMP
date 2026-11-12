@@ -97,6 +97,7 @@ class LiveMap:
         self.last_error = None   # the last problem, shown in the Control Panel
         self.method = None       # how the top block is read (some server versions lack the fast way)
         self.started = False
+        self.enabled = False     # switched on from the Control Panel (the website tells us when we connect)
 
     def voice(self):
         v = getattr(self.plugin, "_voice", None)
@@ -105,11 +106,11 @@ class LiveMap:
     def tick(self):
         """Every 2 seconds."""
         voice = self.voice()
-        if voice is None:
+        if voice is None or not self.enabled:
             return
         if not self.started:
             self.started = True
-            self.plugin.logger.info("Live map: drawing the Overworld around players for galaxymc.us/map")
+            pass
         now = time.time()
         try:
             self.draw_some(voice, now)
@@ -127,6 +128,12 @@ class LiveMap:
                 self.send_markers(voice)
             except Exception as e:
                 self.fail(f"Map markers failed: {e}")
+
+    def set_enabled(self, on):
+        if bool(on) != self.enabled:
+            self.enabled = bool(on)
+            self.plugin.logger.info("Live map: on (drawing for galaxymc.us/map)" if on else "Live map: off (switched off in the Control Panel)")
+            self.next_live = self.next_markers = 0
 
     def fail(self, text):
         if text != self.last_error:  # log each new problem once, not every 2 seconds

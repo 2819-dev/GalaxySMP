@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trades · GalaxySMP</title>
+  <meta name="description" content="Trade items with other GalaxySMP players for in-game money.">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="GalaxySMP">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0c1b">
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/trades.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header" class="site-header-slot"></div>
+  <main id="main">
+    <div class="container narrow">
+      <header class="page-head">
+        <h1>Trades</h1>
+        <p>Offer an item from your inventory to another player for in-game money. The item is held safely until they accept, decline, or 24 hours pass.</p>
+      </header>
+      <div id="tr-signin" class="panel" hidden>
+        <p style="margin:0">Sign in to trade. <a href="/community">Sign in with your Minecraft account</a>.</p>
+      </div>
+      <div id="tr-app" hidden>
+        <div class="staff-tabs" role="tablist" id="tr-tabs">
+          <button type="button" role="tab" data-t="incoming" aria-selected="true">Offers to you <span class="count-badge" id="tr-in-count"></span></button>
+          <button type="button" role="tab" data-t="outgoing" aria-selected="false">Your offers</button>
+          <button type="button" role="tab" data-t="new" aria-selected="false">New offer</button>
+        </div>
+        <section id="tr-incoming" class="stack" style="gap:10px"></section>
+        <section id="tr-outgoing" class="stack" style="gap:10px" hidden></section>
+        <section id="tr-new" hidden></section>
+      </div>
+    </div>
+  </main>
+  <div id="site-footer"></div>
+</body>
+</html>

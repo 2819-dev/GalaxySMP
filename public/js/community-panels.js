@@ -7,7 +7,7 @@ import { iconEl } from "/js/site.js";
 import { renderMarkdown } from "/js/markdown.js";
 import { faceSvg } from "/js/face.js";
 import * as extra from "/js/community-extra.js";
-import { sendTyping } from "/js/chat.js";
+import { sendTyping, emojiMenu } from "/js/chat.js";
 
 const panel = () => document.getElementById("channel-panel");
 const voiceBox = () => document.getElementById("voice-embed");
@@ -386,7 +386,9 @@ function renderDMs(p) {
     d.messages.forEach(add);
     const grow = () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight + 2, 140) + "px"; };
     input.addEventListener("input", grow);
-    const composer = h("div", { class: "dm-composer" }, input, send);
+    const emojiBtn = h("button", { class: "icon-btn composer-emoji", type: "button", "aria-label": "Server emoji", title: "Server emoji" }, iconEl("smile"));
+    emojiBtn.addEventListener("click", (e) => { e.stopPropagation(); emojiMenu(emojiBtn, input); });
+    const composer = h("div", { class: "dm-composer" }, input, emojiBtn, send);
     // "player1 is typing…"
     const typing = h("div", { class: "typing-line dm-typing", "aria-live": "polite" });
     let typingTimer = null;

@@ -112,6 +112,8 @@
           <div class="title"><span class="hash">#</span><span id="channel-name"></span></div>
           <div class="topic" id="channel-topic"></div>
           <span class="conn" id="conn-state" hidden>Reconnecting…</span>
+          <button class="icon-btn" type="button" id="open-pins" aria-label="Pinned messages" title="Pinned messages" data-icon="pushpin"></button>
+          <button class="icon-btn" type="button" id="open-search" aria-label="Search messages" title="Search" data-icon="search"></button>
           <button class="icon-btn members-toggle" type="button" id="open-members" aria-label="Members" data-icon="users"></button>
         </header>
         <div class="messages" id="messages" aria-live="polite"></div>
@@ -126,6 +128,7 @@
           </div>
           <form class="composer" id="composer">
             <textarea id="composer-input" rows="1" maxlength="500" aria-label="Message"></textarea>
+            <button class="icon-btn composer-emoji" type="button" id="composer-emoji" aria-label="Server emoji" title="Server emoji" data-icon="smile"></button>
             <button class="btn btn-primary send" type="submit" aria-label="Send" data-icon="send"></button>
           </form>
           <div class="composer-meta"><span class="typing-line" id="typing-line" aria-live="polite"></span><span id="composer-count"></span></div>

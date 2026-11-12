@@ -98,7 +98,7 @@ export async function renderAccountButton(slot) {
       a.append(make("span", null, label));
       return a;
     };
-    links.append(item("/community", "users", "Community"), item("/community#messages", "chat", "Messages"), item("/account#notifications", "bell", "Notifications"),
+    links.append(item("/community", "users", "Community"), item("/community#messages", "chat", "Messages"), item("/trades", "handshake", "Trades"), item("/account#notifications", "bell", "Notifications"),
       item("/account#subscription", "star", "Subscription"));
     if (me.staff) links.append(item("/staff", "tools", me.panel || "Staff Panel"));
     const out = make("button", "acct-link acct-signout");
