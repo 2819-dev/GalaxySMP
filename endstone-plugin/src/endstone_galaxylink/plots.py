@@ -313,7 +313,7 @@ class Plots:
             kind = "manager" if self.owned(player.xuid) else "shovel"
             if self.has_tool(player, kind):
                 return
-            if player.inventory.first_empty() < 0:
+            if player.inventory.first_empty < 0:
                 return  # no room: try again later instead of dropping it on the ground
             self.give_tool(player, kind)
             name = "Plot Manager" if kind == "manager" else "Plot Claiming Shovel"
