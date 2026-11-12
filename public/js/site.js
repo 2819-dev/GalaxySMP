@@ -331,6 +331,7 @@ function applyTheme() {
   const light = pref === "light" || (pref === "auto" && window.matchMedia?.("(prefers-color-scheme: light)").matches);
   document.documentElement.dataset.theme = light ? "light" : "dark";
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", light ? "#f4f6fc" : "#0a0c1b");
+  swapRankIcons();
   const b = document.getElementById("theme-btn");
   if (b) {
     const label = { auto: "Theme: Auto (follows your device)", light: "Theme: Light", dark: "Theme: Dark" }[pref];
@@ -339,6 +340,30 @@ function applyTheme() {
     b.setAttribute("aria-label", b.title);
   }
 }
+// Rank icons have a dark pixel outline that looks heavy on a light page: light mode uses copies without it.
+// (paths are built from parts so the asset step doesn't add a version to them)
+const RANK_DIR = ["", "img", "ranks", ""].join("/");
+const RANK_LIGHT = RANK_DIR + "light/";
+const RANK_SEL = `img[src*="${RANK_DIR}"]`;
+function swapRankIcons(root = document) {
+  const light = document.documentElement.dataset.theme === "light";
+  root.querySelectorAll?.(RANK_SEL).forEach((img) => {
+    const src = img.getAttribute("src");
+    const want = light ? (src.includes(RANK_LIGHT) ? src : src.replace(RANK_DIR, RANK_LIGHT)) : src.replace(RANK_LIGHT, RANK_DIR);
+    if (want !== src) img.setAttribute("src", want);
+  });
+}
+if (typeof MutationObserver !== "undefined") {
+  new MutationObserver((list) => {
+    if (document.documentElement.dataset.theme !== "light") return;
+    for (const m of list) for (const n of m.addedNodes) {
+      if (n.nodeType !== 1) continue;
+      if (n.matches?.(RANK_SEL)) swapRankIcons(n.parentNode || document);
+      else if (n.querySelector?.(RANK_SEL)) swapRankIcons(n);
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true });
+}
+
 export function setTheme(pref) {
   try { localStorage.setItem("gx_theme", pref); } catch { /* still applies for this visit */ }
   applyTheme();
