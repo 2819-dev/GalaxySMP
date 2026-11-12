@@ -2319,3 +2319,22 @@ html[data-theme="light"] .dialog, html[data-theme="light"] dialog { background: 
 .co-gift { display: flex; align-items: center; gap: 8px; font-weight: 600; margin: 4px 0; }
 .co-gift svg { width: 18px; height: 18px; color: #ff8fc7; }
 .co-gift-box { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+.tm-rank { display: inline-block; }
+
+/* ---------- "+" menu next to the message box ---------- */
+.composer-plus { flex: none; align-self: flex-end; }
+.composer-plus svg { width: 22px; height: 22px; }
+.composer-legacy { display: none !important; }
+.plus-menu { position: fixed; z-index: 70; width: 260px; padding: 10px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border-strong); box-shadow: 0 16px 40px rgba(0,0,0,.4); display: flex; flex-direction: column; gap: 10px; animation: pc-in .12s ease-out; }
+.plus-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.plus-item { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px; border: 0; border-radius: 12px; background: none; color: var(--text); font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; }
+.plus-item:hover { background: var(--surface-2); }
+.plus-ic { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--surface-2); color: var(--accent-text); }
+.plus-item:hover .plus-ic { background: var(--surface-3); }
+.plus-ic svg { width: 22px; height: 22px; }
+.plus-photo { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border: 1px dashed var(--border-strong); border-radius: 12px; background: var(--surface-2); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.plus-photo:hover { border-color: var(--accent, #6d8bff); }
+.plus-photo svg { width: 26px; height: 26px; color: var(--text-2); flex: none; }
+.plus-photo b { display: block; }
+.plus-photo span span { display: block; font-size: .78rem; color: var(--text-3); }
+.gift-note { display: flex; align-items: center; gap: 10px; padding: 12px 16px; margin-bottom: 14px; } .gift-note svg { color: #ff8fc7; width: 20px; height: 20px; }

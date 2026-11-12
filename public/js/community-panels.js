@@ -9,6 +9,7 @@ import { faceSvg } from "/js/face.js";
 import * as extra from "/js/community-extra.js";
 import { sendTyping, emojiMenu, chatState, channelChoices } from "/js/chat.js";
 import { attachChannelSuggest } from "/js/channel-suggest.js";
+import { openPlusMenu, giftDialog } from "/js/plus-menu.js";
 import { renderTimeline } from "/js/community-feed.js";
 import { helpCenterBlock } from "/js/help-center.js";
 import { renderTeam, renderApplications } from "/js/community-team.js";
@@ -386,9 +387,16 @@ function renderDMs(p) {
     d.messages.forEach(add);
     const grow = () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight + 2, 140) + "px"; };
     input.addEventListener("input", grow);
-    const emojiBtn = h("button", { class: "icon-btn composer-emoji", type: "button", "aria-label": "Server emoji", title: "Server emoji" }, iconEl("smile"));
-    emojiBtn.addEventListener("click", (e) => { e.stopPropagation(); emojiMenu(emojiBtn, input); });
-    const composer = h("div", { class: "dm-composer" }, input, emojiBtn, send);
+    // "+": Emojis and Gift (to this person)
+    const plusBtn = h("button", { class: "icon-btn composer-plus", type: "button", "aria-label": "More: emojis, gift", title: "Emojis, gift" }, iconEl("plus"));
+    plusBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openPlusMenu(plusBtn, { items: [
+        { icon: "smile", label: "Emojis", onClick: () => emojiMenu(plusBtn, input) },
+        { icon: "gift", label: "Gift", onClick: () => giftDialog({ id: d.other.id, username: d.other.username, head: d.other.head }) },
+      ], photo: null });
+    });
+    const composer = h("div", { class: "dm-composer" }, plusBtn, input, send);
     // "player1 is typing…"
     const typing = h("div", { class: "typing-line dm-typing", "aria-live": "polite" });
     let typingTimer = null;

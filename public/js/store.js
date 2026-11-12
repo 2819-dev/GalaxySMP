@@ -25,6 +25,16 @@ const priceAfter = (p, price) => {
   return Math.min(price, f);
 };
 
+// Coming from "Gift" in the community (+ menu): the Store opens with that member picked as the gift receiver.
+const giftParams = new URLSearchParams(location.search);
+const presetGift = giftParams.get("gift") && giftParams.get("giftName") ? { id: Number(giftParams.get("gift")), username: giftParams.get("giftName") } : null;
+if (presetGift) {
+  setTimeout(() => {
+    const note = h("div", { class: "panel gift-note" }, iconEl("gift"), h("span", {}, "Pick something to gift to ", h("b", { text: presetGift.username }), ". It goes to their Minecraft account."));
+    (document.getElementById("shop") || document.querySelector("main .container"))?.prepend(note);
+  }, 0);
+}
+
 // ---------- Checkout window ----------
 function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
   if (!me.signedIn) {
@@ -75,6 +85,7 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
   });
   giftBox.append(giftSearch, giftPicked, giftList, h("p", { class: "text-3 small", style: "margin:4px 0 0", text: "They get it on their Minecraft account. You pay." }));
   giftToggle.addEventListener("change", () => { giftBox.hidden = !giftToggle.checked; if (!giftToggle.checked) giftTo = null; else giftSearch.focus(); });
+  if (presetGift) { giftToggle.checked = true; giftBox.hidden = false; pickGift(presetGift); }
 
   const draw = () => {
     const final = applied ? applied.final : price;

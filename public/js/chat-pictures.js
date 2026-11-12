@@ -4,6 +4,8 @@ import { toast } from "/js/site.js";
 import { h, getJson, postJson, openDialog } from "/js/dialog.js";
 import { chatState as state, messageBodyHooks, composerHooks } from "/js/chat.js";
 import { shrink } from "/js/community-extra.js";
+import { emojiMenu } from "/js/chat.js";
+import { openPlusMenu, giftDialog } from "/js/plus-menu.js";
 
 let rights = null;
 getJson("/api/uploads/rights").then((r) => { rights = r; refreshButton(); }).catch(() => {});
@@ -70,4 +72,18 @@ messageBodyHooks.push((m, body, text) => {
   const img = h("img", { class: "msg-pic", src: `/api/chat/images/${m.image.id}`, alt: "Picture", loading: "lazy", width, height: Math.round(width * ratio) });
   const a = h("a", { class: "msg-pic-link", href: `/api/chat/images/${m.image.id}`, target: "_blank", rel: "noopener" }, img);
   body.append(a);
+});
+
+// The "+" next to the message box: Poll, Emojis, Gift, and Choose a photo.
+const plus = document.getElementById("composer-plus");
+plus?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  openPlusMenu(plus, {
+    items: [
+      { icon: "poll", label: "Poll", onClick: () => document.getElementById("composer-poll")?.click() },
+      { icon: "smile", label: "Emojis", onClick: () => emojiMenu(plus, document.getElementById("composer-input")) },
+      { icon: "gift", label: "Gift", onClick: () => giftDialog() },
+    ],
+    photo: () => btn?.click(),
+  });
 });

@@ -127,11 +127,12 @@
             <button class="icon-btn" type="button" id="reply-cancel" aria-label="Cancel reply" data-icon="close"></button>
           </div>
           <form class="composer" id="composer">
+            <button class="icon-btn composer-plus" type="button" id="composer-plus" aria-label="More: poll, emojis, gift, photo" title="Poll, emojis, gift, photo" data-icon="plus"></button>
             <textarea id="composer-input" rows="1" maxlength="500" aria-label="Message"></textarea>
-            <button class="icon-btn composer-emoji" type="button" id="composer-pic" aria-label="Add a picture" title="Add a picture" data-icon="image" hidden></button>
+            <button class="icon-btn composer-emoji composer-legacy" type="button" id="composer-pic" aria-label="Add a picture" title="Add a picture" data-icon="image" hidden></button>
             <input type="file" id="composer-pic-file" accept="image/*" hidden>
-            <button class="icon-btn composer-emoji" type="button" id="composer-poll" aria-label="Make a poll" title="Make a poll" data-icon="poll" hidden></button>
-            <button class="icon-btn composer-emoji" type="button" id="composer-emoji" aria-label="Server emoji" title="Server emoji" data-icon="smile"></button>
+            <button class="icon-btn composer-emoji composer-legacy" type="button" id="composer-poll" aria-label="Make a poll" title="Make a poll" data-icon="poll" hidden></button>
+            <button class="icon-btn composer-emoji composer-legacy" type="button" id="composer-emoji" aria-label="Server emoji" title="Server emoji" data-icon="smile"></button>
             <button class="btn btn-primary send" type="submit" aria-label="Send" data-icon="send"></button>
           </form>
           <div class="composer-meta"><span class="typing-line" id="typing-line" aria-live="polite"></span><span id="composer-count"></span></div>

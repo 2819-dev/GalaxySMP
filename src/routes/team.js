@@ -1,6 +1,9 @@
 // #Meet The Team: the staff (Moderators, Admins and the owner) with their picture, role and a bio they write.
 // #Applications: members apply to become a Moderator; only the owner sees applications, chats with the
 // applicant, and accepts (they become a Moderator on the website) or declines.
+import { rankOf } from "../chat/messages.js";
+import { displayRank, loadPlanPriority } from "./ranks.js";
+import { PLANS } from "./plans.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -40,19 +43,25 @@ export async function listTeam(request, env) {
   const sql = getDb(env);
   const rows = await sql`
     SELECT u.id, u.username, u.platform, u.team_bio, u.created_at, r.power, r.name AS role_name, r.color AS role_color,
-           pl.xuid, pl.head_at, pl.gamerpic_at, pl.gamertag, (pl.online_at > now() - interval '150 seconds') AS in_game
+           pl.xuid, pl.head_at, pl.gamerpic_at, pl.gamertag, (pl.online_at > now() - interval '150 seconds') AS in_game,
+           rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient,
+           rk.position AS rank_position, rk.priority AS rank_priority,
+           (SELECT s.plan FROM subscriptions s WHERE s.xuid = pl.xuid AND (s.expires_at IS NULL OR s.expires_at > now())) AS plan
       FROM users u JOIN roles r ON r.id = u.role_id LEFT JOIN players pl ON pl.uuid = u.mc_uuid
-     WHERE NOT u.banned AND r.power >= ${STAFF} ORDER BY r.power DESC, u.created_at`;
+      LEFT JOIN player_top_rank prk ON prk.xuid = pl.xuid LEFT JOIN ranks rk ON rk.id = prk.rank_id
+     WHERE NOT u.banned AND r.power >= ${STAFF} ORDER BY r.power DESC, rk.priority NULLS LAST, u.created_at`;
+  const planPriority = await loadPlanPriority(sql);
   const meOwner = ownerOf(env, me);
   const team = rows.map((u) => {
     const owner = ownerOf(env, u);
     return {
-      id: Number(u.id), name: u.gamertag || u.username, username: u.username, role: owner ? "Owner" : u.role_name, owner,
-      color: u.role_color, head: headUrlFor(u), bio: u.team_bio || "", inGame: Boolean(u.in_game), since: u.created_at,
+      // the rank tag they show in chat (their top rank); the staff level itself isn't shown, it only orders the list
+      id: Number(u.id), name: u.gamertag || u.username, username: u.username, rank: displayRank(rankOf(u), u.plan, planPriority, PLANS), owner, power: Number(u.power),
+      head: headUrlFor(u), bio: u.team_bio || "", inGame: Boolean(u.in_game), since: u.created_at,
       profile: u.gamertag ? `/player/${encodeURIComponent(u.gamertag)}` : null,
       canEdit: Number(u.id) === Number(me.id) || meOwner, isMe: Number(u.id) === Number(me.id),
     };
-  }).sort((a, b) => Number(b.owner) - Number(a.owner));
+  }).sort((a, b) => Number(b.owner) - Number(a.owner) || b.power - a.power).map(({ power, ...m }) => m);
   return json({ ok: true, team });
 }
 

@@ -3,6 +3,7 @@ import { h, getJson, postJson, openDialog, field } from "/js/dialog.js";
 import { iconEl } from "/js/site.js";
 import { faceSvg } from "/js/face.js";
 import { renderThread, composer } from "/js/jr-chat.js";
+import { rankTag } from "/js/rank-paint.js";
 
 const when = (d) => new Date(d).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const face = (src, name, size) => {
@@ -27,8 +28,7 @@ export function renderTeam(root, { toast }) {
       if (!m.isMe) actions.append(h("a", { class: "btn btn-primary btn-sm", href: `/community#dm-${m.id}` }, iconEl("message"), "Message"));
       if (m.profile) actions.append(h("a", { class: "btn btn-secondary btn-sm", href: m.profile, text: "Profile" }));
       if (m.canEdit) actions.append(h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => editBio(m) }, iconEl("pencil"), m.isMe ? "Edit my bio" : "Edit bio"));
-      const role = h("span", { class: `tm-role${m.owner ? " owner" : ""}`, text: m.role });
-      if (!m.owner && m.color) role.style.setProperty("--c", m.color);
+      const role = m.rank ? h("span", { class: "tm-rank" }, rankTag(m.rank)) : null;
       return h("article", { class: "tm-card" },
         h("div", { class: "tm-top" }, h("div", { class: `tm-pic${m.inGame ? " on" : ""}` }, face(m.head, m.name, 72)),
           h("div", {}, h("h3", { class: "tm-name", text: m.name }), role, m.inGame ? h("span", { class: "tm-online", text: "Playing now" }) : null)),
