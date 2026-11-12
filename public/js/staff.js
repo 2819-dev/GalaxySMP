@@ -11,6 +11,7 @@ import { setupPromos } from "/js/promos-panel.js";
 import { setupBadges } from "/js/badges-panel.js";
 import { setupPayments } from "/js/payments-panel.js";
 import { setupJoins } from "/js/joins-panel.js";
+import { setupServerControl } from "/js/servercontrol-panel.js";
 import { setupMyPresence } from "/js/presence-panel.js";
 import { MC_COLORS, hexOf, GRADIENTS, paint, gradientCss, rankTag } from "/js/rank-paint.js";
 
@@ -914,11 +915,13 @@ $("help-reset").addEventListener("click", () => openDialog({
     setupPayments({ loaders });
     setupJoins({ loaders, toast, setBadge });
     document.querySelector('[data-tab="joins"]').hidden = false;
+    setupServerControl({ loaders, toast });
+    document.querySelector('[data-tab="serverctl"]').hidden = false;
     setupMyPresence({ toast });
     document.querySelector('[data-tab="payments"]').hidden = false;
   }
   let start = location.hash.slice(1).split("/")[0];
   if (power >= 100) document.querySelectorAll('[data-tab="ranks"], [data-tab="economy"], [data-tab="badges"], [data-tab="promos"], [data-tab="help"], [data-tab="emoji"], [data-tab="rooms"]').forEach((t) => (t.hidden = false));
   if (start === "members") { start = "players"; history.replaceState(null, "", "#players"); } // old link: Members is one tab now
-  selectTab(["overview", "tickets", "appeals", "players", "reports", "words", "audit", ...(summary.owner ? ["dms", "payments", "joins"] : []), ...(power >= 100 ? ["ranks", "economy", "badges", "promos", "help", "emoji", "rooms"] : [])].includes(start) ? start : "overview");
+  selectTab(["overview", "tickets", "appeals", "players", "reports", "words", "audit", ...(summary.owner ? ["dms", "payments", "joins", "serverctl"] : []), ...(power >= 100 ? ["ranks", "economy", "badges", "promos", "help", "emoji", "rooms"] : [])].includes(start) ? start : "overview");
 })();

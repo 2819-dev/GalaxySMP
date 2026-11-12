@@ -12,7 +12,7 @@ import urllib.request
 
 from endstone import ColorFormat, Player
 from endstone.command import Command, CommandSender
-from endstone.event import (ActorDamageEvent, ActorDeathEvent, ActorExplodeEvent, ActorSpawnEvent, BlockBreakEvent, BlockExplodeEvent,
+from endstone.event import (PlayerLoginEvent, ActorDamageEvent, ActorDeathEvent, ActorExplodeEvent, ActorSpawnEvent, BlockBreakEvent, BlockExplodeEvent,
                             BlockFromToEvent, BlockPlaceEvent, PlayerChatEvent, PlayerCommandEvent, PlayerDeathEvent,
                             PlayerDropItemEvent, PlayerInteractActorEvent, PlayerInteractEvent, PlayerJoinEvent, PlayerQuitEvent,
                             PlayerRespawnEvent,
@@ -30,6 +30,7 @@ from endstone_galaxylink.leaderboards import Leaderboards
 from endstone_galaxylink.floating import FloatingTexts
 from endstone_galaxylink.jobs import Jobs
 from endstone_galaxylink.shopchests import ShopChests
+from endstone_galaxylink.servercontrol import ServerControl
 from endstone_galaxylink.crates import Crates
 from endstone_galaxylink.elevators import Elevators
 from endstone_galaxylink.ranktags import RankTags
@@ -46,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.30.0"
+VERSION = "2.31.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -205,6 +206,7 @@ class GalaxyLink(Plugin):
         self.floating = FloatingTexts(self)
         self.jobs = Jobs(self)
         self.shopchests = ShopChests(self)
+        self.servercontrol = ServerControl(self)  # maintenance mode, scheduled restart, welcome kit (website)
         self.crates = Crates(self)
         self.elevators = Elevators(self)
         from endstone_galaxylink.dms import DirectMessages
@@ -229,6 +231,7 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self.elevators.tick, delay=2, period=2)
         self.server.scheduler.run_task(self, self.elevators.check_tools, delay=1200, period=1200)
         self.server.scheduler.run_task(self, self.jobs.tick, delay=100, period=100)
+        self.server.scheduler.run_task(self, self.servercontrol.tick, delay=20, period=20)
         self.server.scheduler.run_task(self, self.cosmetics.tick, delay=TRAIL_TICKS, period=TRAIL_TICKS)
         self.server.scheduler.run_task(self, self.floating.update, delay=1400, period=1200)
         self.server.scheduler.run_task(self, self.leaderboards.update, delay=1300, period=1200)
@@ -323,8 +326,19 @@ class GalaxyLink(Plugin):
             self.logger.info(f"[Website] {by}: {name} will {'become' if op else 'stop being'} an operator when they next join")
 
     @event_handler
+    def on_player_login(self, event: PlayerLoginEvent):
+        # maintenance mode: only the owner can join (refused before they get in, with the owner's message)
+        if not self.servercontrol.can_login(event.player):
+            event.kick_message = self.servercontrol.kick_text()
+            event.cancel()
+
+    @event_handler
     def on_player_join(self, event: PlayerJoinEvent):
         player = event.player
+        if not self.servercontrol.can_login(player):  # in case the login check was skipped
+            player.kick(self.servercontrol.kick_text())
+            return
+        brand_new = self.progress.load(player.xuid) is None
         pending = self._pending_ops()
         if str(player.xuid) in pending:
             try:
@@ -340,6 +354,8 @@ class GalaxyLink(Plugin):
         self.announcements.on_join(player)
         self.moderation.on_join(player)
         self.progress.on_join(player)
+        if brand_new:  # very first join: welcome kit
+            self.server.scheduler.run_task(self, lambda: player.is_valid and self.servercontrol.welcome(player), delay=40)
         self.shopchests.on_join(player)
         self.elevators.check_tool(player)
         self.cosmetics.on_join(player)

@@ -34,6 +34,7 @@ import * as emoji from "./routes/emoji.js";
 import * as trades from "./routes/trades.js";
 import * as shops from "./routes/shops.js";
 import * as joinreq from "./routes/joinrequests.js";
+import * as serverctl from "./routes/servercontrol.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -72,6 +73,9 @@ const routes = [
   ["POST", "/api/trades/:id/:action", trades.tradeAction],
   ["GET", "/api/shops", (req, env) => shops.listShops(req, env)],
   ["POST", "/api/join-requests", (req, env) => joinreq.createJoinRequest(req, env)],
+  ["GET", "/api/site-notice", (req, env) => serverctl.siteNotice(req, env)],
+  ["GET", "/api/panel/server-control", (req, env) => serverctl.getServerControl(req, env)],
+  ["POST", "/api/panel/server-control", (req, env) => serverctl.saveServerControl(req, env)],
   ["GET", "/api/join-requests/:token", joinreq.getJoinRequest],
   ["POST", "/api/join-requests/:token/messages", joinreq.postJoinMessage],
   ["GET", "/api/panel/join-requests", joinreq.listJoinRequests],

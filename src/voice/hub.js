@@ -18,6 +18,7 @@ import { loadRanksState, recordPlayers } from "../routes/ranks.js";
 import { loadShop, recordBalances } from "../routes/economy.js";
 import { loadHelp } from "../routes/help.js";
 import { planMessage } from "../routes/plans.js";
+import { pluginMessage as serverControlMessage } from "../routes/servercontrol.js";
 import { hubStub } from "../routes/chat.js";
 import { notify } from "../routes/notify.js";
 import { recordChunks } from "../routes/map.js";
@@ -693,6 +694,7 @@ export class VoiceHub extends DurableObject {
       this.send(plugin, { type: "shop", shop: await loadShop(sql) });
       this.send(plugin, { type: "help", help: (await loadHelp(sql)).help });
       this.send(plugin, await planMessage(sql));
+      this.send(plugin, await serverControlMessage(this.env, sql));  // maintenance, scheduled restart, welcome kit
       await this.sendWords();
     } catch (e) {
       console.error("shop load failed", e);

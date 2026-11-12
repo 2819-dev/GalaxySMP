@@ -1,6 +1,8 @@
 // Live server status, fetched from the free mcsrvstat.us service.
+import { getDb } from "../lib/db.js";
 // Visitors' browsers only talk to OUR site; our site asks mcsrvstat.us at most
 // about once a minute and remembers the answer. Player names are never passed on.
+import { loadServerControl } from "./servercontrol.js";
 import config from "../../public/config.js";
 import { json } from "../lib/http.js";
 
@@ -35,6 +37,16 @@ export async function buildStatus(env) {
       message: String(manual.message || ""),
       checkedAt: new Date().toISOString(),
     };
+  }
+  // Maintenance mode (Control Panel > Server control): amber, with the owner's message.
+  if (env && env.DATABASE_URL) {
+    try {
+      const { maintenance } = await loadServerControl(getDb(env));
+      if (maintenance.on) {
+        return { configured: true, maintenance: true, online: false, color: "amber", title: "Maintenance", message: maintenance.message,
+          bedrockAddress: config.bedrockAddress, bedrockPort: config.bedrockPort, checkedAt: new Date().toISOString() };
+      }
+    } catch (e) { console.error("maintenance check failed", e); }
   }
   const configured = config.hosting !== "realm" && config.bedrockAddress && config.bedrockAddress !== PLACEHOLDER;
   const base = {

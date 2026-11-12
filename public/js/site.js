@@ -283,6 +283,7 @@ export async function fetchStatus() {
 }
 
 export function statusText(s) {
+  if (s && s.maintenance) return { cls: "is-maintenance", text: "Maintenance" };
   if (s && s.manual) {
     const cls = { green: "is-online", amber: "is-maintenance", red: "is-offline" }[s.color] || (s.online ? "is-online" : "is-offline");
     return { cls, text: s.title };
@@ -309,12 +310,37 @@ export function startStatus(onData) {
       if (label) label.textContent = text;
     });
     document.querySelectorAll("[data-status-message]").forEach((el) => {
-      el.textContent = s && s.manual ? (s.message || s.title) : text;
+      el.textContent = s && (s.manual || s.maintenance) ? (s.message || s.title) : text;
     });
     if (onData) onData(s);
   };
   update();
   setInterval(() => { if (document.visibilityState === "visible") update(); }, 60_000);
+}
+
+// A banner under the header on every page: maintenance mode (the owner's message) or a restart coming up.
+async function renderNotice() {
+  let d;
+  try { d = await fetch("/api/site-notice").then((r) => r.json()); } catch { return; }
+  if (!d?.ok || (!d.maintenance && !d.restart)) return;
+  const bar = document.createElement("div");
+  bar.className = `site-notice ${d.maintenance ? "maint" : "restart"}`;
+  bar.setAttribute("role", "status");
+  const inner = document.createElement("div");
+  inner.className = "container site-notice-in";
+  inner.innerHTML = icon(d.maintenance ? "wrench" : "clock");
+  const text = document.createElement("span");
+  if (d.maintenance) {
+    text.textContent = d.maintenance.message;
+  } else {
+    const at = new Date(d.restart.at);
+    const sameDay = at.toDateString() === new Date().toDateString();
+    const when = at.toLocaleString([], sameDay ? { hour: "numeric", minute: "2-digit" } : { weekday: "short", hour: "numeric", minute: "2-digit" });
+    text.textContent = `The server restarts ${sameDay ? "today" : ""} at ${when}${d.restart.reason ? `: ${d.restart.reason}` : "."}`.replace("  ", " ");
+  }
+  inner.append(text);
+  bar.append(inner);
+  document.querySelector(".site-header")?.after(bar);
 }
 
 // Pages shown inside the community (e.g. Voice Chat) hide the site header and footer.
@@ -323,6 +349,7 @@ if (EMBED) document.documentElement.classList.add("embedded");
 else {
   renderHeader();
   renderFooter();
+  renderNotice();
   if (!EMBED) import("/js/account-menu.js").then((m) => m.renderAccountButton(document.getElementById("acct-slot"))).catch(() => {});
 }
 fillConfig();

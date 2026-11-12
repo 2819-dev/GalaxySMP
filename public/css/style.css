@@ -2139,3 +2139,19 @@ img.emoji-big { width: 44px; height: 44px; vertical-align: middle; margin: 2px 4
 .jr-pane { display: flex; flex-direction: column; gap: 10px; padding: 14px; min-width: 0; }
 .jr-pane .jr-log { border: 1px solid var(--border); border-radius: 12px; }
 @media (max-width: 760px) { .jr-layout { grid-template-columns: 1fr; } }
+
+/* ---------- Site notice (maintenance mode / scheduled restart) ---------- */
+.site-notice { border-bottom: 1px solid rgba(255, 200, 80, .35); background: linear-gradient(90deg, rgba(255, 176, 32, .18), rgba(255, 120, 60, .12)); color: #ffe2a8; }
+.site-notice.restart { border-bottom-color: rgba(120, 160, 255, .35); background: linear-gradient(90deg, rgba(80, 120, 255, .18), rgba(140, 90, 255, .12)); color: #d6e0ff; }
+.site-notice-in { display: flex; align-items: center; gap: 10px; padding-top: 10px; padding-bottom: 10px; font-weight: 600; font-size: .92rem; }
+.site-notice-in svg { flex: none; width: 18px; height: 18px; }
+.site-notice-in span { overflow-wrap: anywhere; }
+
+/* ---------- Control Panel > Server control ---------- */
+.sc-card { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.sc-card p { margin: 0; }
+.sc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.sc-head h2 { margin: 0; font-size: 1.15rem; }
+.sc-big { font-size: 1.05rem; }
+.sc-item { display: grid; grid-template-columns: 1fr 90px auto; gap: 8px; align-items: center; }
+@media (max-width: 520px) { .sc-item { grid-template-columns: 1fr 70px; } .sc-item .btn { grid-column: 1 / -1; justify-self: start; } }

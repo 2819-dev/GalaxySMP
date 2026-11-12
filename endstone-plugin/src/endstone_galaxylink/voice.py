@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.30.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.31.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -209,6 +209,8 @@ class VoiceLink:
             self._on_main(lambda: self.plugin.chatfilter.set_enabled(msg.get("enabled"), msg.get("by") or "staff on the website"))
         elif msg.get("type") == "trade":  # trades started on the website (galaxymc.us/trades)
             self._on_main(lambda: self.plugin.trades.from_website(msg))
+        elif msg.get("type") == "server_control":  # maintenance / restart / welcome kit (Control Panel)
+            self._on_main(lambda: self.plugin.servercontrol.update(msg))
         elif msg.get("type") == "allowlist":  # owner approved a join request on the website
             self._on_main(lambda: self._allowlist(msg))
         elif msg.get("type") == "shopchest_buy":  # Buy on galaxymc.us/shops

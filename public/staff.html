@@ -61,6 +61,7 @@
           </div>
           <div class="cp-group">
             <h2 class="cp-group-name">Server</h2>
+            <button type="button" data-tab="serverctl" aria-selected="false" hidden>Server control</button>
             <button type="button" data-tab="economy" aria-selected="false" hidden>Economy</button>
             <button type="button" data-tab="help" aria-selected="false" hidden>Help menu</button>
             <button type="button" data-tab="emoji" aria-selected="false" hidden>Emoji</button>
@@ -247,6 +248,10 @@
           <div class="toolbar"><input class="input" id="dm-owner-search" type="search" placeholder="Search by member name" autocomplete="off"></div>
           <div id="dm-owner-list" class="panel" style="padding:0"></div>
           <div id="dm-owner-view" hidden></div>
+        </section>
+
+        <section data-panel="serverctl" hidden>
+          <div id="serverctl-box" class="stack" style="gap:16px"><p class="text-3">Loading…</p></div>
         </section>
 
         <section data-panel="joins" hidden>
