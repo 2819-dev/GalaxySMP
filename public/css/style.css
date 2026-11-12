@@ -1012,6 +1012,7 @@ section.panel, .server-card, .worlds, .voice-band { position: relative; }
 
 /* page titles */
 .page-head h1 { background: linear-gradient(90deg, #fff 30%, #bfe9ff); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+html[data-theme="light"] .page-head h1 { background: linear-gradient(90deg, #14183a 30%, #2b4fd8); -webkit-background-clip: text; background-clip: text; }
 
 @media (max-width: 900px) { .worlds { grid-template-columns: repeat(2, minmax(0,1fr)); } .stats-strip { grid-template-columns: repeat(2, minmax(0,1fr)); } .stats-strip > div:nth-child(2) { border-right: 0; } .stats-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--glass-border); } }
 @media (max-width: 520px) { .worlds { grid-template-columns: 1fr; } .stats-strip .num { font-size: 1.5rem; } .stats-strip > div { padding: 14px 16px; } }
@@ -2355,3 +2356,68 @@ html[data-theme="light"] .dialog, html[data-theme="light"] dialog { background: 
 .acting-bar { position: sticky; top: 0; z-index: 200; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; padding: 8px 14px;
   background: linear-gradient(90deg, #7a3cff, #2457eb); color: #fff; font-weight: 600; font-size: .9rem; text-align: center; }
 .acting-bar .btn { background: #fff; color: #2a2f6b; border: 0; }
+
+/* ---------- Light mode: darker versions of the bright text colors made for the dark theme (generated) ---------- */
+html[data-theme="light"] :is(.composer-note) { color: rgb(184,0,31); }
+html[data-theme="light"] :is(.leaderboard li[data-top="1"] .lb-rank) { color: rgb(184,132,0); }
+html[data-theme="light"] :is(.leaderboard li[data-top="2"] .lb-rank) { color: rgb(61,75,122); }
+html[data-theme="light"] :is(.plan-pill-plus) { color: rgb(37,146,125); }
+html[data-theme="light"] :is(.plan-pill.plus) { color: rgb(37,146,125); }
+html[data-theme="light"] :is(.tk-status.waiting) { color: rgb(1,131,183); }
+html[data-theme="light"] :is(.tk-label.report) { color: rgb(184,77,0); }
+html[data-theme="light"] :is(.tk-label.store) { color: rgb(30,154,87); }
+html[data-theme="light"] :is(.tk-label.question) { color: rgb(2,130,182); }
+html[data-theme="light"] :is(.shop-icon) { color: rgb(60,66,98); }
+html[data-theme="light"] :is(.cat-money .shop-icon) { color: rgb(15,168,84); }
+html[data-theme="light"] :is(.cat-plots .shop-icon) { color: rgb(184,121,0); }
+html[data-theme="light"] :is(.cat-effects .shop-icon) { color: rgb(0,110,184); }
+html[data-theme="light"] :is(.cat-cosmetics .shop-icon) { color: rgb(184,0,111); }
+html[data-theme="light"] :is(.badge .e) { color: rgb(0,34,184); }
+html[data-theme="light"] :is(.msg-link:hover) { color: rgb(0,132,184); }
+html[data-theme="light"] :is(.mention) { color: rgb(9,22,175); }
+html[data-theme="light"] :is(.mention.me) { color: rgb(184,135,0); }
+html[data-theme="light"] :is(.acc-nav a[aria-current="true"]) { color: rgb(60,66,98); }
+html[data-theme="light"] :is(.store-promo-pill) { color: rgb(184,0,108); }
+html[data-theme="light"] :is(.shop-badge.owned) { color: rgb(15,168,84); }
+html[data-theme="light"] :is(.co-offer-icon) { color: rgb(184,0,108); }
+html[data-theme="light"] :is(.co-item.cat-plan .shop-icon) { color: rgb(44,0,184); }
+html[data-theme="light"] :is(.co-applied) { color: rgb(18,165,85); }
+html[data-theme="light"] :is(.co-done-icon) { color: rgb(15,168,84); }
+html[data-theme="light"] :is(.promo-status.on) { color: rgb(15,168,84); }
+html[data-theme="light"] :is(.store-balance-icon) { color: rgb(184,121,0); }
+html[data-theme="light"] :is(.acc-plus) { color: rgb(15,168,84); }
+html[data-theme="light"] :is(.promo-status.bad) { color: rgb(184,0,0); }
+html[data-theme="light"] :is(.donate-icon) { color: rgb(184,0,99); }
+html[data-theme="light"] :is(.ob-icon) { color: rgb(0,109,184); }
+html[data-theme="light"] :is(.ob-list svg) { color: rgb(15,168,84); }
+html[data-theme="light"] :is(.ob-seg-btn[aria-checked="true"], .ob-option[aria-checked="true"], .ob-chip[aria-pressed="true"]) { color: rgb(60,66,98); }
+html[data-theme="light"] :is(.ob-link svg) { color: rgb(0,109,184); }
+html[data-theme="light"] :is(.act-time) { color: rgb(15,168,84); }
+html[data-theme="light"] :is(.pr-icon[aria-checked="true"]) { color: rgb(60,66,98); }
+html[data-theme="light"] :is(.pp-status.on) { color: rgb(15,168,84); }
+html[data-theme="light"] :is(.pp-stat-icon) { color: rgb(0,63,184); }
+html[data-theme="light"] :is(.pp-stat-sub) { color: rgb(15,168,84); }
+html[data-theme="light"] :is(.nw-tag.event) { color: rgb(60,0,184); }
+html[data-theme="light"] :is(.nw-tag.store) { color: rgb(175,122,9); }
+html[data-theme="light"] :is(.bd-botw-label) { color: rgb(175,122,9); }
+html[data-theme="light"] :is(.sg-similar-head) { color: rgb(175,122,9); }
+html[data-theme="light"] :is(.tr-price) { color: rgb(175,122,9); }
+html[data-theme="light"] :is(.nw-tag.recap) { color: rgb(175,122,9); }
+html[data-theme="light"] :is(.potw-pill) { color: rgb(184,135,0); }
+html[data-theme="light"] :is(.potw-k) { color: rgb(184,134,0); }
+html[data-theme="light"] :is(.site-notice) { color: rgb(184,122,0); }
+html[data-theme="light"] :is(.site-notice.restart) { color: rgb(0,45,184); }
+html[data-theme="light"] :is(.channel-mention) { color: rgb(9,22,175); }
+html[data-theme="light"] :is(.hc-q-ic) { color: rgb(0,36,184); }
+html[data-theme="light"] :is(.hc-tips-head) { color: rgb(16,168,109); }
+/* light mode: a few spots the generator can't see */
+html[data-theme="light"] .acc-nav a[aria-current="true"] { color: var(--accent); }
+html[data-theme="light"] .ob-seg-btn[aria-checked="true"], html[data-theme="light"] .ob-option[aria-checked="true"], html[data-theme="light"] .ob-chip[aria-pressed="true"] { color: #1d46cc; background: rgba(36,87,235,.12); }
+html[data-theme="light"] .store-tabs { background: rgba(255,255,255,.9); border-color: var(--border); }
+html[data-theme="light"] .plan-pill.plus { color: #12806e; }
+html[data-theme="light"] .plan-pill.pro { color: #7a3cc9; }
+html[data-theme="light"] .leaderboard li[data-top="3"] .lb-rank { color: #a3541c; }
+html[data-theme="light"] .plan-more { color: #2457eb; }
+html[data-theme="light"] .tl-card.k-first_join { --tl: #12865a; } html[data-theme="light"] .tl-card.k-achievement { --tl: #a06c00; }
+html[data-theme="light"] .tl-card.k-potw { --tl: #a06c00; } html[data-theme="light"] .tl-card.k-botw { --tl: #b4501c; }
+html[data-theme="light"] .tl-card.k-rank { --tl: #7a3cc9; } html[data-theme="light"] .tl-card.k-plan { --tl: #1576a8; }
