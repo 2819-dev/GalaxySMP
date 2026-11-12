@@ -115,8 +115,9 @@ PICTURES = None  # set by the plugin: ranktags.RankTags (smooth gradient tags as
 
 
 def tag_spec(tag):
-    """What the rank tag pictures need: the prefix and the gradient's hex colors."""
-    return {"prefix": tag.get("prefix", ""), "stops": GRADIENT_HEX.get(tag.get("gradient") or "")}
+    """What a rank badge picture needs: the name, the colors (the gradient, or the rank's one color) and the icon."""
+    stops = GRADIENT_HEX.get(tag.get("gradient") or "") or [HEX.get(tag.get("color") or "f", "#FFFFFF")]
+    return {"prefix": tag.get("prefix", ""), "stops": stops, "icon": tag.get("icon") if tag.get("icon") in GLYPHS else None}
 
 
 def _rgb(h):
@@ -180,25 +181,20 @@ def solid(tag):
 
 
 def tag_text(rank):
-    """[👑 OWNER] in the rank's color or gradient (the icon goes inside the brackets).
-    Gradient tags are smooth hex-gradient pictures once the rank tag pack is installed."""
+    """The rank badge (a picture: the rank's colors as a background, with its icon and name), once the rank
+    tag pack is installed. Until then: [👑 OWNER] as colored text (the icon goes inside the brackets)."""
+    pics = PICTURES.glyphs_for(tag_spec(rank)) if PICTURES is not None else None
+    if pics:
+        return "§f" + pics
     glyph = GLYPHS.get(rank.get("icon") or "")
-    pics = PICTURES.glyphs_for(tag_spec(rank)) if PICTURES is not None and rank.get("gradient") else None
-    if pics:  # pics = ["[" pictures, "PREFIX]" pictures]; the icon goes in between
-        return "§f" + (pics[0] + glyph + " " + pics[1] if glyph else pics[0] + pics[1])
     if glyph:
-        text = paint(f"[{glyph} {rank['prefix']}]", rank)
-        return text
+        return paint(f"[{glyph} {rank['prefix']}]", rank)
     return paint(f"[{rank['prefix']}]", rank)
 
 
 def name_text(player_name, rank, bold=False):
-    """A player's name in their rank's color or gradient (smooth pictures once installed)."""
-    if PICTURES is not None and rank and rank.get("gradient"):
-        pics = PICTURES.glyphs_for_text(player_name, GRADIENT_HEX.get(rank["gradient"]))
-        if pics:
-            return "§f" + pics
-    return paint(player_name, rank, bold)
+    """A player's name in game: one color, their rank's main color (the badge carries the gradient)."""
+    return paint(player_name, solid(rank) if rank else None, bold)
 
 
 class RankManager:
@@ -224,40 +220,16 @@ class RankManager:
         self.plugin.server.scheduler.run_task(self.plugin, self.refresh_pictures)
 
     def all_tags(self):
-        """Every gradient tag on the server: ranks and the Galaxy+ / Pro+ plan tags."""
-        tags = [r for r in self.ranks.values() if r.get("gradient")]
+        """Every rank badge on the server: ranks and the Galaxy+ / Pro+ plan tags."""
+        tags = list(self.ranks.values())
         plans = getattr(self.plugin, "plans", None)
         if plans:
             try:
                 from endstone_galaxylink.plans import plan_defs
-                tags += [p["tag"] for p in plan_defs().values() if p.get("tag") and p["tag"].get("gradient")]
+                tags += [p["tag"] for p in plan_defs().values() if p.get("tag")]
             except Exception:
                 pass
-        return [tag_spec(t) for t in tags] + self.all_names()
-
-    def all_names(self):
-        """Names that show in a gradient: players with a gradient rank, or Galaxy+/Pro+ players without a rank."""
-        names = {}
-        db = self.plugin.economy.db
-        lookup = lambda x: (db.execute("SELECT name FROM balances WHERE xuid = ?", (str(x),)).fetchone() or [None])[0]
-        for p in self.plugin.server.online_players:
-            names[str(p.xuid)] = p.name
-        out = []
-        for xuid in self.assign:
-            r = self.top_rank(xuid)
-            name = names.get(xuid) or lookup(xuid)
-            if r and r.get("gradient") and name:
-                out.append({"text": name, "stops": GRADIENT_HEX.get(r["gradient"])})
-        plans = getattr(self.plugin, "plans", None)
-        if plans:
-            for xuid, sub in (plans.subs or {}).items():
-                if xuid in self.assign:
-                    continue
-                tag = (plans.defs.get(sub.get("plan")) or {}).get("tag") or {}
-                name = names.get(xuid) or lookup(xuid)
-                if tag.get("gradient") and name:
-                    out.append({"text": name, "stops": GRADIENT_HEX.get(tag["gradient"])})
-        return out
+        return [tag_spec(t) for t in tags if t.get("prefix")]
 
     def refresh_pictures(self):
         pics = getattr(self.plugin, "ranktags", None)

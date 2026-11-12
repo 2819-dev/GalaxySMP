@@ -98,22 +98,61 @@ export const GRADIENT_HEX = {
   ember: ["#FFE45C", "#FF9A1F", "#FF4A1F", "#B31212"],
 };
 
-// [👑 OWNER] for a rank (or null).
+// Rank badges (same look and math as the in-game badge pictures, plugin badges.py): a rounded pill in
+// the rank's colors, made deep enough for white letters, with the rank's icon in white.
+const MAX_LUMA = 0.62;
+function hls(r, g, b) {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  if (mx === mn) return [0, l, 0];
+  const d = mx - mn, s = l <= 0.5 ? d / (mx + mn) : d / (2 - mx - mn);
+  const rc = (mx - r) / d, gc = (mx - g) / d, bc = (mx - b) / d;
+  let h = r === mx ? bc - gc : g === mx ? 2 + rc - bc : 4 + gc - rc;
+  h = ((h / 6) % 1 + 1) % 1;
+  return [h, l, s];
+}
+function rgbOf(h, l, s) {
+  if (s === 0) return [l, l, l];
+  const m2 = l <= 0.5 ? l * (1 + s) : l + s - l * s, m1 = 2 * l - m2;
+  const v = (hh) => {
+    hh = ((hh % 1) + 1) % 1;
+    if (hh < 1 / 6) return m1 + (m2 - m1) * hh * 6;
+    if (hh < 0.5) return m2;
+    if (hh < 2 / 3) return m1 + (m2 - m1) * (2 / 3 - hh) * 6;
+    return m1;
+  };
+  return [v(h + 1 / 3), v(h), v(h - 1 / 3)];
+}
+export function badgeColor(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  let [h, l, s] = hls(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
+  if (s > 0.05) s = Math.max(s, 0.6);
+  for (let i = 0; i < 60; i++) {
+    const [r, g, b] = rgbOf(h, l, s);
+    if (0.299 * r + 0.587 * g + 0.114 * b <= MAX_LUMA || l <= 0.2) break;
+    l -= 0.01;
+  }
+  return "#" + rgbOf(h, l, s).map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
+}
+export const badgeStops = (rank) => (rank.gradient && GRADIENT_HEX[rank.gradient] ? GRADIENT_HEX[rank.gradient] : [hexOf(rank.color || "f")]).map(badgeColor);
+
+// The rank badge for a rank (or null).
 export function rankTag(rank) {
   if (!rank) return null;
-  const stops = rank.gradient ? GRADIENT_HEX[rank.gradient] : null;
-  if (!stops) {
-    const tag = paint(`[${rank.prefix}]`, rank, rank.icon);
-    tag.className = "rank-tag";
-    return tag;
-  }
-  // A smooth gradient across the whole tag, like the in-game pictures.
+  const stops = badgeStops(rank);
   const tag = document.createElement("span");
-  tag.className = "rank-tag rank-tag-smooth";
-  tag.style.backgroundImage = `linear-gradient(90deg, ${stops.join(", ")})`;
-  tag.append("[");
-  if (rank.icon) tag.append(iconImg(rank.icon), " ");
-  tag.append(`${rank.prefix}]`);
+  tag.className = "rank-tag";
+  tag.style.background = stops.length > 1 ? `linear-gradient(90deg, ${stops.join(", ")})` : stops[0];
+  if (rank.icon) {
+    const img = document.createElement("img");
+    img.className = "rank-tag-icon";
+    img.src = ["", "img", "badge", `rank_${rank.icon}.png`].join("/");
+    img.alt = "";
+    img.width = 14;
+    img.height = 14;
+    tag.append(img);
+  }
+  tag.append(rank.prefix || rank.name || "");
+  tag.title = rank.name || rank.prefix || "";
   return tag;
 }
 

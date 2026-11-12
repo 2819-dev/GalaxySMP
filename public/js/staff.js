@@ -401,11 +401,12 @@ let rankSearchTimer;
 let rankData = null;
 const PERM_PREFIXES = ["minecraft.command.", "endstone.command.", "galaxylink.command."];
 
-// Looks like chat in game: [👑 OWNER] **name** → message (rank color on the tag and name).
+// Looks like the name line in game: the rank badge, then the name in the rank's main color (one color in game).
 function rankPreview(prefix, color, name, icon, message, gradient) {
-  const style = { color, gradient };
+  const chain = gradient ? (GRADIENTS.find((g) => g[0] === gradient) || [])[2] : null;
+  const solid = { color: chain ? chain[Math.floor(chain.length / 2)] : color };
   const span = h("span", { class: "rank-preview" });
-  span.append(paint(`[${prefix}]`, style, icon), " ", h("b", {}, paint(name, style)));
+  span.append(rankTag({ prefix, color, gradient, icon }), h("b", {}, paint(name, solid)));
   if (message) span.append(h("span", { class: "text-3", text: " → " }), h("span", { text: message }));
   return span;
 }

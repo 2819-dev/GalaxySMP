@@ -1,14 +1,14 @@
-"""Smooth gradient rank tags.
+"""Rank badges as pictures.
 
-Bedrock text can't use hex colors, but it can show small pictures (like the rank icons). So the plugin
-draws every gradient rank tag (and the Galaxy+ / Pro+ plan tags) letter by letter as pictures with a
-true smooth hex gradient across the whole tag, and packs them into a tiny resource pack:
+Bedrock text can't use hex colors or backgrounds, but it can show small pictures. So the plugin draws
+every rank tag (and the Galaxy+ / Pro+ plan tags) as a badge: a rounded pill in the rank's colors with
+the rank's icon and name in white (badges.py), and packs them into a tiny resource pack:
     BDS-Addons/GalaxySMP_RankTags.mcpack
 BisectHosting's add-on installer installs it when the server starts. When ranks change, the pack is
-rebuilt by itself and the new pictures show after the next restart (until then the tag uses the normal
-28-color gradient, so nothing ever looks broken).
+rebuilt by itself and the new badges show after the next restart (until then the tag is the normal
+colored text [icon NAME], so nothing ever looks broken). Player names are normal colored text.
 
-/ranktags off  switches back to the normal colored text right away; /ranktags on  turns pictures back on.
+/ranktags off  switches back to the colored text right away; /ranktags on  turns badges back on.
 """
 
 import json
@@ -16,19 +16,14 @@ import struct
 import zlib
 from pathlib import Path
 
+from endstone_galaxylink.badges import render_badge
+
 PACK_UUID = "c1a5e6f2-7b3d-4e9a-8f21-5d6c7b8a9e01"
 MODULE_UUID = "d2b6f7a3-8c4e-4fab-9a32-6e7d8c9bae12"
-# Glyph pages (256 pictures each):
-#   "instant" letters: every letter/digit/symbol in a range of gradient colors, so any rank or name shows a real
-#   gradient the moment it's given (Bedrock trims each picture's empty right side, so letters keep natural widths).
-#   "strips": whole tags/names drawn perfectly smooth; these need a restart, then replace the instant letters.
-BASE_PAGES = list(range(0xE4, 0xE9)) + list(range(0xEC, 0xF7))   # E4-E8, EC-F6: 16 pages (F7, F8 = GalaxySMP Icons)
-PAGES = [0xE9, 0xEA, 0xEB]                                       # strips
-CELL = 16                          # pixels per picture (256x256 page = the same size as normal text)
-UNIT = 1                           # 1 image pixel = 1 text pixel (Bedrock draws pictures at that scale: same size as chat)
-TOP = 0                            # letters at the top of each picture (Bedrock lines pictures up by their top, like text)
+PAGES = [0xE9, 0xEA, 0xEB]         # badge pictures (F7, F8 = GalaxySMP Icons)
+CELL = 32                          # 512x512 pages: 32 picture pixels per cell = 16 text pixels (2 picture pixels per text pixel)
 FILE = "GalaxySMP_RankTags.mcpack"
-FORMAT = 6                         # bump when the drawing changes, so everything is rebuilt
+FORMAT = 7                         # bump when the drawing changes, so everything is rebuilt
 CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789[]+-_.!?&'"
 
 # A 5x7 pixel font in the style of Minecraft's (# = pixel). Width = longest row.
@@ -146,62 +141,22 @@ def color_at(stops, t):
     return tuple(int(round(a[k] + (b[k] - a[k]) * f)) for k in range(3))
 
 
-SPACE_UNITS = 3
-
-
-def render_strip(text, stops):
-    """Draws the whole text as one strip with normal letter spacing (like Minecraft's chat font) and one
-    smooth gradient across it. Returns (pixels {(x, y): rgba}, width in pixels, x where the 2nd character starts)."""
-    layout, x = [], 0
-    for i, ch in enumerate(text):
-        g = font_char(ch)
-        if g is None:  # space (or a character the font doesn't have)
-            x += SPACE_UNITS
-            layout.append((None, x))
-            continue
-        layout.append((g, x))
-        x += len(g[0]) + 1
-    units = max(1, x - 1)
-    width = units * UNIT
-    pixels, split = {}, None
-    for i, (g, x0) in enumerate(layout):
-        if i == 1:
-            split = x0 * UNIT
-        if g is None:
-            continue
-        for row, line in enumerate(g):
-            for col, c in enumerate(line):
-                if c != "#":
-                    continue
-                for dx in range(UNIT):
-                    px = (x0 + col) * UNIT + dx
-                    color = color_at(stops, px / max(1, width - 1))
-                    for dy in range(UNIT):
-                        pixels[(px, TOP + row * UNIT + dy)] = (*color, 255)
-    return pixels, width, split
-
-
-def tiles(pixels, x_from, x_to):
-    """Cuts part of a strip into 16x16 pictures that fit together exactly. Each picture gets two almost
-    invisible pixels at its left and right edge so Minecraft keeps its full width (no gaps, no overlap)."""
+def tiles(pixels, width):
+    """Cuts a badge into CELL-wide pictures. Each piece but the last gets a nearly invisible pixel at its
+    right edge so Minecraft keeps its full width (no gaps, no overlap); the last one is trimmed to the badge."""
     out = []
-    for left in range(x_from, x_to, CELL):
+    for left in range(0, width, CELL):
         tile = {}
         for x in range(CELL):
             for y in range(CELL):
                 c = pixels.get((left + x, y))
                 if c:
                     tile[(x, y)] = c
-        for edge in (0, CELL - 1):
-            tile.setdefault((edge, CELL - 1), (255, 255, 255, 1))
+        tile.setdefault((0, CELL - 1), (255, 255, 255, 1))
+        if left + CELL < width:
+            tile.setdefault((CELL - 1, CELL - 1), (255, 255, 255, 1))
         out.append(tile)
     return out
-
-
-def render_tag(text, stops):
-    """Kept for previews/tests: the strip as a list of 16x16 tiles."""
-    pixels, width, _ = render_strip(text, stops)
-    return tiles(pixels, 0, width)
 
 
 def png(width, height, pixels):
@@ -380,85 +335,8 @@ def glyph_conflicts():
     return sorted(set(found))
 
 
-def gradient_palette():
-    """The colors the instant letters come in: every gradient sampled at 5 points (start, 1/4, middle, 3/4, end)."""
-    from endstone_galaxylink.ranks import GRADIENT_HEX
-    pal = []
-    for key in GRADIENT_HEX:
-        for t in (0, 0.25, 0.5, 0.75, 1):
-            c = color_at(GRADIENT_HEX[key], t)
-            if c not in pal:
-                pal.append(c)
-    room = len(BASE_PAGES) * 256 // len(CHARSET)
-    while len(pal) > room:  # too many: drop the color closest to another one
-        best = min(((i, j) for i in range(len(pal)) for j in range(i + 1, len(pal))),
-                   key=lambda ij: sum((a - b) ** 2 for a, b in zip(pal[ij[0]], pal[ij[1]])))
-        pal.pop(best[1])
-    return pal
-
-
-PALETTE = None
-
-
-def palette():
-    global PALETTE
-    if PALETTE is None:
-        PALETTE = gradient_palette()
-    return PALETTE
-
-
-def base_id():
-    """Identifies the instant-letter set (changes if the palette, letters or drawing change)."""
-    import hashlib
-    return hashlib.sha1(json.dumps([FORMAT, CHARSET, palette(), UNIT, CELL]).encode()).hexdigest()[:12]
-
-
-def base_char(ch, color_index):
-    i = color_index * len(CHARSET) + CHARSET.index(ch)
-    return chr((BASE_PAGES[i // 256] << 8) + i % 256)
-
-
-def nearest_color(rgb_):
-    pal = palette()
-    return min(range(len(pal)), key=lambda i: sum((a - b) ** 2 for a, b in zip(pal[i], rgb_)))
-
-
-def instant_text(text, stops):
-    """Any text in a real gradient right away, built from the instant letters."""
-    letters = [ch for ch in text if ch in CHARSET]
-    n = len(letters)
-    out, k = [], 0
-    for ch in text:
-        if ch not in CHARSET:
-            out.append(ch)  # spaces etc.
-            continue
-        out.append(base_char(ch, nearest_color(color_at(stops, k / max(1, n - 1)))))
-        k += 1
-    return "".join(out)
-
-
-def base_pages():
-    """Draws all instant letters: {page: pixels}."""
-    pages = {}
-    for ci, color in enumerate(palette()):
-        for li, ch in enumerate(CHARSET):
-            g = font_char(ch)
-            i = ci * len(CHARSET) + li
-            page, idx = BASE_PAGES[i // 256], i % 256
-            cx, cy = (idx % 16) * CELL, (idx // 16) * CELL
-            px = pages.setdefault(page, {})
-            for row, line in enumerate(g):
-                for col, c in enumerate(line):
-                    if c == "#":
-                        for dx in range(UNIT):
-                            for dy in range(UNIT):
-                                px[(cx + col * UNIT + dx, cy + TOP + row * UNIT + dy)] = (*color, 255)
-    return pages
-
-
 def signature(item):
-    """What a text looks like (text + gradient colors): same signature = same pictures."""
-    return json.dumps([FORMAT, item.get("text", ""), item.get("stops")], separators=(",", ":"))
+    return json.dumps([FORMAT, "badge", item.get("prefix", ""), item.get("stops"), item.get("icon")], separators=(",", ":"))
 
 
 class RankTags:
@@ -505,55 +383,37 @@ class RankTags:
         folder = addons if addons.is_dir() else Path(self.plugin.data_folder)
         return folder / FILE
 
-    # ---------- used by ranks.tag_text and ranks.name_text ----------
+    # ---------- used by ranks.tag_text ----------
     def glyphs_for(self, tag):
-        """Pictures for a rank tag "[PREFIX]", or None to use colored text."""
-        return self.glyphs_for_text(f"[{tag.get('prefix', '')}]", tag.get("stops"))
-
-    def glyphs_for_text(self, text, stops):
-        """Pictures for any text (a tag or a player's name), or None to use colored text."""
-        if not self.enabled or not stops or not text:
+        """The badge pictures for a rank tag {"prefix", "stops", "icon"}, or None to use colored text."""
+        if not self.enabled or not tag or not tag.get("prefix") or not tag.get("stops"):
             return None
-        found = self.active.get(signature({"text": text, "stops": stops}))
-        if text.startswith("[") and isinstance(found, list):
-            return found  # perfectly smooth strip: ["[", "PREFIX]"] so the icon can go in between
-        if not text.startswith("[") and isinstance(found, str):
-            return found
-        if self.active.get("__base__") == base_id():  # instant letters: works for any new rank or name
-            if text.startswith("["):
-                full = instant_text(text, stops)
-                return [full[0], full[1:]]
-            return instant_text(text, stops)
-        return None
+        found = self.active.get(signature(tag))
+        return found if isinstance(found, str) and found else None
 
     # ---------- building the pack ----------
     def wanted(self, items):
-        """items: rank tags {"prefix", "stops"} and names {"text", "stops"}."""
+        """items: rank and plan tags {"prefix", "stops", "icon"}."""
         out = {}
         for t in items:
-            if not t or not t.get("stops"):
-                continue
-            text = t.get("text") or (f"[{t['prefix']}]" if t.get("prefix") else "")
-            if text:
-                item = {"text": text, "stops": t["stops"]}
+            if t and t.get("prefix") and t.get("stops"):
+                item = {"prefix": t["prefix"], "stops": t["stops"], "icon": t.get("icon")}
                 out[signature(item)] = item
         return out
 
     def refresh(self, tags):
-        """Called when ranks arrive from the website: rebuild the pack if any gradient tag changed."""
+        """Called when ranks arrive from the website: rebuild the pack if any tag changed."""
         want = self.wanted(tags)
         newest = self.history.get(str(self.version))
         fingerprinted = isinstance(newest, dict) and bool(newest.get("hash"))  # builds before 2.26.1 have none: rebuild once
-        if fingerprinted and set(want) == {k for k in self.built if k != "__base__"} and self.built.get("__base__") == base_id():
+        if fingerprinted and set(want) == set(self.built):
             return False
-        built, pages = {"__base__": base_id()}, base_pages()
+        built, pages = {}, {}
         cp = [0]
 
         def place(tile_list):
             chars = []
             for tile in tile_list:
-                if cp[0] >= len(PAGES) * 256:
-                    break
                 page, idx = PAGES[cp[0] // 256], cp[0] % 256
                 cx, cy = (idx % 16) * CELL, (idx // 16) * CELL
                 page_px = pages.setdefault(page, {})
@@ -564,23 +424,19 @@ class RankTags:
             return "".join(chars)
 
         for sig, t in sorted(want.items()):
-            pixels, width, split = render_strip(t["text"], t["stops"])
-            if cp[0] + (width // CELL + 2) > len(PAGES) * 256:
-                continue  # no room left for strips: this one uses the instant letters
-            if t["text"].startswith("[") and split:  # tag: "[" and "PREFIX]" separately, the icon goes between
-                built[sig] = [place(tiles(pixels, 0, split)), place(tiles(pixels, split, width))]
-            else:
-                built[sig] = place(tiles(pixels, 0, width))
+            pixels, width, _ = render_badge(t["prefix"], t["stops"], t.get("icon"), font_char)
+            if cp[0] + (width + CELL - 1) // CELL > len(PAGES) * 256:
+                continue  # no room left: this one stays colored text
+            built[sig] = place(tiles(pixels, width))
         self.version += 1
         prints = self.write_pack(pages)
         self.built = built
         self.history[str(self.version)] = {"glyphs": built, "hash": prints}
         self.save()
-        self.plugin.logger.info(f"Gradient pictures updated ({len(built) - 1} smooth tags/names + instant letters). "
-                                "Smooth versions show after the next restart; new ranks and names use the instant letters right away.")
+        self.plugin.logger.info(f"Rank badges updated ({len(built)} badges). They show after the next server restart.")
         for p in self.plugin.server.online_players:
             if p.is_op:
-                p.send_message("§7New smooth gradient tags and names are ready. §eThey show after the next server restart.")
+                p.send_message("§7New rank badges are ready. §eThey show after the next server restart.")
         return True
 
     def write_pack(self, pages):
@@ -588,7 +444,7 @@ class RankTags:
         import zipfile
         manifest = {
             "format_version": 2,
-            "header": {"name": "GalaxySMP Rank Tags", "description": "Smooth gradient rank tags (made by the GalaxyLink plugin)",
+            "header": {"name": "GalaxySMP Rank Tags", "description": "Rank badges (made by the GalaxyLink plugin)",
                        "uuid": PACK_UUID, "version": [1, 0, self.version], "min_engine_version": [1, 21, 40]},
             "modules": [{"type": "resources", "uuid": MODULE_UUID, "version": [1, 0, self.version]}],
         }
@@ -605,9 +461,8 @@ class RankTags:
         return fingerprint(files)
 
     def status(self):
-        instant = "ready (new ranks and names get gradients instantly)" if self.active.get("__base__") == base_id() else "after the next restart"
-        return (f"Gradient pictures: {'on' if self.enabled else 'off'}; the world loads version {self.installed or 'none'}, "
-                f"newest built {self.version}; {len([k for k in self.active if k != '__base__'])} smooth tags/names; instant letters {instant}.")
+        return (f"Rank badges: {'on' if self.enabled else 'off'}; the world loads version {self.installed or 'none'}, "
+                f"newest built {self.version}; {len(self.active)} badges ready.")
 
     # ---------- /ranktags ----------
     def command(self, sender, args):
@@ -615,7 +470,7 @@ class RankTags:
         if what in ("chat on", "chat off"):
             self.chat_pictures = what == "chat on"
             self.save()
-            sender.send_message("§7Chat style: " + ("§aDiscord style§7: a name line with the smooth gradient pictures, then messages in the normal font." if self.chat_pictures
+            sender.send_message("§7Chat style: " + ("§aDiscord style§7: a name line with the rank badge, then messages in the normal font." if self.chat_pictures
                                 else "§eone line§7: [RANK] Name: message, colored text only."))
             return
         if what in ("on", "off"):
@@ -627,7 +482,7 @@ class RankTags:
         state = "§aon" if self.enabled else "§coff"
         ready = (f"installed (version {self.installed})" if self.active else
                  f"waiting for a server restart (built version {self.version}, the world has {self.installed or 'none'})")
-        sender.send_message(f"§7Smooth gradient rank tags are {state}§7 (pictures {ready}; file: BDS-Addons/{FILE}). "
+        sender.send_message(f"§7Rank badges are {state}§7 (pictures {ready}; file: BDS-Addons/{FILE}). "
                             "Use /ranktags on or /ranktags off.")
         sender.send_message("§8- " + self.status())
         for line in pack_report():
