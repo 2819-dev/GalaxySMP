@@ -450,3 +450,10 @@ forceInstallScreen();
 if (isIos() && !EMBED && !location.pathname.startsWith("/voice")) setTimeout(() => installBanner(), 1500);  // optional elsewhere
 
 export { config };
+
+// Player pictures: Minecraft heads (8 x 8) stay crisp and blocky, but Xbox and custom pictures are
+// real photos, which look jagged when drawn pixelated. Bigger pictures get smooth scaling.
+document.addEventListener("load", (e) => {
+  const img = e.target;
+  if (img instanceof HTMLImageElement && img.naturalWidth > 16 && /\/api\/head\//.test(img.src)) img.style.imageRendering = "auto";
+}, true);

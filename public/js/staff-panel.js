@@ -296,6 +296,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
       admin ? h("h4", { text: "Rank, plan and money" }) : null,
       admin ? h("div", { class: "pc-actions" },
         act("Change ranks", "btn-secondary", () => rankDialog(p, xuid, reload)),
+        act("Profile picture", "btn-secondary", () => pictureDialog(p, xuid, reload)),
         act("Change plan", "btn-secondary", () => planDialog(p, xuid, reload)),
         act("Change money", "btn-secondary", () => moneyDialog(p, xuid, reload)),
         act("Give a Shop item", "btn-secondary", () => shopDialog(p, d.shop, xuid, reload), false, "cart")) : null,
@@ -363,6 +364,51 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
   function rankDialog(p, xuid, reload) {
     ranksDialog({ name: p.name, xuid, rankIds: p.rankIds || (p.rankId ? [p.rankId] : []), onSaved: (msg) => reload(msg) });
   }
+  // Profile picture: Minecraft head, Xbox picture, or a custom picture (cropped to a square here).
+  function pictureDialog(p, xuid, reload) {
+    let source = p.picSource === "auto" ? (p.hasHead ? "head" : "xbox") : p.picSource;
+    let upload = null;
+    const preview = h("img", { class: "pic-preview", alt: "Preview", width: 96, height: 96 });
+    const showPreview = () => {
+      preview.src = upload && source === "custom" ? upload.url : `/api/head/${xuid}?as=${source}&t=${Date.now()}`;
+    };
+    const opts = [["head", "Minecraft head", "The face of their skin, from the server."], ["xbox", "Xbox picture", "Their Xbox profile picture."], ["custom", "Custom picture", "A picture you upload, cropped to a square."]];
+    const group = h("div", { class: "pic-opts", role: "radiogroup", "aria-label": "Picture" });
+    const file = h("input", { type: "file", accept: "image/*", id: "pic-file", class: "sr-only" });
+    const pick = h("label", { class: "btn btn-secondary btn-sm", for: "pic-file", text: p.hasCustomPic ? "Upload a different picture" : "Upload a picture" });
+    const refresh = h("input", { type: "checkbox", id: "pic-refresh", checked: source === "xbox" });
+    const extra = h("div", { class: "pic-extra" });
+    const drawExtra = () => extra.replaceChildren(
+      source === "custom" ? pick : null,
+      source === "xbox" ? h("label", { class: "check" }, refresh, "Get their newest Xbox picture now") : null);
+    const draw = () => {
+      group.replaceChildren(...opts.map(([k, name, hint]) => {
+        const b = h("button", { type: "button", class: `pic-opt${k === source ? " on" : ""}`, role: "radio", "aria-checked": String(k === source),
+          onclick: () => { source = k; draw(); drawExtra(); showPreview(); } }, h("b", { text: name }), h("span", { class: "text-3 small", text: hint }));
+        if (k === "head" && !p.hasHead) { b.disabled = true; b.title = "The server hasn't sent their head yet."; }
+        return b;
+      }));
+    };
+    file.addEventListener("change", async () => {
+      const f = file.files[0];
+      file.value = "";
+      if (!f) return;
+      try { upload = await squarePicture(f); source = "custom"; draw(); drawExtra(); preview.src = upload.url; }
+      catch (e) { toast(e.message); }
+    });
+    draw(); drawExtra();
+    preview.src = `/api/head/${xuid}?t=${Date.now()}`;
+    openDialog({
+      title: `Profile picture for ${p.name}`,
+      body: h("div", { class: "form" }, h("div", { class: "pic-top" }, preview, h("p", { class: "text-3 small", style: "margin:0", text: "Shown on their profile, in the community, the leaderboards and the server map." })), group, extra, file),
+      actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: async () => {
+        if (source === "custom" && !upload && !p.hasCustomPic) throw new Error("Upload a picture first.");
+        await postJson(`/api/mod/players/${xuid}/picture`, { source, image: source === "custom" && upload ? { mime: upload.mime, data: upload.data } : null, refreshXbox: source === "xbox" && refresh.checked });
+        reload("Profile picture updated.");
+      } }],
+    });
+  }
+
   function planDialog(p, xuid, reload) {
     const plan = select("pa-plan", [["", "Galaxy Free (no plan)"], ["plus", "Galaxy+"], ["pro", "Galaxy Pro+"]], p.plan || "");
     const days = select("pa-days", [["30", "30 days"], ["90", "90 days"], ["365", "1 year"], ["0", "Forever"]], "30");
@@ -500,3 +546,17 @@ function connectLive(...handlers) {
   open();
   setInterval(() => { try { if (ws?.readyState === 1) ws.send("ping"); } catch { /* */ } }, 30000);
 }
+
+// Crops a photo to a centred square and shrinks it to 256 x 256 (JPEG), in the browser.
+async function squarePicture(file) {
+  if (!/^image\//.test(file.type)) throw new Error("Choose a picture file.");
+  const bmp = await createImageBitmap(file).catch(() => { throw new Error("That picture couldn't be opened."); });
+  const side = Math.min(bmp.width, bmp.height);
+  const c = document.createElement("canvas");
+  c.width = 256; c.height = 256;
+  c.getContext("2d").drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, 256, 256);
+  const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.88));
+  const data = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.readAsDataURL(blob); });
+  return { mime: "image/jpeg", data, url: URL.createObjectURL(blob) };
+}
+

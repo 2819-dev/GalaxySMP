@@ -8,7 +8,7 @@ import { isOwner } from "../lib/names.js";
 import { voiceStub } from "./voice.js";
 import { toPlugin } from "./economy.js";
 import { openTicketCount } from "./support.js";
-import { headUrlFor } from "./heads.js";
+import { headUrlFor, setPicture } from "./heads.js";
 import { sendPlans } from "./plans.js";
 import { SHOP_ITEMS, SHOP } from "../store/shop.js";
 
@@ -167,6 +167,7 @@ export async function playerCard(request, env, ctx, url, params) {
     player: {
       ...rowOut(p),
       rankId: p.rank_id ? Number(p.rank_id) : null, rankIds: (p.rank_ids || []).map(Number), rankBy: p.assigned_by || null,
+      picSource: p.pic_source || "auto", hasHead: Boolean(p.head), hasCustomPic: Boolean(p.custom_pic),
       firstSeen: p.first_seen, extraPlots: p.extra_plots,
       stats: { playtimeH: Math.round(Number(p.playtime_s || 0) / 360) / 10, mined: Number(p.mined || 0), placed: Number(p.placed || 0), kills: Number(p.kills || 0), deaths: Number(p.deaths || 0), quests: p.quests_done, streak: p.streak, achievements: (p.achievements || []).length },
       account: p.user_id ? {
@@ -200,10 +201,10 @@ const GAME_ACTIONS = { warn: MOD, mute: MOD, unmute: MOD, kick: MOD, ban: ADMIN,
 
 export async function playerAction(request, env, ctx, url, params) {
   const action = String(params.action);
-  const needed = ["givekey", "note-delete", "shopgive", "setop"].includes(action) ? ADMIN : GAME_ACTIONS[action] ?? (action === "note" ? MOD : null);
+  const needed = ["givekey", "note-delete", "shopgive", "setop", "picture"].includes(action) ? ADMIN : GAME_ACTIONS[action] ?? (action === "note" ? MOD : null);
   if (needed == null) throw new HttpError(400, "Unknown action.");
   const user = await requireStaff(request, env, needed);
-  const body = await readJson(request);
+  const body = await readJson(request, action === "picture" ? 400_000 : 8192);
   const sql = getDb(env);
   const [p] = await sql`
     SELECT p.xuid, p.gamertag, p.is_op, u.username, u.platform, rk.website_role
@@ -223,6 +224,11 @@ export async function playerAction(request, env, ctx, url, params) {
     return json({ ok: true });
   }
   if (action === "shopgive") return json(await giveShopItem(env, sql, p, body, user));
+  if (action === "picture") {  // profile picture: Minecraft head, Xbox picture or a custom upload
+    await setPicture(env, sql, p.xuid, { source: String(body.source || ""), image: body.image || null, refreshXbox: Boolean(body.refreshXbox) });
+    await audit(sql, user.id, "player.picture", { player: p.gamertag, source: body.source });
+    return json({ ok: true });
+  }
   if (action === "givekey") {
     const kind = KEY_KINDS.includes(body.kind) ? body.kind : null;
     const amount = Number(body.amount || 1);

@@ -129,7 +129,7 @@ export async function headImage(request, env, ctx, url, params) {
   const xuid = String(params.xuid || "").replace(/\.png$/, "");
   if (!/^\d{1,20}$/.test(xuid)) throw new HttpError(404, "No head.");
   const sql = getDb(env);
-  const rows = await sql`SELECT head, gamerpic, gamerpic_type FROM players WHERE xuid = ${xuid}`;
+  const rows = await sql`SELECT head, gamerpic, gamerpic_type, pic_source, custom_pic, custom_pic_type FROM players WHERE xuid = ${xuid}`;
   const p = rows[0];
   if (!p) throw new HttpError(404, "No head yet.");
   const versioned = url.searchParams.has("v") && url.searchParams.get("v") !== "0";
@@ -137,10 +137,45 @@ export async function headImage(request, env, ctx, url, params) {
     "Cache-Control": versioned ? "public, max-age=31536000, immutable" : "public, max-age=3600",
     "X-Content-Type-Options": "nosniff",
   };
-  if (p.head) return new Response(await pngFromRgba(p.head), { headers: { ...headers, "Content-Type": "image/png" } });
+  // ?as=head|xbox|custom: a preview of one choice (Control Panel), never cached
+  const as = url.searchParams.get("as");
+  if (["head", "xbox", "custom"].includes(as)) { p.pic_source = as; headers["Cache-Control"] = "no-store"; }
+  const photo = (b64, type) => new Response(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)), { headers: { ...headers, "Content-Type": type } });
+  // The player's chosen picture: custom (set by an Admin), Xbox, or their Minecraft head.
+  if (p.pic_source === "custom" && p.custom_pic) return photo(p.custom_pic, p.custom_pic_type || "image/png");
+  if (p.head && p.pic_source !== "xbox") return new Response(await pngFromRgba(p.head), { headers: { ...headers, "Content-Type": "image/png" } });
   let pic = p.gamerpic ? { b64: p.gamerpic, type: p.gamerpic_type || "image/png" } : null;
   if (!pic && env.XBL_API_KEY) pic = await fetchGamerpic(env, sql, xuid);
+  if (!pic && p.head) return new Response(await pngFromRgba(p.head), { headers: { ...headers, "Cache-Control": "public, max-age=600", "Content-Type": "image/png" } });
   if (!pic) return new Response("No picture yet.", { status: 404, headers: { "Cache-Control": "public, max-age=600" } });
   const bytes = Uint8Array.from(atob(pic.b64), (c) => c.charCodeAt(0));
   return new Response(bytes, { headers: { ...headers, "Content-Type": pic.type } });
+}
+
+// Changing a player's picture (Control Panel): the source, a custom image, or the newest Xbox picture.
+// The picture's address changes too (head_at / gamerpic_at are its version), so browsers show it at once.
+export async function setPicture(env, sql, xuid, { source, image, refreshXbox }) {
+  if (!["auto", "head", "xbox", "custom"].includes(source)) throw new HttpError(400, "Choose a picture.");
+  if (source === "custom") {
+    if (image) {
+      const type = String(image.mime || "");
+      const b64 = String(image.data || "").replace(/\s+/g, "");
+      if (!/^image\/(png|jpeg|webp)$/.test(type)) throw new HttpError(400, "The picture must be PNG, JPEG or WebP.");
+      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64) || b64.length > 400_000) throw new HttpError(400, "That picture is too large. Try a smaller one.");
+      await sql`UPDATE players SET custom_pic = ${b64}, custom_pic_type = ${type} WHERE xuid = ${xuid}`;
+    } else {
+      const [has] = await sql`SELECT custom_pic IS NOT NULL AS ok FROM players WHERE xuid = ${xuid}`;
+      if (!has?.ok) throw new HttpError(400, "Upload a picture first.");
+    }
+  }
+  if (refreshXbox || source === "xbox") {
+    if (refreshXbox) await sql`UPDATE players SET gamerpic_tried = NULL WHERE xuid = ${xuid}`;
+    if (refreshXbox && env.XBL_API_KEY) {
+      const got = await fetchGamerpic(env, sql, xuid);
+      if (!got) throw new HttpError(502, "The Xbox picture couldn't be loaded right now. Try again in a few minutes.");
+    }
+  }
+  await sql`UPDATE players SET pic_source = ${source},
+                 head_at = CASE WHEN head IS NOT NULL THEN now() ELSE head_at END,
+                 gamerpic_at = now() WHERE xuid = ${xuid}`;
 }
