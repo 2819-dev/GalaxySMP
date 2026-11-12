@@ -21,7 +21,7 @@
   <div id="site-header" class="site-header-slot"></div>
 
   <main id="main">
-    <div class="container narrow">
+    <div class="container" style="max-width:860px">
       <header class="page-head">
         <h1>Server Status</h1>
         <p>Live server information, refreshed automatically.</p>
@@ -57,6 +57,23 @@
       <p class="note small" data-hosting="realm" hidden style="margin-top:16px"><strong>GalaxySMP is currently a private, invite-only Minecraft Realm</strong> while we move to our own server. Joining details will be published here when we open to everyone.</p>
 
       <p class="text-3 small" style="margin-top:20px">Last checked <span id="st-checked">–</span>. <span id="st-source"></span></p>
+
+      <section class="panel tl-panel" style="margin-top:24px" aria-labelledby="tl-title">
+        <div class="tl-top">
+          <div>
+            <h2 id="tl-title" style="font-size:1.15rem;margin:0">Timeline</h2>
+            <p class="text-3 small" style="margin:4px 0 0">When the server was online and who played. Tap a bar for details.</p>
+          </div>
+          <div class="tabs-mini" id="tl-range" role="group" aria-label="Time range">
+            <button type="button" data-days="1" aria-pressed="false">24 hours</button>
+            <button type="button" data-days="7" aria-pressed="true">7 days</button>
+            <button type="button" data-days="14" aria-pressed="false">14 days</button>
+          </div>
+        </div>
+        <div class="tl-sum" id="tl-sum"></div>
+        <div id="tl-chart"><p class="text-3 small">Loading…</p></div>
+        <div id="tl-hours" style="margin-top:18px"></div>
+      </section>
     </div>
   </main>
 

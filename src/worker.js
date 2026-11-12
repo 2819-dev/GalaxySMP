@@ -27,6 +27,9 @@ import * as badges from "./routes/badges.js";
 import * as dms from "./routes/dms.js";
 import * as notifyRoutes from "./routes/notify.js";
 import * as account from "./routes/account.js";
+import * as features from "./routes/features.js";
+import * as appeals from "./routes/appeals.js";
+import * as livemap from "./routes/map.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -95,12 +98,37 @@ const routes = [
   ["GET", "/api/head/:xuid", headImage],
   ["GET", "/api/players/:name", progress.profile],
   ["GET", "/api/players/:name/social", progress.socialProfile],
+  ["GET", "/api/players/:name/history", progress.playerHistory],
+  ["GET", "/api/timeline", progress.timeline],
+  ["GET", "/api/map/info", (req, env) => livemap.mapInfo(req, env)],
+  ["GET", "/api/map/region/:rx/:rz", livemap.mapRegion],
+  ["POST", "/api/appeals", (req, env) => appeals.createAppeal(req, env)],
+  ["GET", "/api/appeals/:token", appeals.getAppeal],
+  ["GET", "/api/mod/appeals", appeals.listAppeals],
+  ["POST", "/api/mod/appeals/:id", appeals.decideAppeal],
   ["GET", "/api/mod/economy", economy.adminEconomy],
   ["POST", "/api/mod/economy/plan", (req, env) => plans.adminSetPlan(req, env)],
   ["POST", "/api/mod/economy/:action", economy.adminEconomyAction],
   ["GET", "/api/help", help.getHelp],
   ["GET", "/api/community/auction", (req, env) => community.auctionList(req, env)],
-  ["GET", "/api/community/events", (req, env) => community.eventsList(req, env)],
+  ["GET", "/api/community/events", (req, env) => features.eventsList(req, env)],
+  ["POST", "/api/community/events", (req, env) => features.eventSave(req, env)],
+  ["POST", "/api/community/events/:id/:action", features.eventAction],
+  ["GET", "/api/community/news", features.newsList],
+  ["POST", "/api/community/news", (req, env) => features.newsSave(req, env)],
+  ["POST", "/api/community/news/:id/delete", features.newsDelete],
+  ["GET", "/api/community/polls", (req, env) => features.pollsList(req, env)],
+  ["POST", "/api/community/polls", (req, env) => features.pollCreate(req, env)],
+  ["POST", "/api/community/polls/:id/:action", features.pollAction],
+  ["GET", "/api/community/builds", features.buildsList],
+  ["POST", "/api/community/builds", (req, env) => features.buildCreate(req, env)],
+  ["GET", "/api/community/builds/image/:id", features.buildImage],
+  ["POST", "/api/community/builds/:id/:action", features.buildAction],
+  ["GET", "/api/community/suggestions/similar", features.suggestionSimilar],
+  ["GET", "/api/community/suggestions/:id/comments", features.suggestionComments],
+  ["POST", "/api/community/suggestions/:id/comments", features.suggestionComment],
+  ["POST", "/api/community/suggestions/:id/respond", features.suggestionRespond],
+  ["POST", "/api/community/suggestion-comments/:id/delete", features.suggestionCommentDelete],
   ["POST", "/api/community/auction/:id/buy", community.auctionBuy],
   ["GET", "/api/community/suggestions", community.suggestionsList],
   ["POST", "/api/community/suggestions", (req, env) => community.suggestionCreate(req, env)],
@@ -193,7 +221,8 @@ async function health(env) {
 export default {
   // Daily notifications (reward reminder, daily summary): see "triggers" in wrangler.jsonc.
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(notifyRoutes.daily(env, event.cron).catch((e) => console.error("daily notifications failed", e)));
+    if (event.cron === "*/5 * * * *") ctx.waitUntil(features.tick(env).catch((e) => console.error("5-minute jobs failed", e)));
+    else ctx.waitUntil(notifyRoutes.daily(env, event.cron).catch((e) => console.error("daily notifications failed", e)));
   },
 
   async fetch(request, env, ctx) {

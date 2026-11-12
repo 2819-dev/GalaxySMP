@@ -52,6 +52,72 @@ export async function recordStats(env, list, online) {
                                                      THEN now() ELSE session_start END,
                                  online_at = now() WHERE xuid = ANY(${onlineIds})`;
   }
+  await recordHistory(sql, players.map((p) => String(p.xuid)), onlineIds).catch((e) => console.error("history failed", e));
+}
+
+// Timeline and charts: one stats row per player per day, play sessions, and server uptime.
+// The server sends stats every minute while it's running (even with nobody online).
+async function recordHistory(sql, changed, onlineIds) {
+  const ids = [...new Set([...changed, ...onlineIds])];
+  if (ids.length) {
+    await sql`
+      INSERT INTO player_stats_daily (xuid, day, playtime_s, balance_cents, mined, placed)
+      SELECT xuid, (now() AT TIME ZONE 'America/New_York')::date, coalesce(playtime_s, 0), coalesce(balance_cents, 0), coalesce(mined, 0), coalesce(placed, 0)
+        FROM players WHERE xuid = ANY(${ids})
+      ON CONFLICT (xuid, day) DO UPDATE SET playtime_s = EXCLUDED.playtime_s, balance_cents = EXCLUDED.balance_cents, mined = EXCLUDED.mined, placed = EXCLUDED.placed`;
+  }
+  if (onlineIds.length) {
+    const extended = await sql`
+      UPDATE player_sessions s SET ended_at = now()
+        FROM (SELECT DISTINCT ON (xuid) id, ended_at FROM player_sessions WHERE xuid = ANY(${onlineIds}) ORDER BY xuid, ended_at DESC) last
+       WHERE s.id = last.id AND last.ended_at > now() - interval '150 seconds'
+      RETURNING s.xuid`;
+    const have = new Set(extended.map((r) => r.xuid));
+    const fresh = onlineIds.filter((x) => !have.has(x));
+    if (fresh.length) {
+      await sql`INSERT INTO player_sessions (xuid, started_at, ended_at)
+                SELECT x, now(), now() FROM unnest(${fresh}::text[]) x WHERE EXISTS (SELECT 1 FROM players p WHERE p.xuid = x)`;
+    }
+  }
+  const [up] = await sql`
+    UPDATE server_uptime SET ended_at = now(), peak = greatest(peak, ${onlineIds.length})
+     WHERE id = (SELECT id FROM server_uptime ORDER BY ended_at DESC LIMIT 1) AND ended_at > now() - interval '150 seconds'
+    RETURNING id`;
+  if (!up) await sql`INSERT INTO server_uptime (started_at, ended_at, peak) VALUES (now(), now(), ${onlineIds.length})`;
+}
+
+// GET /api/players/:name/history: daily playtime, money, mined and placed (last 60 days).
+export async function playerHistory(request, env, ctx, url, params) {
+  const sql = getDb(env);
+  const rows = await sql`
+    SELECT d.day, d.playtime_s, d.balance_cents, d.mined, d.placed FROM player_stats_daily d JOIN players p ON p.xuid = d.xuid
+     WHERE lower(p.gamertag) = lower(${String(params.name).replace(/^\./, "").slice(0, 32)}) AND d.day > now()::date - 60
+     ORDER BY d.day`;
+  return json({ ok: true, days: rows.map((r) => ({ day: String(r.day instanceof Date ? r.day.toISOString() : r.day).slice(0, 10), playtime: Number(r.playtime_s), money: Number(r.balance_cents), mined: Number(r.mined), placed: Number(r.placed) })) });
+}
+
+// GET /api/timeline?days=7: server uptime, who played when, and busiest hours (like a Realm's timeline).
+export async function timeline(request, env, ctx, url) {
+  const days = Math.min(14, Math.max(1, Number(url.searchParams.get("days")) || 7));
+  const sql = getDb(env);
+  const [uptime, sessions] = await Promise.all([
+    sql`SELECT started_at, ended_at, peak FROM server_uptime WHERE ended_at > now() - make_interval(days => ${days}) ORDER BY started_at`,
+    sql`SELECT s.xuid, p.gamertag, s.started_at, s.ended_at FROM player_sessions s JOIN players p ON p.xuid = s.xuid
+         WHERE s.ended_at > now() - make_interval(days => ${days}) ORDER BY s.started_at LIMIT 5000`,
+  ]);
+  const players = new Map();
+  for (const s of sessions) {
+    if (!players.has(s.xuid)) players.set(s.xuid, { name: s.gamertag, sessions: [], total: 0 });
+    const p = players.get(s.xuid);
+    const a = new Date(s.started_at).getTime(), b = Math.max(a + 60e3, new Date(s.ended_at).getTime());
+    p.sessions.push([a, b]);
+    p.total += b - a;
+  }
+  return json({
+    ok: true, now: Date.now(), from: Date.now() - days * 864e5,
+    uptime: uptime.map((u) => [new Date(u.started_at).getTime(), Math.max(new Date(u.started_at).getTime() + 60e3, new Date(u.ended_at).getTime()), u.peak]),
+    players: [...players.values()].sort((x, y) => y.total - x.total).slice(0, 40),
+  });
 }
 
 export async function recordAchievementDefs(env, list) {

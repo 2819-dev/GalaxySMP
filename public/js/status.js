@@ -1,4 +1,5 @@
 import { startStatus, statusText } from "/js/site.js";
+import { timelineChart, busiestHours, barChart } from "/js/charts.js";
 
 const $ = (id) => document.getElementById(id);
 const time = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -51,3 +52,33 @@ function render(s) {
 }
 
 startStatus(render);
+
+// ---------- Timeline (like a Realm's): uptime, who played when, busiest hours ----------
+let tlDays = 7;
+async function loadTimeline() {
+  const box = $("tl-chart");
+  let d;
+  try { d = await fetch(`/api/timeline?days=${tlDays}`).then((r) => r.json()); } catch { box.textContent = "The timeline couldn't be loaded."; return; }
+  if (!d.ok) { box.textContent = "The timeline couldn't be loaded."; return; }
+  const span = d.now - d.from;
+  const up = d.uptime.reduce((n, [a, b]) => n + Math.max(0, Math.min(b, d.now) - Math.max(a, d.from)), 0);
+  const peak = Math.max(0, ...d.uptime.map((u) => u[2]));
+  const fact = (k, v) => { const el = document.createElement("div"); const b = document.createElement("b"); b.textContent = v; const s = document.createElement("span"); s.textContent = k; el.append(b, s); return el; };
+  $("tl-sum").replaceChildren(
+    fact("online", d.uptime.length ? `${Math.round((up / span) * 100)}%` : "–"),
+    fact(d.players.length === 1 ? "player" : "players", String(d.players.length)),
+    fact("most at once", String(peak)));
+  box.replaceChildren(timelineChart({ data: d, onName: (n) => `/player/${encodeURIComponent(n)}` }));
+  const hrs = busiestHours(d);
+  const lbl = (h) => new Date(2000, 0, 1, h).toLocaleTimeString([], { hour: "numeric" });
+  $("tl-hours").replaceChildren(d.players.length ? barChart({ title: "Busiest hours (average players online, your time)", height: 140, width: $("tl-hours").clientWidth || 600,
+    days: hrs.map((v, h) => ({ label: lbl(h), value: v, tip: [`${lbl(h)} – ${lbl((h + 1) % 24)}`, `${Math.round(v * 10) / 10} players on average`] })),
+    format: (v) => String(Math.round(v * 10) / 10) }) : "");
+}
+document.querySelectorAll("#tl-range button").forEach((b) => b.addEventListener("click", () => {
+  tlDays = Number(b.dataset.days);
+  document.querySelectorAll("#tl-range button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  loadTimeline();
+}));
+loadTimeline();
+setInterval(loadTimeline, 120000);

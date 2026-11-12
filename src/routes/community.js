@@ -57,16 +57,18 @@ export async function suggestionsList(request, env, ctx, url) {
   const sort = url.searchParams.get("sort") === "new" ? "new" : "top";
   const sql = getDb(env);
   const rows = await sql`
-    SELECT s.id, s.title, s.body, s.anonymous, s.status, s.created_at, s.user_id,
-           u.username,
+    SELECT s.id, s.title, s.body, s.anonymous, s.status, s.created_at, s.user_id, s.staff_reply, s.staff_reply_at,
+           u.username, ru.username AS reply_by,
+           (SELECT count(*)::int FROM suggestion_comments c WHERE c.suggestion_id = s.id AND c.deleted_at IS NULL) AS comments,
            coalesce(sum(CASE WHEN v.value = 1 THEN 1 ELSE 0 END), 0)::int AS likes,
            coalesce(sum(CASE WHEN v.value = -1 THEN 1 ELSE 0 END), 0)::int AS dislikes,
            max(CASE WHEN v.user_id = ${user.id} THEN v.value END) AS mine
       FROM suggestions s
       JOIN users u ON u.id = s.user_id
+      LEFT JOIN users ru ON ru.id = s.staff_reply_by
       LEFT JOIN suggestion_votes v ON v.suggestion_id = s.id
      WHERE s.deleted_at IS NULL
-     GROUP BY s.id, u.username
+     GROUP BY s.id, u.username, ru.username
      ORDER BY CASE WHEN ${sort} = 'top' THEN coalesce(sum(v.value), 0) END DESC NULLS LAST, s.created_at DESC
      LIMIT 100`;
   return json({
@@ -87,6 +89,8 @@ export async function suggestionsList(request, env, ctx, url) {
         likes: r.likes,
         dislikes: r.dislikes,
         myVote: r.mine == null ? 0 : Number(r.mine),
+        comments: r.comments,
+        staffReply: r.staff_reply ? { text: r.staff_reply, by: r.reply_by || "Staff", at: r.staff_reply_at } : null,
       };
     }),
   });

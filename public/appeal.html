@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ban Appeal · GalaxySMP</title>
+  <meta name="description" content="Appeal a GalaxySMP ban.">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="GalaxySMP">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0c1b">
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/appeal.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header" class="site-header-slot"></div>
+  <main id="main">
+    <div class="container narrow">
+      <header class="page-head">
+        <h1>Ban appeal</h1>
+        <p>Banned from the server or the community? Tell us what happened. Staff read every appeal.</p>
+      </header>
+
+      <section class="panel" id="ap-form-box">
+        <form id="ap-form" class="form" novalidate>
+          <div class="field">
+            <label class="field-label" for="ap-gamertag">Your Xbox gamertag</label>
+            <input class="input" id="ap-gamertag" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+          </div>
+          <div class="field">
+            <label class="field-label" for="ap-message">What happened, and why should we lift the ban?</label>
+            <textarea class="input" id="ap-message" rows="7" maxlength="1500" required></textarea>
+            <p class="hint"><span id="ap-count">0</span> / 1500. Be honest and specific. Don't include personal information like your email or phone number.</p>
+          </div>
+          <p class="form-error" id="ap-error" role="alert"></p>
+          <button class="btn btn-primary" type="submit" id="ap-send">Send appeal</button>
+        </form>
+      </section>
+
+      <section class="panel" id="ap-status" hidden aria-live="polite"></section>
+
+      <p class="text-3 small" style="margin-top:20px">Appeals are usually answered within a few days. You can appeal up to twice a week. See the <a href="/rules">rules</a>.</p>
+    </div>
+  </main>
+  <div id="site-footer"></div>
+</body>
+</html>

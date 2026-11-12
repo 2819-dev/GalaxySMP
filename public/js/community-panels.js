@@ -1,4 +1,4 @@
-// Special community channels: Information, Events, Auction House, Suggestions and Voice Chat.
+// Special community channels: Information, Events, News, Polls, Builds, Auction House, Suggestions and Voice Chat.
 // All text goes in with textContent, never as HTML.
 import { money } from "/js/money.js";
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
@@ -6,6 +6,7 @@ import { ticketChat, newTicketDialog, onTicketEvent, chip, when, LABELS } from "
 import { iconEl } from "/js/site.js";
 import { renderMarkdown } from "/js/markdown.js";
 import { faceSvg } from "/js/face.js";
+import * as extra from "/js/community-extra.js";
 
 const panel = () => document.getElementById("channel-panel");
 const voiceBox = () => document.getElementById("voice-embed");
@@ -38,7 +39,12 @@ export function showPanel(channel, context) {
   voiceBox().hidden = true;
   p.hidden = false;
   p.scrollTop = 0;
-  const render = { info: renderInfo, events: renderEvents, auction: renderAuction, suggestions: renderSuggestions, support: renderSupport, dms: renderDMs }[channel.kind];
+  const helpers = { toast: (m) => ctx.toast(m), setTimer: (t) => { refreshTimer = t; } };
+  const render = {
+    info: renderInfo, auction: renderAuction, suggestions: renderSuggestions, support: renderSupport, dms: renderDMs,
+    events: (el) => extra.renderEvents(el, helpers), news: (el) => extra.renderNews(el, helpers),
+    polls: (el) => extra.renderPolls(el, helpers), builds: (el) => extra.renderBuilds(el, helpers),
+  }[channel.kind];
   if (render) render(p);
 }
 
@@ -86,40 +92,6 @@ async function renderInfo(p) {
   }
   rules.append(h("p", { class: "text-3 small", style: "margin:12px 0 0" }, "Full rules: ", h("a", { href: "/rules", text: "galaxymc.us/rules" })));
   wrap.append(info, rules);
-}
-
-// ---------- Events ----------
-const ACCESS_NAMES = { all: "Everyone", plus: "Galaxy+ and Pro+", pro: "Galaxy Pro+ only" };
-
-function renderEvents(p) {
-  const list = h("div", { class: "stack", style: "gap:10px" });
-  const status = h("p", { class: "text-3 small", style: "margin:8px 0 0" });
-  p.append(h("div", { class: "cp-wrap" },
-    h("section", { class: "panel", style: "padding:16px" },
-      h("h2", { style: "font-size:1.15rem;margin:0 0 6px", text: "Minigames" }),
-      h("p", { class: "text-2", style: "margin:0" }, "Minigames hosted by players and run by our Minigame Staff. To join or watch, go to a ",
-        h("strong", { text: "Minigame Computer" }), " in the Minigame Center, or type ", h("code", { text: "/minigames" }),
-        " in game. Galaxy+ and Pro+ players can host their own."), status),
-    list));
-  const load = async () => {
-    let data;
-    try { data = await getJson("/api/community/events"); } catch (e) { status.textContent = e.message; return; }
-    list.replaceChildren();
-    const now = Date.now() / 1000;
-    if (!data.events.length) list.append(h("div", { class: "panel empty", text: "No minigames are running right now. Check back soon!" }));
-    for (const e of data.events) {
-      const open = e.signupEnds > now;
-      const left = Math.max(0, e.signupEnds - now);
-      list.append(h("article", { class: "panel ev-card" },
-        h("div", { class: "ev-main" },
-          h("h3", { class: "sg-title", text: e.game }),
-          h("p", { class: "sg-foot", style: "margin:0" }, `Hosted by ${e.host} · ${e.players} player${e.players === 1 ? "" : "s"} · ${ACCESS_NAMES[e.access] || "Everyone"}`)),
-        h("span", { class: `sg-status ${open ? "planned" : "done"}`, text: open ? `Sign-ups open · ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, "0")}` : "In progress" })));
-    }
-    status.textContent = data.updated ? `Updated ${new Date(data.updated).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Waiting for the Minecraft server.";
-  };
-  load();
-  refreshTimer = setInterval(load, 15000);
 }
 
 // ---------- Auction House ----------
@@ -214,10 +186,10 @@ function renderSuggestions(p) {
   const list = h("div", { class: "stack", style: "gap:10px" });
   const top = h("button", { type: "button", "aria-pressed": "true", text: "Top" });
   const newest = h("button", { type: "button", "aria-pressed": "false", text: "New" });
-  const add = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "New suggestion", onclick: () => newSuggestion(load) });
+  const add = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "New suggestion", onclick: () => extra.newSuggestion(load, ctx.toast) });
   p.append(h("div", { class: "cp-wrap" },
     h("section", { class: "panel", style: "padding:16px" },
-      h("p", { class: "text-2", style: "margin:0 0 12px", text: "Have an idea for GalaxySMP? Share it, and like or dislike other ideas. Staff mark ideas as Planned, Done or Declined." }),
+      h("p", { class: "text-2", style: "margin:0 0 12px", text: "Have an idea for GalaxySMP? Share it, vote and discuss other ideas in the comments. Staff mark ideas as Planned, Done or Declined and can respond." }),
       h("div", { class: "cp-toolbar", style: "justify-content:space-between" }, h("div", { class: "tabs-mini" }, top, newest), add)),
     list));
 
@@ -226,7 +198,7 @@ function renderSuggestions(p) {
     try { data = await getJson(`/api/community/suggestions?sort=${sort}`); } catch (e) { list.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
     list.replaceChildren();
     if (!data.suggestions.length) list.append(h("div", { class: "panel empty", text: "No suggestions yet. Be the first!" }));
-    for (const s of data.suggestions) list.append(card(s, data.canModerate, load));
+    for (const s of data.suggestions) list.append(extra.suggestionCard(s, data.canModerate, load, ctx.toast));
   }
   for (const [btn, key] of [[top, "top"], [newest, "new"]]) {
     btn.addEventListener("click", () => {
@@ -237,60 +209,6 @@ function renderSuggestions(p) {
     });
   }
   load();
-}
-
-function card(s, canModerate, reload) {
-  const vote = async (value) => {
-    try { await postJson(`/api/community/suggestions/${s.id}/vote`, { value: s.myVote === value ? 0 : value }); reload(); } catch (e) { ctx.toast(e.message); }
-  };
-  const up = h("button", { class: "sg-vote up", type: "button", "aria-pressed": String(s.myVote === 1), "aria-label": `Like (${s.likes})`, onclick: () => vote(1) }, iconEl("thumbsUp"), String(s.likes));
-  const down = h("button", { class: "sg-vote down", type: "button", "aria-pressed": String(s.myVote === -1), "aria-label": `Dislike (${s.dislikes})`, onclick: () => vote(-1) }, iconEl("thumbsDown"), String(s.dislikes));
-  let who;
-  if (!s.anonymous) who = s.author;
-  else if (s.author) who = `Anonymous (${s.mine ? "you" : s.author}, only ${s.mine ? "you and the owners" : "owners"} can see this)`;
-  else who = "Anonymous";
-  const foot = h("div", { class: "sg-foot" },
-    h("span", { class: `sg-status ${s.status}`, text: STATUS_NAMES[s.status] }),
-    h("span", { text: `${who} · ${new Date(s.createdAt).toLocaleDateString()}` }));
-  if (canModerate) {
-    const sel = h("select", { class: "input", "aria-label": "Status", style: "width:auto;height:30px;padding:0 8px;font-size:.85rem" });
-    for (const [k, n] of Object.entries(STATUS_NAMES)) sel.append(h("option", { value: k, text: n, selected: k === s.status }));
-    sel.addEventListener("change", async () => {
-      try { await postJson(`/api/community/suggestions/${s.id}/status`, { status: sel.value }); reload(); } catch (e) { ctx.toast(e.message); }
-    });
-    foot.append(sel);
-  }
-  if (canModerate || s.mine) {
-    foot.append(h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Delete", onclick: () => openDialog({
-      title: "Delete this suggestion?",
-      body: h("p", { class: "text-2", text: s.title }),
-      actions: [{ label: "Cancel" }, { label: "Delete", kind: "danger", onClick: async () => { await postJson(`/api/community/suggestions/${s.id}/delete`, {}); reload(); } }],
-    }) }));
-  }
-  return h("article", { class: "panel sg-card" },
-    h("div", { class: "sg-votes" }, up, down),
-    h("div", { class: "sg-body" }, h("h3", { class: "sg-title", text: s.title }), s.body ? h("p", { class: "sg-text", text: s.body }) : null, foot));
-}
-
-function newSuggestion(done) {
-  const title = h("input", { class: "input", id: "sg-title", maxlength: 80, placeholder: "e.g. Add a fishing contest" });
-  const body = h("textarea", { class: "input", id: "sg-body", maxlength: 500, rows: 4, placeholder: "Details (optional)" });
-  const anon = h("input", { type: "checkbox", id: "sg-anon" });
-  openDialog({
-    title: "New suggestion",
-    body: h("div", { class: "form" },
-      field("Title", title),
-      field("Details", body),
-      h("label", { class: "check" }, anon, "Post anonymously ", h("span", { class: "text-3 small", text: "(other players won't see your name; only the server owners can)" }))),
-    actions: [{ label: "Cancel" }, {
-      label: "Post", kind: "primary",
-      onClick: async () => {
-        await postJson("/api/community/suggestions", { title: title.value, body: body.value, anonymous: anon.checked });
-        ctx.toast("Suggestion posted!");
-        done();
-      },
-    }],
-  });
 }
 
 // ---------- Support: private live chat with staff ----------

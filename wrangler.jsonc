@@ -43,7 +43,7 @@
   ],
 
   // Daily notifications (reward reminder at 16:05 UTC = noon US Eastern, summary at 00:35 UTC = evening).
-  "triggers": { "crons": ["5 16 * * *", "35 0 * * *"] },
+  "triggers": { "crons": ["5 16 * * *", "35 0 * * *", "*/5 * * * *"] },
 
   "observability": { "enabled": true }
 }

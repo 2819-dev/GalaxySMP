@@ -306,7 +306,7 @@ class Moderation:
         if why:
             return actor.send_message("§c" + why)
         expires = None if minutes is None else datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=minutes)
-        text = f"Banned from GalaxySMP {length_text(minutes)}. Reason: {reason or 'Breaking the rules'}"
+        text = f"Banned from GalaxySMP {length_text(minutes)}. Reason: {reason or 'Breaking the rules'}. Appeal at {WEBSITE}/appeal"
         try:
             self.plugin.server.ban_list.add_ban(name, xuid=str(xuid), reason=text, expires=expires, source=getattr(actor, "name", "Console"))
         except Exception as e:
@@ -314,7 +314,7 @@ class Moderation:
             return actor.send_message("§cCouldn't ban that player. Check the server log.")
         p = self.online(xuid)
         if p:
-            p.kick(f"§c{text}\n§7Questions? Visit {WEBSITE}")
+            p.kick(f"§c{text}")
         self.record("ban", xuid, name, actor, reason, minutes)
         actor.send_message(f"§aBanned {name} {length_text(minutes)}.")
 

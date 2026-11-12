@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Server Map · GalaxySMP</title>
+  <meta name="description" content="A live map of the GalaxySMP world: plots, shops, spawn and who is online.">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="GalaxySMP">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0c1b">
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/map.js"></script>
+</head>
+<body class="map-page">
+  <a class="skip-link" href="#map-view">Skip to the map</a>
+  <div id="site-header" class="site-header-slot"></div>
+  <main id="main" class="map-main">
+    <div class="map-shell">
+      <aside class="map-side" id="map-side">
+        <div class="map-side-head">
+          <h1>Server Map</h1>
+          <p class="text-3 small" id="map-sub">The world fills in as players explore.</p>
+        </div>
+        <h2 class="map-h">Online <span class="text-3" id="map-online-n"></span></h2>
+        <div id="map-players" class="map-list"></div>
+        <h2 class="map-h">Places</h2>
+        <div id="map-places" class="map-list"></div>
+        <div class="map-legend" aria-label="Legend">
+          <span><i class="lg-plot"></i>Plot</span><span><i class="lg-shop"></i>Shop</span><span><i class="lg-area"></i>Area</span>
+        </div>
+      </aside>
+      <div class="map-stage">
+        <canvas id="map-view" tabindex="0" aria-label="Server map. Drag or use the arrow keys to move, plus and minus to zoom."></canvas>
+        <div class="map-tools">
+          <button class="btn btn-secondary btn-sm" type="button" id="map-zoom-in" aria-label="Zoom in">+</button>
+          <button class="btn btn-secondary btn-sm" type="button" id="map-zoom-out" aria-label="Zoom out">−</button>
+          <button class="btn btn-secondary btn-sm" type="button" id="map-home">Spawn</button>
+          <button class="btn btn-secondary btn-sm map-side-toggle" type="button" id="map-toggle" aria-expanded="false" aria-controls="map-side">Players</button>
+        </div>
+        <div class="map-coords" id="map-coords" aria-live="off"></div>
+        <div class="map-tip" id="map-tip" hidden></div>
+        <div class="map-empty" id="map-empty" hidden>
+          <b>The map is still empty</b>
+          <span>It draws itself around players while they play. Check back after someone has been online.</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

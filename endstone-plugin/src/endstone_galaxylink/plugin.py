@@ -46,7 +46,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.25.0"
+VERSION = "2.26.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -210,6 +210,8 @@ class GalaxyLink(Plugin):
         self.ranktags = RankTags(self)
         from endstone_galaxylink.bedwars import Bedwars
         self.bedwars = Bedwars(self)
+        from endstone_galaxylink.livemap import LiveMap
+        self.livemap = LiveMap(self)
         ranks_module.PICTURES = self.ranktags
         try:
             from endstone_galaxylink.ranktags import pack_report, clean_world_packs
@@ -231,6 +233,7 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self.announcements.tick, delay=20, period=20)
         self.server.scheduler.run_task(self, self.minigames.tick, delay=600, period=600)
         self.server.scheduler.run_task(self, self.bedwars.tick, delay=100, period=10)
+        self.server.scheduler.run_task(self, self.livemap.tick, delay=200, period=40)  # website map
         self.server.scheduler.run_task(self, self.plots.tick, delay=1, period=1)
         self.server.scheduler.run_task(self, self.plots.check_tools, delay=400, period=200)  # plot tools come back if missing
         self.server.scheduler.run_task(self, self.auction.tick, delay=600, period=600)

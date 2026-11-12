@@ -172,7 +172,7 @@ export async function ban(request, env, ctx, url, params) {
     sql`DELETE FROM sessions WHERE user_id = ${target.id}`,
     audit(sql, actor.id, "user.ban", { userId: target.id, details: { reason } }),
   ]);
-  await hubBroadcast(env, { type: "kick", userId: Number(target.id), reason: "Your account has been banned from the community." });
+  await hubBroadcast(env, { type: "kick", userId: Number(target.id), reason: "Your account has been banned from the community. You can appeal at galaxymc.us/appeal." });
   await voiceEvent(env, { type: "banned", userId: Number(target.id) });
   await hubBroadcast(env, { type: "member_removed", userId: Number(target.id) });
   return json({ ok: true });

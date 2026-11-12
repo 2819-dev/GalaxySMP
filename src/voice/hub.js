@@ -20,6 +20,7 @@ import { loadHelp } from "../routes/help.js";
 import { planMessage } from "../routes/plans.js";
 import { hubStub } from "../routes/chat.js";
 import { notify } from "../routes/notify.js";
+import { recordChunks } from "../routes/map.js";
 
 const DOWN_AFTER_MS = 3 * 60 * 1000; // quick restarts (under 3 minutes) don't send notifications
 
@@ -205,6 +206,11 @@ export class VoiceHub extends DurableObject {
     if (url.pathname === "/internal/events") {
       return Response.json((await this.ctx.storage.get("events")) || { events: [], at: null });
     }
+    if (url.pathname === "/internal/map") {
+      const [live, marks] = await Promise.all([this.ctx.storage.get("map_live"), this.ctx.storage.get("map_markers")]);
+      const fresh = live && Date.now() - live.at < 30_000;
+      return Response.json({ players: fresh ? live.players : [], playersAt: live?.at || null, markers: marks?.markers || [], plots: marks?.plots || [] });
+    }
     if (url.pathname === "/internal/ah") {
       return Response.json((await this.ctx.storage.get("ah")) || { listings: [], at: null });
     }
@@ -353,6 +359,22 @@ export class VoiceHub extends DurableObject {
     if (msg.type === "events") {
       const events = (Array.isArray(msg.events) ? msg.events : []).slice(0, 50);
       return this.ctx.storage.put("events", { events, at: Date.now() });
+    }
+    if (msg.type === "map_chunks") {
+      return recordChunks(this.env, msg).catch((e) => console.error("map chunks failed", e));
+    }
+    if (msg.type === "map_live") {
+      const players = (Array.isArray(msg.players) ? msg.players : []).slice(0, 200).map((p) => ({
+        name: String(p.name || "").slice(0, 32), xuid: String(p.xuid || "").slice(0, 20), x: Number(p.x) || 0, z: Number(p.z) || 0, yaw: Number(p.yaw) || 0 }));
+      return this.ctx.storage.put("map_live", { players, at: Date.now() });
+    }
+    if (msg.type === "map_markers") {
+      const markers = (Array.isArray(msg.markers) ? msg.markers : []).slice(0, 50).map((m) => ({
+        kind: String(m.kind || "").slice(0, 12), label: String(m.label || "").slice(0, 40), x: Number(m.x) || 0, z: Number(m.z) || 0 }));
+      const plots = (Array.isArray(msg.plots) ? msg.plots : []).slice(0, 2000).map((p) => ({
+        kind: String(p.kind || "plot").slice(0, 8), label: String(p.label || "").slice(0, 40), owner: String(p.owner || "").slice(0, 32),
+        x1: Number(p.x1) || 0, z1: Number(p.z1) || 0, x2: Number(p.x2) || 0, z2: Number(p.z2) || 0 }));
+      return this.ctx.storage.put("map_markers", { markers, plots, at: Date.now() });
     }
     if (msg.type === "ah") {
       const listings = (Array.isArray(msg.listings) ? msg.listings : []).slice(0, 300);

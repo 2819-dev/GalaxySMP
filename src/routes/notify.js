@@ -13,6 +13,9 @@ export const KINDS = {
   announcements: { name: "Server announcements", hint: "Announcements staff send in game", default: true },
   server: { name: "Server online / offline", hint: "When GalaxySMP goes down or comes back online", default: true },
   reward: { name: "Daily reward reminder", hint: "Around noon (US Eastern) if you haven't claimed /daily yet", default: true },
+  events: { name: "Events", hint: "New events, and a reminder 15 minutes before events you asked to be reminded about", default: true },
+  news: { name: "News & polls", hint: "New posts in #News and new polls", default: true },
+  community: { name: "Suggestions & builds", hint: "Replies to your suggestions, and Build of the Week", default: true },
   summary: { name: "Daily summary", hint: "Each evening: who played today, your money and streak", default: true },
 };
 const prefsOf = (stored) => Object.fromEntries(Object.entries(KINDS).map(([k, v]) => [k, stored && typeof stored[k] === "boolean" ? stored[k] : v.default]));
@@ -126,6 +129,7 @@ export async function notify(env, userIds, kind, message, options = {}) {
 
 // ---------- daily notifications (Cloudflare cron) ----------
 export async function daily(env, cron) {
+  if (!cron.startsWith("5 16") && !cron.startsWith("35 0")) return 0;
   const sql = getDb(env);
   const etToday = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10); // US Eastern date (close enough)
   if (cron.startsWith("5 16")) {

@@ -8,6 +8,7 @@ import { money, hours, playerSearch } from "/js/leaderboard.js";
 import { faceSvg } from "/js/face.js";
 import { activityBlock } from "/js/activity.js";
 import { badgeRow } from "/js/badges.js";
+import { barChart, lineChart } from "/js/charts.js";
 
 // A line icon for each achievement (instead of the emojis the game uses).
 const ACH_ICONS = {
@@ -145,6 +146,10 @@ async function load() {
       stat("skull", "Final kills", short(bw.finals)),
       stat("pickaxe", "Beds broken", short(bw.beds)))) : null;
 
+  // ---- activity over time (charts) ----
+  const charts = section("Activity", h("p", { class: "text-3 small", style: "margin:0", text: "Loading…" }));
+  loadCharts(p.name, charts);
+
   // ---- achievements (earned in game) ----
   const total = p.achievements.length;
   const pct = total ? Math.round((unlocked.length / total) * 100) : 0;
@@ -161,7 +166,36 @@ async function load() {
     h("p", { class: "text-3 small", style: "margin:12px 0 0" }, "Earn achievements with ", h("code", { text: "/achievements" }), ", ", h("code", { text: "/quests" }), " and ", h("code", { text: "/daily" }), " in game. ",
       h("a", { href: "/leaderboard", text: "See the leaderboards" }), "."));
 
-  box.replaceChildren(hero, h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, stats, bedwars), h("div", { class: "pp-col" }, achievements)));
+  box.replaceChildren(hero, h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, stats, bedwars, charts), h("div", { class: "pp-col" }, achievements)));
+}
+
+// Playtime per day (bars) and money over the last 30 days (line), from the daily history.
+async function loadCharts(name, box) {
+  const body = box.querySelector("p");
+  let d;
+  try { d = await fetch(`/api/players/${encodeURIComponent(name)}/history`).then((r) => r.json()); } catch { body.textContent = "Charts couldn't be loaded."; return; }
+  const rows = (d.days || []).slice(-31);
+  if (rows.length < 2) { body.textContent = "Charts appear after a couple of days of playing."; return; }
+  const byDay = new Map(rows.map((r) => [r.day, r]));
+  const days = [];
+  const start = new Date(`${rows[0].day}T12:00:00`);
+  for (let t = start; t <= new Date(`${rows[rows.length - 1].day}T12:00:00`); t = new Date(t.getTime() + 864e5)) days.push(t.toISOString().slice(0, 10));
+  let prev = null, lastMoney = rows[0].money;
+  const label = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString([], { month: "short", day: "numeric" });
+  const play = [], cash = [];
+  for (const iso of days) {
+    const r = byDay.get(iso);
+    const secs = r && prev != null ? Math.max(0, r.playtime - prev) : 0;
+    if (r) { prev = r.playtime; lastMoney = r.money; }
+    if (iso !== days[0]) play.push({ label: label(iso), value: secs / 3600, tip: [label(iso), secs ? `Played ${hours(secs)}` : "Didn't play"] });
+    cash.push({ label: label(iso), value: lastMoney, tip: [label(iso), money(lastMoney)] });
+  }
+  const total = play.reduce((n, x) => n + x.value, 0);
+  const width = body.clientWidth || 600;
+  box.replaceChildren(h("h2", { class: "pp-h2", text: "Activity" }),
+    h("p", { class: "text-3 small", style: "margin:0 0 10px", text: `${hours(Math.round(total * 3600))} played in the last ${play.length} days.` }),
+    barChart({ title: "Playtime per day", width, days: play, format: (v) => (v ? `${Math.round(v * 10) / 10}h` : "0") }),
+    lineChart({ title: "Money", width, points: cash, format: (v) => money(v) }));
 }
 
 playerSearch($("player-search"), $("player-q"), $("player-suggest"));

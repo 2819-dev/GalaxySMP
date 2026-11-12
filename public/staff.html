@@ -42,6 +42,7 @@
             <h2 class="cp-group-name">Moderation</h2>
             <button type="button" data-tab="reports" aria-selected="false">Reports <span class="count-badge" id="tab-reports-count"></span></button>
             <button type="button" data-tab="tickets" aria-selected="false">Tickets <span class="count-badge" id="tab-tickets-count"></span></button>
+            <button type="button" data-tab="appeals" aria-selected="false">Appeals <span class="count-badge" id="tab-appeals-count"></span></button>
             <button type="button" data-tab="words" aria-selected="false">Word filter</button>
             <button type="button" data-tab="audit" aria-selected="false">Audit log</button>
           </div>
@@ -245,6 +246,17 @@
           <div id="dm-owner-view" hidden></div>
         </section>
 
+        <section data-panel="appeals" hidden>
+          <div class="cx-row" style="justify-content:space-between;margin-bottom:12px">
+            <div class="tabs-mini" id="appeal-filter" role="group" aria-label="Show">
+              <button type="button" data-status="open" aria-pressed="true">Waiting</button>
+              <button type="button" data-status="accepted" aria-pressed="false">Accepted</button>
+              <button type="button" data-status="declined" aria-pressed="false">Declined</button>
+            </div>
+            <a class="text-3 small" href="/appeal" target="_blank" rel="noopener">The appeal page players use</a>
+          </div>
+          <div id="appeal-list" class="stack" style="gap:10px"></div>
+        </section>
         <section data-panel="audit" hidden>
           <div class="panel" style="padding:0" id="audit-list"></div>
           <button class="btn btn-secondary" type="button" id="audit-more" style="margin-top:12px" hidden>Load older entries</button>

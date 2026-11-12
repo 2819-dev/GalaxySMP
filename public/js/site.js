@@ -25,6 +25,7 @@ const ICONS = {
   tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
   alert: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>',
+  map: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/>',
   pin: '<path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>',
   key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M15 8l2 2"/>',
   cart: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a1 1 0 0 0 1 .8h9.6a1 1 0 0 0 1-.8L21 7H6.2"/>',
@@ -120,6 +121,7 @@ const NAV = [
   ["/rules", "Rules", "shield"],
   ["/status", "Status", "activity"],
   ["/leaderboard", "Leaderboard", "trophy"],
+  ["/map", "Map", "map"],
   ["/store", "Store", "bag"],
   ["/voice", "Voice", "mic"],
 ];
@@ -194,8 +196,8 @@ function renderFooter() {
           <a class="brand" href="/" aria-label="${config.serverName} home"><img src="/img/wordmark.png" alt="${config.serverName}" width="150" height="26"></a>
           <p>A family-friendly Minecraft Bedrock server.</p>
         </div>
-        <div><h4>Play</h4><ul><li><a href="/join">How to Join</a></li><li><a href="/status">Server Status</a></li><li><a href="/leaderboard">Leaderboards</a></li><li><a href="/store">Store</a></li><li><a href="/store#donate">Donate</a></li></ul></div>
-        <div><h4>Community</h4><ul><li><a href="/community">Community Chat</a></li><li><a href="/voice">Voice Chat</a></li><li><a href="/rules">Rules</a></li></ul></div>
+        <div><h4>Play</h4><ul><li><a href="/join">How to Join</a></li><li><a href="/status">Server Status</a></li><li><a href="/leaderboard">Leaderboards</a></li><li><a href="/map">Server Map</a></li><li><a href="/store">Store</a></li><li><a href="/store#donate">Donate</a></li></ul></div>
+        <div><h4>Community</h4><ul><li><a href="/community">Community Chat</a></li><li><a href="/voice">Voice Chat</a></li><li><a href="/rules">Rules</a></li><li><a href="/appeal">Ban appeals</a></li></ul></div>
         <div><h4>Account</h4><ul><li><a href="/account">Account settings</a></li><li><a href="/account#notifications">Notifications</a></li><li><a href="/privacy">Privacy Policy</a></li></ul></div>
       </div>
     </div>
