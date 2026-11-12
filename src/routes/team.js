@@ -114,7 +114,7 @@ export async function listApplications(request, env, ctx, url) {
     return json({ ok: true, owner: true, open: n, questions: QUESTIONS, applications: rows.map(appOut) });
   }
   const [mine] = await sql`SELECT * FROM staff_applications WHERE user_id = ${me.id} ORDER BY id DESC LIMIT 1`;
-  if (mine?.user_unread) await sql`UPDATE staff_applications SET user_unread = 0 WHERE id = ${mine.id}`;
+  if (mine?.user_unread && !me.acting_by) await sql`UPDATE staff_applications SET user_unread = 0 WHERE id = ${mine.id}`;
   const staff = can(me, "mod_panel");
   const waitDays = mine && mine.status === "declined" ? Math.ceil(14 - (Date.now() - new Date(mine.decided_at)) / 864e5) : 0;
   return json({

@@ -193,6 +193,11 @@ export class CommunityHub extends DurableObject {
       return;
     }
     try {
+      // "Act as Member" (look-only): nothing is sent, edited, reacted to or marked as seen
+      if (user?.readOnly && ["send", "react", "seen", "edit", "typing", "delete"].includes(msg.type)) {
+        if (msg.type === "send" || msg.type === "edit") this.send(ws, { type: "rejected", nonce: msg.nonce, message: "You're looking at the site as another member, so you can't send messages." });
+        return;
+      }
       if (msg.type === "send") await this.onSend(ws, user, msg);
       else if (msg.type === "react") await this.onReact(ws, user, msg);
       else if (msg.type === "seen") await this.onSeen(user, msg);

@@ -43,7 +43,8 @@ export async function headerMe(request, env) {
       money: u.balance_cents == null ? null : Number(u.balance_cents) / 100, inGame: Boolean(u.in_game),
       staff: Number(u.power) >= 50,
       panel: Number(u.power) < 50 ? null : isOwner(env, user.username, user.platform === "bedrock") ? "Control Panel" : Number(u.power) >= 100 ? "Admin Panel" : "Staff Panel",
-      onboarding: !u.onboarded_at, // still has to do the welcome steps
+      onboarding: !u.onboarded_at && !user.acting_by, // still has to do the welcome steps
+      acting: user.acting_by ? { by: user.acting_by_name } : null,  // the owner is looking as this member
     },
   }, 200, { "Cache-Control": "no-store" });
 }

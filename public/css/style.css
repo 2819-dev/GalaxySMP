@@ -2350,3 +2350,8 @@ html[data-theme="light"] .dialog, html[data-theme="light"] dialog { background: 
 .wp-item input { margin-top: 3px; }
 .wp-label { display: block; font-weight: 600; }
 .wp-hint { display: block; font-size: .78rem; color: var(--text-3); }
+
+/* ---------- "Act as Member" bar ---------- */
+.acting-bar { position: sticky; top: 0; z-index: 200; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; padding: 8px 14px;
+  background: linear-gradient(90deg, #7a3cff, #2457eb); color: #fff; font-weight: 600; font-size: .9rem; text-align: center; }
+.acting-bar .btn { background: #fff; color: #2a2f6b; border: 0; }

@@ -39,6 +39,8 @@ import * as feed from "./routes/feed.js";
 import * as team from "./routes/team.js";
 import * as helpcenter from "./routes/helpcenter.js";
 import * as uploads from "./routes/uploads.js";
+import * as actas from "./routes/actas.js";
+import { isActingRequest } from "./lib/auth.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -63,6 +65,8 @@ const routes = [
   ["POST", "/api/auth/link/poll", (req, env) => linkPoll(req, env)],
   ["POST", "/api/auth/login", (req, env) => login(req, env)],
   ["POST", "/api/auth/logout", (req, env) => logout(req, env)],
+  ["POST", "/api/act-as/stop", (req, env) => actas.stopActingRoute(req, env)],
+  ["POST", "/api/mod/act-as/:id", actas.startActing],
   ["GET", "/api/me", (req, env) => me(req, env)],
   ["GET", "/api/plugin/ping", (req, env) => pluginPing(req, env)],
   ["POST", "/api/plugin/link", (req, env) => pluginLink(req, env)],
@@ -301,6 +305,11 @@ export default {
     }
     if (!url.pathname.startsWith("/api/")) return serveStatic(request);
     try {
+      // "Act as Member" sessions are look-only: no changes of any kind (except going back / signing out)
+      if (!["GET", "HEAD", "OPTIONS"].includes(request.method) && !["/api/auth/logout", "/api/act-as/stop"].includes(url.pathname)
+          && !url.pathname.startsWith("/api/plugin/") && request.headers.get("Cookie")?.includes("gsmp_session=") && await isActingRequest(request, env)) {
+        return error("You're looking at the site as another member, so changes are turned off. Use \"Back to my account\" to go back.", 403);
+      }
       let pathFound = false;
       for (const [method, path, handler] of routes) {
         const params = matchPath(path, url.pathname);

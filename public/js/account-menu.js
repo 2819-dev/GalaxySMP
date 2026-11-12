@@ -14,6 +14,7 @@ export async function renderAccountButton(slot) {
   if (!slot) return;
   let me = null;
   try { me = (await (await fetch("/api/me/header", { credentials: "same-origin" })).json()).user; } catch { /* offline */ }
+  if (me?.acting) actingBanner(me);
   // New members finish the welcome steps first (the rules and privacy pages stay readable)
   if (me?.onboarding && !["/welcome", "/rules", "/privacy"].includes(location.pathname)) {
     location.replace("/welcome");
@@ -106,8 +107,8 @@ export async function renderAccountButton(slot) {
     out.innerHTML = icon("logout"); // fixed icon only
     out.append(make("span", null, "Sign out"));
     out.addEventListener("click", async () => {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
-      location.href = "/";
+      const r = await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).then((x) => x.json()).catch(() => ({}));
+      location.href = r.backToOwner ? r.url : "/";  // acting as a member: back to the owner's account
     });
     links.append(out);
 
@@ -119,4 +120,25 @@ export async function renderAccountButton(slot) {
     setTimeout(() => { document.addEventListener("click", outside, true); document.addEventListener("keydown", esc); }, 0);
     acct.focus();
   });
+}
+
+// "Act as Member": a bar on every page so it's always clear whose account this is, with the way back.
+function actingBanner(me) {
+  if (document.getElementById("acting-bar")) return;
+  const bar = document.createElement("div");
+  bar.id = "acting-bar";
+  bar.className = "acting-bar";
+  const text = document.createElement("span");
+  text.textContent = `You're seeing GalaxySMP as ${me.username}. Look only: nothing you do changes their account.`;
+  const back = document.createElement("button");
+  back.type = "button";
+  back.className = "btn btn-sm";
+  back.textContent = "Back to my account";
+  back.addEventListener("click", async () => {
+    back.disabled = true;
+    const r = await fetch("/api/act-as/stop", { method: "POST", credentials: "same-origin" }).then((x) => x.json()).catch(() => ({}));
+    location.href = r.backToOwner ? r.url : "/";
+  });
+  bar.append(text, back);
+  document.body.prepend(bar);
 }

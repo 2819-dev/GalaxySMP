@@ -41,7 +41,8 @@ $("notify-prefs").addEventListener("click", () => openPreferences());
 
 $("sign-out").addEventListener("click", async () => {
   stopChat();
-  await api("/api/auth/logout", {}).catch(() => {});
+  const r = await api("/api/auth/logout", {}).catch(() => ({}));
+  if (r?.backToOwner) { location.href = r.url; return; }  // acting as a member: back to the owner's account
   show("auth");
 });
 

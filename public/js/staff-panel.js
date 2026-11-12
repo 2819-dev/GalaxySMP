@@ -289,6 +289,14 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
         p.banned ? act("Unban", "btn-secondary", gameAction("unban", "Unban", { noReason: true }), true)
           : act("Ban", "btn-danger", gameAction("ban", "Ban", { lengths: [...LEN, ["perm", "Permanent"]], defaultLen: "perm", danger: true, reasonRequired: true }), true),
         act("Give crate keys", "btn-secondary", () => keyDialog(p, xuid, reload), true, "key"),
+        owner && acc && !acc.owner ? act("Act as member", "btn-secondary", () => openDialog({
+          title: `See the site as ${acc.username || p.name}?`,
+          body: h("p", { class: "text-2", text: "You'll be signed in to their account to see exactly what they see: channels, panels and buttons. It's look-only, so nothing you do changes anything. Use \"Back to my account\" or Sign out to come back. It ends by itself after 2 hours." }),
+          actions: [{ label: "Cancel" }, { label: "Act as member", kind: "primary", onClick: async () => {
+            await postJson(`/api/mod/act-as/${acc.id}`, {});
+            location.href = "/community";
+          } }],
+        }), false, "user") : null,
         owner ? act(p.op ? "Remove operator" : "Make operator", p.op ? "btn-danger" : "btn-secondary", () => openDialog({
           title: p.op ? `Remove operator from ${p.name}?` : `Make ${p.name} an operator?`,
           body: h("p", { class: "text-2", text: p.op

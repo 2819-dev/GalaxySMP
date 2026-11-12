@@ -117,9 +117,10 @@ export async function getConversation(request, env, ctx, url, params) {
     messages = rows.reverse().map((m) => ({ id: Number(m.id), from: Number(m.sender_id), body: m.body, via: m.via, at: m.created_at,
       read: Boolean(m.read_at), editedAt: m.edited_at || null }));
     // opening the conversation reads their messages: the sender can't edit them any more
-    const read = await sql`UPDATE dm_messages SET read_at = now() WHERE thread_id = ${thread.id} AND sender_id <> ${me.id} AND read_at IS NULL RETURNING id`;
+    // (looking as this member with "Act as Member" doesn't mark their messages as read)
+    const read = me.acting_by ? [] : await sql`UPDATE dm_messages SET read_at = now() WHERE thread_id = ${thread.id} AND sender_id <> ${me.id} AND read_at IS NULL RETURNING id`;
     if (read.length) await notify(env, { type: "dm_read", ids: read.map((r) => Number(r.id)), from: Number(me.id), to: Number(other.id) });
-    await sql`UPDATE dm_threads SET a_unread = CASE WHEN user_a = ${me.id} THEN 0 ELSE a_unread END,
+    if (!me.acting_by) await sql`UPDATE dm_threads SET a_unread = CASE WHEN user_a = ${me.id} THEN 0 ELSE a_unread END,
                                    b_unread = CASE WHEN user_b = ${me.id} THEN 0 ELSE b_unread END WHERE id = ${thread.id}`;
   }
   const [blockedByMe] = await sql`SELECT 1 FROM dm_blocks WHERE user_id = ${me.id} AND blocked_id = ${other.id}`;

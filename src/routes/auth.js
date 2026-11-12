@@ -1,4 +1,5 @@
 // Accounts: create (via in-game /link code), sign in, sign out, who am I.
+import { stopActing } from "./actas.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { linkCode, formatCode, randomToken, sha256 } from "../lib/crypto.js";
@@ -126,6 +127,9 @@ export async function login(request, env) {
 }
 
 export async function logout(request, env) {
+  // "Sign out" while acting as a member goes back to the owner's own account
+  const back = await stopActing(request, env);
+  if (back) return back;
   await destroySession(request, env);
   return json({ ok: true }, 200, { "Set-Cookie": clearCookie() });
 }

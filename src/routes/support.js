@@ -70,7 +70,7 @@ async function detail(sql, t, viewer) {
       FROM ticket_messages m LEFT JOIN users u ON u.id = m.user_id LEFT JOIN players p ON p.uuid = u.mc_uuid
      WHERE m.ticket_id = ${t.id} ORDER BY m.id`;
   // reading clears the unread counter for whoever is looking
-  if (Number(t.user_id) === Number(viewer.id) && t.user_unread) await sql`UPDATE tickets SET user_unread = 0 WHERE id = ${t.id}`;
+  if (Number(t.user_id) === Number(viewer.id) && t.user_unread && !viewer.acting_by) await sql`UPDATE tickets SET user_unread = 0 WHERE id = ${t.id}`;
   else if (isStaff(viewer) && Number(t.user_id) !== Number(viewer.id) && t.staff_unread) await sql`UPDATE tickets SET staff_unread = 0 WHERE id = ${t.id}`;
   return {
     ok: true,

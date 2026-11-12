@@ -17,13 +17,25 @@ export function clearCookie() {
   return `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
 }
 
-export function readCookie(request) {
+export function readCookie(request, name = COOKIE) {
   const header = request.headers.get("Cookie") || "";
   for (const part of header.split(";")) {
     const [k, ...v] = part.trim().split("=");
-    if (k === COOKIE) return v.join("=");
+    if (k === name) return v.join("=");
   }
   return null;
+}
+
+// "Act as Member": the owner's own session token waits in this cookie until they go back.
+export const RETURN_COOKIE = "gsmp_return";
+export const returnCookie = (token, maxAge) => `${RETURN_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+
+// Is this request from a look-only "Act as Member" session? (Used to block every change.)
+export async function isActingRequest(request, env) {
+  const token = readCookie(request);
+  if (!token || token.length > 100) return false;
+  const [s] = await getDb(env)`SELECT acting_by FROM sessions WHERE token_hash = ${await sha256(token)}`;
+  return Boolean(s?.acting_by);
 }
 
 export async function createSession(sql, userId) {
@@ -47,7 +59,8 @@ export async function getUser(request, env) {
   if (!token || token.length > 100) return null;
   const sql = getDb(env);
   const rows = await sql`
-    SELECT u.id, u.username, u.platform, u.banned, u.ban_reason, u.muted_until, u.mute_reason,
+    SELECT u.id, u.username, u.platform, u.banned, u.ban_reason, u.muted_until, u.mute_reason, s.acting_by,
+           (SELECT username FROM users a WHERE a.id = s.acting_by) AS acting_by_name,
            r.key AS role_key, r.name AS role_name, r.color AS role_color, r.power AS role_power,
            (SELECT coalesce(array_agg(DISTINCT pm), '{}') FROM players pl JOIN player_ranks x ON x.xuid = pl.xuid JOIN ranks rk ON rk.id = x.rank_id,
                    unnest(rk.web_perms) pm WHERE pl.uuid = u.mc_uuid) AS web_perms
@@ -78,6 +91,7 @@ export function publicUser(u) {
     platform: u.platform,
     role: { key: u.role_key, name: u.role_name, color: u.role_color, power: Number(u.role_power) },
     perms: u.perms || [], owner: Boolean(u.owner),
+    acting: u.acting_by ? { by: u.acting_by_name } : null,  // the owner is looking at the site as this member
     mutedUntil: u.muted_until && new Date(u.muted_until) > new Date() ? u.muted_until : null,
   };
 }
