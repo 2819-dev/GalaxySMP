@@ -354,9 +354,10 @@ export async function findMembers(request, env, ctx, url) {
   const q = String(url.searchParams.get("q") || "").trim().toLowerCase().slice(0, 32);
   if (q.length < 2) return json({ ok: true, members: [] });
   const sql = getDb(env);
+  const skip = url.searchParams.get("self") === "1" ? 0 : user.id; // gifts leave yourself out; badges don't
   const rows = await sql`
     SELECT u.id, u.username, p.xuid, p.head_at, p.gamerpic_at FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid
-     WHERE NOT u.banned AND u.id <> ${user.id} AND u.username_lower LIKE ${q.replace(/[%_\\]/g, "\\$&") + "%"}
+     WHERE NOT u.banned AND u.id <> ${skip} AND u.username_lower LIKE ${q.replace(/[%_\\]/g, "\\$&") + "%"}
      ORDER BY length(u.username), u.username_lower LIMIT 8`;
   return json({ ok: true, members: rows.map((r) => ({ id: Number(r.id), username: r.username, head: headUrlFor(r) })) });
 }

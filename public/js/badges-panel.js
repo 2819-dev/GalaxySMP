@@ -23,7 +23,7 @@ function memberPicker(chosen, onChange) {
     const q = input.value.trim();
     if (q.length < 2) { results.replaceChildren(); return; }
     t = setTimeout(async () => {
-      const d = await getJson(`/api/store/members?q=${encodeURIComponent(q)}`).catch(() => ({ members: [] }));
+      const d = await getJson(`/api/store/members?self=1&q=${encodeURIComponent(q)}`).catch(() => ({ members: [] }));
       results.replaceChildren(...d.members.map((m) => {
         const img = h("img", { class: "gift-face", alt: "", width: 28, height: 28 });
         img.src = m.head || faceSvg(m.username);
@@ -33,7 +33,7 @@ function memberPicker(chosen, onChange) {
       }));
     }, 200);
   });
-  return h("div", {}, input, results, chips);
+  return { input, list: h("div", {}, results, chips) };
 }
 
 export function setupBadges({ loaders, toast }) {
@@ -77,8 +77,8 @@ export function setupBadges({ loaders, toast }) {
     openDialog({
       title: action === "award" ? `Give "${b.name}"` : `Take back "${b.name}"`,
       body: h("div", {}, h("div", { class: "bd-hero" }, hexBadge(b, 72)),
-        action === "award" ? field("Give it to", picker.querySelector("input")) : h("p", { class: "text-2", text: "Tap names to choose who loses it (ticked = taken back)." }),
-        picker ? h("div", {}, ...[...picker.children].slice(1)) : list),
+        action === "award" ? field("Give it to", picker.input) : h("p", { class: "text-2", text: "Tap names to choose who loses it (ticked = taken back)." }),
+        picker ? picker.list : list),
       actions: [{ label: "Cancel" }, { label: action === "award" ? "Give badge" : "Take back", kind: action === "award" ? "primary" : "danger", onClick: async () => {
         if (!chosen.size) throw new Error("Pick at least one member.");
         await postJson(`/api/panel/badges/${b.id}`, { action, userIds: [...chosen.keys()] });
