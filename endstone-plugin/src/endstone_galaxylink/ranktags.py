@@ -246,6 +246,41 @@ def installed_version(pack_uuid):
     return None
 
 
+def installed_pack_folder(pack_uuid):
+    """The folder the server really loads our pack from (resource_packs/<something>), found by its manifest uuid."""
+    roots = [Path.cwd() / "resource_packs", level_folder() / "resource_packs", Path.cwd() / "development_resource_packs"]
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for manifest in root.glob("*/manifest.json"):
+            try:
+                if json.loads(manifest.read_text("utf-8")).get("header", {}).get("uuid") == pack_uuid:
+                    return manifest.parent
+            except Exception:
+                continue
+    return None
+
+
+def fingerprint(files):
+    """One hash for a set of glyph pictures {name: png bytes} (same pictures = same hash)."""
+    import hashlib
+    h = hashlib.sha1()
+    for name in sorted(files):
+        h.update(name.encode())
+        h.update(hashlib.sha1(files[name]).digest())
+    return h.hexdigest()[:16]
+
+
+def installed_fingerprint(pack_uuid):
+    folder = installed_pack_folder(pack_uuid)
+    if folder is None or not (folder / "font").is_dir():
+        return None
+    try:
+        return fingerprint({f.name: f.read_bytes() for f in (folder / "font").glob("glyph_*.png")})
+    except Exception:
+        return None
+
+
 GALAXY_PACKS = [("resource", "6b0f4c3e-2d1a-4a8e-9c5b-1f7e3a9d2c41", "GalaxySMP Icons"),
                 ("behavior", "27c58f05-2465-44d9-98cc-ff4e5bb2a019", "GalaxySMP Blocks"),
                 ("resource", PACK_UUID, "GalaxySMP Rank Tags")]
@@ -438,13 +473,29 @@ class RankTags:
         self.history = cfg.get("history") or {}       # pack version -> its glyphs (the last few builds)
         # Only use pictures from the pack version the world really loaded (world_resource_packs.json).
         self.installed = installed_version(PACK_UUID)
-        mapping = self.history.get(str(self.installed))
-        if mapping is None and self.installed == self.version:  # built by an older plugin version (no history yet)
-            mapping = self.built
-        self.active = dict(mapping or {}) if self.installed else {}
+        self.active = self.pick_active()
+
+    def pick_active(self):
+        """The picture map for the pack the server REALLY loaded. The version number in the world's pack
+        list can lag behind the pack's actual pictures (some hosts' add-on installers update the files but
+        not the number), and using the wrong map shows wrong pieces of other tags (like "MEMBER]"). So the
+        installed pictures are fingerprinted and matched to the build that made them. No match: colored
+        text (always correct) until the next restart."""
+        entries = {k: (v if isinstance(v, dict) and "glyphs" in v else {"glyphs": v, "hash": None}) for k, v in self.history.items()}
+        found = installed_fingerprint(PACK_UUID)
+        if found is not None:
+            for k, e in entries.items():
+                if e.get("hash") == found:
+                    self.installed = int(k)
+                    return dict(e["glyphs"] or {})
+            return {}
+        # The pack folder couldn't be read: trust the world's version number, as before.
+        e = entries.get(str(self.installed))
+        mapping = e["glyphs"] if e else (self.built if self.installed == self.version else None)
+        return dict(mapping or {}) if self.installed else {}
 
     def save(self):
-        keep = sorted(self.history, key=int)[-3:]
+        keep = sorted(self.history, key=int)[-12:]
         self.history = {k: self.history[k] for k in keep}
         self.eco.set_config("ranktags", {"enabled": self.enabled, "chat": self.chat_pictures, "version": self.version,
                                          "built": self.built, "history": self.history})
@@ -491,7 +542,9 @@ class RankTags:
     def refresh(self, tags):
         """Called when ranks arrive from the website: rebuild the pack if any gradient tag changed."""
         want = self.wanted(tags)
-        if set(want) == {k for k in self.built if k != "__base__"} and self.built.get("__base__") == base_id():
+        newest = self.history.get(str(self.version))
+        fingerprinted = isinstance(newest, dict) and bool(newest.get("hash"))  # builds before 2.26.1 have none: rebuild once
+        if fingerprinted and set(want) == {k for k in self.built if k != "__base__"} and self.built.get("__base__") == base_id():
             return False
         built, pages = {"__base__": base_id()}, base_pages()
         cp = [0]
@@ -519,9 +572,9 @@ class RankTags:
             else:
                 built[sig] = place(tiles(pixels, 0, width))
         self.version += 1
-        self.write_pack(pages)
+        prints = self.write_pack(pages)
         self.built = built
-        self.history[str(self.version)] = built
+        self.history[str(self.version)] = {"glyphs": built, "hash": prints}
         self.save()
         self.plugin.logger.info(f"Gradient pictures updated ({len(built) - 1} smooth tags/names + instant letters). "
                                 "Smooth versions show after the next restart; new ranks and names use the instant letters right away.")
@@ -540,14 +593,16 @@ class RankTags:
             "modules": [{"type": "resources", "uuid": MODULE_UUID, "version": [1, 0, self.version]}],
         }
         buf = io.BytesIO()
+        files = {f"glyph_{page:02X}.png": png(16 * CELL, 16 * CELL, pixels) for page, pixels in pages.items()}
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
             z.writestr("manifest.json", json.dumps(manifest, indent=2))
-            for page, pixels in pages.items():
-                z.writestr(f"font/glyph_{page:02X}.png", png(16 * CELL, 16 * CELL, pixels))
+            for name, data in files.items():
+                z.writestr(f"font/{name}", data)
         path = self.pack_path()
         tmp = path.with_suffix(".tmp")
         tmp.write_bytes(buf.getvalue())
         tmp.replace(path)
+        return fingerprint(files)
 
     def status(self):
         instant = "ready (new ranks and names get gradients instantly)" if self.active.get("__base__") == base_id() else "after the next restart"

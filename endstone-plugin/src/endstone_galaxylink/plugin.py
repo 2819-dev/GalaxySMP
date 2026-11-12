@@ -46,7 +46,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.26.0"
+VERSION = "2.26.1"
 
 
 def _cmd(description, usage, perm, aliases=None):
