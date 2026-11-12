@@ -200,6 +200,28 @@ async function applyAction(env, sql, action, body, actor) {
     await changed(env);
     return { planPriority: next };
   }
+  if (action === "order") {
+    // The full top-to-bottom order of every rank plus the Galaxy+ / Pro+ plan tags, e.g.
+    // ["rank:1", "rank:2", "plan:pro", "plan:plus", "rank:3"]. Saved as priorities 5, 10, 15...
+    const order = Array.isArray(body.order) ? body.order.map(String) : [];
+    const ranks = await sql`SELECT id FROM ranks`;
+    const expected = new Set([...ranks.map((r) => `rank:${r.id}`), "plan:pro", "plan:plus"]);
+    if (order.length !== expected.size || new Set(order).size !== order.length || !order.every((k) => expected.has(k))) {
+      throw new HttpError(409, "The ranks changed while you were editing. Reload and try again.");
+    }
+    const step = Math.max(1, Math.min(5, Math.floor(255 / order.length)));
+    const plans = {};
+    for (const [i, key] of order.entries()) {
+      const priority = (i + 1) * step;
+      if (key.startsWith("plan:")) plans[key.slice(5)] = priority;
+      else await sql`UPDATE ranks SET priority = ${priority}, position = ${i + 1}, updated_at = now() WHERE id = ${Number(key.slice(5))}`;
+    }
+    await sql`INSERT INTO economy_config (key, value, updated_by) VALUES ('plan_priority', ${JSON.stringify(plans)}::jsonb, ${actor.label})
+              ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = EXCLUDED.updated_by`;
+    await audit(sql, actor.id, "rank.order", { by: actor.label, order });
+    await changed(env);
+    return { planPriority: plans };
+  }
   if (action === "delete") {
     const holders = await sql`SELECT xuid FROM player_ranks WHERE rank_id = ${Number(body.id)}`;
     const [gone] = await sql`DELETE FROM ranks WHERE id = ${Number(body.id)} RETURNING name`;

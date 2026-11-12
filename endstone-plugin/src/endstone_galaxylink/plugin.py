@@ -46,7 +46,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.24.2"
+VERSION = "2.24.3"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -274,7 +274,6 @@ class GalaxyLink(Plugin):
             for p in self.server.online_players:
                 p.name_tag = self.compose_tag(p, None)
 
-    @event_handler
     # ---------- operator on/off from the website (Control Panel, owner only) ----------
     # Operator status saved by an old Realm lives in the player's own data, so the server's /deop
     # can't remove it. Setting it on the player directly does. Offline players get it when they join.
@@ -316,6 +315,7 @@ class GalaxyLink(Plugin):
             self._save_pending_ops(pending)
             self.logger.info(f"[Website] {by}: {name} will {'become' if op else 'stop being'} an operator when they next join")
 
+    @event_handler
     def on_player_join(self, event: PlayerJoinEvent):
         player = event.player
         pending = self._pending_ops()

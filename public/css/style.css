@@ -1247,6 +1247,14 @@ img[src*="g=1"] { image-rendering: auto !important; }
 .plan-priority-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 8px; }
 .plan-priority-row label { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; color: var(--text-2); }
 .plan-priority-row .input { width: 110px; }
+.rank-order { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.rank-order-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); min-width: 0; }
+.rank-order-row.is-current { border-color: var(--accent, #6d8bff); box-shadow: 0 0 0 1px var(--accent, #6d8bff) inset; }
+.rank-order-n { width: 1.6em; text-align: center; font-weight: 700; color: var(--text-3); font-variant-numeric: tabular-nums; flex: none; }
+.rank-order-tag { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-order-note { font-size: .72rem; color: var(--text-3); flex: none; }
+.rank-order-btns { display: flex; gap: 2px; flex: none; }
+.rank-order-btns .btn { min-width: 36px; min-height: 36px; padding: 0; font-size: 1rem; }
 
 .msg-link { color: var(--accent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
 .msg-link:hover { color: #9fe4ff; }

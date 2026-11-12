@@ -383,6 +383,59 @@ function rankPreview(prefix, color, name, icon, message, gradient) {
   return span;
 }
 
+// ---- Rank order: every rank plus the Galaxy+ / Pro+ plan tags, top = shown first ----
+const PLAN_TAGS = {
+  "plan:pro": { name: "Pro+ plan", prefix: "PRO+", color: "d", gradient: "royal", icon: "wingeddiamond" },
+  "plan:plus": { name: "Galaxy+ plan", prefix: "GALAXY+", color: "b", gradient: "aurora", icon: "star" },
+};
+
+function currentOrder() {
+  const pp = rankData.planPriority || { pro: 50, plus: 60 };
+  const items = rankData.ranks.map((r) => ({ key: `rank:${r.id}`, pri: r.priority ?? 100, pos: r.position ?? 0, r }));
+  for (const k of ["pro", "plus"]) items.push({ key: `plan:${k}`, pri: pp[k] ?? 100, pos: -1, r: PLAN_TAGS[`plan:${k}`] });
+  return items.sort((a, b) => a.pri - b.pri || a.pos - b.pos).map((x) => x.key);
+}
+
+// A list with up/down buttons. highlight = the key of the rank being edited ("new" for a new rank).
+// Returns { el, order(), changed() }.
+function rankOrderList(highlight, newLabel) {
+  const start = currentOrder();
+  if (highlight === "new") start.push("new");
+  let order = [...start];
+  const el = h("ol", { class: "rank-order" });
+  const labelOf = (key) => {
+    if (key === "new") return { name: newLabel?.() || "New rank", prefix: newLabel?.prefix?.() || "NEW", color: "f" };
+    if (PLAN_TAGS[key]) return PLAN_TAGS[key];
+    return rankData.ranks.find((r) => `rank:${r.id}` === key);
+  };
+  const move = (i, d) => {
+    const j = i + d;
+    if (j < 0 || j >= order.length) return;
+    [order[i], order[j]] = [order[j], order[i]];
+    draw(order[j]);
+  };
+  const draw = (focusKey) => {
+    el.replaceChildren(...order.map((key, i) => {
+      const r = labelOf(key);
+      const up = h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "↑", "aria-label": `Move ${r.name} up`, disabled: i === 0, onclick: () => move(i, -1) });
+      const down = h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "↓", "aria-label": `Move ${r.name} down`, disabled: i === order.length - 1, onclick: () => move(i, 1) });
+      up.dataset.key = key; down.dataset.key = key;
+      return h("li", { class: `rank-order-row${key === highlight ? " is-current" : ""}` },
+        h("span", { class: "rank-order-n", text: String(i + 1) }),
+        h("span", { class: "rank-order-tag" }, rankPreview(r.prefix, r.color, r.name, r.icon, null, r.gradient)),
+        key === highlight ? h("span", { class: "rank-order-note", text: "This rank" }) : null,
+        h("span", { class: "rank-order-btns" }, up, down));
+    }));
+    if (focusKey) el.querySelector(`button[data-key="${CSS.escape(focusKey)}"]:not([disabled])`)?.focus();
+  };
+  draw();
+  return { el, redraw: () => draw(), order: () => [...order], changed: () => order.join() !== start.join() };
+}
+
+async function saveOrder(order) {
+  await postJson("/api/mod/ranks/order", { order });
+}
+
 function splitPerms(perms) {
   const commands = [];
   const other = [];
@@ -399,13 +452,14 @@ loaders.ranks = async () => {
   const list = $("rank-list");
   list.replaceChildren();
   if (!rankData.ranks.length) list.append(h("div", { class: "empty", text: "No ranks yet. Select New rank to create one." }));
+  const place = currentOrder();
   for (const r of rankData.ranks) {
     const role = STAFF_POWERS.find((x) => x[0] === String(r.websiteRole || ""))?.[1] || "None";
     const { commands } = splitPerms(r.permissions);
     list.append(h("div", { class: "member-row" },
       h("div", { class: "info" },
         h("strong", {}, rankPreview(r.prefix, r.color, r.name, r.icon, null, r.gradient)),
-        h("span", { text: `Priority ${r.priority ?? 100} · ${r.players} player${r.players === 1 ? "" : "s"} · ${commands.length ? "Commands: " + commands.map((c) => "/" + c).join(" ") : "No commands"} · Staff powers: ${role}` })),
+        h("span", { text: `#${place.indexOf(`rank:${r.id}`) + 1} in rank order · ${r.players} player${r.players === 1 ? "" : "s"} · ${commands.length ? "Commands: " + commands.map((c) => "/" + c).join(" ") : "No commands"} · Staff powers: ${role}` })),
       h("div", { class: "row-actions" },
         h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Edit", onclick: () => rankDialog(r) }),
         h("button", { class: "btn btn-danger btn-sm", type: "button", text: "Delete", onclick: () => deleteRank(r) }))));
@@ -421,18 +475,16 @@ function renderPlanPriority() {
     box = h("div", { id: "plan-priority", class: "plan-priority" });
     $("rank-list").after(box);
   }
-  const pp = rankData.planPriority || { pro: 50, plus: 60 };
-  const pro = h("input", { class: "input", id: "pp-pro", type: "number", min: 1, max: 255, value: String(pp.pro) });
-  const plus = h("input", { class: "input", id: "pp-plus", type: "number", min: 1, max: 255, value: String(pp.plus) });
-  const save = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Save", onclick: async () => {
-    try { await postJson("/api/mod/ranks/plan-priority", { pro: Number(pro.value), plus: Number(plus.value) }); toast("Plan tag priorities saved."); loaders.ranks(); }
+  const list = rankOrderList(null);
+  const save = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Save order", onclick: async () => {
+    try { await saveOrder(list.order()); toast("Rank order saved."); loaders.ranks(); }
     catch (e) { toast(e.message); }
   } });
   box.replaceChildren(
-    h("h3", { text: "Plan tag priority" }),
-    h("p", { class: "text-3 small", text: "Every rank has a priority from 1 (highest) to 255 (lowest). A player who has a rank and a Galaxy+ or Pro+ plan shows only one tag: the one with the better (lower) priority. Example: Owner is 1, so an owner with Pro+ still shows OWNER." }),
-    h("div", { class: "plan-priority-row" },
-      h("label", {}, "Galaxy Pro+", pro), h("label", {}, "Galaxy+", plus), save));
+    h("h3", { text: "Rank order" }),
+    h("p", { class: "text-3 small", text: "Higher in the list wins. A player who has a rank and a Galaxy+ or Pro+ plan shows only one tag: whichever is higher here. Ranks are listed in this order everywhere." }),
+    list.el,
+    h("div", { class: "plan-priority-row" }, save));
 }
 
 function renderRankPlayers() {
@@ -524,13 +576,14 @@ function rankDialog(rank) {
     (v) => (v ? h("img", { src: `/img/ranks/rank_${v}.png`, alt: "" }) : h("span", { text: "None" })));
   const role = select("rank-role", STAFF_POWERS, STAFF_POWERS.some((x) => x[0] === String(r.websiteRole || "")) ? String(r.websiteRole || "") : "");
   const cmds = commandChips(commands);
-  const priority = h("input", { class: "input", id: "rank-priority", type: "number", min: 1, max: 255, step: 1, value: String(r.priority ?? 100) });
+  const orderList = rankOrderList(rank ? `rank:${rank.id}` : "new", Object.assign(() => name.value.trim() || "New rank", { prefix: () => prefix.value.trim() || "NEW" }));
   const advanced = h("input", { class: "input", id: "rank-other", placeholder: "someplugin.permission, another.one", value: other.join(", ") });
   const preview = h("div", { class: "rank-preview-box" });
   const update = () => {
     preview.replaceChildren(rankPreview(prefix.value || "PREFIX", color.value(), "VisionDevs", icon.value(), "hello!", gradient.value()));
   };
   [name, prefix, color.el, gradient.el, icon.el].forEach((el) => el.addEventListener("input", update));
+  if (!rank) [name, prefix].forEach((el) => el.addEventListener("input", orderList.redraw));
   update();
   openDialog({
     title: rank ? `Edit ${rank.name}` : "New rank",
@@ -538,7 +591,8 @@ function rankDialog(rank) {
       preview,
       field("Rank name", name),
       field("Prefix", prefix, "Shown as [PREFIX] in chat and above heads."),
-      field("Priority (1 to 255)", priority, `1 is the highest. If a player also has Galaxy+ (${rankData.planPriority?.plus ?? 60}) or Pro+ (${rankData.planPriority?.pro ?? 50}), only the tag with the lower number shows. Ranks are listed in this order too.`),
+      h("div", { class: "field" }, h("span", { class: "field-label", text: "Rank order" }), orderList.el,
+        h("p", { class: "hint", text: "Move this rank up or down. Higher wins: a player with this rank and a Galaxy+ or Pro+ plan shows whichever tag is higher in this list." })),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Color" }), color.el),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Gradient (optional)" }), gradient.el,
         h("p", { class: "hint", text: "A smooth gradient on the tag and name above the player's head in game (and on the website). In game chat the tag uses one solid color from the gradient." })),
@@ -553,11 +607,15 @@ function rankDialog(rank) {
     actions: [{ label: "Cancel" }, {
       label: rank ? "Save" : "Create", kind: "primary",
       onClick: async () => {
-        await postJson(`/api/mod/ranks/${rank ? "update" : "create"}`, {
+        const res = await postJson(`/api/mod/ranks/${rank ? "update" : "create"}`, {
           id: rank?.id, name: name.value, prefix: prefix.value, color: color.value(), gradient: gradient.value() || null, icon: icon.value() || null,
-          websiteRole: role.value || null, commands: cmds.value(), priority: Number(priority.value),
+          websiteRole: role.value || null, commands: cmds.value(),
           permissions: advanced.value.split(",").map((s) => s.trim()).filter((x) => x && x !== MG).concat(mgStaff.checked ? [MG] : []),
         });
+        if (orderList.changed() || !rank) {
+          const id = rank?.id ?? res.rank?.id;
+          if (id != null) await saveOrder(orderList.order().map((k) => (k === "new" ? `rank:${id}` : k)));
+        }
         toast(rank ? "Rank saved." : "Rank created.");
         loaders.ranks();
       },
