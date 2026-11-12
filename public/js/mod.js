@@ -4,7 +4,7 @@ import {
   chatState as state, messageActionHooks, memberHooks, profileActionHooks, eventHooks,
   renderMembers, renderComposer, removeMessage, roleOf,
 } from "/js/chat.js";
-import { h, openDialog, postJson, getJson, field, select, REPORT_REASONS, MUTE_LABELS, muteDialog, banDialog } from "/js/dialog.js";
+import { h, openDialog, postJson, getJson, field, select, REPORT_REASONS, MUTE_LABELS, reportPlayerDialog, muteDialog, banDialog } from "/js/dialog.js";
 import { rankTag } from "/js/rank-paint.js";
 import { ranksDialog } from "/js/rank-picker.js";
 
@@ -71,6 +71,16 @@ function deleteDialog(m, mine) {
 
 // ---------- Member profiles (click a name in the member list) ----------
 // Staff: a "Moderate" button on everyone's profile card (click a name, picture or member).
+// Everyone: "Report" on other members' cards (staff use Moderate instead).
+profileActionHooks.push((m, actions, close) => {
+  if (!state.me || m.id === state.me.id || myPower() >= STAFF) return;
+  const b = h("button", { class: "btn btn-ghost btn-sm", type: "button", title: "Report this player to staff" });
+  b.innerHTML = icon("flag");
+  b.append(" Report");
+  b.addEventListener("click", () => { close(); reportPlayerDialog(m.username, { userId: m.id }); });
+  actions.append(b);
+});
+
 profileActionHooks.push((m, actions, close) => {
   if (myPower() < STAFF || m.id === state.me.id) return;
   const b = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Moderate" });

@@ -1,6 +1,7 @@
 import { toast, config } from "/js/site.js";
 import { startChat, stopChat } from "/js/chat.js";
 import "/js/mod.js";
+import "/js/chat-polls.js";
 import { maybeAskForNotifications, refreshSubscription, openPreferences } from "/js/notify.js";
 
 const $ = (id) => document.getElementById(id);

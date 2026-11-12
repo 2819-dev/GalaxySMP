@@ -1,3 +1,4 @@
+import { toast as toastMsg } from "/js/site.js";
 // Small, accessible pop-up dialogs built on the native <dialog> element.
 
 export function h(tag, attrs = {}, ...children) {
@@ -80,6 +81,24 @@ export async function getJson(path) {
 
 export const MUTE_LABELS = { 10: "10 minutes", 60: "1 hour", 1440: "1 day", 10080: "7 days", 43200: "30 days" };
 export const REPORT_REASONS = ["Bad language", "Bullying or harassment", "Personal information", "Spam", "Inappropriate content", "Other"];
+export const PLAYER_REPORT_REASONS = ["Cheating or hacking", "Griefing", "Stealing", "Bad language", "Bullying or harassment", "Spam", "Other"];
+
+// "Report player" from a profile or member card: who = { userId } or { name }.
+export function reportPlayerDialog(label, who) {
+  const reason = select("preport-reason", PLAYER_REPORT_REASONS.map((r) => [r, r]), PLAYER_REPORT_REASONS[0]);
+  const details = h("textarea", { class: "input", id: "preport-details", maxlength: 300, rows: 3, placeholder: "What happened? Where and when, if it was in the game." });
+  openDialog({
+    title: `Report ${label}`,
+    body: h("div", { class: "form" },
+      field("What's wrong?", reason),
+      field("Details", details, "Only staff can see your report. The player isn't told who reported them.")),
+    actions: [
+      { label: "Cancel" },
+      { label: "Send report", kind: "primary", onClick: async () => { const r = await postJson("/api/reports/player", { ...who, reason: reason.value, details: details.value }); toastMsg(r.message); } },
+    ],
+  });
+}
+
 export const ROLE_OPTIONS = [["member", "Member"], ["vip", "VIP"], ["moderator", "Moderator"], ["admin", "Admin"]];
 
 export function select(id, options, value) {

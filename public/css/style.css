@@ -1844,6 +1844,10 @@ textarea.input.dm-input { resize: none; min-height: 44px; max-height: 140px; ove
 .nw-body p { margin: 0 0 8px; }
 
 .pl-card { padding: 16px; }
+.msg-poll { margin-top: 6px; max-width: 460px; }
+.pl-card.in-chat { padding: 12px 14px; background: var(--surface-2); }
+.pl-card.in-chat .pl-opt { background: var(--surface); }
+.pl-card.in-chat .sg-title { font-size: 1rem; margin: 0 0 4px; }
 .pl-opts { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 10px; }
 .pl-opt { position: relative; overflow: hidden; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
 .pl-opt:hover:not(:disabled) { border-color: var(--text-3); }
@@ -2079,3 +2083,40 @@ img.emoji-big { width: 44px; height: 44px; vertical-align: middle; margin: 2px 4
 .v-join-rooms { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
 .v-join-rooms h3 { margin: 0 0 4px; font-size: 1rem; }
 .nw-tag.recap { background: rgba(255, 196, 60, .14); color: #f3c562; }
+
+/* ---------- Player Shops (/shops) ---------- */
+.sh-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+.sh-bar #sh-q { flex: 1 1 220px; }
+.sh-bar #sh-sort { flex: 0 0 auto; width: auto; }
+.sh-bal { margin-left: auto; color: var(--text-2); font-weight: 600; }
+.sh-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.sh-grid > .empty { grid-column: 1 / -1; }
+.sh-card { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+.sh-card.out { opacity: .65; }
+.sh-top { display: flex; gap: 12px; align-items: center; }
+.sh-tile { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; font-weight: 800; letter-spacing: .02em;
+  background: hsl(var(--h) 55% 30%); color: hsl(var(--h) 90% 85%); border: 1px solid hsl(var(--h) 50% 45%); }
+.sh-what { min-width: 0; }
+.sh-name { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
+.sh-deal { color: var(--text-2); }
+.sh-deal b { color: var(--text); }
+.sh-meta { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--text-3); }
+.sh-meta a { color: var(--text-2); }
+.sh-stock { color: var(--ok); font-weight: 600; }
+.sh-stock.none { color: var(--bad); }
+.sh-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
+.sh-total { margin: 0; }
+.sh-warn { color: var(--bad); }
+
+/* ---------- Player of the Week ---------- */
+.potw-pill { font-size: .78rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; color: #ffe08a;
+  background: linear-gradient(90deg, rgba(255,200,60,.22), rgba(255,120,200,.18)); border: 1px solid rgba(255,210,90,.35); }
+.potw-card { display: flex; align-items: center; gap: 14px; max-width: 420px; margin: 18px auto 0; padding: 12px 18px; border-radius: 16px; text-decoration: none; color: var(--text);
+  background: linear-gradient(120deg, rgba(255,200,60,.14), rgba(138,92,255,.16)); border: 1px solid rgba(255,210,90,.3); }
+.potw-card:hover { border-color: rgba(255,210,90,.6); }
+.potw-card[hidden] { display: none; }
+.potw-face { width: 56px; height: 56px; border-radius: 12px; image-rendering: pixelated; background: var(--surface-2); }
+.potw-card > div { display: flex; flex-direction: column; }
+.potw-k { font-size: .78rem; font-weight: 700; color: #ffd76a; text-transform: uppercase; letter-spacing: .04em; }
+.potw-name { font-size: 1.15rem; }
+.potw-sub { font-size: .85rem; color: var(--text-2); }

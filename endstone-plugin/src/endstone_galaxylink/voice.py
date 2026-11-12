@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.28.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.29.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -209,6 +209,8 @@ class VoiceLink:
             self._on_main(lambda: self.plugin.chatfilter.set_enabled(msg.get("enabled"), msg.get("by") or "staff on the website"))
         elif msg.get("type") == "trade":  # trades started on the website (galaxymc.us/trades)
             self._on_main(lambda: self.plugin.trades.from_website(msg))
+        elif msg.get("type") == "shopchest_buy":  # Buy on galaxymc.us/shops
+            self._on_main(lambda: self.plugin.shopchests.from_website(msg))
         elif msg.get("type") == "ah_buy":
             self._on_main(lambda: self.plugin.auction.from_website(msg))
         elif msg.get("type") == "eco":
@@ -337,6 +339,7 @@ class VoiceLink:
             self.plugin.auction.push()
         except Exception as e:
             self.plugin.logger.warning(f"Couldn't send Auction House listings to the website: {e}")
+        self.plugin.shopchests.push()
         try:
             from endstone_galaxylink.heads import send_head
             for p in list(self.plugin.server.online_players):

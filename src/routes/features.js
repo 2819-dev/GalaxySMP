@@ -12,6 +12,8 @@ import { toPlugin } from "./economy.js";
 import { Buffer } from "node:buffer";
 import { expireTrades } from "./trades.js";
 import { weeklyRecap } from "./recap.js";
+import { loadMessage } from "../chat/messages.js";
+import { hubBroadcast } from "./chat.js";
 
 const STAFF = 50;
 const ADMIN = 100;
@@ -196,7 +198,7 @@ export async function pollsList(request, env) {
            (p.closed OR (p.closes_at IS NOT NULL AND p.closes_at < now())) AS is_closed,
            (SELECT count(DISTINCT v.user_id) FROM poll_votes v WHERE v.poll_id = p.id) AS voters
       FROM polls p LEFT JOIN users u ON u.id = p.author_id
-     WHERE p.deleted_at IS NULL ORDER BY (p.closed OR (p.closes_at IS NOT NULL AND p.closes_at < now())), p.id DESC LIMIT 30`;
+     WHERE p.deleted_at IS NULL AND p.channel_id IS NULL ORDER BY (p.closed OR (p.closes_at IS NOT NULL AND p.closes_at < now())), p.id DESC LIMIT 30`;
   const ids = polls.map((p) => p.id);
   const options = ids.length ? await sql`
     SELECT o.id, o.poll_id, o.label, o.position, (SELECT count(*) FROM poll_votes v WHERE v.option_id = o.id) AS votes,
@@ -210,6 +212,75 @@ export async function pollsList(request, env) {
       options: options.filter((o) => String(o.poll_id) === String(p.id)).map((o) => ({ id: Number(o.id), label: o.label, votes: Number(o.votes), mine: o.mine })),
     })),
   });
+}
+
+// One poll with its answers and votes (for polls shown inside chat messages).
+async function loadPoll(sql, pid, user) {
+  const [p] = await sql`
+    SELECT p.id, p.question, p.multi, p.author_id, p.closes_at, p.channel_id, u.username AS author,
+           (p.closed OR (p.closes_at IS NOT NULL AND p.closes_at < now())) AS is_closed,
+           (SELECT count(DISTINCT v.user_id) FROM poll_votes v WHERE v.poll_id = p.id) AS voters
+      FROM polls p LEFT JOIN users u ON u.id = p.author_id WHERE p.id = ${pid} AND p.deleted_at IS NULL`;
+  if (!p) return null;
+  const options = await sql`
+    SELECT o.id, o.label, (SELECT count(*) FROM poll_votes v WHERE v.option_id = o.id) AS votes,
+           EXISTS (SELECT 1 FROM poll_votes v WHERE v.option_id = o.id AND v.user_id = ${user.id}) AS mine
+      FROM poll_options o WHERE o.poll_id = ${pid} ORDER BY o.position`;
+  return {
+    id: Number(p.id), question: p.question, multi: p.multi, author: p.author || "Staff", closesAt: p.closes_at,
+    closed: Boolean(p.is_closed), voters: Number(p.voters),
+    canClose: !p.is_closed && (isStaff(user) || Number(p.author_id) === Number(user.id)),
+    options: options.map((o) => ({ id: Number(o.id), label: o.label, votes: Number(o.votes), mine: o.mine })),
+  };
+}
+
+// Galaxy+ and Galaxy Pro+ members (and staff) can make polls in chat channels.
+async function canMakeChatPoll(sql, user) {
+  if (isStaff(user)) return true;
+  const [row] = await sql`SELECT s.plan FROM users u JOIN players p ON p.uuid = u.mc_uuid JOIN subscriptions s ON s.xuid = p.xuid
+                           WHERE u.id = ${user.id} AND (s.expires_at IS NULL OR s.expires_at > now())`;
+  return row?.plan === "plus" || row?.plan === "pro";
+}
+
+function pollInput(body) {
+  const question = oneLine(body.question, 140);
+  const opts = (Array.isArray(body.options) ? body.options : []).map((o) => oneLine(o, 80)).filter(Boolean);
+  if (question.length < 3) throw new HttpError(400, "Write the question.");
+  if (opts.length < 2 || opts.length > 8) throw new HttpError(400, "A poll needs 2 to 8 answers.");
+  if (new Set(opts.map((o) => o.toLowerCase())).size !== opts.length) throw new HttpError(400, "Two answers are the same.");
+  const hours = Number(body.hours) || 0;
+  if (hours < 0 || hours > 24 * 30) throw new HttpError(400, "Polls can run for up to 30 days.");
+  return { question, opts, hours, closesAt: hours ? new Date(Date.now() + hours * 3600e3).toISOString() : null };
+}
+
+// POST /api/chat/polls { channelId, question, options[], multi, hours }: a poll posted as a chat message.
+export async function chatPollCreate(request, env) {
+  const user = await requireUser(request, env);
+  canPost(user, "post");
+  const sql = getDb(env);
+  if (!(await canMakeChatPoll(sql, user))) throw new HttpError(403, "Polls in chat are a Galaxy+ and Galaxy Pro+ perk.");
+  await rateLimit(env, "POLL_LIMITER", `chatpoll:${user.id}`);
+  const body = await readJson(request);
+  const { question, opts, closesAt } = pollInput(body);
+  await filterOrThrow(sql, [question, ...opts]);
+  const [ch] = await sql`SELECT c.id FROM channels c, users u JOIN roles r ON r.id = u.role_id
+                          WHERE c.id = ${Number(body.channelId) || 0} AND c.kind = 'text' AND NOT c.hidden AND u.id = ${user.id} AND r.power >= c.min_post_power`;
+  if (!ch) throw new HttpError(403, "You can't post in this channel.");
+  const [p] = await sql`INSERT INTO polls (question, multi, author_id, closes_at, channel_id)
+                        VALUES (${question}, ${Boolean(body.multi)}, ${user.id}, ${closesAt}, ${ch.id}) RETURNING id`;
+  await sql.transaction(opts.map((label, i) => sql`INSERT INTO poll_options (poll_id, label, position) VALUES (${p.id}, ${label}, ${i})`));
+  const [m] = await sql`INSERT INTO messages (channel_id, user_id, content, poll_id) VALUES (${ch.id}, ${user.id}, ${`📊 Poll: ${question}`}, ${p.id}) RETURNING id`;
+  const message = await loadMessage(sql, Number(m.id));
+  if (message) await hubBroadcast(env, { type: "message", message });
+  return json({ ok: true, id: Number(p.id), messageId: Number(m.id) });
+}
+
+// GET /api/chat/polls/:id
+export async function chatPollGet(request, env, ctx, url, params) {
+  const user = await requireUser(request, env);
+  const poll = await loadPoll(getDb(env), id(params.id), user);
+  if (!poll) throw new HttpError(404, "That poll no longer exists.");
+  return json({ ok: true, poll });
 }
 
 export async function pollCreate(request, env) {
@@ -236,7 +307,8 @@ export async function pollAction(request, env, ctx, url, params) {
   const user = await requireUser(request, env);
   const sql = getDb(env);
   const pid = id(params.id);
-  const [p] = await sql`SELECT id, question, multi, (closed OR (closes_at IS NOT NULL AND closes_at < now())) AS is_closed FROM polls WHERE id = ${pid} AND deleted_at IS NULL`;
+  const [p] = await sql`SELECT id, question, multi, author_id, channel_id, (closed OR (closes_at IS NOT NULL AND closes_at < now())) AS is_closed FROM polls WHERE id = ${pid} AND deleted_at IS NULL`;
+  const changed = () => (p.channel_id ? hubBroadcast(env, { type: "poll", id: Number(pid) }).catch(() => {}) : null);
   if (!p) throw new HttpError(404, "That poll no longer exists.");
   if (params.action === "vote") {
     canPost(user, "vote");
@@ -250,12 +322,19 @@ export async function pollAction(request, env, ctx, url, params) {
       sql`DELETE FROM poll_votes WHERE poll_id = ${pid} AND user_id = ${user.id}`,
       ...chosen.map((o) => sql`INSERT INTO poll_votes (poll_id, option_id, user_id) VALUES (${pid}, ${o}, ${user.id})`),
     ]);
+    await changed();
+    return json({ ok: true });
+  }
+  if (params.action === "close" && p.channel_id && Number(p.author_id) === Number(user.id)) {
+    await sql`UPDATE polls SET closed = true WHERE id = ${pid}`;
+    await changed();
     return json({ ok: true });
   }
   if (!isStaff(user)) throw new HttpError(403, "Only staff can do that.");
   if (params.action === "close") {
     await sql`UPDATE polls SET closed = true WHERE id = ${pid}`;
     await audit(sql, user.id, "poll.close", { question: p.question });
+    await changed();
     return json({ ok: true });
   }
   if (params.action === "delete") {

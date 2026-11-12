@@ -32,6 +32,7 @@ import * as appeals from "./routes/appeals.js";
 import * as livemap from "./routes/map.js";
 import * as emoji from "./routes/emoji.js";
 import * as trades from "./routes/trades.js";
+import * as shops from "./routes/shops.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -68,12 +69,15 @@ const routes = [
   ["GET", "/api/trades/inventory", (req, env) => trades.inventory(req, env)],
   ["POST", "/api/trades", (req, env) => trades.createTrade(req, env)],
   ["POST", "/api/trades/:id/:action", trades.tradeAction],
+  ["GET", "/api/shops", (req, env) => shops.listShops(req, env)],
+  ["POST", "/api/shops/:id/buy", shops.buyFromShop],
   ["GET", "/api/emoji/:name", emoji.emojiImage],
   ["POST", "/api/panel/emoji", (req, env) => emoji.addEmoji(req, env)],
   ["POST", "/api/panel/emoji/:name/delete", emoji.deleteEmoji],
   ["POST", "/api/chat/messages/:id/pin", chatPin],
   ["GET", "/api/chat/connect", (req, env) => connect(req, env)],
   ["POST", "/api/reports", (req, env) => mod.createReport(req, env)],
+  ["POST", "/api/reports/player", (req, env) => gamemod.webReportPlayer(req, env)],
   ["POST", "/api/messages/:id/delete", mod.deleteMessage],
   ["GET", "/api/mod/summary", (req, env) => mod.staffSummary(req, env)],
   ["GET", "/api/mod/reports", mod.listReports],
@@ -137,6 +141,8 @@ const routes = [
   ["GET", "/api/community/polls", (req, env) => features.pollsList(req, env)],
   ["POST", "/api/community/polls", (req, env) => features.pollCreate(req, env)],
   ["POST", "/api/community/polls/:id/:action", features.pollAction],
+  ["POST", "/api/chat/polls", (req, env) => features.chatPollCreate(req, env)],
+  ["GET", "/api/chat/polls/:id", features.chatPollGet],
   ["GET", "/api/community/builds", features.buildsList],
   ["POST", "/api/community/builds", (req, env) => features.buildCreate(req, env)],
   ["GET", "/api/community/builds/image/:id", features.buildImage],

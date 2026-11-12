@@ -148,3 +148,35 @@ export async function staffResolveGameReport(request, env, ctx, url, params) {
   await resolveGameReport(env, getDb(env), Number(params.id), b.outcome, b.note, Number(user.id), user.username);
   return json({ ok: true });
 }
+
+// ---------- from the website: "Report player" on profiles and member cards ----------
+// Goes into the same list as in-game /report, so staff see it in Staff Tools > Reports and in the in-game /mod panel.
+export async function webReportPlayer(request, env) {
+  const user = await requireUser(request, env);
+  const b = await readJson(request);
+  const sql = getDb(env);
+  const reason = GAME_REPORT_REASONS.includes(b.reason) ? b.reason : "Other";
+  // who is reported: a website member (userId) or a player by gamertag (name)
+  let target = null;
+  if (b.userId) {
+    [target] = await sql`SELECT u.id, coalesce(p.gamertag, u.username) AS name, p.xuid FROM users u
+                           LEFT JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${Number(b.userId) || 0}`;
+  } else if (b.name) {
+    [target] = await sql`SELECT u.id, p.gamertag AS name, p.xuid FROM players p LEFT JOIN users u ON u.mc_uuid = p.uuid
+                          WHERE lower(p.gamertag) = lower(${text(b.name, 32)}) LIMIT 1`;
+  }
+  if (!target) throw new HttpError(404, "That player couldn't be found.");
+  if (target.id && Number(target.id) === Number(user.id)) throw new HttpError(400, "You can't report yourself.");
+  const [me] = await sql`SELECT coalesce(p.gamertag, u.username) AS name, p.xuid FROM users u
+                          LEFT JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${user.id}`;
+  const [{ recent, same }] = await sql`
+    SELECT count(*) FILTER (WHERE created_at > now() - interval '1 day')::int AS recent,
+           count(*) FILTER (WHERE status = 'open' AND lower(target_name) = lower(${target.name}))::int AS same
+      FROM game_reports WHERE lower(reporter_name) = lower(${me.name})`;
+  if (same) return json({ ok: true, message: "You've already reported this player. Staff will look at it soon." });
+  if (recent >= 5) throw new HttpError(429, "You've sent a lot of reports today. Please try again tomorrow, or open a ticket in #support.");
+  await sql`INSERT INTO game_reports (reporter_xuid, reporter_name, target_xuid, target_name, reason, details, world)
+            VALUES (${me.xuid || null}, ${me.name}, ${target.xuid || null}, ${target.name}, ${reason}, ${text(b.details, 300)}, 'website')`;
+  await notifyStaff(env, sql);
+  return json({ ok: true, message: "Thanks. Your report was sent to staff." });
+}

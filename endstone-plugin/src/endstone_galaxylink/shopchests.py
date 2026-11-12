@@ -8,6 +8,10 @@ The stock is kept inside the shop itself (not in the chest), so it can't be stol
 item, price and stock above every shop chest. Removing a shop chest, unclaiming or losing the plot gives the
 stock back to the owner (the next time they join, if they're offline).
 Named and enchanted items can't be sold in shop chests (use the Auction House).
+
+Website: every Sell shop chest is sent to galaxymc.us/shops. The website only lists the ones whose owner has
+Galaxy+ or Galaxy Pro+, and members can buy from them there. The buyer pays from their in-game balance and the
+items go into their inventory (the next time they join, if they're offline).
 """
 
 import json
@@ -36,6 +40,7 @@ class ShopChests:
         self.db.commit()
         self.shops = {sid: json.loads(d) for sid, d in self.db.execute("SELECT id, data FROM shop_chests").fetchall()}
         self.returns = self.eco.get_config("shop_returns") or {}   # owner xuid -> [[item, count]]
+        self.deliveries = self.eco.get_config("shop_web_deliveries") or {}   # buyer xuid -> [[item, count]] bought on the website
         self.last_tap = {}
 
     # ---------- storage ----------
@@ -43,6 +48,77 @@ class ShopChests:
         self.db.execute("UPDATE shop_chests SET data = ? WHERE id = ?", (json.dumps(self.shops[sid]), sid))
         self.db.commit()
         self.label(sid)
+        self.push()
+
+    # ---------- website (galaxymc.us/shops) ----------
+    def payload(self):
+        plots = getattr(self.plugin, "plots", None)
+        out = []
+        for sid, s in self.shops.items():
+            if s["mode"] != "sell":
+                continue
+            plot = plots.plots.get(s["plot"]) if plots else None
+            out.append({"id": sid, "owner": s["owner"], "ownerName": s["owner_name"], "item": s["item"], "name": self.item_name(s),
+                        "amount": s["amount"], "price": s["price"], "stock": s["stock"],
+                        "shop": (plots.label(plot) if plot else "Shop"), "dim": s["dim"], "x": s["x"], "y": s["y"], "z": s["z"]})
+        return out
+
+    def push(self):
+        voice = getattr(self.plugin, "_voice", None)
+        if voice and voice.ws:
+            try:
+                voice.send_json({"type": "shopchests", "shops": self.payload()})
+            except Exception as e:
+                self.plugin.logger.warning(f"Couldn't send shop chests to the website: {e}")
+
+    def from_website(self, msg):
+        """A member pressed Buy on galaxymc.us/shops. Always answers, so the website isn't left waiting."""
+        voice = getattr(self.plugin, "_voice", None)
+        try:
+            ok, text = self.web_buy(msg)
+        except Exception as e:
+            self.plugin.logger.warning(f"Website shop buy failed: {e}")
+            ok, text = False, "Something went wrong. Please try again."
+        if voice:
+            voice.send_json({"type": "answer", "req": msg.get("req"), "ok": ok, "message": text})
+
+    def web_buy(self, msg):
+        sid = int(msg.get("shop") or 0)
+        s = self.shops.get(sid)
+        if not s or s["mode"] != "sell":
+            return False, "This shop chest isn't selling any more."
+        xuid, name = str(msg.get("xuid") or ""), str(msg.get("name") or "")[:32]
+        if not xuid.isdigit():
+            return False, "Link your Minecraft account first."
+        if xuid == s["owner"]:
+            return False, "That's your own shop."
+        if int(msg.get("price") or 0) != s["price"] or int(msg.get("amount") or 0) != s["amount"]:
+            return False, "The owner just changed the price. Check the new price and try again."
+        times = max(1, min(int(msg.get("times") or 1), 1000))
+        if s["stock"] // s["amount"] < times:
+            return False, "There isn't enough in stock for that any more." if s["stock"] >= s["amount"] else "This shop is out of stock."
+        cost = times * s["price"]
+        buyer = next((p for p in self.plugin.server.online_players if str(p.xuid) == xuid), None)
+        paid = self.eco.charge(buyer, cost) if buyer is not None else self.eco.take(xuid, cost)
+        if not paid:
+            return False, f"You need {money.exact(cost)} in your in-game balance for that."
+        n = times * s["amount"]
+        s["stock"] -= n
+        self.save(sid)
+        self.eco.add(s["owner"], s["owner_name"], cost)
+        self.plugin.progress.bump(s["owner"], "shop_earned", cost, name=s["owner_name"])
+        if buyer is not None:
+            self.plugin.progress.add(buyer, "shop_buys")
+            dropped = money.give(buyer, money.make_stacks(s["item"], n))
+            buyer.send_message(f"§aBought {n}x {self.item_name(s)} on galaxymc.us for {money.exact(cost)}." + (" §7Some dropped at your feet." if dropped else ""))
+            where = "They're in your inventory."
+        else:
+            self.plugin.progress.bump(xuid, "shop_buys", 1, name=name or None)
+            self.deliveries.setdefault(xuid, []).append([s["item"], n])
+            self.eco.set_config("shop_web_deliveries", self.deliveries)
+            where = "You'll get them the next time you join the server."
+        self.tell_owner(s, f"§a{name or 'Someone'} bought {n}x {self.item_name(s)} from your shop on galaxymc.us for {money.exact(cost)}.")
+        return True, f"Bought {n}x {self.item_name(s)} for {money.exact(cost)}. {where}"
 
     def at(self, block):
         for sid, s in self.shops.items():
@@ -83,6 +159,12 @@ class ShopChests:
             for item, count in items:
                 money.give(player, money.make_stacks(item, count))
             player.send_message("§6Items from your closed shop chests were given back to you.")
+        bought = self.deliveries.pop(str(player.xuid), None)
+        if bought:
+            self.eco.set_config("shop_web_deliveries", self.deliveries)
+            for item, count in bought:
+                money.give(player, money.make_stacks(item, count))
+            player.send_message("§aThe items you bought on galaxymc.us/shops are in your inventory.")
 
     def remove_shop(self, sid, player=None):
         s = self.shops.pop(sid, None)
@@ -93,6 +175,7 @@ class ShopChests:
         ft = getattr(self.plugin, "floating", None)
         if ft:
             ft.remove(f"shopchest:{sid}")
+        self.push()
         owner_here = player if player is not None and str(player.xuid) == s["owner"] else None
         if owner_here is None:
             owner_here = next((p for p in self.plugin.server.online_players if str(p.xuid) == s["owner"]), None)
@@ -184,6 +267,7 @@ class ShopChests:
             sid = cur.lastrowid
             self.shops[sid] = s
             self.label(sid)
+            self.push()
             p.send_message(f"§aShop chest ready: {'selling' if s['mode'] == 'sell' else 'buying'} {self.deal(s)}."
                            + (f" §7Stock: {s['stock']}." if s["mode"] == "sell" else " §7Make sure you have money to pay sellers."))
 
@@ -200,7 +284,8 @@ class ShopChests:
             return
         verb = "Selling" if s["mode"] == "sell" else "Buying"
         form = ActionForm(title="§lYour shop chest", content=f"{verb} §l{self.deal(s)}§r\nStock: {s['stock']:,} {self.item_name(s)}"
-                          + (f"\n§7Buying until stock reaches {s.get('limit', 640):,}." if s["mode"] == "buy" else ""))
+                          + (f"\n§7Buying until stock reaches {s.get('limit', 640):,}." if s["mode"] == "buy" else
+                             "\n§7Galaxy+ and Galaxy Pro+ members' shops are also listed on galaxymc.us/shops."))
         have = self.plugin.shop.count(player, s["item"])
         form.add_button(f"§lAdd stock§r\n§8You have {have:,} {self.item_name(s)}", icon="textures/ui/color_plus",
                         on_click=lambda p: self.add_stock(p, sid))

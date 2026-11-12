@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Player Shops · GalaxySMP</title>
+  <meta name="description" content="Buy from GalaxySMP players' shop chests right from the website.">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="GalaxySMP">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0c1b">
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/shops.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header" class="site-header-slot"></div>
+  <main id="main">
+    <div class="container">
+      <header class="page-head">
+        <h1>Player Shops</h1>
+        <p>Buy from players' shop chests without going to the Shop District. You pay from your in-game balance and the items go into your inventory (the next time you join, if you're offline).</p>
+      </header>
+      <div class="sh-bar">
+        <input class="input" id="sh-q" type="search" placeholder="Search items or players" aria-label="Search shops">
+        <select class="input" id="sh-sort" aria-label="Sort shops">
+          <option value="name">A to Z</option>
+          <option value="cheap">Cheapest first</option>
+          <option value="stock">Most in stock</option>
+        </select>
+        <span class="sh-bal" id="sh-bal"></span>
+      </div>
+      <div id="sh-list" class="sh-grid" aria-live="polite"><div class="panel empty">Loading shops...</div></div>
+      <p class="text-3 small" style="margin-top:18px">Shops from Galaxy+ and Galaxy Pro+ members are listed here. Every shop chest is still open in game in the Shop District. <a href="/store">See Galaxy+</a></p>
+    </div>
+  </main>
+  <div id="site-footer"></div>
+</body>
+</html>

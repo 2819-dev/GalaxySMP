@@ -212,7 +212,7 @@ export function renderPolls(p, { toast, setTimer }) {
   setTimer(setInterval(load, 30000));
 }
 
-function pollCard(pl, canManage, reload, toast) {
+export function pollCard(pl, canManage, reload, toast, { chat = false } = {}) {
   const voted = pl.options.some((o) => o.mine);
   const showResults = voted || pl.closed;
   const total = pl.options.reduce((n, o) => n + o.votes, 0);
@@ -229,7 +229,7 @@ function pollCard(pl, canManage, reload, toast) {
     const bar = h("span", { class: "pl-bar" });
     if (showResults) bar.style.width = `${pct}%`;
     b.append(bar, h("span", { class: "pl-mark", "aria-hidden": "true", text: o.mine ? "✓" : "" }), h("span", { class: "pl-label", text: o.label }),
-      showResults ? h("span", { class: "pl-pct", text: `${pct}%` }) : null);
+      ...(showResults ? [h("span", { class: "pl-pct", text: `${pct}%` })] : []));
     b.addEventListener("click", () => {
       if (pl.multi) chosen.has(o.id) ? chosen.delete(o.id) : chosen.add(o.id);
       else { if (chosen.has(o.id)) chosen.clear(); else { chosen.clear(); chosen.add(o.id); } }
@@ -240,18 +240,20 @@ function pollCard(pl, canManage, reload, toast) {
   const status = pl.closed ? "Closed" : pl.closesAt ? `Closes ${day(pl.closesAt)}, ${time(pl.closesAt)}` : "Open";
   const foot = h("div", { class: "sg-foot" }, h("span", { class: `sg-status ${pl.closed ? "done" : "planned"}`, text: pl.closed ? "Closed" : "Open" }),
     h("span", { text: `${pl.voters} vote${pl.voters === 1 ? "" : "s"} · ${pl.multi ? "Choose any" : "Choose one"} · ${pl.closed ? `by ${pl.author}` : status}` }));
-  if (canManage) {
+  if (chat && pl.canClose) {
+    foot.append(h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Close poll", onclick: async () => { try { await postJson(`/api/community/polls/${pl.id}/close`, {}); reload(); } catch (e) { toast(e.message); } } }));
+  } else if (canManage && !chat) {
     if (!pl.closed) foot.append(h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Close poll", onclick: async () => { await postJson(`/api/community/polls/${pl.id}/close`, {}); reload(); } }));
     foot.append(h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Delete", onclick: () => openDialog({
       title: "Delete this poll?", body: h("p", { class: "text-2", text: pl.question }),
       actions: [{ label: "Cancel" }, { label: "Delete", kind: "danger", onClick: async () => { await postJson(`/api/community/polls/${pl.id}/delete`, {}); reload(); } }],
     }) }));
   }
-  return h("article", { class: "panel pl-card" }, h("h3", { class: "sg-title", text: pl.question }),
+  return h("article", { class: `panel pl-card${chat ? " in-chat" : ""}` }, h("h3", { class: "sg-title", text: pl.question }),
     !showResults ? h("p", { class: "text-3 small", style: "margin:0 0 8px", text: "Vote to see the results." }) : null, opts, foot);
 }
 
-function pollDialog(done, toast) {
+export function pollDialog(done, toast, { channelId = null, channelName = "" } = {}) {
   const q = h("input", { class: "input", id: "pl-q", maxlength: 140, placeholder: "e.g. What should the next event be?" });
   const box = h("div", { class: "stack", style: "gap:6px" });
   const addRow = (v = "") => {
@@ -269,9 +271,10 @@ function pollDialog(done, toast) {
     body: h("div", { class: "form" }, field("Question", q),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Answers (2 to 8)" }), box, more),
       h("label", { class: "check" }, multi, "Let people choose more than one"),
-      field("Runs for", length), h("label", { class: "check" }, tell, "Notify everyone")),
+      field("Runs for", length), channelId ? h("p", { class: "text-3 small", style: "margin:0", text: `It's posted as a message in #${channelName}.` }) : h("label", { class: "check" }, tell, "Notify everyone")),
     actions: [{ label: "Cancel" }, { label: "Post poll", kind: "primary", onClick: async () => {
-      await postJson("/api/community/polls", { question: q.value, options: [...box.children].map((i) => i.value), multi: multi.checked, hours: Number(length.value), notify: tell.checked });
+      const data = { question: q.value, options: [...box.children].map((i) => i.value), multi: multi.checked, hours: Number(length.value), notify: tell.checked };
+      await postJson(channelId ? "/api/chat/polls" : "/api/community/polls", channelId ? { ...data, channelId } : data);
       toast("Poll posted.");
       done();
     } }],

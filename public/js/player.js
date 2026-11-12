@@ -2,7 +2,7 @@
 // Everyone sees the game side (rank, badges, stats, achievements). Signed-in members also see the social side:
 // real name (unless hidden), bio, what they like to play, profile color, activity and a Message button.
 import { iconEl, toast } from "/js/site.js";
-import { h } from "/js/dialog.js";
+import { h, reportPlayerDialog } from "/js/dialog.js";
 import { rankTag, paint } from "/js/rank-paint.js";
 import { money, hours, playerSearch } from "/js/leaderboard.js";
 import { faceSvg } from "/js/face.js";
@@ -47,7 +47,7 @@ const section = (title, ...children) => h("section", { class: "panel pp-sec" }, 
 async function load() {
   const box = $("profile");
   if (!name) { box.replaceChildren(h("div", { class: "panel empty", text: "Search for a player above." })); return; }
-  let data, social = null;
+  let data, social = null, signedIn = false;
   try {
     const [res, soc] = await Promise.all([
       fetch(`/api/players/${encodeURIComponent(name)}`).then((r) => r.json()),
@@ -56,6 +56,7 @@ async function load() {
     data = res;
     if (!data.ok) throw new Error(data.error);
     social = soc?.member || null;
+    signedIn = Boolean(soc?.ok);
   } catch (e) {
     box.replaceChildren(h("div", { class: "panel empty", text: e.message || "This profile couldn't be loaded." }));
     return;
@@ -83,6 +84,7 @@ async function load() {
   const tags = h("div", { class: "pp-tags" },
     p.rank ? rankTag(p.rank) : null,
     p.plan && p.plan !== "free" ? h("span", { class: `plan-pill ${p.plan}`, text: PLANS[p.plan] }) : null,
+    p.potw?.current ? h("span", { class: "potw-pill", title: "Played the most on GalaxySMP last week" }, "⭐ Player of the Week") : null,
     p.online ? h("span", { class: "pp-status on" }, h("span", { class: "online-dot" }), "Playing now") : h("span", { class: "pp-status", text: `Last online ${ago(p.lastOnline)}` }));
 
   const actions = h("div", { class: "pp-actions" });
@@ -98,6 +100,11 @@ async function load() {
     } catch { /* cancelled */ }
   });
   actions.append(share);
+  if (signedIn && !social?.isMe) {
+    const rep = h("button", { class: "btn btn-ghost btn-sm", type: "button", title: "Report this player to staff" }, iconEl("flag"), "Report");
+    rep.addEventListener("click", () => reportPlayerDialog(p.name, { name: p.name }));
+    actions.append(rep);
+  }
 
   const activity = h("div", { class: "pp-activity" });
   if (social) {
@@ -118,7 +125,8 @@ async function load() {
   const facts = h("div", { class: "pp-facts" },
     h("div", {}, h("span", { class: "pp-k", text: "First joined" }), h("b", { text: date(p.firstSeen) })),
     social?.since ? h("div", {}, h("span", { class: "pp-k", text: "Community member since" }), h("b", { text: date(social.since) })) : null,
-    h("div", {}, h("span", { class: "pp-k", text: "Played" }), h("b", { text: hours(s.playtime) })));
+    h("div", {}, h("span", { class: "pp-k", text: "Played" }), h("b", { text: hours(s.playtime) })),
+    p.potw ? h("div", {}, h("span", { class: "pp-k", text: "Player of the Week" }), h("b", { text: p.potw.times === 1 ? "1 time" : `${p.potw.times} times` })) : null);
   const about = social
     ? section("About",
       social.bio ? h("p", { class: "pp-bio", text: social.bio }) : h("p", { class: "text-3", style: "margin:0 0 12px", text: social.isMe ? "Add a short bio in your Account so people know what you're into." : "No bio yet." }),

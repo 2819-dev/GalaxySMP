@@ -251,6 +251,9 @@ export class VoiceHub extends DurableObject {
       return Response.json({ players: fresh ? live.players : [], playersAt: live?.at || null, markers: marks?.markers || [], plots: marks?.plots || [],
         status: marks?.status || null, statusAt: marks?.at || null });
     }
+    if (url.pathname === "/internal/shopchests") {
+      return Response.json((await this.ctx.storage.get("shopchests")) || { shops: [], at: null });
+    }
     if (url.pathname === "/internal/ah") {
       return Response.json((await this.ctx.storage.get("ah")) || { listings: [], at: null });
     }
@@ -421,6 +424,14 @@ export class VoiceHub extends DurableObject {
       const st = msg.status && typeof msg.status === "object" ? msg.status : {};
       const status = { sent: Number(st.sent) || 0, error: st.error ? String(st.error).slice(0, 200) : null, method: st.method ? String(st.method).slice(0, 10) : null };
       return this.ctx.storage.put("map_markers", { markers, plots, status, at: Date.now() });
+    }
+    if (msg.type === "shopchests") {
+      const shops = (Array.isArray(msg.shops) ? msg.shops : []).slice(0, 1000).map((x) => ({
+        id: Number(x.id) || 0, owner: String(x.owner || "").slice(0, 20), ownerName: String(x.ownerName || "").slice(0, 32),
+        item: String(x.item || "").slice(0, 80), name: String(x.name || "").slice(0, 60), amount: Number(x.amount) || 1,
+        price: Number(x.price) || 0, stock: Number(x.stock) || 0, shop: String(x.shop || "").slice(0, 40),
+        dim: String(x.dim || "").slice(0, 20), x: Number(x.x) || 0, y: Number(x.y) || 0, z: Number(x.z) || 0 }));
+      return this.ctx.storage.put("shopchests", { shops, at: Date.now() });
     }
     if (msg.type === "ah") {
       const listings = (Array.isArray(msg.listings) ? msg.listings : []).slice(0, 300);

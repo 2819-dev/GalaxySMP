@@ -340,7 +340,7 @@ export class CommunityHub extends DurableObject {
     if (!check.ok) return reject(check.message);
     const [u] = await sql`SELECT banned, muted_until FROM users WHERE id = ${user.id}`;
     if (u?.banned || (u?.muted_until && new Date(u.muted_until) > new Date())) return reject("You can't edit messages right now.");
-    const done = await sql`UPDATE messages SET content = ${check.text}, edited_at = now() WHERE id = ${id} AND seen_at IS NULL RETURNING id`;
+    const done = await sql`UPDATE messages SET content = ${check.text}, edited_at = now() WHERE id = ${id} AND seen_at IS NULL AND poll_id IS NULL RETURNING id`;
     if (!done.length) return reject("Someone has just read this message, so it can't be edited any more.");
     const message = await loadMessage(sql, id);
     this.send(ws, { type: "edited", nonce: msg.nonce, id });

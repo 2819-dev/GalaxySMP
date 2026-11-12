@@ -502,6 +502,7 @@ function renderMessage(m, prev) {
     text.append(ed);
   }
   body.append(head, text);
+  for (const hook of messageBodyHooks) hook(m, body, text);
   body.append(renderReactions(m));
   row.append(body);
 
@@ -524,6 +525,8 @@ function renderMessage(m, prev) {
 
 // Stage D adds staff actions (report, delete) through this hook.
 export const messageActionHooks = [];
+export const messageBodyHooks = [];  // e.g. polls draw themselves inside their message
+export const composerHooks = [];     // e.g. the Poll button, when the channel changes
 
 function actionBtn(name, label, onClick) {
   const b = el("button", "icon-btn" + (name === "trash" ? " danger" : ""));
@@ -772,6 +775,7 @@ function renderComposer() {
     note("");
     input.placeholder = `Message #${ch.name}`;
   }
+  for (const hook of composerHooks) hook(ch, !form.hidden);
 }
 
 function renderReplyBar() {
