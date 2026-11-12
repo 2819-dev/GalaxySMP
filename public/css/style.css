@@ -2316,3 +2316,6 @@ html[data-theme="light"] .dialog, html[data-theme="light"] dialog { background: 
 .al-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 12px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); font-weight: 600; font-size: .9rem; }
 .al-chip button { border: 0; background: none; color: var(--text-3); font-size: 1.1rem; line-height: 1; cursor: pointer; padding: 0 4px; border-radius: 50%; }
 .al-chip button:hover { color: var(--bad); }
+.co-gift { display: flex; align-items: center; gap: 8px; font-weight: 600; margin: 4px 0; }
+.co-gift svg { width: 18px; height: 18px; color: #ff8fc7; }
+.co-gift-box { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }

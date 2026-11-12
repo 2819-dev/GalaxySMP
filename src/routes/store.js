@@ -2,6 +2,7 @@
 // or straight with a card. Card payments go through Stripe Checkout once its keys are in Cloudflare
 // (STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET); Stripe then calls /api/store/stripe-webhook and
 // the item or credit is delivered. What can be bought: the Shop's cosmetics (the rest says "Coming soon").
+import { recordGift } from "./gifter.js";
 import { postTimeline } from "./feed.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
@@ -69,22 +70,29 @@ async function prepare(sql, user, body) {
   const prod = product(body.item ?? body.rankId, body.option);
   if (!prod) throw new HttpError(404, "That item doesn't exist.");
   if (!onSale(prod)) return { soon: true, prod };
-  const p = await linkedPlayer(sql, user.id);
-  if (!p) throw new HttpError(409, "Link your Minecraft account first (type /link in game), so we know who to give it to.");
+  // "Gift to someone": it goes to their Minecraft account instead
+  let giftTo = null;
+  if (body.giftTo) {
+    [giftTo] = await sql`SELECT id, username, banned FROM users WHERE id = ${Number(body.giftTo) || 0}`;
+    if (!giftTo || giftTo.banned) throw new HttpError(404, "There's no member with that name.");
+    if (Number(giftTo.id) === Number(user.id)) throw new HttpError(400, "That's you! Turn off gifting to buy it for yourself.");
+  }
+  const p = await linkedPlayer(sql, giftTo ? giftTo.id : user.id);
+  if (!p) throw new HttpError(409, giftTo ? `${giftTo.username} hasn't linked their Minecraft account yet, so they can't get Store items.` : "Link your Minecraft account first (type /link in game), so we know who to give it to.");
   const item = prod.isPlan ? null : SHOP_ITEMS[prod.key];
   if (prod.isPlan) {
     const [s] = await sql`SELECT plan, expires_at FROM subscriptions WHERE xuid = ${p.xuid}`;
-    if (s && !s.expires_at && s.plan === prod.key) throw new HttpError(409, `You already have ${prod.name} with no end date.`);
+    if (s && !s.expires_at && s.plan === prod.key) throw new HttpError(409, giftTo ? `${giftTo.username} already has ${prod.name} with no end date.` : `You already have ${prod.name} with no end date.`);
   }
   if (item?.limit) {
     const [{ n }] = await sql`SELECT count(*)::int AS n FROM shop_orders WHERE xuid = ${p.xuid} AND item = ${item.id}`;
     const has = n + ((p.cosmetics || []).includes(item.id) && !n ? 1 : 0);
-    if (has >= item.limit) throw new HttpError(409, item.limit === 1 ? `You already have ${item.name}.` : `You already have the most (${item.limit}) of ${item.name}.`);
+    if (has >= item.limit) throw new HttpError(409, giftTo ? `${giftTo.username} already has ${item.limit === 1 ? item.name : `the most of ${item.name}`}.` : item.limit === 1 ? `You already have ${item.name}.` : `You already have the most (${item.limit}) of ${item.name}.`);
   }
   let promo = null;
   let final = prod.price;
   if (body.code) ({ promo, final } = await checkPromo(sql, user, body.code, prod));
-  return { prod, item, player: p, promo, final };
+  return { prod, item, player: p, promo, final, giftTo };
 }
 
 async function deliver(env, sql, player, prod, by, source) {
@@ -116,19 +124,28 @@ export async function checkout(request, env) {
   const sql = getDb(env);
   const ready = await prepare(sql, user, body);
   if (ready.soon) return json({ ok: false, comingSoon: true, message: `${ready.prod.name} is coming soon.` });
-  const { prod, player, promo, final } = ready;
+  const { prod, player, promo, final, giftTo } = ready;
   const by = { id: user.id, username: promo ? `promo ${promo.code}` : user.username };
+  // a gift: count it for the Gifter badges and tell them
+  const gifted = async (paid, ref) => {
+    if (!giftTo) return;
+    await recordGift(env, sql, { giverId: user.id, receiverId: giftTo.id, kind: prod.isPlan ? "plan" : "item", item: prod.key, cents: paid ? final : 0, paid, ref });
+    await pushNotify(env, [giftTo.id], "dms", { title: `${user.username} sent you a gift!`, body: `${prod.name} is yours. It's ready in game.`, url: "/store", tag: `gift-item-${user.id}` }).catch(() => {});
+  };
+  const giftNote = (m) => (giftTo ? `You gifted ${prod.name} to ${giftTo.username}!` : m);
 
   if (final === 0) { // free with a promo code: give it now
     const result = await deliver(env, sql, player, prod, by, "promo");
     await sql`INSERT INTO promo_redemptions (promo_id, user_id, item, option, price_cents, final_cents, status)
               VALUES (${promo.id}, ${user.id}, ${prod.key}, ${prod.option}, ${prod.price}, 0, 'used')`;
-    return json({ ok: true, done: true, message: doneMessage(prod, result.sent) });
+    await gifted(false, null);
+    return json({ ok: true, done: true, message: giftNote(doneMessage(prod, result.sent)) });
   }
 
   if (body.method === "credits" && ownerOf(env, user)) {
     const result = await deliver(env, sql, player, prod, { id: user.id, username: user.username }, "credits");
-    return json({ ok: true, done: true, message: doneMessage(prod, result.sent) });
+    await gifted(false, null);  // the owner's free gifts count too
+    return json({ ok: true, done: true, message: giftNote(doneMessage(prod, result.sent)) });
   }
   if (body.method === "credits") {
     const left = await change(sql, user.id, -final, "purchase", prod.name, prod.key);
@@ -138,7 +155,8 @@ export async function checkout(request, env) {
       await sql`UPDATE shop_orders SET price_cents = ${final} WHERE id = (SELECT max(id) FROM shop_orders WHERE xuid = ${player.xuid} AND item = ${prod.isPlan ? "plan:" + prod.key : prod.key})`;
       if (promo) await sql`INSERT INTO promo_redemptions (promo_id, user_id, item, option, price_cents, final_cents, status)
                            VALUES (${promo.id}, ${user.id}, ${prod.key}, ${prod.option}, ${prod.price}, ${final}, 'used')`;
-      return json({ ok: true, done: true, credits: left / 100, message: doneMessage(prod, result.sent) });
+      await gifted(true, null);
+      return json({ ok: true, done: true, credits: left / 100, message: giftNote(doneMessage(prod, result.sent)) });
     } catch (e) {
       await change(sql, user.id, final, "refund", `${prod.name} (couldn't be given)`, prod.key); // give the credit back
       throw e;
@@ -148,14 +166,14 @@ export async function checkout(request, env) {
   // card
   if (!stripeReady(env)) return json({ ok: false, comingSoon: true, message: "Card payments open very soon. Check back shortly!" });
   const amount = Math.max(MIN_CHARGE, final);
-  const [pay] = await sql`INSERT INTO payments (user_id, kind, item, option, promo_id, amount_cents)
-                          VALUES (${user.id}, 'item', ${prod.key}, ${prod.option}, ${promo?.id || null}, ${amount}) RETURNING id`;
+  const [pay] = await sql`INSERT INTO payments (user_id, kind, item, option, promo_id, amount_cents, gift_to)
+                          VALUES (${user.id}, 'item', ${prod.key}, ${prod.option}, ${promo?.id || null}, ${amount}, ${giftTo?.id || null}) RETURNING id`;
   if (promo) await sql`INSERT INTO promo_redemptions (promo_id, user_id, item, option, price_cents, final_cents, status, payment_id)
                        VALUES (${promo.id}, ${user.id}, ${prod.key}, ${prod.option}, ${prod.price}, ${amount}, 'pending', ${pay.id})`;
   const origin = new URL(request.url).origin;
   const session = await createCheckout(env, {
     paymentId: pay.id, userId: user.id, name: `GalaxySMP: ${prod.name}`,
-    description: `For ${player.gamertag} on GalaxySMP${promo ? ` (promo ${promo.code})` : ""}`,
+    description: `${giftTo ? "A gift for" : "For"} ${player.gamertag} on GalaxySMP${promo ? ` (promo ${promo.code})` : ""}`,
     amountCents: amount, origin, successPath: "/store?paid=item", cancelPath: "/store#shop",
   });
   await sql`UPDATE payments SET stripe_session = ${session.id} WHERE id = ${pay.id}`;
@@ -201,6 +219,7 @@ export async function gift(request, env) {
     if (cents > 100_000_00) throw new HttpError(400, "That's a lot! Gifts go up to $100,000 at a time.");
     await change(sql, to.id, cents, "staff", `Gift from ${user.username}`, String(user.id));
     await audit(sql, user.id, "credits.give", { to: to.username, cents });
+    await recordGift(env, sql, { giverId: user.id, receiverId: to.id, kind: "credits", cents, paid: false });
     try {
       await pushNotify(env, [to.id], "dms", { title: `${user.username} sent you ${usd(cents)} of credits!`, body: "Spend them in the GalaxySMP Store.", url: "/store", tag: `gift-${user.id}` });
     } catch { /* best effort */ }
@@ -213,6 +232,7 @@ export async function gift(request, env) {
   if (left === null) throw new HttpError(409, `You only have ${usd(await balance(sql, user.id))} of credits.`);
   await change(sql, to.id, cents, "gift_in", `From ${user.username}`, String(user.id));
   await audit(sql, user.id, "credits.gift", { to: to.username, cents });
+  await recordGift(env, sql, { giverId: user.id, receiverId: to.id, kind: "credits", cents, paid: true });
   try {
     await pushNotify(env, [to.id], "dms", { title: `${user.username} sent you ${usd(cents)} of credits!`, body: "Spend them in the GalaxySMP Store.", url: "/store", tag: `gift-${user.id}` });
   } catch { /* best effort */ }
@@ -228,11 +248,15 @@ async function fulfil(env, sql, payId) {
     return;
   }
   const prod = product(pay.item, pay.option);
-  const player = await linkedPlayer(sql, pay.user_id);
+  const player = await linkedPlayer(sql, pay.gift_to || pay.user_id);  // a gift goes to the other member
   const [u] = await sql`SELECT username FROM users WHERE id = ${pay.user_id}`;
   try {
     if (!prod || !player) throw new Error("no player");
     await deliver(env, sql, player, prod, { id: pay.user_id, username: u?.username || "card" }, "payment");
+    if (pay.gift_to) {
+      await recordGift(env, sql, { giverId: pay.user_id, receiverId: pay.gift_to, kind: prod.isPlan ? "plan" : "item", item: prod.key, cents: pay.amount_cents, paid: true, ref: `payment:${pay.id}` });
+      await pushNotify(env, [pay.gift_to], "dms", { title: `${u?.username || "Someone"} sent you a gift!`, body: `${prod.name} is yours. It's ready in game.`, url: "/store", tag: `gift-item-${pay.user_id}` }).catch(() => {});
+    }
     await sql`UPDATE shop_orders SET price_cents = ${pay.amount_cents} WHERE id = (SELECT max(id) FROM shop_orders WHERE xuid = ${player.xuid} AND item = ${prod.isPlan ? "plan:" + prod.key : prod.key})`;
   } catch (e) {
     // couldn't give it (e.g. they got it another way meanwhile): turn the payment into credit instead
@@ -343,6 +367,7 @@ export async function ownerCredits(request, env) {
     await change(sql, to.id, -cents, "staff", `Taken by ${user.username}`, String(user.id));
   } else {
     await change(sql, to.id, cents, "staff", `Gift from ${user.username}`, String(user.id));
+    await recordGift(env, sql, { giverId: user.id, receiverId: to.id, kind: "credits", cents, paid: false });  // the owner's free gifts count
     try {
       await pushNotify(env, [to.id], "dms", { title: `${user.username} sent you ${usd(cents)} of credits!`, body: "Spend them in the GalaxySMP Store.", url: "/store", tag: `gift-${user.id}` });
     } catch { /* best effort */ }

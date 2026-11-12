@@ -45,6 +45,36 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
   const creditNote = h("p", { class: "co-credit-note text-3 small" });
   const err = h("p", { class: "form-error", role: "alert" });
   const have = me.infinite ? Infinity : Number(me.credits || 0);
+  // "Gift to someone": pick a member; they get it in game and it counts toward the Gifter badges
+  let giftTo = null;
+  const giftToggle = h("input", { type: "checkbox", id: "co-gift" });
+  const giftBox = h("div", { class: "co-gift-box", hidden: true });
+  const giftSearch = h("input", { class: "input", id: "co-gift-to", placeholder: "Who is it for? Type their name", autocomplete: "off", maxlength: 32, autocapitalize: "off", spellcheck: "false" });
+  const giftList = h("div", { class: "gift-list", role: "listbox", "aria-label": "Members" });
+  const giftPicked = h("div", { class: "gift-picked", hidden: true });
+  const gface = (m) => { const img = h("img", { class: "gift-face", alt: "", width: 28, height: 28 }); img.src = m.head || faceSvg(m.username); img.addEventListener("error", () => { img.src = faceSvg(m.username); }, { once: true }); return img; };
+  const pickGift = (m) => {
+    giftTo = m;
+    giftSearch.hidden = true; giftList.replaceChildren();
+    giftPicked.replaceChildren(gface(m), h("span", {}, "A gift for ", h("b", { text: m.username })),
+      h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Change", onclick: () => { giftTo = null; giftPicked.hidden = true; giftSearch.hidden = false; giftSearch.value = ""; giftSearch.focus(); } }));
+    giftPicked.hidden = false;
+  };
+  let gTimer = null;
+  giftSearch.addEventListener("input", () => {
+    clearTimeout(gTimer);
+    const q = giftSearch.value.trim();
+    if (q.length < 2) { giftList.replaceChildren(); return; }
+    gTimer = setTimeout(async () => {
+      let d;
+      try { d = await (await fetch(`/api/store/members?q=${encodeURIComponent(q)}`, { credentials: "same-origin" })).json(); } catch { return; }
+      if (giftTo) return;
+      giftList.replaceChildren(...(d.members?.length ? d.members.map((m) => h("button", { class: "gift-option", type: "button", role: "option", onclick: () => pickGift(m) }, gface(m), h("span", { text: m.username })))
+        : [h("p", { class: "text-3 small gift-hint", text: "No members start with that." })]));
+    }, 200);
+  });
+  giftBox.append(giftSearch, giftPicked, giftList, h("p", { class: "text-3 small", style: "margin:4px 0 0", text: "They get it on their Minecraft account. You pay." }));
+  giftToggle.addEventListener("change", () => { giftBox.hidden = !giftToggle.checked; if (!giftToggle.checked) giftTo = null; else giftSearch.focus(); });
 
   const draw = () => {
     const final = applied ? applied.final : price;
@@ -97,13 +127,14 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
     err.textContent = "";
     btn.disabled = true;
     try {
-      const r = await postJson("/api/store/checkout", { item: id, option: option(), code: applied?.code || "", method });
+      if (giftToggle.checked && !giftTo) throw new Error("Pick who the gift is for, or turn off gifting.");
+      const r = await postJson("/api/store/checkout", { item: id, option: option(), code: applied?.code || "", method, giftTo: giftTo?.id || null });
       if (r.url) { location.href = r.url; return; } // Stripe's secure card page
       if (r.done) {
         dlg.close();
         await refreshMine();
         renderAll();
-        celebrate(name, r.message);
+        celebrate(name, r.message, Boolean(giftTo));
         return;
       }
       err.textContent = r.message || "Payments open soon.";
@@ -137,6 +168,7 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
     h("div", { class: `co-item cat-${cat}` },
       h("div", { class: "shop-icon" }, iconEl(icon)),
       h("div", { class: "co-item-text" }, h("b", { text: name }), h("span", { class: "text-3 small", text: isPlan ? "30 days (buy again to add more)" : "One-time purchase" }))),
+    h("label", { class: "check co-gift" }, giftToggle, iconEl("gift"), "Gift to someone"), giftBox,
     codeRow, appliedRow,
     h("div", { class: "co-total" }, h("span", { class: "text-2", text: "Total" }), h("span", {}, was, " ", total)),
     err,
@@ -148,9 +180,9 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
   draw();
 }
 
-function celebrate(name, message) {
+function celebrate(name, message, gift = false) {
   openDialog({
-    title: "It's yours!",
+    title: gift ? "Gift sent!" : "It's yours!",
     body: h("div", { class: "co-done" }, h("div", { class: "co-done-icon" }, iconEl("check")), h("p", { class: "text-2", text: message || `${name} is yours!` }),
       h("p", { class: "text-3 small", text: "Pick cosmetics in game with /cosmetics." })),
     actions: [{ label: "Done", kind: "primary" }],
