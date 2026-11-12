@@ -13,6 +13,7 @@ import * as progress from "./routes/progress.js";
 import { headImage } from "./routes/heads.js";
 import { bootstrap, history, connect, search as chatSearch, pins as chatPins, pin as chatPin } from "./routes/chat.js";
 import * as mod from "./routes/mod.js";
+import * as staffroom from "./routes/staffroom.js";
 import { voiceConnect, voiceServer } from "./routes/voice.js";
 import * as ranks from "./routes/ranks.js";
 import * as economy from "./routes/economy.js";
@@ -140,6 +141,7 @@ const routes = [
   ["GET", "/api/mod/chatfilter", (req, env) => mod.chatFilterState(req, env)],
   ["POST", "/api/mod/chatfilter", (req, env) => mod.chatFilterSet(req, env)],
   ["GET", "/api/mod/audit", mod.listAudit],
+  ["GET", "/api/staff-room/logs", staffroom.staffLogs],
   ["GET", "/api/voice/connect", (req, env) => voiceConnect(req, env)],
   ["GET", "/api/voice/server", (req, env) => voiceServer(req, env)],
   ["POST", "/api/mod/members/:id/voice-mute", mod.voiceMute],

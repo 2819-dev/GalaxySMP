@@ -81,11 +81,14 @@ export async function uploadChatImage(request, env) {
 
 // GET /api/chat/images/:id  (members only)
 export async function chatImage(request, env, ctx, url, params) {
-  await requireUser(request, env);
+  const user = await requireUser(request, env);
+  const staff = can(user, "staff_chat");
   const [row] = await getDb(env)`
     SELECT i.mime, encode(i.data, 'base64') AS b64 FROM message_images i
      WHERE i.id = ${Number(params.id) || 0}
-       AND (EXISTS (SELECT 1 FROM messages m WHERE m.image_id = i.id AND m.deleted_at IS NULL) OR i.created_at > now() - interval '10 minutes')`;
+       AND (EXISTS (SELECT 1 FROM messages m JOIN channels c ON c.id = m.channel_id
+                     WHERE m.image_id = i.id AND m.deleted_at IS NULL AND (NOT c.staff_only OR ${staff}))
+            OR (i.user_id = ${user.id} AND i.created_at > now() - interval '10 minutes'))`;
   return serve(row);
 }
 

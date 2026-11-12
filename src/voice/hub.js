@@ -41,6 +41,8 @@ export class VoiceHub extends DurableObject {
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
     ctx.blockConcurrencyWhile(async () => {
       this.groups = (await ctx.storage.get("groups")) || {};
+      // The locked Staff group: always there, only members with the Staff category permission can join
+      if (!this.groups.staff) this.groups.staff = { id: "staff", name: "Staff", description: "Staff only", room: true, staffOnly: true, passwordHash: null, createdBy: null, position: 0 };
     });
   }
 
@@ -92,7 +94,7 @@ export class VoiceHub extends DurableObject {
   publicGroups() {
     return Object.values(this.groups).map((g) => ({
       id: g.id, name: g.name, locked: Boolean(g.passwordHash), saved: Boolean(g.saved), owner: g.createdBy,
-      room: Boolean(g.room), position: g.position ?? 0, description: g.description || "",
+      room: Boolean(g.room), staffOnly: Boolean(g.staffOnly), position: g.position ?? 0, description: g.description || "",
       members: (g.members || []).map((m) => ({ id: m.id, username: m.username })),
     }));
   }
@@ -184,6 +186,7 @@ export class VoiceHub extends DurableObject {
     if (listener.id === speaker.id || !speaker.trackName || this.isVoiceMuted(speaker)) return false;
     if (speaker.global && speaker.canGlobal) return true;
     if (listener.groupId && listener.groupId === speaker.groupId) return true;
+    if (this.groups[speaker.groupId]?.staffOnly) return false; // the Staff group is private: no one nearby hears it
     const p = this.position(listener);
     const q = this.position(speaker);
     if (!p || !q || p.dim !== q.dim) return false;
@@ -213,7 +216,7 @@ export class VoiceHub extends DurableObject {
       // Voice rooms made by Admins (Control Panel): permanent groups anyone can join.
       if (request.method === "POST") {
         const body = await request.json();
-        const rooms = Object.values(this.groups).filter((g) => g.room);
+        const rooms = Object.values(this.groups).filter((g) => g.room && !g.staffOnly);
         if (body.action === "add") {
           if (rooms.length >= 12) return Response.json({ ok: false, error: "You can have up to 12 rooms." });
           const name = String(body.name || "").trim().replace(/\s+/g, " ").slice(0, 24);
@@ -223,7 +226,7 @@ export class VoiceHub extends DurableObject {
             position: rooms.length ? Math.max(...rooms.map((r) => r.position || 0)) + 1 : 1 };
         } else {
           const g = this.groups[String(body.id)];
-          if (!g?.room) return Response.json({ ok: false, error: "That room no longer exists." });
+          if (!g?.room || g.staffOnly) return Response.json({ ok: false, error: "That room no longer exists." });
           if (body.action === "rename") {
             const name = String(body.name || "").trim().replace(/\s+/g, " ").slice(0, 24);
             if (name.length < 2) return Response.json({ ok: false, error: "Room names need at least 2 characters." });
@@ -242,7 +245,7 @@ export class VoiceHub extends DurableObject {
         await this.saveGroups();
         this.sendRoster();
       }
-      const list = Object.values(this.groups).filter((g) => g.room).sort((x, y) => (x.position || 0) - (y.position || 0))
+      const list = Object.values(this.groups).filter((g) => g.room && !g.staffOnly).sort((x, y) => (x.position || 0) - (y.position || 0))
         .map((g) => ({ id: g.id, name: g.name, description: g.description || "", inRoom: [...this.members().values()].filter(({ a }) => a.groupId === g.id).length }));
       return Response.json({ ok: true, rooms: list });
     }
@@ -588,6 +591,7 @@ export class VoiceHub extends DurableObject {
       case "group.join": {
         const g = this.groups[String(msg.id)];
         if (!g) throw new Error("That group no longer exists.");
+        if (g.staffOnly && !a.staffChat) throw new Error("Only staff can join the Staff group.");
         const staff = (a.power || 0) >= 50;
         const invited = g.createdBy === a.id || (g.members || []).some((m) => m.id === a.id); // invited players skip the password
         if (g.passwordHash && !staff && !invited && (await sha256(`${g.id}:${String(msg.password || "")}`)) !== g.passwordHash) {

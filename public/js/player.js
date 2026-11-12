@@ -2,7 +2,7 @@
 // Everyone sees the game side (rank, badges, stats, achievements). Signed-in members also see the social side:
 // real name (unless hidden), bio, what they like to play, profile color, activity and a Message button.
 import { iconEl, toast } from "/js/site.js";
-import { h, reportPlayerDialog } from "/js/dialog.js";
+import { h, reportPlayerDialog, postJson } from "/js/dialog.js";
 import { rankTag, paint } from "/js/rank-paint.js";
 import { money, hours, playerSearch } from "/js/leaderboard.js";
 import { faceSvg } from "/js/face.js";
@@ -118,11 +118,38 @@ async function load() {
     }).catch(() => {});
   }
 
+  // Owner only: show this player's Xbox picture or their Minecraft head (their own Pro+ picture comes first)
+  let picBox = null;
+  if (p.picture) {
+    const pic = p.picture;
+    picBox = h("div", { class: "pp-pic-pick" }, h("span", { class: "text-3 small", text: "Profile picture" }));
+    if (pic.custom) picBox.append(h("span", { class: "text-3 small", text: "· They use their own Galaxy Pro+ picture, which comes first." }));
+    else {
+      const current = pic.source === "auto" ? (pic.hasHead ? "head" : "xbox") : pic.source;
+      const seg = h("div", { class: "seg", role: "radiogroup", "aria-label": "Profile picture" });
+      for (const [value, label] of [["xbox", "Xbox picture"], ["head", "Player head"]]) {
+        const b = h("button", { type: "button", role: "radio", "aria-checked": String(current === value), text: label });
+        b.addEventListener("click", async () => {
+          if (b.getAttribute("aria-checked") === "true") return;
+          if (value === "head" && !pic.hasHead) { toast("Their Minecraft head hasn't arrived yet. They need to join the server first."); return; }
+          try {
+            await postJson(`/api/mod/players/${encodeURIComponent(pic.xuid)}/picture`, { source: value });
+            for (const x of seg.children) x.setAttribute("aria-checked", String(x === b));
+            face.src = `${(p.head || "").split("?")[0]}?v=${Date.now()}`;
+            toast(value === "xbox" ? "Now showing their Xbox picture." : "Now showing their player head.");
+          } catch (e) { toast(e.message); }
+        });
+        seg.append(b);
+      }
+      picBox.append(seg);
+    }
+  }
+
   const hero = h("section", { class: "panel pp-hero" }, banner,
     h("div", { class: "pp-hero-body" },
       avatarWrap,
       h("div", { class: "pp-who" }, nameEl, sub.childNodes.length ? sub : null, tags,
-        p.badges?.length ? h("div", { class: "pp-badges" }, badgeRow(p.badges, 40)) : null),
+        p.badges?.length ? h("div", { class: "pp-badges" }, badgeRow(p.badges, 40)) : null, picBox),
       actions),
     activity);
 

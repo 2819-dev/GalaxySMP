@@ -70,7 +70,7 @@ export class CommunityHub extends DurableObject {
 
   // "player1 is typing…": in a channel to everyone else, in a DM only to the other person.
   // Not stored anywhere; browsers send it at most every few seconds and hide it after 6 seconds.
-  onTyping(ws, user, msg) {
+  async onTyping(ws, user, msg) {
     if (user.muted_until && new Date(user.muted_until) > new Date()) return;
     const now = Date.now();
     const key = msg.dm != null ? `dm:${Number(msg.dm)}` : `ch:${Number(msg.channelId)}`;
@@ -89,9 +89,12 @@ export class CommunityHub extends DurableObject {
     }
     const channelId = Number(msg.channelId);
     if (!Number.isInteger(channelId)) return;
+    const staffOnly = (await this.staffChannels()).has(channelId);
+    if (staffOnly && !hubCan(user, "staff_chat")) return;
     const text = JSON.stringify({ type: "typing", channelId, ...who });
     for (const s of this.ctx.getWebSockets()) {
-      if (Number(s.deserializeAttachment()?.id) === Number(user.id)) continue;
+      const u = s.deserializeAttachment();
+      if (Number(u?.id) === Number(user.id) || (staffOnly && !hubCan(u, "staff_chat"))) continue;
       try { s.send(text); } catch { /* gone */ }
     }
   }
@@ -127,6 +130,25 @@ export class CommunityHub extends DurableObject {
 
   send(ws, data) {
     try { ws.send(JSON.stringify(data)); } catch { /* socket gone */ }
+  }
+
+  // Channels only staff can see (the Staff category): their messages, edits, reactions and typing only go to staff.
+  async staffChannels() {
+    if (this.staffSet && Date.now() - this.staffSetAt < 60_000) return this.staffSet;
+    const rows = await getDb(this.env)`SELECT id FROM channels WHERE staff_only`;
+    this.staffSet = new Set(rows.map((r) => Number(r.id)));
+    this.staffSetAt = Date.now();
+    return this.staffSet;
+  }
+
+  // Send to everyone who can see this channel.
+  async broadcastChannel(channelId, data, except) {
+    if (!(await this.staffChannels()).has(Number(channelId))) return this.broadcast(data, except);
+    const text = JSON.stringify(data);
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws === except || !hubCan(ws.deserializeAttachment(), "staff_chat")) continue;
+      try { ws.send(text); } catch { /* socket gone */ }
+    }
   }
 
   broadcast(data, except) {
@@ -171,6 +193,14 @@ export class CommunityHub extends DurableObject {
       this.words = null;
       return;
     }
+    if (event.type === "channels_changed") {
+      this.staffSet = null;
+      return;
+    }
+    if ((event.type === "message" || event.type === "message_updated") && event.message) {
+      this.ctx.waitUntil(this.broadcastChannel(event.message.channelId, event));
+      return;
+    }
     if (event.staffOnly) {
       const text = JSON.stringify(event);
       for (const ws of this.ctx.getWebSockets()) {
@@ -203,7 +233,7 @@ export class CommunityHub extends DurableObject {
       else if (msg.type === "seen") await this.onSeen(user, msg);
       else if (msg.type === "edit") await this.onEdit(ws, user, msg);
       else if (msg.type === "viewing") this.onViewing(ws, user, msg);
-      else if (msg.type === "typing") this.onTyping(ws, user, msg);
+      else if (msg.type === "typing") await this.onTyping(ws, user, msg);
     } catch (e) {
       console.error("hub error", e);
       this.send(ws, { type: "error", nonce: msg.nonce, message: "Something went wrong. Please try again." });
@@ -262,6 +292,7 @@ export class CommunityHub extends DurableObject {
           FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ${user.id}
       ), ch AS (
         SELECT id, min_post_power FROM channels WHERE id = ${channelId} AND kind = 'text' AND NOT hidden
+           AND (NOT staff_only OR ${hubCan(user, "staff_chat")})
       ), ins AS (
         INSERT INTO messages (channel_id, user_id, content, reply_to, image_id)
         SELECT ch.id, who.id, ${check.text},
@@ -290,14 +321,15 @@ export class CommunityHub extends DurableObject {
     }
     const message = await loadMessage(sql, r.id);
     this.send(ws, { type: "sent", nonce: msg.nonce, id: message.id });
-    this.broadcast({ type: "message", message });
+    await this.broadcastChannel(channelId, { type: "message", message });
     this.ctx.waitUntil(this.pushFor(sql, user, channelId, r.id, check.text || "📷 Sent a picture").catch((e) => console.error("push failed", e)));
   }
 
   // Phone/computer notifications: #announcements posts (Updates), and @mentions / replies.
   async pushFor(sql, user, channelId, messageId, text) {
-    const [ch] = await sql`SELECT slug, name FROM channels WHERE id = ${channelId}`;
+    const [ch] = await sql`SELECT slug, name, staff_only FROM channels WHERE id = ${channelId}`;
     if (!ch) return;
+    if (ch.staff_only) return this.pushStaff(sql, user, ch, messageId, text);
     if (ch.slug === "announcements") {
       await notify(this.env, "all", "updates", { title: `New in #${ch.name}`, body: text, url: `/community#${ch.slug}`, tag: `ann-${messageId}`, ttl: 24 * 3600 },
         { exclude: [user.id, ...this.viewersOf(ch.slug)] });
@@ -325,6 +357,28 @@ export class CommunityHub extends DurableObject {
         title: `${user.username} in #${ch.name}`, body: text, url: `/community#${ch.slug}`, tag: `chat-${ch.slug}`,
       }, { exclude: [...this.viewersOf(ch.slug)] });
     }
+  }
+
+  // Staff channels: @mentions, replies and @everyone / @here only ever reach staff.
+  async pushStaff(sql, user, ch, messageId, text) {
+    const { staffMemberIds } = await import("../routes/staffroom.js");
+    const staff = new Set(await staffMemberIds(this.env, sql));
+    const lower = text.toLowerCase();
+    let ids;
+    if (/@(everyone|here)\b/.test(lower) && hubCan(user, "mention_everyone")) {
+      ids = [...staff];
+      if (/@here\b/.test(lower)) { const on = new Set(this.onlineUserIds().map(Number)); ids = ids.filter((id) => on.has(id)); }
+    } else {
+      ids = (await sql`
+        SELECT DISTINCT u.id FROM users u
+         WHERE NOT u.banned AND (position('@' || lower(u.username) in ${lower}) > 0
+               OR u.id = (SELECT m.user_id FROM messages m JOIN messages me ON me.reply_to = m.id WHERE me.id = ${messageId}))
+         LIMIT 25`).map((r) => Number(r.id));
+    }
+    ids = ids.filter((id) => staff.has(id) && id !== Number(user.id));
+    if (!ids.length) return;
+    await notify(this.env, ids, "mentions", { title: `${user.username} in #${ch.name}`, body: text, url: `/community#${ch.slug}`, tag: `chat-${ch.slug}` },
+      { exclude: [...this.viewersOf(ch.slug)] });
   }
 
   // Someone saw these messages on screen: their authors can't edit them any more.
@@ -357,13 +411,15 @@ export class CommunityHub extends DurableObject {
     if (!done.length) return reject("Someone has just read this message, so it can't be edited any more.");
     const message = await loadMessage(sql, id);
     this.send(ws, { type: "edited", nonce: msg.nonce, id });
-    this.broadcast({ type: "message_updated", message });
+    await this.broadcastChannel(message.channelId, { type: "message_updated", message });
   }
 
   async onReact(ws, user, msg) {
     const messageId = Number(msg.messageId);
     if (!Number.isInteger(messageId) || typeof msg.emoji !== "string") return;
     const sql = getDb(this.env);
+    const [target] = await sql`SELECT m.channel_id, c.staff_only FROM messages m JOIN channels c ON c.id = m.channel_id WHERE m.id = ${messageId}`;
+    if (!target || (target.staff_only && !hubCan(user, "staff_chat"))) return;
     if (!REACTIONS.includes(msg.emoji)) {  // a custom emoji: ":name:" that exists
       const name = /^:([a-z0-9_]{2,24}):$/.exec(msg.emoji)?.[1];
       if (!name) return;
@@ -384,6 +440,6 @@ export class CommunityHub extends DurableObject {
       if (!added.length) return;
     }
     const reactions = await loadReactions(sql, messageId);
-    this.broadcast({ type: "reactions", messageId, reactions });
+    await this.broadcastChannel(target.channel_id, { type: "reactions", messageId, reactions });
   }
 }

@@ -78,19 +78,19 @@ export async function loadPins(sql, channelId) {
 }
 
 // Search the text channels the member can see: words in the message, optionally by one person or in one channel.
-export async function searchMessages(sql, { q, channelId, from, limit = 30 }) {
+export async function searchMessages(sql, { q, channelId, from, staff = false, limit = 30 }) {
   const words = String(q || "").toLowerCase().split(/\s+/).filter((w) => w.length >= 2).slice(0, 5)
     .map((w) => `%${w.replace(/[%_\\]/g, "\\$&")}%`);
   if (!words.length && !from) return [];
   const rows = await sql.query(
     `${SELECT}
       JOIN channels ch ON ch.id = m.channel_id
-     WHERE m.deleted_at IS NULL AND ch.kind = 'text' AND NOT ch.hidden
+     WHERE m.deleted_at IS NULL AND ch.kind = 'text' AND NOT ch.hidden AND (NOT ch.staff_only OR $4::boolean)
        AND ($1::int IS NULL OR m.channel_id = $1)
        AND ($2::text IS NULL OR u.username_lower = lower($2))
        AND (SELECT bool_and(m.content ILIKE w) FROM unnest($3::text[]) w)
      ORDER BY m.id DESC LIMIT ${Math.min(50, limit)}`,
-    [channelId ?? null, from || null, words.length ? words : ["%"]]);
+    [channelId ?? null, from || null, words.length ? words : ["%"], Boolean(staff)]);
   return rows.map(formatMessage);
 }
 

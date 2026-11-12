@@ -27,7 +27,8 @@ export async function bootstrap(request, env) {
   const sql = getDb(env);
   const [categories, channels, roles, members] = await Promise.all([
     sql`SELECT id, name FROM categories ORDER BY position, id`,
-    sql`SELECT id, category_id, slug, name, topic, min_post_power, kind FROM channels WHERE NOT hidden ORDER BY position, id`,
+    sql`SELECT id, category_id, slug, name, topic, min_post_power, kind FROM channels
+         WHERE NOT hidden AND (NOT staff_only OR ${can(user, "staff_chat")}) ORDER BY position, id`,
     sql`SELECT key, name, color, power FROM roles ORDER BY power DESC`,
     sql`SELECT u.id, u.username, r.key AS role, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color, u.custom_presence, u.platform AS plat,
                rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon,
@@ -56,7 +57,7 @@ export async function bootstrap(request, env) {
     ok: true,
     me,
     onboarding: !onboarded,
-    categories: categories.map((c) => ({ id: c.id, name: c.name })),
+    categories: categories.filter((c) => channels.some((ch) => ch.category_id === c.id)).map((c) => ({ id: c.id, name: c.name })),
     channels: channels.map((c) => ({
       id: c.id,
       categoryId: c.category_id,
@@ -87,12 +88,19 @@ export async function bootstrap(request, env) {
   });
 }
 
+// Staff-only channels (the Staff category) can only be read by members with the Staff category permission.
+async function assertCanRead(sql, user, channelId) {
+  const [c] = await sql`SELECT staff_only FROM channels WHERE id = ${channelId}`;
+  if (!c || (c.staff_only && !can(user, "staff_chat"))) throw new HttpError(404, "Unknown channel.");
+}
+
 export async function history(request, env, ctx, url, params) {
-  await requireUser(request, env);
+  const user = await requireUser(request, env);
   const channelId = Number(params.id);
   const before = url.searchParams.get("before");
   if (!Number.isInteger(channelId)) throw new HttpError(400, "Unknown channel.");
   const sql = getDb(env);
+  await assertCanRead(sql, user, channelId);
   const around = Number(url.searchParams.get("around"));
   if (Number.isInteger(around) && around > 0) return json({ ok: true, ...(await loadAround(sql, channelId, around)) });
   const messages = await loadHistory(sql, channelId, before ? Number(before) : null);
@@ -101,20 +109,22 @@ export async function history(request, env, ctx, url, params) {
 
 // GET /api/chat/search?q=words&channel=ID&from=username
 export async function search(request, env, ctx, url) {
-  await requireUser(request, env);
+  const user = await requireUser(request, env);
   const q = String(url.searchParams.get("q") || "").slice(0, 100);
   const channelId = Number(url.searchParams.get("channel")) || null;
   const from = String(url.searchParams.get("from") || "").replace(/^@/, "").trim().slice(0, 32) || null;
   const sql = getDb(env);
-  return json({ ok: true, messages: await searchMessages(sql, { q, channelId, from }) });
+  return json({ ok: true, messages: await searchMessages(sql, { q, channelId, from, staff: can(user, "staff_chat") }) });
 }
 
 // GET /api/chat/channels/:id/pins
 export async function pins(request, env, ctx, url, params) {
-  await requireUser(request, env);
+  const user = await requireUser(request, env);
   const channelId = Number(params.id);
   if (!Number.isInteger(channelId)) throw new HttpError(400, "Unknown channel.");
-  return json({ ok: true, messages: await loadPins(getDb(env), channelId) });
+  const sql = getDb(env);
+  await assertCanRead(sql, user, channelId);
+  return json({ ok: true, messages: await loadPins(sql, channelId) });
 }
 
 // POST /api/chat/messages/:id/pin { pinned } (staff)
@@ -124,6 +134,8 @@ export async function pin(request, env, ctx, url, params) {
   const body = await request.json().catch(() => ({}));
   const sql = getDb(env);
   const id = Number(params.id);
+  const [where] = await sql`SELECT c.staff_only FROM messages m JOIN channels c ON c.id = m.channel_id WHERE m.id = ${Number(params.id)}`;
+  if (where?.staff_only && !can(user, "staff_chat")) throw new HttpError(404, "That message no longer exists.");
   const [m] = await sql`UPDATE messages SET pinned_at = ${body.pinned ? new Date().toISOString() : null}, pinned_by = ${body.pinned ? user.id : null}
                          WHERE id = ${id} AND deleted_at IS NULL RETURNING id, channel_id`;
   if (!m) throw new HttpError(404, "That message no longer exists.");

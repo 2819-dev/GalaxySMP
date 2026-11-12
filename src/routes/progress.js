@@ -189,13 +189,14 @@ export async function leaderboards(request, env, ctx, url) {
 }
 
 export async function profile(request, env, ctx, url, params) {
-  await requireUser(request, env);  // profiles are for signed-in members
+  const me = await requireUser(request, env);  // profiles are for signed-in members
   const name = String(params.name || "").trim().replace(/^\./, "").toLowerCase().slice(0, 32);
   if (!name) throw new HttpError(404, "No player with that name.");
   const sql = getDb(env);
   const rows = await sql`
     SELECT p.xuid, p.gamertag, p.first_seen, p.last_seen, p.balance_cents, p.is_op, p.playtime_s, p.mined, p.placed, p.kills, p.deaths,
            p.quests_done, p.streak, p.best_streak, p.achievements, p.online_at, p.extra_plots, p.head_at, p.gamerpic_at,
+           p.pic_source, (p.head IS NOT NULL) AS has_head, (p.custom_pic IS NOT NULL) AS has_custom,
            (p.online_at > now() - interval '150 seconds') AS online,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient,
            rk.position AS rank_position, rk.priority AS rank_priority, p.bw_games, p.bw_wins, p.bw_kills, p.bw_finals, p.bw_beds,
@@ -235,6 +236,8 @@ export async function profile(request, env, ctx, url, params) {
       achievements: defs.map((a) => ({ ...a, unlocked: have.has(a.id) })),
       // Player of the Week: how many times, and whether they're this week's (picked within the last 7 days)
       potw: potw.length ? { times: potw.length, current: Date.now() - new Date(potw[0].week).getTime() < 14 * 864e5, week: potw[0].week, secs: Number(potw[0].secs) } : null,
+      // the owner can pick this player's picture: Xbox picture or player head (their own Pro+ picture comes first)
+      ...(me.owner ? { picture: { xuid: p.xuid, source: p.pic_source || "auto", hasHead: Boolean(p.has_head), custom: p.pic_source === "custom" && Boolean(p.has_custom) } } : {}),
       badges: p.user_id ? (await badgesFor(env, sql, [{ id: p.user_id, username: p.user_name, platform: p.user_platform }])).get(Number(p.user_id)) : [],
     },
   }, 200, { "Cache-Control": "private, no-store" });

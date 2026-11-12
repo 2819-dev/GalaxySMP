@@ -1,3 +1,4 @@
+import { can } from "../lib/perms.js";
 // Voice chat connections: browsers (signed-in, linked members) and the Endstone plugin.
 import { getDb } from "../lib/db.js";
 import { HttpError } from "../lib/http.js";
@@ -34,6 +35,7 @@ export async function voiceConnect(request, env) {
     power,
     mcUuid: String(extra.mc_uuid).toLowerCase(),
     canGlobal: power >= 50 || Boolean(extra.global_mic),
+    staffChat: can(user, "staff_chat"),
     voiceMutedUntil: extra.voice_muted_until && new Date(extra.voice_muted_until) > new Date() ? extra.voice_muted_until : null,
   }));
   return voiceStub(env).fetch(new Request(request.url, { headers }));

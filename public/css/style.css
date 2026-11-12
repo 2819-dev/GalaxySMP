@@ -2425,3 +2425,18 @@ html[data-theme="light"] .plan-more { color: #2457eb; }
 html[data-theme="light"] .tl-card.k-first_join { --tl: #12865a; } html[data-theme="light"] .tl-card.k-achievement { --tl: #a06c00; }
 html[data-theme="light"] .tl-card.k-potw { --tl: #a06c00; } html[data-theme="light"] .tl-card.k-botw { --tl: #b4501c; }
 html[data-theme="light"] .tl-card.k-rank { --tl: #7a3cc9; } html[data-theme="light"] .tl-card.k-plan { --tl: #1576a8; }
+
+/* ---------- Staff category: #Staff Logs and #Reports ---------- */
+.sl-list { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+.sl-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.sl-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; flex: none; background: #3fbf7f; }
+.sl-row.warn .sl-dot { background: #e5a33a; }
+.sl-row.bad .sl-dot { background: #e5484d; }
+.sl-body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.sl-row time { white-space: nowrap; }
+.sl-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+@media (max-width: 520px) { .sl-row { flex-wrap: wrap; } .sl-side { flex-direction: row; width: 100%; justify-content: space-between; align-items: center; } }
+.pp-pic-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.pp-pic-pick .seg button { white-space: nowrap; height: auto; padding: 5px 10px; border-radius: 7px; border: 0; background: none; color: var(--text-2); font: inherit; font-size: .85rem; font-weight: 650; cursor: pointer; }
+.pp-pic-pick .seg button[aria-checked="true"] { background: var(--accent); color: #fff; }
+.pp-pic-pick .seg { display: inline-flex; flex: none; padding: 3px; }

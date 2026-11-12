@@ -13,6 +13,7 @@ import { openPlusMenu, giftDialog } from "/js/plus-menu.js";
 import { renderTimeline } from "/js/community-feed.js";
 import { helpCenterBlock } from "/js/help-center.js";
 import { renderTeam, renderApplications } from "/js/community-team.js";
+import { renderStaffLogs, renderReports } from "/js/community-staff.js";
 
 const panel = () => document.getElementById("channel-panel");
 const voiceBox = () => document.getElementById("voice-embed");
@@ -51,6 +52,7 @@ export function showPanel(channel, context) {
     events: (el) => extra.renderEvents(el, helpers), news: (el) => extra.renderNews(el, helpers),
     polls: (el) => extra.renderPolls(el, helpers), builds: (el) => extra.renderBuilds(el, helpers),
     timeline: (el) => renderTimeline(el, helpers), team: (el) => renderTeam(el, helpers), applications: (el) => renderApplications(el, helpers),
+    stafflogs: (el) => renderStaffLogs(el, helpers), reports: (el) => renderReports(el, helpers),
   }[channel.kind];
   if (render) render(p);
 }

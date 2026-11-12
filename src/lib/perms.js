@@ -3,6 +3,7 @@
 export const PERMS = [
   // Community
   { key: "post_staff_channels", group: "Community", label: "Post in staff-only channels", hint: "#Announcements, #Updates, #Events and #Polls" },
+  { key: "staff_chat", group: "Community", label: "See the Staff category", hint: "#Staff Announcements, #Staff Chat, #Staff Logs, #Reports, #Ideas & To-Do and the Staff voice group" },
   { key: "team_listed", group: "Community", label: "Listed on #Meet The Team", hint: "Shows on the team page and can write a team bio" },
   { key: "pin_messages", group: "Community", label: "Pin messages" },
   { key: "mention_everyone", group: "Community", label: "Mention @everyone and @here" },

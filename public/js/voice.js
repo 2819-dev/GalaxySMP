@@ -474,13 +474,15 @@ function renderRooms(rooms) {
     const members = [...S.users.values()].filter((u) => u.group === g.id);
     const mine = me?.group === g.id;
     const ic = h("span", { class: "vstate" });
-    ic.innerHTML = vicon("group");
+    const shut = g.staffOnly && !(S.me?.owner || (S.me?.perms || []).includes("staff_chat"));
+    ic.innerHTML = vicon(shut ? "lock" : "group");
     return h("div", { class: "vrow" + (mine ? " mine" : "") }, ic,
       h("div", { class: "vinfo" },
         h("div", { class: "vname" }, g.name, members.length ? h("span", { class: "vtag", text: `${members.length} here` }) : null),
         h("div", { class: "vdetail", text: members.length ? members.map((m) => m.username).join(", ") : (g.description || "Nobody here yet.") })),
       h("div", { class: "vgroup-actions" }, mine
         ? h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Leave", onclick: () => request("group.leave").catch((e) => toast(e.message)) })
+        : shut ? h("span", { class: "vtag", text: "Staff only" })
         : h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Join", onclick: () => request("group.join", { id: g.id }).catch((e) => toast(e.message)) })));
   }));
 }
