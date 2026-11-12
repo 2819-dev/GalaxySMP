@@ -13,7 +13,7 @@ import { sendPlans } from "./plans.js";
 import { SHOP_ITEMS, SHOP } from "../store/shop.js";
 
 const MOD = 50;
-export const LATEST_PLUGIN = "2.26.1"; // the GalaxyLink version made for this website
+export const LATEST_PLUGIN = "2.27.0"; // the GalaxyLink version made for this website
 export const LATEST_ICONS = "1.9.0"; // the GalaxySMP Icons resource pack version that goes with it
 const older = (a, b) => { const x = String(a).split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
 const ADMIN = 100;
@@ -60,6 +60,11 @@ export async function overview(request, env) {
     serverInfo(env),
   ]);
   const online = await sql`SELECT xuid, gamertag, head_at, gamerpic_at FROM players WHERE online_at > now() - interval '3 minutes' ORDER BY gamertag LIMIT 60`;
+  // Server map health: chunks stored, and what the plugin last reported.
+  const [[mapRow], mapLive] = await Promise.all([
+    sql`SELECT count(*)::int AS chunks, max(updated_at) AS last FROM map_chunks`,
+    voiceStub(env).fetch("https://voice/internal/map").then((r) => r.json()).catch(() => ({})),
+  ]);
   return json({
     ok: true,
     owner: user.owner,
@@ -75,6 +80,7 @@ export async function overview(request, env) {
       reports: counts.game_reports + counts.chat_reports, punishmentsWeek: counts.punishments_week, plans: counts.plans,
     },
     online: online.map((p) => ({ xuid: p.xuid, name: p.gamertag, head: headUrl(p) })),
+    map: { chunks: mapRow.chunks, lastChunk: mapRow.last, liveAt: mapLive.playersAt || null, error: mapLive.status?.error || null, reportAt: mapLive.statusAt || null },
     recent: recent.map((r) => ({ action: r.action, details: r.details, at: r.created_at, actor: r.actor || "System" })),
   });
 }

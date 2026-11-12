@@ -93,6 +93,10 @@ class LiveMap:
         self.drawn = {}          # (cx, cz) -> time drawn
         self.next_live = 0
         self.next_markers = 0
+        self.sent = 0            # chunks sent since the server started
+        self.last_error = None   # the last problem, shown in the Control Panel
+        self.method = None       # how the top block is read (some server versions lack the fast way)
+        self.started = False
 
     def voice(self):
         v = getattr(self.plugin, "_voice", None)
@@ -103,23 +107,31 @@ class LiveMap:
         voice = self.voice()
         if voice is None:
             return
+        if not self.started:
+            self.started = True
+            self.plugin.logger.info("Live map: drawing the Overworld around players for galaxymc.us/map")
         now = time.time()
         try:
             self.draw_some(voice, now)
         except Exception as e:
-            self.plugin.logger.warning(f"Map drawing failed: {e}")
+            self.fail(f"Map drawing failed: {e}")
         if now >= self.next_live:
             self.next_live = now + LIVE_EVERY
             try:
                 self.send_live(voice)
             except Exception as e:
-                self.plugin.logger.warning(f"Map players failed: {e}")
+                self.fail(f"Map players failed: {e}")
         if now >= self.next_markers:
             self.next_markers = now + MARKERS_EVERY
             try:
                 self.send_markers(voice)
             except Exception as e:
-                self.plugin.logger.warning(f"Map markers failed: {e}")
+                self.fail(f"Map markers failed: {e}")
+
+    def fail(self, text):
+        if text != self.last_error:  # log each new problem once, not every 2 seconds
+            self.plugin.logger.warning(text)
+        self.last_error = text
 
     # ---------- the land ----------
     def wanted(self, now):
@@ -160,14 +172,27 @@ class LiveMap:
                 self.drawn.pop(k, None)
         if chunks:
             voice.send_json({"type": "map_chunks", "dim": "overworld", "chunks": chunks})
+            self.sent += len(chunks)
+            if self.last_error and self.last_error.startswith("Map drawing failed"):
+                self.last_error = None
 
     def draw_chunk(self, dim, cx, cz):
         x0, z0 = cx * 16, cz * 16
         heights = {}
 
         def top(x, z):
-            b = dim.get_highest_block_at(x, z)
-            return b.y, b.type
+            # Fast way first; if this server version doesn't have it, read the height and then the block.
+            if self.method != "slow":
+                try:
+                    b = dim.get_highest_block_at(x, z)
+                    self.method = "fast"
+                    return b.y, b.type
+                except (AttributeError, TypeError):
+                    if self.method == "fast":
+                        raise
+                    self.method = "slow"
+            y = dim.get_highest_block_y_at(x, z)
+            return y, dim.get_block_at(x, y, z).type
 
         # The row just north of the chunk, for shading the first row.
         north = []
@@ -178,12 +203,14 @@ class LiveMap:
                 north.append(None)
         out = bytearray(768)
         blank = 0
+        errors = []
         for j in range(16):
             for i in range(16):
                 try:
                     y, kind = top(x0 + i, z0 + j)
-                except Exception:
+                except Exception as e:
                     y, kind = None, None
+                    errors.append(e)
                 heights[(i, j)] = y
                 if y is None or kind in (None, "minecraft:air"):
                     c = (0, 0, 0)
@@ -197,6 +224,8 @@ class LiveMap:
                         c = shade(c, 0.95 + ((i + j) % 2) * 0.05)
                 k = (j * 16 + i) * 3
                 out[k], out[k + 1], out[k + 2] = c
+        if len(errors) == 256:
+            raise RuntimeError(f"couldn't read the ground ({type(errors[0]).__name__}: {errors[0]})")
         return None if blank == 256 else bytes(out)
 
     # ---------- players and markers ----------
@@ -224,4 +253,5 @@ class LiveMap:
             kind = "area" if p.get("kind") == "area" else "shop" if p.get("shop") else "plot"
             plots.append({"kind": kind, "label": self.plugin.plots.label(p) if kind != "plot" or p.get("name") else "",
                           "owner": p.get("owner_name") or "", "x1": p["x1"], "z1": p["z1"], "x2": p["x2"], "z2": p["z2"]})
-        voice.send_json({"type": "map_markers", "markers": markers, "plots": plots[:2000]})
+        voice.send_json({"type": "map_markers", "markers": markers, "plots": plots[:2000],
+                         "status": {"sent": self.sent, "error": self.last_error, "method": self.method}})

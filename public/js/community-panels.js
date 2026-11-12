@@ -7,6 +7,7 @@ import { iconEl } from "/js/site.js";
 import { renderMarkdown } from "/js/markdown.js";
 import { faceSvg } from "/js/face.js";
 import * as extra from "/js/community-extra.js";
+import { sendTyping } from "/js/chat.js";
 
 const panel = () => document.getElementById("channel-panel");
 const voiceBox = () => document.getElementById("voice-embed");
@@ -257,6 +258,10 @@ function renderSupport(p, openId) {
 // ---------- Direct messages ----------
 const dmListeners = new Set();
 export function dmEvent(data) {
+  if (data.type === "typing") { // someone typing to you: the open conversation shows it
+    document.getElementById("channel-panel")?.querySelector(".dm-main")?.onDmTyping?.(data);
+    return;
+  }
   for (const fn of dmListeners) fn(data);
 }
 const dmTime = (at) => {
@@ -382,7 +387,19 @@ function renderDMs(p) {
     const grow = () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight + 2, 140) + "px"; };
     input.addEventListener("input", grow);
     const composer = h("div", { class: "dm-composer" }, input, send);
-    main.replaceChildren(h("div", { class: "dm-chat" }, head, log, d.blocked ? h("p", { class: "text-3 small dm-start", text: "You blocked this member." }) : composer));
+    // "player1 is typing…"
+    const typing = h("div", { class: "typing-line dm-typing", "aria-live": "polite" });
+    let typingTimer = null;
+    const stopTyping = () => { clearTimeout(typingTimer); typing.replaceChildren(); typing.classList.remove("on"); };
+    main.onDmTyping = (t) => {
+      if (t.dm !== userId) return;
+      typing.replaceChildren(h("span", { class: "typing-dots", "aria-hidden": "true" }, h("i"), h("i"), h("i")), h("span", { text: `${d.other.username} is typing…` }));
+      typing.classList.add("on");
+      clearTimeout(typingTimer);
+      typingTimer = setTimeout(stopTyping, 6000);
+    };
+    input.addEventListener("input", () => { if (input.value.trim()) sendTyping({ dm: userId }); });
+    main.replaceChildren(h("div", { class: "dm-chat" }, head, log, typing, d.blocked ? h("p", { class: "text-3 small dm-start", text: "You blocked this member." }) : composer));
     log.scrollTop = log.scrollHeight;
     async function sendIt() {
       const text = input.value.trim();
@@ -417,6 +434,7 @@ function renderDMs(p) {
         return;
       }
       if (log.querySelector(`[data-id="${m.id}"]`)) return;
+      if (m.from === userId) stopTyping();
       add(m);
       log.querySelector(".dm-start")?.remove();
       log.scrollTop = log.scrollHeight;

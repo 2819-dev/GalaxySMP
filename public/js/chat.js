@@ -28,6 +28,7 @@ const state = {
   online: new Set(),
   reactions: [],
   channelId: null,
+  typing: new Map(),   // channelId -> Map(userId -> { name, until })
   messages: new Map(), // id -> message (current channel only)
   hasMore: false,
   replyTo: null,
@@ -259,6 +260,7 @@ setInterval(reportView, 4 * 60_000); // still looking: say so again now and then
 
 async function selectChannel(id) {
   state.channelId = id;
+  renderTyping();
   state.unread.delete(id);
   state.replyTo = null;
   renderReplyBar();
@@ -746,6 +748,44 @@ function memberRow(m, isOnline) {
 // Stage D adds staff tools to member rows through this hook.
 export const memberHooks = [];
 
+// ---------- "player1 is typing…" ----------
+const typingSent = new Map();
+// target: { channelId } or { dm: userId }. Sent at most every 3 seconds while typing.
+export function sendTyping(target) {
+  const key = target.dm != null ? `dm:${target.dm}` : `ch:${target.channelId}`;
+  const now = Date.now();
+  if (now - (typingSent.get(key) || 0) < 3000) return;
+  typingSent.set(key, now);
+  if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.send(JSON.stringify({ type: "typing", ...target }));
+}
+export function typingText(names) {
+  if (!names.length) return "";
+  if (names.length === 1) return `${names[0]} is typing…`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
+  if (names.length === 3) return `${names[0]}, ${names[1]} and ${names[2]} are typing…`;
+  return "Several people are typing…";
+}
+function renderTyping() {
+  const el = $("typing-line");
+  if (!el) return;
+  const now = Date.now();
+  const here = state.typing.get(state.channelId);
+  const names = [];
+  if (here) for (const [id, t] of here) { if (t.until > now) names.push(t.name); else here.delete(id); }
+  el.replaceChildren();
+  if (names.length) {
+    const dots = document.createElement("span");
+    dots.className = "typing-dots";
+    dots.setAttribute("aria-hidden", "true");
+    dots.append(document.createElement("i"), document.createElement("i"), document.createElement("i"));
+    const b = document.createElement("span");
+    b.textContent = typingText(names);
+    el.append(dots, b);
+  }
+  el.classList.toggle("on", names.length > 0);
+}
+setInterval(renderTyping, 1000);
+
 // ---------- Live connection ----------
 function send(data) {
   if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.send(JSON.stringify(data));
@@ -813,7 +853,15 @@ function handleEvent(data) {
       renderMembers();
       break;
     case "message":
+      state.typing.get(data.message.channelId)?.delete(data.message.author.id);
       addMessage(data.message);
+      renderTyping();
+      break;
+    case "typing":
+      if (data.dm != null) { dmEvent(data); break; }
+      if (!state.typing.has(data.channelId)) state.typing.set(data.channelId, new Map());
+      state.typing.get(data.channelId).set(data.userId, { name: data.username, until: Date.now() + 6000 });
+      renderTyping();
       break;
     case "sent":
       state.pending.delete(data.nonce);
@@ -921,6 +969,7 @@ function wireUi() {
   });
   const input = $("composer-input");
   input.addEventListener("input", autosize);
+  input.addEventListener("input", () => { if (input.value.trim() && state.channelId) sendTyping({ channelId: state.channelId }); });
   setupMentions(input, () => [...state.members.values()].filter((m) => m.id !== state.me?.id).map((m) => ({ id: m.id, username: m.username, head: m.head, online: state.online.has(m.id) })),
     () => (state.me?.role?.power || 0) >= 50);
   input.addEventListener("keydown", (e) => {

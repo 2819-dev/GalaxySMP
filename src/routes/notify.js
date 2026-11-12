@@ -9,7 +9,8 @@ import { sendPush } from "../lib/webpush.js";
 export const KINDS = {
   dms: { name: "Direct messages", hint: "When someone sends you a DM", default: true },
   mentions: { name: "Chat mentions & replies", hint: "When someone @mentions you or replies to you in the community", default: true },
-  updates: { name: "Updates", hint: "New posts in #announcements", default: true },
+  updates: { name: "Announcements", hint: "New posts in #Announcements", default: true },
+  minor: { name: "Minor updates", hint: "Small updates posted in #Updates", default: false },
   announcements: { name: "Server announcements", hint: "Announcements staff send in game", default: true },
   server: { name: "Server online / offline", hint: "When GalaxySMP goes down or comes back online", default: true },
   reward: { name: "Daily reward reminder", hint: "Around noon (US Eastern) if you haven't claimed /daily yet", default: true },

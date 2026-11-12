@@ -66,6 +66,34 @@ export class CommunityHub extends DurableObject {
     ws.serializeAttachment({ ...user, viewing: view, viewingAt: Date.now() });
   }
 
+  // "player1 is typing…": in a channel to everyone else, in a DM only to the other person.
+  // Not stored anywhere; browsers send it at most every few seconds and hide it after 6 seconds.
+  onTyping(ws, user, msg) {
+    if (user.muted_until && new Date(user.muted_until) > new Date()) return;
+    const now = Date.now();
+    const key = msg.dm != null ? `dm:${Number(msg.dm)}` : `ch:${Number(msg.channelId)}`;
+    const last = (this.typingAt ||= new Map());
+    const k = `${user.id}|${key}`;
+    if (now - (last.get(k) || 0) < 2000) return;
+    last.set(k, now);
+    if (last.size > 5000) last.clear();
+    const who = { userId: Number(user.id), username: user.username };
+    if (msg.dm != null) {
+      const to = Number(msg.dm);
+      if (!Number.isInteger(to) || to === Number(user.id)) return;
+      const text = JSON.stringify({ type: "typing", dm: Number(user.id), ...who });
+      for (const s of this.socketsFor(to)) { try { s.send(text); } catch { /* gone */ } }
+      return;
+    }
+    const channelId = Number(msg.channelId);
+    if (!Number.isInteger(channelId)) return;
+    const text = JSON.stringify({ type: "typing", channelId, ...who });
+    for (const s of this.ctx.getWebSockets()) {
+      if (Number(s.deserializeAttachment()?.id) === Number(user.id)) continue;
+      try { s.send(text); } catch { /* gone */ }
+    }
+  }
+
   socketsFor(userId) {
     return this.ctx.getWebSockets(`user:${userId}`);
   }
@@ -168,6 +196,7 @@ export class CommunityHub extends DurableObject {
       else if (msg.type === "seen") await this.onSeen(user, msg);
       else if (msg.type === "edit") await this.onEdit(ws, user, msg);
       else if (msg.type === "viewing") this.onViewing(ws, user, msg);
+      else if (msg.type === "typing") this.onTyping(ws, user, msg);
     } catch (e) {
       console.error("hub error", e);
       this.send(ws, { type: "error", nonce: msg.nonce, message: "Something went wrong. Please try again." });
@@ -256,6 +285,11 @@ export class CommunityHub extends DurableObject {
   async pushFor(sql, user, channelId, messageId, text) {
     const [ch] = await sql`SELECT slug, name FROM channels WHERE id = ${channelId}`;
     if (!ch) return;
+    if (ch.slug === "updates") { // minor announcements: only members who turned "Minor updates" on
+      await notify(this.env, "all", "minor", { title: "New in #Updates", body: text, url: "/community#updates", tag: `upd-${messageId}`, ttl: 24 * 3600 },
+        { exclude: [user.id, ...this.viewersOf(ch.slug)] });
+      return;
+    }
     if (ch.slug === "announcements") {
       await notify(this.env, "all", "updates", { title: `New in #${ch.name}`, body: text, url: `/community#${ch.slug}`, tag: `ann-${messageId}`, ttl: 24 * 3600 },
         { exclude: [user.id, ...this.viewersOf(ch.slug)] });

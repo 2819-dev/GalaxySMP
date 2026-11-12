@@ -209,7 +209,8 @@ export class VoiceHub extends DurableObject {
     if (url.pathname === "/internal/map") {
       const [live, marks] = await Promise.all([this.ctx.storage.get("map_live"), this.ctx.storage.get("map_markers")]);
       const fresh = live && Date.now() - live.at < 30_000;
-      return Response.json({ players: fresh ? live.players : [], playersAt: live?.at || null, markers: marks?.markers || [], plots: marks?.plots || [] });
+      return Response.json({ players: fresh ? live.players : [], playersAt: live?.at || null, markers: marks?.markers || [], plots: marks?.plots || [],
+        status: marks?.status || null, statusAt: marks?.at || null });
     }
     if (url.pathname === "/internal/ah") {
       return Response.json((await this.ctx.storage.get("ah")) || { listings: [], at: null });
@@ -374,7 +375,9 @@ export class VoiceHub extends DurableObject {
       const plots = (Array.isArray(msg.plots) ? msg.plots : []).slice(0, 2000).map((p) => ({
         kind: String(p.kind || "plot").slice(0, 8), label: String(p.label || "").slice(0, 40), owner: String(p.owner || "").slice(0, 32),
         x1: Number(p.x1) || 0, z1: Number(p.z1) || 0, x2: Number(p.x2) || 0, z2: Number(p.z2) || 0 }));
-      return this.ctx.storage.put("map_markers", { markers, plots, at: Date.now() });
+      const st = msg.status && typeof msg.status === "object" ? msg.status : {};
+      const status = { sent: Number(st.sent) || 0, error: st.error ? String(st.error).slice(0, 200) : null, method: st.method ? String(st.method).slice(0, 10) : null };
+      return this.ctx.storage.put("map_markers", { markers, plots, status, at: Date.now() });
     }
     if (msg.type === "ah") {
       const listings = (Array.isArray(msg.listings) ? msg.listings : []).slice(0, 300);
