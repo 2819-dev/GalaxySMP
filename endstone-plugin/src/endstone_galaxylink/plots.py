@@ -3,6 +3,8 @@
 Admins:  /plotaxe gives the Plot Axe. Left-click the ground for point 1, right-click for
          point 2, then a Save menu opens: a claimable Plot or a Protected area (like spawn).
          Sneak + right-click inside an existing plot or area with the axe to edit or delete it.
+         A claimed plot can be unclaimed and reset, or unclaimed with its builds kept: the builds then become
+         the plot's new starting point and it's free for anyone to claim.
 Shop plots: the third Save option. Staff make a row of them (the Shop District). Players claim them the
          same way; each plan has its own number of shop plots (Free 1, Galaxy+ 2, Galaxy Pro+ 3). Owners
          put shop chests in them (shopchests.py) and can name their shop.
@@ -509,6 +511,24 @@ class Plots:
         self.save(pid)
         self._keep_loaded(plot, False)
 
+    def _job_keep(self, pid, admin_uid):
+        """Unclaimed with the builds kept: save what's there now as the plot's starting point, then open it up."""
+        plot = self.plots[pid]
+        self._keep_loaded(plot, True)
+        yield 60
+        if plot["kind"] == "plot":
+            self.paint_edge(plot)
+        yield 2
+        for name, ax, az, bx, bz in self.tiles(plot):
+            self.cmd(f"structure save {name} {ax} {plot['bottom']} {az} {bx} {plot['top']} {bz} false disk true", plot)
+        yield 10
+        plot["status"] = "ready"
+        self.save(pid)
+        self._keep_loaded(plot, False)
+        admin = self.plugin.server.get_player(admin_uid)
+        if admin:
+            admin.send_message(f"§a{self.label(plot)} is ready to claim, builds included.")
+
     def _job_delete(self, pid):
         plot = self.plots[pid]
         self._keep_loaded(plot, True)
@@ -735,7 +755,7 @@ class Plots:
         form.add_button("No, keep my plot", on_click=lambda p: self.manage(p, pid))
         player.send_form(form)
 
-    def unclaim(self, player, pid, by_admin=False):
+    def unclaim(self, player, pid, by_admin=False, keep=False):
         plot = self.plots.get(pid)
         if not plot:
             return
@@ -752,9 +772,13 @@ class Plots:
                 ft.remove(f"shopsign:{pid}")
             plot.pop("shop_name", None)
             plot.pop("sign", None)
-        # "resetting" right away, so nobody can claim it before the reset has finished.
+        # "resetting" right away, so nobody can claim it before the reset (or the new snapshot) has finished.
         plot.update({"owner": None, "owner_name": None, "members": {}, "status": "resetting", "public": False})
         self.save(pid)
+        if keep:
+            self.run(self._job_keep(pid, player.unique_id))
+            player.send_message(f"§a{self.label(plot)} unclaimed. §7The builds stay and it will be available to claim in a moment.")
+            return
         self.run(self._job_reset(pid))
         if by_admin:
             player.send_message(f"§a{self.label(plot)} is being reset and will be available again.")
@@ -785,7 +809,19 @@ class Plots:
         form.add_button("§lSettings", on_click=lambda p: self.admin_settings(p, pid))
         if plot.get("owner"):
             form.add_button("§lUnclaim and reset", on_click=lambda p: self.unclaim(p, pid, by_admin=True))
+            form.add_button("§lUnclaim and keep builds", on_click=lambda p: self.confirm_keep(p, pid))
         form.add_button("§c§lDelete this plot", on_click=lambda p: self.admin_delete(p, pid))
+        player.send_form(form)
+
+    def confirm_keep(self, player, pid):
+        plot = self.plots[pid]
+        form = ActionForm(title=f"Unclaim {self.label(plot)}?",
+                          content=f"{plot.get('owner_name') or 'The owner'} loses the plot, but §lnothing is deleted§r.\n\n"
+                                  "The builds become this plot's new starting point: anyone can claim it with the builds "
+                                  "included, and a later reset goes back to the builds as they are now."
+                                  + ("\n\n§7Its shop chests close and their stock goes back to the owner." if plot.get("shop") else ""))
+        form.add_button("§2§lUnclaim and keep builds", on_click=lambda p: self.unclaim(p, pid, by_admin=True, keep=True))
+        form.add_button("Back", on_click=lambda p: self.admin_menu(p, pid))
         player.send_form(form)
 
     def admin_settings(self, player, pid):

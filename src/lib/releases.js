@@ -73,6 +73,11 @@ Profiles now show how rare each achievement is, with Rare, Epic and Legendary ta
     title: "Gift card text limits",
     body: `Custom greetings on gift cards can now be up to 22 characters and personal messages up to 160, so every card looks great. A live counter under each field shows how many characters you've used and turns orange as you get close to the limit.`,
   },
+  {
+    id: "2026-11-16",
+    title: "Plots can now change hands with their builds",
+    body: `Staff can now unclaim a plot without clearing it. The builds stay in place and the plot becomes available to claim again, builds included. This is useful when a player leaves the server but their build is worth keeping for someone else.`,
+  },
 ];
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.
