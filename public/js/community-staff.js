@@ -32,8 +32,23 @@ const DESCRIBE = {
   "uploads.unblock": (e) => ["allowed picture uploads again for", e.details.member],
   "appeal.accepted": (e) => ["accepted the ban appeal of", e.details.player],
   "appeal.declined": (e) => ["declined the ban appeal of", e.details.player],
+  "server.crash": (e) => [`stopped unexpectedly (last seen ${e.details.lastSeen || "unknown"}). Recent changes in the world may have been lost.`, null],
 };
-const KIND = (a) => (/ban|kick/.test(a) && !/unban/.test(a) ? "bad" : /mute|warn|rollback|remove|block|delete/.test(a) && !/un(mute|block)/.test(a) ? "warn" : "ok");
+const KIND = (a) => (a === "server.crash" ? "bad" : /ban|kick/.test(a) && !/unban/.test(a) ? "bad" : /mute|warn|rollback|remove|block|delete/.test(a) && !/un(mute|block)/.test(a) ? "warn" : "ok");
+
+// A crash report: what the plugin was doing, who was online and the end of the server log.
+function crashDetails(d) {
+  const facts = [
+    `Last activity: ${d.doing || "unknown"}`,
+    d.uptimeMinutes != null ? `Up for ${d.uptimeMinutes} min before it stopped` : null,
+    `Online: ${d.players?.length ? d.players.join(", ") : "nobody"}`,
+  ].filter(Boolean);
+  const log = d.log?.length
+    ? h("details", { class: "sl-crash-log" }, h("summary", { text: `End of the server log${d.logFile ? ` (${d.logFile})` : ""}` }),
+      h("pre", { class: "small", text: d.log.join("\n") }))
+    : h("div", { class: "text-3 small", text: "No server log file was found to attach." });
+  return h("div", { class: "sl-reason text-3 small" }, ...facts.map((f) => h("div", { text: f })), log);
+}
 
 export function renderStaffLogs(root, { setTimer }) {
   const list = h("div", { class: "sl-list" });
@@ -48,7 +63,8 @@ export function renderStaffLogs(root, { setTimer }) {
     const [what, who] = (DESCRIBE[e.action] || (() => [e.action, null]))(e);
     const by = e.details?.by && /\(in game\)$/.test(e.details.by) ? e.details.by : e.actor || e.details?.by || "Someone";
     const line = h("div", { class: "sl-line" }, h("b", { text: by }), ` ${what} `, who ? h("b", { text: who }) : null);
-    const reason = e.details?.reason ? h("div", { class: "sl-reason text-3 small", text: `Reason: ${e.details.reason}` }) : null;
+    const reason = e.details?.reason ? h("div", { class: "sl-reason text-3 small", text: `Reason: ${e.details.reason}` }) : null
+      || (e.action === "server.crash" ? crashDetails(e.details || {}) : null);
     return h("div", { class: `sl-row ${KIND(e.action)}`, "data-id": String(e.id) },
       h("span", { class: "sl-dot", "aria-hidden": "true" }),
       h("div", { class: "sl-body" }, line, reason), h("time", { class: "text-3 small", text: when(e.at) }));

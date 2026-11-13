@@ -2,16 +2,17 @@
 
 Bedrock text can't use hex colors or backgrounds, but it can show small pictures. So the plugin draws
 every rank tag (and the Galaxy+ / Pro+ plan tags) as a badge: a rounded pill in the rank's colors with
-the rank's icon and name in white (badges.py), and packs them into a tiny resource pack:
-    BDS-Addons/GalaxySMP_RankTags.mcpack
-BisectHosting's add-on installer installs it when the server starts. When ranks change, the pack is
-rebuilt by itself and the new badges show after the next restart (until then the tag is the normal
-colored text [icon NAME], so nothing ever looks broken). Player names are normal colored text.
+the rank's icon and name in white (badges.py), and packs them into a tiny resource pack that it installs
+itself: resource_packs/GalaxySMP_RankTags, listed in the world's world_resource_packs.json. (It used to rely
+on the host's add-on installer, which didn't always install it.) When ranks change, the pack is rebuilt by
+itself and the new badges show after the next restart (until then the tag is the normal colored text
+[icon NAME], so nothing ever looks broken). Player names are normal colored text.
 
 /ranktags off  switches back to the colored text right away; /ranktags on  turns badges back on.
 """
 
 import json
+import shutil
 import struct
 import zlib
 from pathlib import Path
@@ -185,6 +186,17 @@ def level_folder():
     return Path.cwd() / "worlds" / name
 
 
+def texturepack_required():
+    """True/False from server.properties, or None if it can't be read."""
+    try:
+        for line in (Path.cwd() / "server.properties").read_text("utf-8", "ignore").splitlines():
+            if line.startswith("texturepack-required="):
+                return line.split("=", 1)[1].strip().lower() == "true"
+    except Exception:
+        pass
+    return None
+
+
 def world_packs(kind="resource"):
     """The packs the world loads: [(uuid, version list)] from world_resource_packs.json / world_behavior_packs.json."""
     try:
@@ -351,7 +363,11 @@ class RankTags:
         self.history = cfg.get("history") or {}       # pack version -> its glyphs (the last few builds)
         # Only use pictures from the pack version the world really loaded (world_resource_packs.json).
         self.installed = installed_version(PACK_UUID)
-        self.active = self.pick_active()
+        self.active = self.pick_active()  # what the server loaded at this start
+        try:
+            self.ensure_installed()       # the newest build is in place for the next start
+        except Exception as e:
+            plugin.logger.warning(f"Couldn't install the rank badge pack: {e}")
 
     def pick_active(self):
         """The picture map for the pack the server REALLY loaded. The version number in the world's pack
@@ -379,9 +395,76 @@ class RankTags:
                                          "built": self.built, "history": self.history})
 
     def pack_path(self):
-        addons = Path.cwd() / "BDS-Addons"
-        folder = addons if addons.is_dir() else Path(self.plugin.data_folder)
+        folder = Path(self.plugin.data_folder)
+        folder.mkdir(parents=True, exist_ok=True)
         return folder / FILE
+
+    # ---------- installing the pack ourselves ----------
+    def install(self, files):
+        """files: {"manifest.json": bytes, "font/glyph_E9.png": bytes, ...}. Puts them in the pack folder the
+        server loads and lists this version in world_resource_packs.json (takes effect at the next start)."""
+        roots = [Path.cwd() / "resource_packs", level_folder() / "resource_packs", Path.cwd() / "development_resource_packs"]
+        mine = []
+        for root in roots:
+            if root.is_dir():
+                for manifest in root.glob("*/manifest.json"):
+                    try:
+                        if json.loads(manifest.read_text("utf-8")).get("header", {}).get("uuid") == PACK_UUID:
+                            mine.append(manifest.parent)
+                    except Exception:
+                        continue
+        folder = mine[0] if mine else Path.cwd() / "resource_packs" / "GalaxySMP_RankTags"
+        for extra in mine[1:]:  # the same pack twice makes Minecraft refuse to load it
+            shutil.rmtree(extra, ignore_errors=True)
+        (folder / "font").mkdir(parents=True, exist_ok=True)
+        for old in (folder / "font").glob("glyph_*.png"):
+            if f"font/{old.name}" not in files:
+                old.unlink()
+        for name, data in files.items():
+            target = folder / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+        # the world's pack list: exactly one entry for this pack, at the newest version
+        path = level_folder() / "world_resource_packs.json"
+        try:
+            listed = json.loads(path.read_text("utf-8"))
+            if not isinstance(listed, list):
+                listed = []
+        except Exception:
+            listed = []
+        version = json.loads(files["manifest.json"])["header"]["version"]
+        listed = [e for e in listed if not (isinstance(e, dict) and e.get("pack_id") == PACK_UUID)]
+        listed.append({"pack_id": PACK_UUID, "version": version})
+        if path.parent.is_dir():
+            path.write_text(json.dumps(listed, indent=2), "utf-8")
+        # the old copy for the host's add-on installer would install a second copy: remove it
+        old = Path.cwd() / "BDS-Addons" / FILE
+        if old.exists():
+            try:
+                old.unlink()
+            except Exception:
+                pass
+
+    def ensure_installed(self):
+        """At start: if the newest built pack isn't the one installed, install it (from the saved .mcpack)."""
+        newest = self.history.get(str(self.version))
+        want = newest.get("hash") if isinstance(newest, dict) else None
+        if not want or (installed_fingerprint(PACK_UUID) == want and self.installed == self.version):
+            return
+        import zipfile
+        src = self.pack_path()
+        if not src.exists():
+            old = Path.cwd() / "BDS-Addons" / FILE
+            src = old if old.exists() else None
+        if src is None:
+            self.built = {}  # nothing to install from: rebuild when the ranks arrive
+            return
+        with zipfile.ZipFile(src) as z:
+            files = {n: z.read(n) for n in z.namelist() if n == "manifest.json" or (n.startswith("font/glyph_") and n.endswith(".png"))}
+        if "manifest.json" not in files:
+            return
+        self.install(files)
+        self.plugin.logger.info(f"Installed the rank badge pack (version {self.version}). The badges show after the next restart.")
 
     # ---------- used by ranks.tag_text ----------
     def glyphs_for(self, tag):
@@ -458,11 +541,15 @@ class RankTags:
         tmp = path.with_suffix(".tmp")
         tmp.write_bytes(buf.getvalue())
         tmp.replace(path)
+        self.install({"manifest.json": json.dumps(manifest, indent=2).encode(), **{f"font/{n}": d for n, d in files.items()}})
         return fingerprint(files)
 
     def status(self):
+        req = texturepack_required()
         return (f"Rank badges: {'on' if self.enabled else 'off'}; the world loads version {self.installed or 'none'}, "
-                f"newest built {self.version}; {len(self.active)} badges ready.")
+                f"newest built {self.version}; {len(self.active)} badges ready."
+                + ("" if req is not False else " NOTE: texturepack-required=false in server.properties, so players who "
+                   "skip the resource packs see boxes instead of badges."))
 
     # ---------- /ranktags ----------
     def command(self, sender, args):
@@ -482,7 +569,7 @@ class RankTags:
         state = "§aon" if self.enabled else "§coff"
         ready = (f"installed (version {self.installed})" if self.active else
                  f"waiting for a server restart (built version {self.version}, the world has {self.installed or 'none'})")
-        sender.send_message(f"§7Rank badges are {state}§7 (pictures {ready}; file: BDS-Addons/{FILE}). "
+        sender.send_message(f"§7Rank badges are {state}§7 (pictures {ready}; installed in resource_packs/GalaxySMP_RankTags). "
                             "Use /ranktags on or /ranktags off.")
         sender.send_message("§8- " + self.status())
         for line in pack_report():

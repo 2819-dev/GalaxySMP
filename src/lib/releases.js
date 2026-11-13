@@ -78,6 +78,13 @@ Profiles now show how rare each achievement is, with Rare, Epic and Legendary ta
     title: "Plots can now change hands with their builds",
     body: `Staff can now unclaim a plot without clearing it. The builds stay in place and the plot becomes available to claim again, builds included. This is useful when a player leaves the server but their build is worth keeping for someone else.`,
   },
+  {
+    id: "2026-11-16b",
+    title: "Rank badges in game and a more stable server",
+    body: `- **Rank badges.** Rank badges now show as pictures above players' heads and in chat, at normal text size. They appear after the next server restart.
+- **Rank order.** The member list on the website now follows the rank order exactly, and rank changes show the right tag straight away.
+- **Stability.** The live map no longer reads parts of the world that aren't loaded, and unexpected server stops are now reported to staff so they can be fixed quickly.`,
+  },
 ];
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.

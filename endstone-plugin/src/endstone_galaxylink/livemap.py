@@ -9,7 +9,8 @@ Every few seconds the website also gets who is online and where (the map shows t
 a minute the markers: spawn, plots and shops.
 
 To keep the server smooth, only a few chunks are drawn each time, nearest first, and a chunk is
-redrawn at most every 10 minutes.
+redrawn at most every 10 minutes. Only chunks the server already has loaded are read: reading blocks in
+a chunk that isn't loaded can crash the server.
 """
 
 import base64
@@ -169,14 +170,28 @@ class LiveMap:
         self.last_error = text
 
     # ---------- the land ----------
+    @staticmethod
+    def loaded(dim):
+        """{(cx, cz)} of the chunks this dimension has loaded right now."""
+        out = set()
+        for c in dim.loaded_chunks:
+            try:
+                out.add((c.x, c.z))
+            except Exception:
+                continue
+        return out
+
     def wanted(self, now):
-        """Chunks near Overworld players that need (re)drawing, nearest first."""
+        """Chunks near Overworld players that need (re)drawing (and are loaded), nearest first."""
         seen = {}
+        loaded = None
         for p in self.plugin.server.online_players:
             try:
                 if p.dimension.type.name.lower() != "overworld":
                     continue
                 l = p.location
+                if loaded is None:
+                    loaded = self.loaded(p.dimension)
             except Exception:
                 continue
             pcx, pcz = int(l.x) >> 4, int(l.z) >> 4
@@ -185,11 +200,12 @@ class LiveMap:
                     if dx * dx + dz * dz > RADIUS * RADIUS:
                         continue
                     key = (pcx + dx, pcz + dz)
-                    if now - self.drawn.get(key, 0) < REDRAW_SECONDS:
+                    if key not in loaded or now - self.drawn.get(key, 0) < REDRAW_SECONDS:
                         continue
                     d = dx * dx + dz * dz
                     if key not in seen or d < seen[key][0]:
                         seen[key] = (d, p.dimension)
+        self.loaded_now = loaded or set()
         return sorted(((d, key, dim) for key, (d, dim) in seen.items()), key=lambda t: t[0])
 
     def draw_some(self, voice, now):
@@ -231,9 +247,10 @@ class LiveMap:
 
         # The row just north of the chunk, for shading the first row.
         north = []
+        north_loaded = (cx, cz - 1) in getattr(self, "loaded_now", ())
         for i in range(16):
             try:
-                north.append(dim.get_highest_block_y_at(x0 + i, z0 - 1))
+                north.append(dim.get_highest_block_y_at(x0 + i, z0 - 1) if north_loaded else None)
             except Exception:
                 north.append(None)
         out = bytearray(768)

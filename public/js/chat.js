@@ -841,7 +841,8 @@ function renderMembers() {
   // Online members grouped by rank (in the ranks' order), then everyone without a rank.
   const groups = new Map();
   for (const m of online) {
-    const key = m.rank ? `${String(m.rank.position).padStart(6, "0")}:${m.rank.name}` : "~";
+    // sorted by the Rank order: priority first (1 = top), then position (Galaxy+ / Pro+ tags are -1)
+    const key = m.rank ? `${String(m.rank.priority ?? 100).padStart(3, "0")}:${String((m.rank.position ?? 0) + 1).padStart(6, "0")}:${m.rank.name}` : "~";
     if (!groups.has(key)) groups.set(key, { rank: m.rank, members: [] });
     groups.get(key).members.push(m);
   }

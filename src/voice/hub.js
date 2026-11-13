@@ -402,6 +402,17 @@ export class VoiceHub extends DurableObject {
       }
       return;
     }
+    if (msg.type === "server_crash") {  // the server didn't stop properly last time: show it in #Staff Logs
+      const clip = (v, n) => String(v ?? "").slice(0, n);
+      const details = {
+        by: "Server", lastSeen: clip(msg.lastSeen, 40), uptimeMinutes: Number(msg.uptimeMinutes) || null, doing: clip(msg.doing, 200),
+        players: (Array.isArray(msg.players) ? msg.players : []).slice(0, 40).map((p) => clip(p, 32)),
+        logFile: msg.log?.file ? clip(msg.log.file, 120) : null,
+        log: (Array.isArray(msg.log?.lines) ? msg.log.lines : []).slice(-60).map((l) => clip(l, 300)),
+      };
+      return getDb(this.env)`INSERT INTO audit_log (actor_id, action, details) VALUES (NULL, 'server.crash', ${JSON.stringify(details)}::jsonb)`
+        .catch((e) => console.error("crash report failed", e));
+    }
     if (msg.type === "ah_sale") {  // for the Auction House price history
       return import("../routes/community.js").then((m) => m.recordAhSale(this.env, msg)).catch((e) => console.error("ah sale failed", e));
     }

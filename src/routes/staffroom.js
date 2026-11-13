@@ -20,7 +20,7 @@ export async function staffMemberIds(env, sql) {
 const LOG_ACTIONS = ["message.delete", "user.mute", "user.unmute", "user.ban", "user.unban", "voice.mute", "voice.unmute", "voice.kick",
   "game.warn", "game.mute", "game.unmute", "game.kick", "game.ban", "game.unban", "game.rollback",
   "report.resolve", "report.dismiss", "game_report.resolve", "game_report.dismiss",
-  "uploads.remove-banner", "uploads.remove-picture", "uploads.block", "uploads.unblock", "appeal.accepted", "appeal.declined"];
+  "uploads.remove-banner", "uploads.remove-picture", "uploads.block", "uploads.unblock", "appeal.accepted", "appeal.declined", "server.crash"];
 
 // GET /api/staff-room/logs?before=<id>
 export async function staffLogs(request, env, ctx, url) {

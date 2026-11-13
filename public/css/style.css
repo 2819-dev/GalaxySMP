@@ -3408,3 +3408,6 @@ html[data-theme="light"] .ap-art.tone-plan-plus { color: #1aa3c9; } html[data-th
 .gc-greet.xlong { font-size: 5.6cqw; }
 .gcb-count { display: block; margin-top: 4px; text-align: right; font-size: .74rem; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .gcb-count.near { color: var(--warn); font-weight: 700; }
+.sl-crash-log{margin-top:6px}
+.sl-crash-log summary{cursor:pointer;color:var(--text-2)}
+.sl-crash-log pre{margin:6px 0 0;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:var(--surface-2,rgba(127,127,127,.08));border-radius:8px;padding:8px 10px;font-size:11px;line-height:1.45}

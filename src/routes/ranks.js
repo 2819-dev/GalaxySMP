@@ -140,7 +140,8 @@ export async function syncWebsiteRole(env, sql, xuid) {
     SELECT u.id, u.username, u.platform, u.role_id, u.role_from_rank, u.muted_until,
            (SELECT coalesce(array_agg(DISTINCT pm), '{}') FROM player_ranks x JOIN ranks r ON r.id = x.rank_id, unnest(r.web_perms) pm WHERE x.xuid = p.xuid) AS web_perms,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon,
-           rk.gradient AS rank_gradient, rk.position AS rank_position, rk.priority AS rank_priority
+           rk.gradient AS rank_gradient, rk.position AS rank_position, rk.priority AS rank_priority,
+           (SELECT s.plan FROM subscriptions s WHERE s.xuid = p.xuid AND (s.expires_at IS NULL OR s.expires_at > now())) AS plan
       FROM players p
       JOIN users u ON u.mc_uuid = p.uuid
       LEFT JOIN player_top_rank pr ON pr.xuid = p.xuid
@@ -155,8 +156,11 @@ export async function syncWebsiteRole(env, sql, xuid) {
   const changed = target !== Number(u.role_id);
   if (changed) await sql`UPDATE users SET role_id = ${target}, role_from_rank = ${target !== 1} WHERE id = ${u.id}`;
   const r = await sql`SELECT key FROM roles WHERE id = ${target}`;
-  // Website chat updates the player's tag and name color straight away.
-  await hubBroadcast(env, { type: "member_updated", member: { id: Number(u.id), username: u.username, role: r[0].key, rank: rankOf(u) }, mutedUntil: u.muted_until });
+  // Website chat updates the player's tag and name color straight away (the one tag the Rank order picks,
+  // which can be their Galaxy+ / Pro+ tag).
+  const { PLANS } = await import("./plans.js");
+  const shown = displayRank(rankOf(u), u.plan, await loadPlanPriority(sql), PLANS);
+  await hubBroadcast(env, { type: "member_updated", member: { id: Number(u.id), username: u.username, role: r[0].key, rank: shown }, mutedUntil: u.muted_until });
   if (changed) await voiceEvent(env, { type: "role_changed", userId: Number(u.id) });
 }
 

@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.40.0"
+VERSION = "2.41.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -196,6 +196,8 @@ class GalaxyLink(Plugin):
     def on_enable(self) -> None:
         self._last_use = {}
         self._voice = None
+        from endstone_galaxylink.crashwatch import CrashWatch
+        self.crashwatch = CrashWatch(self)  # tells the staff when the server didn't stop properly (and why, if it can)
         self.ranks = RankManager(self)
         self.economy = Economy(self)
         self.plans = Plans(self)
@@ -259,15 +261,16 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self.jobs.tick, delay=100, period=100)
         self.server.scheduler.run_task(self, self.servercontrol.tick, delay=20, period=20)
         self.server.scheduler.run_task(self, self.cosmetics.tick, delay=TRAIL_TICKS, period=TRAIL_TICKS)
-        self.server.scheduler.run_task(self, self.floating.update, delay=1400, period=1200)
-        self.server.scheduler.run_task(self, self.leaderboards.update, delay=1300, period=1200)
+        self.server.scheduler.run_task(self, self._watched("updating floating texts", self.floating.update), delay=1400, period=1200)
+        self.server.scheduler.run_task(self, self._watched("updating floating leaderboards", self.leaderboards.update), delay=1300, period=1200)
         self.server.scheduler.run_task(self, self.moderation.tick, delay=600, period=600)
         self.server.scheduler.run_task(self, self.blocklog.tick, delay=20, period=20)
         self.server.scheduler.run_task(self, self.announcements.tick, delay=20, period=20)
         self.server.scheduler.run_task(self, self.minigames.tick, delay=600, period=600)
         self.server.scheduler.run_task(self, self.bedwars.tick, delay=100, period=10)
-        self.server.scheduler.run_task(self, self.livemap.tick, delay=200, period=40)  # website map
-        self.server.scheduler.run_task(self, self.plots.tick, delay=1, period=1)
+        self.server.scheduler.run_task(self, self._watched("drawing the website map", self.livemap.tick), delay=200, period=40)  # website map
+        self.server.scheduler.run_task(self, self._watched("a plot job (save/reset)", self.plots.tick, lambda: self.plots.jobs), delay=1, period=1)
+        self.server.scheduler.run_task(self, self.crashwatch.tick, delay=20, period=20)
         self.server.scheduler.run_task(self, self.plots.check_tools, delay=400, period=200)  # plot tools come back if missing
         self.server.scheduler.run_task(self, self.auction.tick, delay=600, period=600)
         self.register_events(self)
@@ -542,6 +545,20 @@ class GalaxyLink(Plugin):
             return
         self.moderation.on_command(event)  # muted players can't /msg or /me
 
+    def _watched(self, what, fn, only_if=None):
+        """Runs a scheduled task, noting it for the crash report while it runs."""
+        cw = self.crashwatch
+
+        def run():
+            if only_if is not None and not only_if():
+                return fn()
+            cw.mark(what)
+            try:
+                return fn()
+            finally:
+                cw.mark("idle")
+        return run
+
     def on_disable(self) -> None:
         if getattr(self, "blocklog", None):
             self.blocklog.flush()
@@ -552,6 +569,8 @@ class GalaxyLink(Plugin):
             self._voice.stop()
         if getattr(self, "economy", None):
             self.economy.db.close()
+        if getattr(self, "crashwatch", None):
+            self.crashwatch.stopped()
 
     # ---------- Website requests (run on a background thread) ----------
     def _request(self, path, body=None):
