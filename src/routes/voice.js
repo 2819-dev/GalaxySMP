@@ -20,6 +20,11 @@ export async function voiceConnect(request, env) {
   if (!origin || new URL(origin).host !== new URL(request.url).host) throw new HttpError(403, "Forbidden.");
   if (!env.REALTIME_APP_ID || !env.REALTIME_APP_SECRET) throw new HttpError(503, "Voice chat isn't set up yet.");
   const user = await requireUser(request, env);
+  return voiceStub(env).fetch(new Request(request.url, { headers: await voiceHeaders(env, request, user) }));
+}
+
+// The voice identity of a member (a browser, or a Galaxy Cube linked to them).
+async function voiceHeaders(env, request, user) {
   const sql = getDb(env);
   const rows = await sql`
     SELECT u.mc_uuid, u.voice_muted_until, u.global_mic, r.key AS role, r.color
@@ -37,9 +42,28 @@ export async function voiceConnect(request, env) {
     canGlobal: power >= 50 || Boolean(extra.global_mic),
     staffChat: can(user, "staff_chat"),
     voiceMutedUntil: extra.voice_muted_until && new Date(extra.voice_muted_until) > new Date() ? extra.voice_muted_until : null,
+    device: user.device || null,
   }));
-  return voiceStub(env).fetch(new Request(request.url, { headers }));
+  return headers;
 }
+
+// GET /api/cube/voice (WebSocket, "Authorization: Bearer <device token>"): a Galaxy Cube joins voice as its owner.
+export async function cubeVoiceConnect(request, env) {
+  if (request.headers.get("Upgrade") !== "websocket") throw new HttpError(426, "Expected a WebSocket.");
+  if (!env.REALTIME_APP_ID || !env.REALTIME_APP_SECRET) throw new HttpError(503, "Voice chat isn't set up yet.");
+  const { requireCube } = await import("./cube.js");
+  const { permsOfUser, tierFor } = await import("../lib/perms.js");
+  const { isOwner } = await import("../lib/names.js");
+  const d = await requireCube(request, env);
+  const sql = getDb(env);
+  const [u] = await sql`SELECT id, username, platform, mc_uuid FROM users WHERE id = ${d.user_id}`;
+  if (!u?.mc_uuid) throw new HttpError(403, "Link your Minecraft account first (Account > Link).");
+  const perms = await permsOfUser(env, sql, u.id);
+  const owner = isOwner(env, u.username, u.platform === "bedrock");
+  const user = { id: Number(u.id), username: u.username, perms, owner, role_power: owner ? 100 : tierFor(perms), device: d.device_id };
+  return voiceStub(env).fetch(new Request(request.url, { headers: await voiceHeaders(env, request, user) }));
+}
+
 
 // The Endstone plugin connects here to send positions and receive voice icons.
 export async function voiceServer(request, env) {

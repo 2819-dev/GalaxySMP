@@ -19,7 +19,8 @@ import * as seasonRoutes from "./routes/season.js";
 import * as goals from "./routes/goals.js";
 import * as referrals from "./routes/referrals.js";
 import * as showcase from "./routes/showcase.js";
-import { voiceConnect, voiceServer } from "./routes/voice.js";
+import { voiceConnect, voiceServer, cubeVoiceConnect } from "./routes/voice.js";
+import * as cube from "./routes/cube.js";
 import * as ranks from "./routes/ranks.js";
 import * as economy from "./routes/economy.js";
 import * as help from "./routes/help.js";
@@ -164,6 +165,13 @@ const routes = [
   ["POST", "/api/showcase", (req, env) => showcase.save(req, env)],
   ["GET", "/api/voice/connect", (req, env) => voiceConnect(req, env)],
   ["GET", "/api/voice/server", (req, env) => voiceServer(req, env)],
+  ["POST", "/api/cube/pair/start", (req, env) => cube.pairStart(req, env)],
+  ["POST", "/api/cube/pair/poll", (req, env) => cube.pairPoll(req, env)],
+  ["POST", "/api/cube/pair/claim", (req, env) => cube.pairClaim(req, env)],
+  ["GET", "/api/cube/devices", (req, env) => cube.myDevices(req, env)],
+  ["POST", "/api/cube/devices/:id", cube.deviceAction],
+  ["GET", "/api/cube/me", (req, env) => cube.cubeMe(req, env)],
+  ["GET", "/api/cube/voice", (req, env) => cubeVoiceConnect(req, env)],
   ["POST", "/api/mod/members/:id/voice-mute", mod.voiceMute],
   ["POST", "/api/mod/members/:id/voice-unmute", mod.voiceUnmute],
   ["POST", "/api/mod/members/:id/voice-kick", mod.voiceKick],
@@ -326,6 +334,10 @@ export default {
     // (The Minecraft plugin's /api/ calls keep working on any address.)
     if (url.hostname === "www.galaxymc.us" || (url.hostname.endsWith(".workers.dev") && !url.pathname.startsWith("/api/"))) {
       return Response.redirect(`https://galaxymc.us${url.pathname}${url.search}`, 301);
+    }
+    // cube.galaxymc.us (the address in the Galaxy Cube's manual) opens the Cube page on the main site, where you're signed in
+    if (url.hostname.startsWith("cube.") && !url.pathname.startsWith("/api/")) {
+      return Response.redirect(`https://galaxymc.us/cube${url.search}`, 302);
     }
     if (!url.pathname.startsWith("/api/")) return serveStatic(request);
     try {
