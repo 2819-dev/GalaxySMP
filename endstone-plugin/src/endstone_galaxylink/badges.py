@@ -1,22 +1,23 @@
 """Rank badges: a rounded pill in the rank's colors with the rank's icon and name in white, drawn as
 pictures for the rank tag pack (ranktags.py). Pure Python (no image libraries on the server).
 
-Badges are drawn at double resolution: 2 picture pixels = 1 text pixel, on 512x512 glyph pages
-(32 pixel cells), so the 16x16 rank icons fit at full detail. The badge is 20 pixels tall (10 text
-pixels: just taller than the letters), and its letters are the Minecraft-style font at text size.
+Badges are drawn at text size (Bedrock shows 1 picture pixel as 1 text pixel; bigger pictures just
+show bigger): 10 pixels tall, the Minecraft-style letters (7 tall) in white, and the rank's icon in
+color, shrunk to 8x8.
 """
 
 import base64
 import colorsys
 import zlib
 
-SCALE = 2           # picture pixels per text pixel
-HEIGHT = 20         # badge height in picture pixels
-RADIUS = 5          # rounded corners
-TEXT_TOP = 3        # first row of the letters (7 text rows = 14 pixels: rows 3-16)
-ICON_TOP = 2        # 16x16 icon: rows 2-17
-PAD = 5             # space inside the left and right edge
-GAP = 4             # between the icon and the name
+SCALE = 1           # picture pixels per text pixel
+HEIGHT = 10         # badge height
+RADIUS = 2          # rounded corners
+TEXT_TOP = 1        # first row of the letters (rows 1-7)
+ICON = 8            # icon size
+ICON_TOP = 1        # icon rows 1-8
+PAD = 2             # space inside the left and right edge
+GAP = 2             # between the icon and the name
 MAX_LUMA = 0.62     # badge colors are kept this dark or darker so white letters always read well
 WHITE = (255, 255, 255)
 OUTLINE = (24, 24, 32)  # the icons' dark outline color (left out inside badges)
@@ -84,6 +85,21 @@ def icon_pixels(name):
     return px
 
 
+def icon8_pixels(name):
+    """The rank icon in color at 8x8 (for badges at text size): {(x, y): (r, g, b, a)}, or None."""
+    key = ("8", name)
+    if key in _icons:
+        return _icons[key]
+    from endstone_galaxylink.badge_icons import ICONS8
+    data = ICONS8.get(name or "")
+    px = None
+    if data:
+        raw = zlib.decompress(base64.b64decode(data))
+        px = {(i % ICON, i // ICON): tuple(raw[i * 4:i * 4 + 4]) for i in range(ICON * ICON) if raw[i * 4 + 3] >= 128}
+    _icons[key] = px
+    return px
+
+
 def _inside(x, y, w, h, r):
     """Is (x, y) inside a w x h rounded rectangle with corner radius r?"""
     cx = r - 0.5 if x < r else (w - r - 0.5 if x >= w - r else x)
@@ -102,9 +118,9 @@ def text_width(text, font_char):
 def render_badge(prefix, stops_hex, icon, font_char):
     """Draws a badge. Returns (pixels {(x, y): rgba}, width, height)."""
     stops = [badge_color(h) for h in (stops_hex or ["#7A7A8C"])]
-    ipx = icon_pixels(icon) if icon else None
+    ipx = icon8_pixels(icon) if icon else None
     tw = text_width(prefix, font_char)
-    width = PAD + (16 + GAP if ipx else 0) + tw + PAD + 1
+    width = PAD + (ICON + GAP if ipx else 0) + tw + PAD + 1
     pixels = {}
     for y in range(HEIGHT):
         for x in range(width):
@@ -112,10 +128,10 @@ def render_badge(prefix, stops_hex, icon, font_char):
                 continue
             base = _along(stops, x / max(1, width - 1))
             # soft top light and bottom shade, like the glossy pill in the reference
-            if y <= 1:
-                c = _mix(base, WHITE, 0.22 if y == 1 else 0.12)
-            elif y >= HEIGHT - 3:
-                c = _mix(base, (0, 0, 0), 0.12 * (y - (HEIGHT - 4)))
+            if y == 1:
+                c = _mix(base, WHITE, 0.18)
+            elif y == HEIGHT - 2:
+                c = _mix(base, (0, 0, 0), 0.12)
             else:
                 c = base
             edge = not all(_inside(x + dx, y + dy, width, HEIGHT, RADIUS) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
@@ -129,7 +145,7 @@ def render_badge(prefix, stops_hex, icon, font_char):
     if ipx:
         for (ix, iy), c in ipx.items():
             marks[(x0 + ix, ICON_TOP + iy)] = c[:3]
-        x0 += 16 + GAP
+        x0 += ICON + GAP
     for ch in prefix:
         g = font_char(ch)
         if g is None:
@@ -146,7 +162,7 @@ def render_badge(prefix, stops_hex, icon, font_char):
         s = (x + 1, y + 1)
         if s in pixels and s not in marks:
             bg = _along(stops, s[0] / max(1, width - 1))
-            pixels[s] = (*_mix(bg, (0, 0, 0), 0.42), 255)
+            pixels[s] = (*_mix(bg, (0, 0, 0), 0.35), 255)
     for xy, c in marks.items():
         if xy in pixels:
             pixels[xy] = (*c, 255)

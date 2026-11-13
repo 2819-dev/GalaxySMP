@@ -12,5 +12,30 @@ for f in sorted(glob.glob(os.path.join(root, "public/img/ranks/rank_*.png"))):
     assert im.size == (16, 16), f
     lines.append(f'    "{name}": "{base64.b64encode(zlib.compress(im.tobytes(), 9)).decode()}",')
 lines.append("}")
+
+# 8x8 colored versions (the icon without its dark outline, shrunk) for the in-game badges at text size
+K = (24, 24, 32)
+lines += ["", "# 8x8, for badges at normal text size", "ICONS8 = {"]
+for f in sorted(glob.glob(os.path.join(root, "public/img/ranks/rank_*.png"))):
+    name = os.path.basename(f)[5:-4]
+    im = Image.open(f).convert("RGBA")
+    px = im.load()
+    for y in range(16):
+        for x in range(16):
+            if px[x, y][:3] == K:
+                px[x, y] = (0, 0, 0, 0)
+    im = im.crop(im.getbbox())
+    side = max(im.size)
+    sq = Image.new("RGBA", (side, side))
+    sq.paste(im, ((side - im.width) // 2, (side - im.height) // 2))
+    sm = sq.resize((8, 8), Image.BOX)
+    small = Image.new("RGBA", (8, 8))
+    for y in range(8):
+        for x in range(8):
+            r, g, b, a = sm.getpixel((x, y))
+            if a >= 110:
+                small.putpixel((x, y), (r, g, b, 255))
+    lines.append(f'    "{name}": "{base64.b64encode(zlib.compress(small.tobytes(), 9)).decode()}",')
+lines.append("}")
 open(out, "w").write("\n".join(lines) + "\n")
 print(out, len(lines) - 4, "icons")

@@ -42,12 +42,12 @@ from endstone_galaxylink.npc import HOLD_TICKS, NpcManager
 from endstone_galaxylink.plans import CHECK_TICKS, Plans
 from endstone_galaxylink.minigames import STAFF_PERMISSION, Minigames
 from endstone_galaxylink.plots import Plots
-from endstone_galaxylink.ranks import RankManager, name_text, tag_text
+from endstone_galaxylink.ranks import RankManager, name_text, tag_text, tag_spec
 from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.34.0"
+VERSION = "2.35.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -501,9 +501,12 @@ class GalaxyLink(Plugin):
             return
         self.chatfilter.on_chat(event)  # scrambles bad words with §k (when it's on)
         pics = getattr(self, "ranktags", None)
-        if False and pics is not None and pics.enabled and pics.chat_pictures:  # gradients are only above heads now
-            # Discord style: "[👑 OWNER] Name" line (pictures) once, then each message on its own line in the
-            # normal Minecraft font. More messages from the same person within 2 minutes skip the name line.
+        style = self.ranks.display_tag(event.player)
+        badge = pics.glyphs_for(tag_spec(style)) if pics is not None and pics.chat_pictures and style else None
+        if badge:
+            # Discord style: a name line with the rank badge (a picture), then each message on its own line in the
+            # normal Minecraft font (Bedrock uses a small font for a whole line once it has a picture in it).
+            # More messages from the same person within 2 minutes skip the name line.
             p = event.player
             now = time.time()
             last = getattr(self, "_last_chat", None)
