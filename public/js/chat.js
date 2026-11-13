@@ -17,7 +17,9 @@ const rankFor = (id, fallback) => (state.members.has(id) ? state.members.get(id)
 
 const $ = (id) => document.getElementById(id);
 export const DM_CHANNEL = -1;
+export const FRIENDS_CHANNEL = -2;
 const DM_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>';
+const FRIENDS_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
 const HELP_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6l3.6 3.6M14.8 14.8l3.6 3.6M18.4 5.6l-3.6 3.6M9.2 14.8l-3.6 3.6"/></svg>';
 const MIC_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>';
 
@@ -230,6 +232,7 @@ function renderChannels() {
       if (ch.kind === "voice") mark.innerHTML = MIC_SVG;
       else if (ch.kind === "support") mark.innerHTML = HELP_SVG;
       else if (ch.kind === "dms") mark.innerHTML = DM_SVG;
+      else if (ch.kind === "friends") mark.innerHTML = FRIENDS_SVG;
       else mark.textContent = "#";
       b.append(mark, el("span", "", ch.name));
       if (!ch.canPost && ch.kind === "text") {
@@ -273,7 +276,7 @@ async function selectChannel(id) {
   const ch = currentChannel();
   $("channel-name").textContent = ch.name;
   $("channel-topic").textContent = ch.topic || "";
-  document.querySelector(".chat-top .hash").textContent = ["voice", "support", "dms"].includes(ch.kind) ? "" : "#";
+  document.querySelector(".chat-top .hash").textContent = ["voice", "support", "dms", "friends"].includes(ch.kind) ? "" : "#";
   try { history.replaceState(null, "", "#" + ch.slug); } catch { /* ignore */ }
   renderChannels();
   // Special channels (Information, Auction House, Suggestions, Voice Chat, Events) have their own views.
@@ -283,7 +286,7 @@ async function selectChannel(id) {
   $("jump-latest").hidden = true;
   setView(ch.kind === "dms" ? (state.dmWith ? `dm:${state.dmWith}` : "dms") : ch.slug);
   if (special) {
-    showPanel(ch, { me: state.me, toast, dmWith: state.dmWith, members: state.members, setView });
+    showPanel(ch, { me: state.me, toast, dmWith: state.dmWith, members: state.members, setView, openDM: (id) => openDM(id) });
     state.dmWith = null;
     return;
   }
@@ -1164,7 +1167,8 @@ export async function startChat({ onSignedOut }) {
     if (support) state.unread.add(support.id);
   }
   // Direct messages show as a channel at the top of the list (its own view, like Support).
-  data.channels.unshift({ id: DM_CHANNEL, categoryId: DM_CHANNEL, slug: "messages", name: "Direct Messages", topic: "Private chats with other members (also in game with /dm)", kind: "dms", canPost: false });
+  data.channels.unshift({ id: DM_CHANNEL, categoryId: DM_CHANNEL, slug: "messages", name: "Direct Messages", topic: "Private chats with other members (also in game with /dm)", kind: "dms", canPost: false },
+    { id: FRIENDS_CHANNEL, categoryId: DM_CHANNEL, slug: "friends", name: "Friends", topic: "Your friends, friend requests and who's in game", kind: "friends", canPost: false });
   state.categories = [{ id: DM_CHANNEL, name: "Messages" }, ...data.categories];
   if (data.dmUnread) state.unread.add(DM_CHANNEL);
   state.reactions = data.reactions;

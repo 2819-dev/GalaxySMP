@@ -22,6 +22,7 @@ const BOARDS = {
   bw_wins: { col: "bw_wins", title: "Bedwars Wins" },
   bw_finals: { col: "bw_finals", title: "Bedwars Final Kills" },
   bw_beds: { col: "bw_beds", title: "Bedwars Beds Broken" },
+  contest_wins: { col: "contest_wins", title: "Build Contest Wins" },
 };
 const ONLINE_SECONDS = 150;
 const n = (v) => Math.max(0, Math.round(Number(v) || 0));
@@ -198,7 +199,7 @@ export async function profile(request, env, ctx, url, params) {
            p.pic_source, (p.head IS NOT NULL) AS has_head, (p.custom_pic IS NOT NULL) AS has_custom,
            (p.online_at > now() - interval '150 seconds') AS online,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient,
-           rk.position AS rank_position, rk.priority AS rank_priority, p.bw_games, p.bw_wins, p.bw_kills, p.bw_finals, p.bw_beds,
+           rk.position AS rank_position, rk.priority AS rank_priority, p.bw_games, p.bw_wins, p.bw_kills, p.bw_finals, p.bw_beds, p.contest_wins,
            s.plan, s.expires_at, u.id AS user_id, u.username AS user_name, u.platform AS user_platform
       FROM players p
       LEFT JOIN player_top_rank pr ON pr.xuid = p.xuid LEFT JOIN ranks rk ON rk.id = pr.rank_id
@@ -224,6 +225,9 @@ export async function profile(request, env, ctx, url, params) {
       rank: displayRank(rankOf(p), p.plan, await loadPlanPriority(sql), PLANS),
       plan: p.plan || "free", linked: Boolean(p.user_id), staff: Boolean(p.is_op),
       money: p.balance_cents == null ? null : Number(p.balance_cents),
+      contestWins: Number(p.contest_wins || 0),
+      friend: p.user_id ? await (await import("./friends.js")).friendState(sql, me.id, p.user_id) : null,
+      userId: p.user_id ? Number(p.user_id) : null,
       bedwars: { games: Number(p.bw_games || 0), wins: Number(p.bw_wins || 0), kills: Number(p.bw_kills || 0), finals: Number(p.bw_finals || 0), beds: Number(p.bw_beds || 0) },
       stats: { playtime: Number(p.playtime_s), mined: Number(p.mined), placed: Number(p.placed), kills: Number(p.kills), deaths: Number(p.deaths),
                quests: p.quests_done, streak: p.streak, bestStreak: p.best_streak },

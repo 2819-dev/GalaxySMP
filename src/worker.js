@@ -54,6 +54,7 @@ import * as team from "./routes/team.js";
 import * as helpcenter from "./routes/helpcenter.js";
 import * as uploads from "./routes/uploads.js";
 import * as actas from "./routes/actas.js";
+import * as friends from "./routes/friends.js";
 import { isActingRequest } from "./lib/auth.js";
 import { ensureSchema } from "./lib/autoschema.js";
 
@@ -163,6 +164,8 @@ const routes = [
   ["GET", "/api/wrapped/:key", wrapped.get],
   ["POST", "/api/wrapped/:key/share", wrapped.share],
   ["POST", "/api/giftcards", (req, env) => giftcards.buy(req, env)],
+  ["GET", "/api/friends", (req, env) => friends.list(req, env)],
+  ["POST", "/api/friends", (req, env) => friends.act(req, env)],
   ["GET", "/api/giftcards/mine", (req, env) => giftcards.mine(req, env)],
   ["GET", "/api/giftcards/open", giftcards.peek],
   ["POST", "/api/giftcards/redeem", (req, env) => giftcards.redeem(req, env)],

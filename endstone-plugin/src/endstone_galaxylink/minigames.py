@@ -9,7 +9,8 @@ GalaxySMP Blocks behavior pack) or /minigames:
   - Watch a Minigame: teleports you to the game's entrance.
 Admins set up the list of minigames (name, backstage room, entrance). Hosts can also pick
 "Custom": the accepting staff member's position becomes its backstage room and entrance, which
-staff can change in Manage.
+staff can change in Manage. "Build Contest" (buildcontest.py) is built in: it runs by itself once
+sign-ups close (plots, Creative, voting, prizes).
 """
 
 import json
@@ -104,7 +105,12 @@ class Minigames:
         plans = getattr(self.plugin, "plans", None)
         return PLAN_LEVEL.get(plans.plan_key(player) if plans else "free", 0)
 
+    def bc(self):
+        return getattr(self.plugin, "buildcontest", None)
+
     def game_name(self, ev):
+        if ev.get("contest"):
+            return "Build Contest"
         if ev.get("type_id") and ev["type_id"] in self.types:
             return self.types[ev["type_id"]]["name"]
         return ev.get("custom") or "Minigame"
@@ -182,7 +188,8 @@ class Minigames:
             player.send_form(form)
             return
         types = sorted(self.types.values(), key=lambda t: t["name"].lower())
-        choices = [t["name"] for t in types] + ["Custom (type a name below)"]
+        contest = self.bc() is not None and self.bc().ready()
+        choices = (["Build Contest"] if contest else []) + [t["name"] for t in types] + ["Custom (type a name below)"]
         controls = [
             Dropdown("Minigame", choices, 0),
             TextInput("Custom minigame name (only for Custom)", "e.g. Hide and Seek", ""),
@@ -197,38 +204,51 @@ class Minigames:
             except ValueError:
                 return
             pick = int(v[0])
+            is_contest = contest and pick == 0
+            pick -= 1 if contest else 0
             custom = " ".join(str(v[1]).split())[:32]
-            if pick >= len(types) and not custom:
+            if not is_contest and pick >= len(types) and not custom:
                 p.send_message("§cType a name for your custom minigame.")
                 return
             ev = {
                 "host": str(p.xuid), "host_name": p.name, "host_uuid": str(p.unique_id),
-                "type_id": types[pick]["id"] if pick < len(types) else None,
-                "custom": custom if pick >= len(types) else "",
+                "type_id": types[pick]["id"] if 0 <= pick < len(types) else None,
+                "custom": custom if pick >= len(types) or pick < 0 else "",
                 "access": ACCESS[int(v[2])][0], "signup_minutes": SIGNUP_MINUTES[int(v[3])],
                 "notes": str(v[4]).strip()[:120], "status": "pending", "created": time.time(), "players": [],
             }
-            cur = self.db.execute("INSERT INTO minigame_events (data) VALUES (?)", (json.dumps(ev),))
-            self.db.commit()
-            ev["id"] = cur.lastrowid
-            self.events[ev["id"]] = ev
-            self.save(ev["id"])
-            p.send_message(f"§aRequest sent! §7Minigame Staff will accept or decline your {self.game_name(ev)}. You'll get a message.")
-            for s in self.plugin.server.online_players:
-                if self.is_staff(s) and s is not p:
-                    s.send_message(f"§d{p.name} wants to host {self.game_name(ev)}. §7Open a Minigame Computer to review.")
-                    try:
-                        s.send_toast("Minigame request", f"{p.name}: {self.game_name(ev)}")
-                    except Exception:
-                        pass
+            if is_contest:
+                ev["type_id"], ev["custom"] = None, ""
+                return self.bc().details_form(p, ev)  # theme, build time and prize, then the request is sent
+            self.create_event(p, ev)
 
-        player.send_form(ModalForm(title="Host a Minigame", controls=controls, submit_button="Send request", on_submit=submit))
+        player.send_form(ModalForm(title="Host a Minigame", controls=controls, submit_button="Next" if contest else "Send request", on_submit=submit))
+
+    def create_event(self, p, ev):
+        cur = self.db.execute("INSERT INTO minigame_events (data) VALUES (?)", (json.dumps(ev),))
+        self.db.commit()
+        ev["id"] = cur.lastrowid
+        self.events[ev["id"]] = ev
+        self.save(ev["id"])
+        p.send_message(f"§aRequest sent! §7Minigame Staff will accept or decline your {self.game_name(ev)}. You'll get a message.")
+        for s in self.plugin.server.online_players:
+            if self.is_staff(s) and s is not p:
+                s.send_message(f"§d{p.name} wants to host {self.game_name(ev)}. §7Open a Minigame Computer to review.")
+                try:
+                    s.send_toast("Minigame request", f"{p.name}: {self.game_name(ev)}")
+                except Exception:
+                    pass
+
+    def _refund(self, e):
+        if e.get("contest") and self.bc() is not None:
+            self.bc().refund(e)
 
     def _cancel_request(self, player, eid):
         e = self.events.get(eid)
         if e and e["status"] == "pending" and e["host"] == str(player.xuid):
             e.update({"status": "declined", "declined_by": player.name, "ended_at": time.time()})
             self.save(eid)
+            self._refund(e)
             player.send_message("§7Request cancelled.")
 
     # ---------- staff: requests ----------
@@ -253,6 +273,12 @@ class Minigames:
                  f"Who can join: §f{dict(ACCESS)[e['access']]}", f"Sign-up time: §f{e['signup_minutes']} minutes"]
         if e.get("notes"):
             lines.append(f"Notes: §f{e['notes']}")
+        c = e.get("contest")
+        if c:
+            custom = False
+            lines += [f"Theme: §f{c['theme']}", f"Build time: §f{c['minutes']} minutes",
+                      f"Prize: §f{'$' + format(c['prize'] / 100, ',.0f') if c.get('prize') else 'none'}",
+                      "", "§7Runs by itself in the Build Contest arena once sign-ups close."]
         if custom:
             lines += ["", "§eCustom game: if you accept, where you're standing now becomes its backstage room and "
                           "entrance. You can change them in Manage minigames."]
@@ -267,12 +293,20 @@ class Minigames:
         if not e or e["status"] != "pending":
             staff.send_message("§eThat request was already handled.")
             return
+        if e.get("contest") and (self.bc() is None or not self.bc().ready()):
+            staff.send_message("§cThe Build Contest arena isn't built yet (Set up minigames > Build Contest arena).")
+            return
+        if e.get("contest") and self.bc().running():
+            staff.send_message("§cA Build Contest is already running. Accept this one when it's over.")
+            return
         now = time.time()
         e.update({"status": "accepted", "accepted_by": staff.name, "accepted_uuid": str(staff.unique_id),
                   "accepted_at": now, "signup_ends": now + e["signup_minutes"] * 60, "ends": now + MAX_HOURS * 3600})
         t = self.types.get(e.get("type_id"))
         e["backstage"] = (t or {}).get("backstage") or spot(staff)
         e["entrance"] = (t or {}).get("entrance") or spot(staff)
+        if e.get("contest"):
+            e["backstage"] = e["entrance"] = self.bc().lobby_spot()
         self.save(eid)
         host = self.online(e["host"])
         if host is not None:
@@ -296,6 +330,7 @@ class Minigames:
                 return
             e.update({"status": "declined", "declined_by": p.name})
             self.save(eid)
+            self._refund(e)
             self.mail(e["host"], f"§cYour {self.game_name(e)} request was declined by {p.name}." + (f" §7Reason: {reason}" if reason else ""))
             p.send_message("§7Request declined.")
         staff.send_form(ModalForm(title="Decline request", controls=[TextInput("Reason (optional, the host sees it)", "e.g. Not enough staff right now", "")],
@@ -343,7 +378,10 @@ class Minigames:
         e = self.events.get(eid)
         if not e or e["status"] != "accepted":
             return self.join_menu(player)
-        content = (f"§l{self.game_name(e)}§r\nHost: §f{e['host_name']}§r\nWho can join: §f{dict(ACCESS)[e['access']]}§r\n"
+        c = e.get("contest")
+        extra = (f"Theme: §f{c['theme']}§r\nBuild time: §f{c['minutes']} minutes§r\n"
+                 + (f"Prize: §f${c['prize'] / 100:,.0f} for the top 3§r\n" if c.get("prize") else "")) if c else ""
+        content = (f"§l{self.game_name(e)}§r\n{extra}Host: §f{e['host_name']}§r\nWho can join: §f{dict(ACCESS)[e['access']]}§r\n"
                    f"Players: §f{len(e['players'])}§r\nSign-ups close in: §f{mins_left(e['signup_ends'])}§r\n\n"
                    "§7Enter teleports you to the players' room backstage.")
         form = ActionForm(title="Join a Minigame", content=content)
@@ -358,6 +396,9 @@ class Minigames:
             return
         if self.plan_level(player) < ACCESS_LEVEL[e["access"]] and not player.is_op:
             player.send_message(f"§cThis game is for {dict(ACCESS)[e['access']]} players. §7galaxymc.us/store")
+            return
+        if e.get("contest") and str(player.xuid) not in e["players"] and len(e["players"]) >= 16:
+            player.send_message("§cThis Build Contest is full (16 builders).")
             return
         if str(player.xuid) not in e["players"]:
             e["players"].append(str(player.xuid))
@@ -404,8 +445,11 @@ class Minigames:
         if self.is_staff(player):
             form.add_button("Set backstage room to where I'm standing", on_click=lambda p: self._set_room(p, eid, "backstage"))
             form.add_button("Set entrance to where I'm standing", on_click=lambda p: self._set_room(p, eid, "entrance"))
+        c = e.get("contest")
         if e["signup_ends"] > time.time():
-            form.add_button("Close sign-ups now", on_click=lambda p: self._close_signups(p, eid))
+            form.add_button("Start building now" if c else "Close sign-ups now", on_click=lambda p: self._close_signups(p, eid))
+        if c and c.get("phase") == "building":
+            form.add_button("Skip to voting", on_click=lambda p: self._skip_to_vote(p, eid))
         form.add_button("§c§lEnd this minigame", on_click=lambda p: self.end(p, eid))
         form.add_button("§l< Back", on_click=self.manage_menu)
         player.send_form(form)
@@ -414,6 +458,13 @@ class Minigames:
         self.events[eid][which] = spot(player)
         self.save(eid)
         player.send_message(f"§a{'Backstage room' if which == 'backstage' else 'Entrance'} set.")
+
+    def _skip_to_vote(self, player, eid):
+        c = (self.events.get(eid) or {}).get("contest")
+        if c and c.get("phase") == "building":
+            c["build_ends"] = time.time()
+            self.save(eid)
+            player.send_message("§aVoting starts now.")
 
     def _close_signups(self, player, eid):
         self.events[eid]["signup_ends"] = time.time()
@@ -424,6 +475,8 @@ class Minigames:
         e = self.events.get(eid)
         if not e:
             return
+        if e.get("contest") and self.bc() is not None:
+            self.bc().stop(e, player.name)
         e.update({"status": "ended", "ended_at": time.time()})
         self.save(eid)
         player.send_message(f"§a{self.game_name(e)} ended. Thanks for hosting!")
@@ -437,6 +490,9 @@ class Minigames:
         form = ActionForm(title="Set up minigames", content="Hosts pick from these. Each needs a backstage room "
                           "(where players wait) and an entrance (where watchers go).")
         form.add_button("§2§lAdd a minigame", on_click=self.add_type_form)
+        bc = self.bc()
+        if bc is not None:
+            form.add_button(f"§d§lBuild Contest arena§r\n§8{'ready' if bc.ready() else 'not built yet'}", on_click=bc.setup_menu)
         for t in sorted(self.types.values(), key=lambda t: t["name"].lower()):
             ready = "ready" if t.get("backstage") and t.get("entrance") else "§cneeds rooms"
             form.add_button(f"§l{t['name']}§r\n§8{ready}", on_click=lambda p, tid=t["id"]: self.type_menu(p, tid))
@@ -492,11 +548,14 @@ class Minigames:
         now = time.time()
         for e in list(self.events.values()):
             if e["status"] == "accepted" and e.get("ends", now + 1) < now:
+                if e.get("contest") and self.bc() is not None:
+                    self.bc().stop(e)
                 e.update({"status": "ended", "ended_at": now})
                 self.save(e["id"])
             elif e["status"] == "pending" and now - e["created"] > 24 * 3600:
                 e["status"] = "declined"
                 self.save(e["id"])
+                self._refund(e)
                 self.mail(e["host"], f"§7Your {self.game_name(e)} request expired (no staff answered within a day).")
         old = [i for i, e in self.events.items() if e["status"] in ("ended", "declined") and now - e.get("ended_at", e["created"]) > 7 * 86400]
         for i in old:
@@ -509,7 +568,7 @@ class Minigames:
     def payload(self):
         out = []
         for e in sorted(self.live(), key=lambda e: e["accepted_at"]):
-            out.append({"id": e["id"], "game": self.game_name(e), "host": e["host_name"], "access": e["access"],
+            out.append({"id": e["id"], "game": self.game_name(e) + (f": {e['contest']['theme']}" if e.get("contest") else ""), "host": e["host_name"], "access": e["access"],
                         "players": len(e["players"]), "signupEnds": int(e["signup_ends"]), "acceptedBy": e.get("accepted_by")})
         return out
 

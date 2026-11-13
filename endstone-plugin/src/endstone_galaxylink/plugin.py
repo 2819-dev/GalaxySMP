@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.42.0"
+VERSION = "2.43.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -128,7 +128,7 @@ class GalaxyLink(Plugin):
         "chatfilter": _cmd("Turn the chat filter on or off for everyone.", "/chatfilter [state: message]", "galaxylink.command.chatfilter"),
         "minigames": _cmd("The Minigame Center: host, join or watch minigames.", "/minigames", "galaxylink.command.minigames", ["minigame", "mg"]),
         "bedwars": _cmd("Play Bedwars.", "/bedwars [action: message]", "galaxylink.command.bedwars", ["bw"]),
-        "leave": _cmd("Leave Bedwars and get your own items back.", "/leave", "galaxylink.command.bedwars"),
+        "leave": _cmd("Leave Bedwars or a Build Contest and get your own items back.", "/leave", "galaxylink.command.bedwars"),
         "trade": _cmd("See trade offers to you (offer items at galaxymc.us/trades).", "/trade", "galaxylink.command.trade"),
         "tpd": _cmd("Teleport where you've been sent (e.g. to the staff member who accepted your minigame).", "/tpd", "galaxylink.command.tpd"),
         "plotaxe": _cmd("Get the Plot Axe to make plots and protected areas.", "/plotaxe", "galaxylink.command.plotaxe"),
@@ -210,6 +210,9 @@ class GalaxyLink(Plugin):
         self.teleports = Teleports(self)
         self.plots = Plots(self)
         self.minigames = Minigames(self)
+        from endstone_galaxylink.buildcontest import BuildContest
+        self.buildcontest = BuildContest(self)  # the Build Contest minigame (hosted through the Minigame Center)
+        self.buildcontest.recover()
         self.chatfilter = ChatFilter(self)
         self.announcements = Announcements(self)
         self.moderation = Moderation(self)
@@ -271,6 +274,8 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self._watched("drawing the website map", self.livemap.tick), delay=200, period=40)  # website map
         self.server.scheduler.run_task(self, self._watched("a plot job (save/reset)", self.plots.tick, lambda: self.plots.jobs), delay=1, period=1)
         self.server.scheduler.run_task(self, self.crashwatch.tick, delay=20, period=20)
+        self.server.scheduler.run_task(self, self._watched("the Build Contest", self.buildcontest.tick,
+                                                          lambda: self.buildcontest.jobs or self.buildcontest.running()), delay=40, period=20)
         self.server.scheduler.run_task(self, self.plots.check_tools, delay=400, period=200)  # plot tools come back if missing
         self.server.scheduler.run_task(self, self.auction.tick, delay=600, period=600)
         self.register_events(self)
@@ -380,6 +385,7 @@ class GalaxyLink(Plugin):
         self.plans.bill(player)
         self.plots.on_join(player)
         self.minigames.on_join(player)
+        self.buildcontest.on_join(player)  # back to your plot, or your items back after a contest
         self.announcements.on_join(player)
         self.moderation.on_join(player)
         self.progress.on_join(player)
@@ -410,6 +416,8 @@ class GalaxyLink(Plugin):
 
     @event_handler
     def on_drop_item(self, event: PlayerDropItemEvent):
+        if self.buildcontest.on_drop(event):  # nothing leaves the Build Contest
+            return
         self.bedwars.on_drop(event)  # the Leave Bedwars item can't be dropped
 
     @event_handler
@@ -453,6 +461,8 @@ class GalaxyLink(Plugin):
             return
         if self.bedwars.on_break(event):  # beds and the arena
             return
+        if self.buildcontest.on_block(event, False):  # the Build Contest arena (no job money for Creative building)
+            return
         if self.crates.on_break(event):  # crates can't be broken
             return
         self.shopchests.on_break(event)
@@ -470,6 +480,8 @@ class GalaxyLink(Plugin):
             return
         if self.bedwars.on_place(event):  # the arena keeps track of placed blocks
             return
+        if self.buildcontest.on_block(event, True):
+            return
         self.plots.on_place(event)
         self.blocklog.log_place(event)
         if not event.cancelled:
@@ -482,6 +494,8 @@ class GalaxyLink(Plugin):
             return
         if event.has_item and self.bedwars.on_use(event):  # the Leave Bedwars item
             return
+        if self.buildcontest.on_interact(event):  # no ender chests while building
+            return
         if self.crates.on_interact(event) or self.shopchests.on_interact(event):  # crates and shop chests
             return
         if self.elevators.on_interact(event):  # call buttons and the floor panel
@@ -492,14 +506,18 @@ class GalaxyLink(Plugin):
 
     @event_handler
     def on_actor_explode(self, event: ActorExplodeEvent):
+        self.buildcontest.on_explode(event)
         self.plots.on_explode(event)
 
     @event_handler
     def on_block_explode(self, event: BlockExplodeEvent):
+        self.buildcontest.on_explode(event)
         self.plots.on_explode(event)
 
     @event_handler
     def on_flow(self, event: BlockFromToEvent):
+        if self.buildcontest.on_flow(event):
+            return
         self.plots.on_flow(event)
 
     @event_handler
@@ -542,6 +560,8 @@ class GalaxyLink(Plugin):
     @event_handler
     def on_player_command(self, event: PlayerCommandEvent):
         if self.bedwars.on_command(event):  # only a few commands work during Bedwars
+            return
+        if self.buildcontest.on_command(event):  # no teleporting out of the Build Contest
             return
         self.moderation.on_command(event)  # muted players can't /msg or /me
 
@@ -655,7 +675,7 @@ class GalaxyLink(Plugin):
             "plotaxe": lambda: self.plots.give_axe(sender),
             "minigames": lambda: self.minigames.open(sender),
             "bedwars": lambda: self.bedwars.command(sender, args),
-            "leave": lambda: self.bedwars.leave(sender),
+            "leave": lambda: self.buildcontest.leave(sender) or self.bedwars.leave(sender),
             "trade": lambda: self.trades.command(sender),
             "chatfilter": lambda: self.chatfilter.command(sender, args),
             "announcement": lambda: self.announcements.command(sender, args),

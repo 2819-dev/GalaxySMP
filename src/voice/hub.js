@@ -464,7 +464,12 @@ export class VoiceHub extends DurableObject {
       return this.ctx.storage.put("ah", { listings, at: Date.now() });
     }
     if (msg.type === "seen") {
-      return recordPlayers(this.env, msg.players).catch((e) => console.error("record players failed", e));
+      // friends first (it needs to know who was already online), then the usual player update
+      return import("../routes/friends.js").then((m) => m.friendsJoined(this.env, msg.players)).catch((e) => console.error("friend alerts failed", e))
+        .then(() => recordPlayers(this.env, msg.players)).catch((e) => console.error("record players failed", e));
+    }
+    if (msg.type === "build_contest") {  // a Build Contest finished: wins on profiles + #Timeline
+      return import("../routes/friends.js").then((m) => m.recordContest(this.env, msg)).catch((e) => console.error("build contest failed", e));
     }
     if (msg.type === "head_error") {
       return recordHeadError(this.env, msg).catch((e) => console.error("record head error failed", e));

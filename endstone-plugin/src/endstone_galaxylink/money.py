@@ -184,9 +184,14 @@ def rebuild(snap):
     return stack
 
 
+GIVE_HOOK = None  # set by the Build Contest: items for a player who is building are kept for later
+
+
 def give(player, stack_or_list):
     """Adds items to a player's inventory and drops anything that doesn't fit at their feet."""
     stacks = stack_or_list if isinstance(stack_or_list, list) else [stack_or_list]
+    if GIVE_HOOK is not None and GIVE_HOOK(player, stacks):
+        return 0
     dropped = 0
     for stack in stacks:
         try:

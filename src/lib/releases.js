@@ -90,6 +90,15 @@ Profiles now show how rare each achievement is, with Rare, Epic and Legendary ta
     title: "The live map is now in 3D",
     body: `Tap **3D** on the live map to see the world as blocks at their real heights: hills, mountains, lakes and builds, with players, spawn and plots on top. Drag to turn, use two fingers to move and pinch to zoom. Tap **2D** to go back to the flat map. The 3D view fills in as players explore, so new areas appear over the next few days.`,
   },
+  {
+    id: "2026-11-17",
+    title: "Build Contests and Friends",
+    body: `**Build Contests**
+A new minigame you can host. Galaxy+ and Pro+ members choose Build Contest in the Minigame Center, pick a theme, a build time and an optional prize, and Minigame Staff approve it like any hosted game. Everyone who joins gets their own plot and builds in Creative. Your own items are kept safe and returned at the end. When time is up, everyone tours the builds with the builders' names hidden and rates each one from 1 to 5. The top three share the prize, and wins appear on profiles, the leaderboard and #Timeline.
+
+**Friends**
+Add friends from their profile or from the new Friends page under Messages in Community. You'll see who is in game right now and get a notification when a friend joins the server.`,
+  },
 ];
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.

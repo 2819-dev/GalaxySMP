@@ -16,6 +16,7 @@ export const KINDS = {
   events: { name: "Events", hint: "New events, and a reminder 15 minutes before events you asked to be reminded about", default: true },
   news: { name: "Updates & polls", hint: "New posts in #Updates (when staff choose to notify) and new polls", default: true },
   jobs: { name: "Jobs", hint: "When someone offers to do your job, takes it or finishes it, and when you're hired or paid", default: true },
+  friends: { name: "Friends", hint: "Friend requests, and when a friend joins the server", default: true },
   wishlist: { name: "Wishlist sales", hint: "When something on your Store wishlist is on sale", default: true },
   trades: { name: "Trades", hint: "Trade offers to you, and answers to your offers", default: true },
   community: { name: "Suggestions & builds", hint: "Replies to your suggestions, and Build of the Week", default: true },

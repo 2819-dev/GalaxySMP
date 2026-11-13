@@ -311,6 +311,9 @@ class Plots:
         bedwars = getattr(self.plugin, "bedwars", None)
         if bedwars is not None and bedwars.playing(player):
             return
+        bc = getattr(self.plugin, "buildcontest", None)
+        if bc is not None and bc.building(player):
+            return
         try:
             kind = "manager" if self.owned(player.xuid) else "shovel"
             if self.has_tool(player, kind):

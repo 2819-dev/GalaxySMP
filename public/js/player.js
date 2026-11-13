@@ -95,6 +95,7 @@ async function load() {
   const actions = h("div", { class: "pp-actions" });
   if (social && !social.isMe) actions.append(h("a", { class: "btn btn-primary btn-sm", href: `/community#dm-${social.id}` }, iconEl("message"), "Message"));
   if (social && !social.isMe) actions.append(h("a", { class: "btn btn-secondary btn-sm", href: `/trades?to=${encodeURIComponent(p.name)}` }, iconEl("handshake"), "Trade"));
+  if (p.userId && p.friend && p.friend !== "self") actions.append(friendButton(p));
   if (social?.isMe) actions.append(h("a", { class: "btn btn-primary btn-sm", href: "/account" }, iconEl("pencil"), "Edit profile"));
   const share = h("button", { class: "btn btn-secondary btn-sm", type: "button" }, iconEl("share"), "Share");
   share.addEventListener("click", async () => {
@@ -177,6 +178,9 @@ async function load() {
       stat("skull", "Deaths", short(s.deaths)),
       stat("scroll", "Quests done", short(s.quests)),
       stat("flame", "Daily streak", `${s.streak} day${s.streak === 1 ? "" : "s"}`, `Best: ${s.bestStreak}`)));
+
+  // ---- Build Contest wins (stats) ----
+  if (p.contestWins) stats.querySelector(".pp-stats")?.append(stat("trophy2", "Build Contest wins", short(p.contestWins)));
 
   // ---- Bedwars ----
   const bw = p.bedwars || {};
@@ -310,4 +314,33 @@ async function editShowcase() {
       location.reload();
     } }],
   });
+}
+
+// Add friend / Request sent / Accept / Friends, on someone else's profile.
+function friendButton(p) {
+  const btn = h("button", { class: "btn btn-secondary btn-sm", type: "button" });
+  const LABELS = { none: ["userPlus", "Add friend"], outgoing: ["clock", "Request sent"], incoming: ["userPlus", "Accept friend request"], friends: ["users", "Friends"] };
+  const draw = () => {
+    const [icon, text] = LABELS[p.friend] || LABELS.none;
+    btn.replaceChildren(iconEl(icon), text);
+    btn.className = `btn btn-sm ${p.friend === "incoming" ? "btn-primary" : "btn-secondary"}`;
+    btn.title = p.friend === "outgoing" ? "Tap to cancel the request" : p.friend === "friends" ? "Tap to remove this friend" : "";
+  };
+  const send = async (action) => {
+    btn.disabled = true;
+    try { p.friend = (await postJson("/api/friends", { action, userId: p.userId })).state; draw(); } catch (e) { toast(e.message); }
+    btn.disabled = false;
+  };
+  btn.addEventListener("click", () => {
+    if (p.friend === "none") return send("request");
+    if (p.friend === "incoming") return send("accept");
+    const remove = p.friend === "friends";
+    openDialog({
+      title: remove ? `Remove ${p.name} as a friend?` : "Cancel your friend request?",
+      body: h("p", { text: remove ? "You'll stop seeing each other in your Friends lists." : `${p.name} won't see your request any more.` }),
+      actions: [{ label: "Keep" }, { label: remove ? "Remove friend" : "Cancel request", kind: "danger", onClick: () => send(remove ? "remove" : "cancel") }],
+    });
+  });
+  draw();
+  return btn;
 }

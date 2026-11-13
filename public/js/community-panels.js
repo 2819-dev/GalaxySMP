@@ -15,6 +15,7 @@ import { helpCenterBlock } from "/js/help-center.js";
 import { renderTeam, renderApplications } from "/js/community-team.js";
 import { renderStaffLogs, renderReports, renderShifts } from "/js/community-staff.js";
 import { renderJobs } from "/js/community-jobs.js";
+import { renderFriends } from "/js/community-friends.js";
 
 const panel = () => document.getElementById("channel-panel");
 const voiceBox = () => document.getElementById("voice-embed");
@@ -55,6 +56,7 @@ export function showPanel(channel, context) {
     timeline: (el) => renderTimeline(el, helpers), team: (el) => renderTeam(el, helpers), applications: (el) => renderApplications(el, helpers),
     stafflogs: (el) => renderStaffLogs(el, helpers), reports: (el) => renderReports(el, helpers), shifts: (el) => renderShifts(el, helpers),
     jobs: (el) => renderJobs(el, helpers),
+    friends: (el) => renderFriends(el, { ...helpers, openDM: ctx.openDM }),
   }[channel.kind];
   if (render) render(p);
 }
