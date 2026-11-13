@@ -1,7 +1,6 @@
 // Weekly recap: every Monday (from about 10 AM US Eastern) an Updates post (card) in #Updates with last week's
 // highlights: most playtime, richest players, Bedwars, Build of the Week, new members, server uptime
 // and upcoming events. Posted under the owner's account and marked as automatic.
-import { postTimeline } from "./feed.js";
 import { getDb } from "../lib/db.js";
 import { isOwner } from "../lib/names.js";
 import { notify } from "./notify.js";
@@ -22,7 +21,7 @@ function lastWeek(now = new Date()) {
 }
 
 export async function buildRecap(sql, { from, to } = lastWeek()) {
-  const [play, rich, bw, botw, newbies, up, events, potw] = await Promise.all([
+  const [play, rich, bw, botw, newbies, up, events] = await Promise.all([
     sql`SELECT p.gamertag, sum(extract(epoch FROM least(s.ended_at, ${to.toISOString()}::timestamptz) - greatest(s.started_at, ${from.toISOString()}::timestamptz)))::bigint AS secs
           FROM player_sessions s JOIN players p ON p.xuid = s.xuid
          WHERE s.ended_at > ${from.toISOString()}::timestamptz AND s.started_at < ${to.toISOString()}::timestamptz
@@ -35,12 +34,10 @@ export async function buildRecap(sql, { from, to } = lastWeek()) {
                coalesce(max(peak), 0) AS peak
           FROM server_uptime WHERE ended_at > ${from.toISOString()}::timestamptz AND started_at < ${to.toISOString()}::timestamptz`,
     sql`SELECT title, starts_at FROM events WHERE deleted_at IS NULL AND starts_at > now() ORDER BY starts_at LIMIT 3`,
-    sql`SELECT gamertag, secs FROM player_of_week WHERE week = ${from.toISOString().slice(0, 10)}::date`,
   ]);
   const end = new Date(to.getTime() - 864e5);
   const lines = [];
   const medal = ["🥇", "🥈", "🥉"];
-  if (potw.length) lines.push("", `⭐ **Player of the Week: ${potw[0].gamertag}**, with ${hours(Number(potw[0].secs))} played. Congratulations!`);
   if (play.length) lines.push("", "**Most time played**", ...play.map((p, i) => `${medal[i]} ${p.gamertag}: ${hours(Number(p.secs))}`));
   if (rich.length) lines.push("", "**Richest players**", ...rich.map((p, i) => `${medal[i]} ${p.gamertag}: ${money(p.balance_cents)}`));
   if (bw.length) lines.push("", "**Bedwars wins (all time)**", ...bw.map((p, i) => `${medal[i]} ${p.gamertag}: ${p.bw_wins}`));
@@ -64,36 +61,10 @@ export async function weeklyRecap(env, force = false) {
   if (!force && done?.value === week) return;
   await sql`INSERT INTO economy_config (key, value, updated_by) VALUES ('recap_last', ${JSON.stringify(week)}::jsonb, 'server')
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = 'server'`;
-  await pickPlayerOfWeek(env, sql, lastWeek(now));
   const recap = await buildRecap(sql);
   if (!recap) return;
   const owners = await sql`SELECT id, username, platform FROM users WHERE NOT banned ORDER BY id`;
   const author = owners.find((u) => isOwner(env, u.username, u.platform === "bedrock"));
   await sql`INSERT INTO news_posts (title, body, tag, author_id) VALUES (${recap.title}, ${recap.body}, 'recap', ${author?.id || null})`;
   await notify(env, "all", "news", { title: recap.title, body: "Last week's top players, Build of the Week and more in #Updates.", url: "/community#updates", tag: `recap-${week}` });
-}
-
-// Player of the Week: whoever played the most last week (staff not included, at least 1 hour).
-// They get the Player of the Week badge on their profile (if they have a website account) and a notification.
-export async function pickPlayerOfWeek(env, sql, { from, to }) {
-  const week = from.toISOString().slice(0, 10);
-  const [done] = await sql`SELECT 1 FROM player_of_week WHERE week = ${week}::date`;
-  if (done) return null;
-  const [top] = await sql`
-    SELECT p.xuid, p.gamertag, u.id AS user_id,
-           sum(extract(epoch FROM least(s.ended_at, ${to.toISOString()}::timestamptz) - greatest(s.started_at, ${from.toISOString()}::timestamptz)))::bigint AS secs
-      FROM player_sessions s JOIN players p ON p.xuid = s.xuid LEFT JOIN users u ON u.mc_uuid = p.uuid
-     WHERE s.ended_at > ${from.toISOString()}::timestamptz AND s.started_at < ${to.toISOString()}::timestamptz
-       AND NOT coalesce(p.is_op, false) AND NOT coalesce(u.banned, false)
-     GROUP BY p.xuid, p.gamertag, u.id ORDER BY secs DESC LIMIT 1`;
-  if (!top || Number(top.secs) < 3600) return null;
-  await sql`INSERT INTO player_of_week (week, xuid, gamertag, secs) VALUES (${week}::date, ${top.xuid}, ${top.gamertag}, ${top.secs}) ON CONFLICT DO NOTHING`;
-  await postTimeline(sql, { kind: "potw", xuid: top.xuid, name: top.gamertag, title: "is Player of the Week", detail: `Played ${hours(Number(top.secs))} last week. Congratulations!`, icon: "star", dedupe: `potw:${week}` });
-  if (top.user_id) {
-    let [badge] = await sql`SELECT id FROM badges WHERE name = 'Player of the Week' ORDER BY id LIMIT 1`;
-    if (!badge) [badge] = await sql`INSERT INTO badges (name, description, icon, style) VALUES ('Player of the Week', 'Played the most in a week on GalaxySMP.', 'star', 'galaxy') RETURNING id`;
-    await sql`INSERT INTO user_badges (user_id, badge_id) VALUES (${top.user_id}, ${badge.id}) ON CONFLICT DO NOTHING`;
-    await notify(env, [top.user_id], "community", { title: "You're Player of the Week!", body: `You played the most on GalaxySMP last week (${hours(Number(top.secs))}). It's on your profile now.`, url: `/player/${encodeURIComponent(top.gamertag)}`, tag: "potw" });
-  }
-  return top;
 }

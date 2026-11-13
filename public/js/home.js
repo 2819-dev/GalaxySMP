@@ -31,20 +31,6 @@ fetch("/api/leaderboards?board=playtime").then((r) => r.json()).then((d) => {
   document.getElementById("hs-blocks").textContent = short(d.totals.mined);
   const online = document.getElementById("hs-online");
   if (online.textContent === "–") online.textContent = d.totals.online.toLocaleString();
-  const potw = document.getElementById("home-potw");
-  if (d.potw && potw) {  // Player of the Week spotlight
-    potw.href = `/player/${encodeURIComponent(d.potw.name)}`;
-    const img = document.createElement("img");
-    img.className = "potw-face"; img.alt = ""; img.width = 56; img.height = 56;
-    img.src = d.potw.head || "/favicon.png";
-    const txt = document.createElement("div");
-    const k = document.createElement("span"); k.className = "potw-k"; k.textContent = "⭐ Player of the Week";
-    const n = document.createElement("b"); n.className = "potw-name"; n.textContent = d.potw.name;
-    const sub = document.createElement("span"); sub.className = "potw-sub"; sub.textContent = `${Math.round(d.potw.secs / 3600)} hours played last week`;
-    txt.append(k, n, sub);
-    potw.replaceChildren(img, txt);
-    potw.hidden = false;
-  }
 }).catch(() => {});
 
 // The server-wide goal (Control Panel > Server control), with a progress bar.

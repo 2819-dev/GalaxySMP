@@ -176,12 +176,9 @@ export async function leaderboards(request, env, ctx, url) {
            coalesce(sum(playtime_s), 0)::text AS playtime, coalesce(sum(mined), 0)::text AS mined,
            count(*) FILTER (WHERE online_at > now() - interval '150 seconds')::int AS online
       FROM players`;
-  const [potw] = await sql`SELECT w.gamertag, w.secs, w.week, p.head_at, p.gamerpic_at, p.xuid FROM player_of_week w JOIN players p ON p.xuid = w.xuid
-                            WHERE w.week > now()::date - 14 ORDER BY w.week DESC LIMIT 1`;
   return json({
     ok: true, board: key, title: board.title,
     signedIn,
-    potw: potw && signedIn ? { name: potw.gamertag, secs: Number(potw.secs), week: potw.week, head: headUrlFor(potw) } : null,
     boards: Object.entries(BOARDS).map(([k, b]) => ({ key: k, title: b.title })),
     players: signedIn ? rows.map((r) => ({ name: r.gamertag, value: Number(r.value), online: Boolean(r.online) })) : [],
     totals: { players: totals.players, money: Number(totals.money), playtime: Number(totals.playtime), mined: Number(totals.mined), online: totals.online },
@@ -211,7 +208,6 @@ export async function profile(request, env, ctx, url, params) {
   const p = rows[0];
   const defs = await achievementDefs(sql);
   const have = new Set(p.achievements || []);
-  const potw = await sql`SELECT week, secs FROM player_of_week WHERE xuid = ${p.xuid} ORDER BY week DESC`;
   const rankAt = async (col, value) => {
     if (!value) return null;
     const [r] = await sql.query(`SELECT count(*)::int + 1 AS pos FROM players WHERE ${col} > $1`, [value]);
@@ -234,8 +230,6 @@ export async function profile(request, env, ctx, url, params) {
         mined: await rankAt("mined", Number(p.mined)),
       },
       achievements: defs.map((a) => ({ ...a, unlocked: have.has(a.id) })),
-      // Player of the Week: how many times, and whether they're this week's (picked within the last 7 days)
-      potw: potw.length ? { times: potw.length, current: Date.now() - new Date(potw[0].week).getTime() < 14 * 864e5, week: potw[0].week, secs: Number(potw[0].secs) } : null,
       // the owner can pick this player's picture: Xbox picture or player head (their own Pro+ picture comes first)
       ...(me.owner ? { picture: { xuid: p.xuid, source: p.pic_source || "auto", hasHead: Boolean(p.has_head), custom: p.pic_source === "custom" && Boolean(p.has_custom) } } : {}),
       badges: p.user_id ? (await badgesFor(env, sql, [{ id: p.user_id, username: p.user_name, platform: p.user_platform }])).get(Number(p.user_id)) : [],

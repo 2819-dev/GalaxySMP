@@ -89,7 +89,6 @@ async function load() {
   const tags = h("div", { class: "pp-tags" },
     p.rank ? rankTag(p.rank) : null,
     p.plan && p.plan !== "free" ? h("span", { class: `plan-pill ${p.plan}`, text: PLANS[p.plan] }) : null,
-    p.potw?.current ? h("span", { class: "potw-pill", title: "Played the most on GalaxySMP last week" }, "⭐ Player of the Week") : null,
     p.online ? h("span", { class: "pp-status on" }, h("span", { class: "online-dot" }), "Playing now") : h("span", { class: "pp-status", text: `Last online ${ago(p.lastOnline)}` }));
 
   const actions = h("div", { class: "pp-actions" });
@@ -158,7 +157,7 @@ async function load() {
     h("div", {}, h("span", { class: "pp-k", text: "First joined" }), h("b", { text: date(p.firstSeen) })),
     social?.since ? h("div", {}, h("span", { class: "pp-k", text: "Community member since" }), h("b", { text: date(social.since) })) : null,
     h("div", {}, h("span", { class: "pp-k", text: "Played" }), h("b", { text: hours(s.playtime) })),
-    p.potw ? h("div", {}, h("span", { class: "pp-k", text: "Player of the Week" }), h("b", { text: p.potw.times === 1 ? "1 time" : `${p.potw.times} times` })) : null);
+);
   const about = social
     ? section("About",
       social.bio ? h("p", { class: "pp-bio", text: social.bio }) : h("p", { class: "text-3", style: "margin:0 0 12px", text: social.isMe ? "Add a short bio in your Account so people know what you're into." : "No bio yet." }),
