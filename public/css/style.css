@@ -3404,3 +3404,7 @@ html[data-theme="light"] .ap-art.tone-plan-plus { color: #1aa3c9; } html[data-th
 .ap-gift-art.stack .gc-card:nth-child(1) { transform: rotate(-12deg) translate(-14%, -10%); }
 .ap-gift-art.stack .gc-card:nth-child(2) { transform: rotate(9deg) translate(12%, -6%); }
 .ap-gift-art.stack .gc-card:nth-child(3) { transform: rotate(-2deg) translateY(12%); }
+.gc-greet.long { font-size: 6.6cqw; }
+.gc-greet.xlong { font-size: 5.6cqw; }
+.gcb-count { display: block; margin-top: 4px; text-align: right; font-size: .74rem; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.gcb-count.near { color: var(--warn); font-weight: 700; }

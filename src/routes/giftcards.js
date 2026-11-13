@@ -7,7 +7,7 @@ import { requireUser } from "../lib/auth.js";
 import { limit as rateLimit } from "../lib/ratelimit.js";
 import { checkMessage, compileWordList } from "../lib/filter.js";
 import { change } from "../store/credits.js";
-import { AMOUNTS, TEMPLATE, GREETINGS, styleOf } from "../../public/js/giftcard-designs.js";
+import { AMOUNTS, TEMPLATE, GREETINGS, GREETING_MAX, MESSAGE_MAX, styleOf } from "../../public/js/giftcard-designs.js";
 import { notify } from "./notify.js";
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O, 1/I
@@ -45,10 +45,12 @@ export async function buy(request, env) {
   // the card the buyer built: background, artwork, foil, pattern and greeting (a template fills these in)
   const design = TEMPLATE[body.template] ? body.template : "custom";
   const style = styleOf({ template: body.template, ...(body.style || {}) });
-  if (!GREETINGS.includes(style.greeting)) style.greeting = await cleanText(sql, style.greeting, 28) || "A gift for you";
+  if (String(body.style?.greeting || "").trim().length > GREETING_MAX) throw new HttpError(400, `Greetings can be up to ${GREETING_MAX} characters.`);
+  if (!GREETINGS.includes(style.greeting)) style.greeting = await cleanText(sql, style.greeting, GREETING_MAX) || "A gift for you";
   const amount = Math.round(Number(body.amount));
   if (!AMOUNTS.includes(amount)) throw new HttpError(400, "Choose an amount.");
-  const message = await cleanText(sql, body.message, 160);
+  if (String(body.message || "").trim().length > MESSAGE_MAX) throw new HttpError(400, `Messages can be up to ${MESSAGE_MAX} characters.`);
+  const message = await cleanText(sql, body.message, MESSAGE_MAX);
   const toName = await cleanText(sql, body.toName, 32);
   const code = newCode();
   const method = body.method === "card" ? "card" : "credits";

@@ -68,6 +68,11 @@ Profiles now show how rare each achievement is, with Rare, Epic and Legendary ta
     title: "Design your own gift card",
     body: `Gift cards are now yours to design. Choose a background, add abstract artwork, pick a foil finish (gold, silver, rose gold or holographic) with a foil pattern, and choose a greeting or write your own. The ready-made designs are still there as one-tap starting points. Open the Store and tap "Design your own" under Gift cards.`,
   },
+  {
+    id: "2026-11-15d",
+    title: "Gift card text limits",
+    body: `Custom greetings on gift cards can now be up to 22 characters and personal messages up to 160, so every card looks great. A live counter under each field shows how many characters you've used and turns orange as you get close to the limit.`,
+  },
 ];
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.

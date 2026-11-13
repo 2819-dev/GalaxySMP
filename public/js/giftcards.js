@@ -2,7 +2,7 @@
 // in the Store, your sent cards, and the gift box that opens on galaxymc.us/gift.
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 import { toast, iconEl } from "/js/site.js";
-import { AMOUNTS, BACKGROUNDS, ARTWORK, FOILS, PATTERNS, GREETINGS, TEMPLATES, GREETING_MAX, styleOf, renderParts } from "/js/giftcard-designs.js";
+import { AMOUNTS, BACKGROUNDS, ARTWORK, FOILS, PATTERNS, GREETINGS, TEMPLATES, GREETING_MAX, MESSAGE_MAX, styleOf, renderParts } from "/js/giftcard-designs.js";
 
 const usd = (c) => `$${(c / 100).toFixed(2).replace(/\.00$/, "")}`;
 
@@ -22,7 +22,7 @@ export function cardEl(look, amount, { to = "", from = "", size = "" } = {}) {
     h("div", { class: "gc-gloss" }),
     h("div", { class: "gc-top" }, h("span", { class: "gc-brand" }, h("b", { text: "GalaxySMP" }), h("span", { text: "GIFT CARD" }))),
     h("div", { class: "gc-bottom" },
-      h("div", {}, h("div", { class: "gc-greet", text: r.style.greeting }), to ? h("div", { class: "gc-to", text: `For ${to}` }) : from ? h("div", { class: "gc-to", text: `From ${from}` }) : null),
+      h("div", {}, h("div", { class: `gc-greet${r.style.greeting.length > 18 ? " xlong" : r.style.greeting.length > 14 ? " long" : ""}`, text: r.style.greeting }), to ? h("div", { class: "gc-to", text: `For ${to}` }) : from ? h("div", { class: "gc-to", text: `From ${from}` }) : null),
       h("div", { class: "gc-amount", text: usd(amount) })),
     h("div", { class: "gc-shine" }));
   // tilts toward the pointer, like holding a real card (the foil catches the light)
@@ -44,7 +44,15 @@ export function giftCardDialog({ me = {}, design = "galaxy", onDone } = {}) {
   let amount = 1000;
   const preview = h("div", { class: "gcb-preview" });
   const to = h("input", { class: "input", id: "gc-to", maxlength: 32, placeholder: "Their name (optional)" });
-  const msg = h("textarea", { class: "input", id: "gc-msg", rows: 2, maxlength: 160, placeholder: "Write a short message (optional)" });
+  const msg = h("textarea", { class: "input", id: "gc-msg", rows: 2, maxlength: MESSAGE_MAX, placeholder: "Write a short message (optional)" });
+  // a live "12 / 160" under each text box, so the limit is clear
+  const counter = (input, max) => {
+    const c = h("span", { class: "gcb-count", text: `0 / ${max}` });
+    const upd = () => { const n = input.value.length; c.textContent = `${n} / ${max}`; c.classList.toggle("near", n >= max * 0.9); };
+    input.addEventListener("input", upd);
+    return c;
+  };
+  const msgCount = counter(msg, MESSAGE_MAX);
   const draw = () => preview.replaceChildren(cardEl(style, amount, { to: to.value.trim() }));
   const pickers = [];
   const refresh = () => { draw(); pickers.forEach((f) => f()); };
@@ -77,7 +85,8 @@ export function giftCardDialog({ me = {}, design = "galaxy", onDone } = {}) {
   pickers.push(() => { if (style.bg !== lastBg) { lastBg = style.bg; drawArt(); } if (style.foil !== lastFoil) { lastFoil = style.foil; drawPat(); } });
 
   // greeting: presets or your own
-  const custom = h("input", { class: "input", id: "gc-greet", maxlength: GREETING_MAX, placeholder: "Or write your own" });
+  const custom = h("input", { class: "input", id: "gc-greet", maxlength: GREETING_MAX, placeholder: `Or write your own (up to ${GREETING_MAX} characters)` });
+  const greetCount = counter(custom, GREETING_MAX);
   const greetRow = h("div", { class: "gcb-chips" }, ...GREETINGS.map((g) => h("button", { class: "gcb-chip", type: "button", "data-g": g, text: g,
     onclick: () => { style.greeting = g; custom.value = ""; template = null; refresh(); } })));
   pickers.push(() => greetRow.querySelectorAll("[data-g]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.g === style.greeting))));
@@ -112,8 +121,8 @@ export function giftCardDialog({ me = {}, design = "galaxy", onDone } = {}) {
       section("Background", row("bg", BACKGROUNDS, swatch)),
       section("Artwork", artRow),
       section("Foil", row("foil", FOILS, foilChip), patRow),
-      section("Greeting", greetRow, custom),
-      section("Amount and message", h("div", { class: "form" }, field("Amount (Galaxy Credits)", amounts), field("To", to), field("Message", msg),
+      section("Greeting", greetRow, custom, greetCount),
+      section("Amount and message", h("div", { class: "form" }, field("Amount (Galaxy Credits)", amounts), field("To", to), h("div", {}, field("Message", msg), msgCount),
         h("p", { class: "text-3 small", style: "margin:0", text: `You'll get a private link to share. Whoever opens it can redeem the credits. Your balance: ${credits}.` })))),
     actions: [{ label: "Cancel" }, { label: "Pay by card", onClick: () => pay("card") }, { label: "Pay with credits", kind: "primary", onClick: () => pay("credits") }],
   });

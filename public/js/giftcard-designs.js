@@ -2,7 +2,8 @@
 // and greeting. Templates fill in all four at once as a quick start. Used by the website pages and the server.
 
 export const AMOUNTS = [500, 1000, 2500, 5000]; // cents of Galaxy Credits
-export const GREETING_MAX = 28;
+export const GREETING_MAX = 22;   // characters in a custom greeting (so it always fits on the card)
+export const MESSAGE_MAX = 160;   // characters in the personal message
 
 // ---------- backgrounds ----------
 export const BACKGROUNDS = [
