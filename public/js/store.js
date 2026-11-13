@@ -221,107 +221,102 @@ function celebrate(name, message, gift = false) {
 
 // ---------- Ranks (plans) ----------
 const usdShort = (n) => (Number(n) % 1 ? usd(n) : `$${Number(n)}`);
-const PERKS_OPEN = 2;  // perk groups shown before "Show all perks"
-const GROUP_ICON = { Looks: "sparkles", "Land & homes": "homes", "Money & rewards": "coins", "Money & trading": "coins", Community: "users",
-  "Getting around": "map", Rewards: "gift" };
+// The 4 perks each plan card shows (the full list is in "Compare all plans"). Keep in step with plans.json.
+const HIGHLIGHTS = {
+  free: ["1 plot, 1 shop plot and 1 home", "Daily rewards, quests and achievements", "Voice chat and community chat", "Season Pass free track"],
+  plus: ["GALAXY+ badge in chat and above your head", "3 plots, 2 shop plots and 5 homes", "+25% daily rewards", "Pictures and polls in community chat"],
+  pro: ["PRO+ badge in chat and above your head", "Your own profile picture and custom status", "5 plots, 10 homes and your own public warp", "+50% daily rewards and the Pro+ Season Pass track"],
+};
+// Everything side by side: [feature, Free, Galaxy+, Pro+]. true = included, false = not included.
+const COMPARE = [
+  ["Looks", [
+    ["Rank badge", false, "GALAXY+", "PRO+"],
+    ["Particle trails", false, "Sparkle", "Sparkle + Galaxy"],
+    ["Firework when you join", false, false, true],
+    ["Profile banner", false, true, true],
+    ["Your own profile picture", false, false, true],
+    ["Custom status on your profile", false, false, true],
+  ]],
+  ["Land & homes", [
+    ["Plots", "1", "3", "5"],
+    ["Shop plots", "1", "2", "3"],
+    ["Homes", "1", "5", "10"],
+    ["Elevators in your plots", false, "2", "4"],
+    ["Your own public warp", false, false, true],
+  ]],
+  ["Money & rewards", [
+    ["Auction House listings", "10", "20", "30"],
+    ["Daily rewards bonus", false, "+25%", "+50%"],
+    ["Season Pass", "Free track", "Free track", "Free + Pro+ tracks"],
+  ]],
+  ["Community", [
+    ["Pictures and polls in community chat", false, true, true],
+    ["Host your own events", false, true, true],
+    ["Event access", "Standard", "Level 2", "Priority"],
+    ["Support", "Standard", "Level 2", "Priority"],
+  ]],
+];
 function buyPlan(plan) {
   checkout({ id: plan.id, option: () => null, name: plan.name, price: plan.price, icon: "star", cat: "plan", tags: ["subs", `plan:${plan.id}`], isPlan: true });
 }
 function renderPlans() {
   const wrap = document.getElementById("plans");
   wrap.replaceChildren();
+  const sellable = (data.onSale || []).includes("plans");
   for (const plan of data.plans) {
     const current = me.signedIn && me.linked && (me.plan || "free") === plan.id;
-    const card = h("article", { class: `panel plan-card plan-${plan.id}${current ? " is-current" : ""}` });
+    const card = h("article", { class: `st-plan plan-${plan.id}${plan.id === "pro" ? " featured" : ""}${current ? " is-current" : ""}` });
     if (plan.price) card.append(heart(plan.id, plan.name));
-    if (current) card.append(h("span", { class: "plan-badge current", text: "Your plan" }));
-    else if (plan.id === "pro") card.append(h("span", { class: "plan-badge", text: "Best value" }));
-    card.append(h("div", { class: "plan-top" }, h("h3", { class: "plan-name", text: plan.name }), plan.tag ? h("div", { class: "plan-tag" }, rankTag(plan.tag)) : null));
-    const price = h("div", { class: "plan-price" });
-    if (plan.price) {
-      price.append(h("span", { class: "plan-amount", text: usdShort(plan.price) }), h("span", { class: "plan-per", text: "/month" }));
-      card.append(price, h("p", { class: "plan-game", text: `+ ${moneyDollars(plan.gameCost)} in-game money / month` }));
-    } else {
-      price.append(h("span", { class: "plan-amount", text: "Free" }));
-      card.append(price, h("p", { class: "plan-game free", text: "For everyone, always" }));
+    const label = current ? "Your plan" : plan.id === "pro" ? "Most perks" : null;
+    card.append(
+      h("div", { class: "st-plan-top" }, h("h3", { class: "st-plan-name", text: plan.name }), label ? h("span", { class: `st-plan-label${current ? " current" : ""}`, text: label }) : null),
+      ...(plan.tag ? [h("div", { class: "st-plan-tag" }, rankTag(plan.tag))] : []),
+      h("div", { class: "st-plan-price" }, h("b", { text: plan.price ? usdShort(plan.price) : "Free" }), plan.price ? h("span", { text: "/ month" }) : null),
+      h("p", { class: "st-plan-sub", text: plan.price ? `Plus ${moneyDollars(plan.gameCost)} in-game money a month` : "For everyone, always" }),
+      h("ul", { class: "st-plan-perks" }, ...(HIGHLIGHTS[plan.id] || []).map((t) => h("li", {}, iconEl("check"), h("span", { text: t })))));
+    let btn;
+    if (!plan.price) btn = h("a", { class: "btn btn-secondary st-plan-btn", href: "/join", text: "How to join" });
+    else if (!sellable) btn = h("span", { class: "btn btn-secondary st-plan-btn is-soon", "aria-disabled": "true", text: "Coming soon" });
+    else {
+      btn = h("button", { class: `btn ${plan.id === "pro" ? "btn-primary" : "btn-secondary"} st-plan-btn`, type: "button", text: current ? "Add 30 days" : `Get ${plan.name.replace(/^Galaxy /, "")}` });
+      btn.addEventListener("click", () => buyPlan(plan));
     }
-    if (plan.price) {
-      const sellable = (data.onSale || []).includes("plans");
-      const btn = h("button", { class: `btn ${sellable ? "btn-primary" : "btn-secondary is-soon"} plan-buy`, type: "button", text: !sellable ? "Coming soon" : current ? "Add 30 days" : "Get 30 days" });
-      if (!sellable) btn.setAttribute("aria-disabled", "true");
-      else btn.addEventListener("click", () => buyPlan(plan));
-      card.append(btn);
-    } else {
-      card.append(h("a", { class: "btn btn-secondary plan-buy", href: "/join", text: "How to join" }));
-    }
-    if (plan.includes) card.append(h("p", { class: "plan-includes", text: plan.includes }));
-    const groups = plan.perkGroups || [{ name: "Perks", items: plan.perks }];
-    const list = h("div", { class: "plan-groups" });
-    groups.forEach((g, gi) => list.append(h("div", { class: "plan-group", hidden: gi >= PERKS_OPEN },
-      h("h4", { class: "plan-group-name" }, iconEl(GROUP_ICON[g.name] || "check"), g.name),
-      h("ul", { class: "plan-perks" }, ...g.items.map((t) => h("li", { text: t }))))));
-    card.append(list);
-    if (groups.length > PERKS_OPEN) {
-      const total = groups.reduce((n, g) => n + g.items.length, 0);
-      const more = h("button", { class: "plan-more", type: "button", text: `Show all ${total} perks` });
-      more.addEventListener("click", () => {
-        const open = more.dataset.open === "1";
-        list.querySelectorAll(".plan-group").forEach((el, gi) => { el.hidden = open && gi >= PERKS_OPEN; });
-        more.dataset.open = open ? "0" : "1";
-        more.textContent = open ? `Show all ${total} perks` : "Show fewer";
-      });
-      card.append(more);
-    }
+    card.append(btn);
     wrap.append(card);
   }
+  renderCompare();
 }
 
-// ---------- Banner: featured deal and category tiles ----------
-function renderFeatured() {
-  const box = document.getElementById("store-featured");
-  const pro = data.plans.find((p) => p.id === "pro");
-  if (!box || !pro) return;
-  const sellable = (data.onSale || []).includes("plans");
-  const btn = h("button", { class: "btn btn-primary", type: "button", text: sellable ? `Get Pro+ for ${usdShort(pro.price)}` : "See Pro+" });
-  btn.addEventListener("click", () => (sellable ? buyPlan(pro) : document.getElementById("subscriptions").scrollIntoView({ behavior: "smooth" })));
-  const top = (pro.perkGroups || []).flatMap((g) => g.items).filter((t) => !/^Everything/.test(t)).slice(0, 4);
-  box.replaceChildren(
-    h("span", { class: "sx-feat-k" }, iconEl("crown"), "Featured"),
-    h("div", { class: "sx-feat-tag" }, rankTag(pro.tag)),
-    h("b", { class: "sx-feat-name", text: pro.name }),
-    h("div", { class: "sx-feat-price" }, h("span", { text: usdShort(pro.price) }), h("small", { text: "/month" })),
-    h("ul", { class: "sx-feat-list" }, ...top.map((t) => h("li", { text: t.replace(/ \(.*\)$/, "") }))),
-    btn);
-}
-
-const CAT_TILES = { devices: ["cube", "Galaxy Cube"], money: ["coins", "Money"], plots: ["homes", "Land"], effects: ["moon", "Effects"], cosmetics: ["sparkles", "Cosmetics"] };
-function renderCats() {
-  const nav = document.getElementById("store-cats");
-  if (!nav) return;
-  const tile = (icon, name, sub, onClick, cls = "") => {
-    const b = h("button", { class: `sx-cat ${cls}`, type: "button" }, h("span", { class: "sx-cat-ic" }, iconEl(icon)), h("b", { text: name }), h("small", { text: sub }));
-    b.addEventListener("click", onClick);
-    return b;
-  };
-  const go = (id) => document.getElementById(id).scrollIntoView({ behavior: "smooth" });
-  nav.replaceChildren(
-    tile("star", "Ranks", "Galaxy+ and Pro+", () => go("subscriptions"), "c-ranks"),
-    ...data.shop.map((c) => {
-      const [icon, name] = CAT_TILES[c.id] || ["cart", c.name];
-      const from = Math.min(...c.items.map((i) => (i.options ? Math.min(...i.options.map((o) => o.price)) : i.price)).filter((x) => x != null));
-      return tile(icon, name, Number.isFinite(from) ? `From ${usd(from)}` : c.id === "devices" ? "Coming soon" : "", () => { filter = c.id; renderFilters(); renderShop(); go("shop"); }, `c-${c.id}`);
-    }),
-    tile("coins", "Credits", "Top up and gift", () => go("credits"), "c-credits"),
-    tile("heart", "Donate", "Help the server", () => go("donate"), "c-donate"));
+function renderCompare() {
+  const box = document.getElementById("plan-compare");
+  if (!box) return;
+  const cell = (v) => (v === true ? h("td", { class: "yes" }, iconEl("check"), h("span", { class: "sr-only", text: "Included" }))
+    : v === false ? h("td", { class: "no" }, h("span", { "aria-hidden": "true", text: "–" }), h("span", { class: "sr-only", text: "Not included" }))
+      : h("td", { text: v }));
+  const names = data.plans.map((p) => p.name.replace(/^Galaxy /, ""));
+  const table = h("table", { class: "st-compare" },
+    h("thead", {}, h("tr", {}, h("th", { scope: "col", text: "" }), ...names.map((n) => h("th", { scope: "col", text: n })))),
+    h("tbody", {},
+      h("tr", { class: "price" }, h("th", { scope: "row", text: "Price" }), ...data.plans.map((p) => h("td", { text: p.price ? `${usdShort(p.price)}/mo` : "Free" }))),
+      ...COMPARE.flatMap(([group, rows]) => [
+        h("tr", { class: "group" }, h("th", { colspan: 4, scope: "colgroup", text: group })),
+        ...rows.map(([name, ...vals]) => h("tr", {}, h("th", { scope: "row", text: name }), ...vals.map(cell))),
+      ])));
+  const det = h("details", { class: "st-compare-box" }, h("summary", {}, h("span", { text: "Compare all plans" }), iconEl("arrow")),
+    h("div", { class: "st-compare-scroll" }, table),
+    h("p", { class: "text-3 small", style: "margin:10px 0 0", text: "Paid plans also cost $1K of in-game money a month, taken automatically while you play." }));
+  box.replaceChildren(det);
 }
 
 // ---------- Shop ----------
 let filter = "all";
+const CAT_NAMES = { devices: "Galaxy Cube", money: "Money", plots: "Land", effects: "Effects", cosmetics: "Cosmetics" };
 function renderFilters() {
   const bar = document.getElementById("shop-filters");
-  const cats = [{ id: "all", name: "All" }, ...data.shop.map((c) => ({ id: c.id, name: c.name.replace(/^Exclusive (\w)/, (_, l) => l.toUpperCase()) }))];
+  bar.className = "st-filters";
+  const cats = [{ id: "all", name: "All" }, ...data.shop.map((c) => ({ id: c.id, name: CAT_NAMES[c.id] || c.name }))];
   bar.replaceChildren(...cats.map((c) => {
-    const b = h("button", { class: "shop-filter", type: "button", "aria-pressed": String(filter === c.id), text: c.name });
+    const b = h("button", { class: "st-filter", type: "button", "aria-pressed": String(filter === c.id), text: c.name });
     b.addEventListener("click", () => { filter = c.id; renderFilters(); renderShop(); });
     return b;
   }));
@@ -333,55 +328,48 @@ function renderShop() {
   for (const cat of data.shop) {
     if (filter !== "all" && filter !== cat.id) continue;
     const sale = itemOnSale(cat);
-    const sec = h("div", { class: "shop-cat" },
-      h("div", { class: "shop-cat-head" },
-        h("div", {}, h("h3", { class: "shop-cat-name", text: cat.name }), h("p", { class: "text-3 small shop-cat-blurb", text: cat.blurb })),
-        sale ? null : h("span", { class: "soon-pill", text: "Coming soon" })));
-    const grid = h("div", { class: "shop-grid" });
+    const list = h("div", { class: "st-list" });
     for (const item of cat.items) {
       const owned = ownedCount(item.id);
       const maxed = item.limit && owned >= item.limit;
-      const card = h("article", { class: `panel shop-item cat-${cat.id}${maxed ? " is-owned" : ""}${sale ? "" : " is-soon"}` });
-      if (!maxed) card.append(heart(item.id, item.name));
-      if (maxed) card.append(h("span", { class: "shop-badge owned" }, iconEl("check"), "Owned"));
-      else if (item.badge) card.append(h("span", { class: "shop-badge", text: item.badge }));
-      card.append(h("div", { class: "shop-icon" }, iconEl(item.icon || "cart")),
-        h("h4", { class: "shop-name", text: item.name }), h("p", { class: "text-2 shop-desc", text: item.description }));
       let option = item.options ? item.options[0].id : null;
-      const amount = item.priceText
-        ? h("span", { class: "shop-price tbd" }, item.priceText, item.priceNote ? h("small", { text: item.priceNote }) : null)
-        : h("span", { class: "shop-price", text: usd(item.options ? item.options[0].price : item.price) });
+      const price = h("span", { class: "st-price" });
+      const setPrice = () => {
+        if (item.priceText) price.replaceChildren(h("b", { text: item.priceText }), item.priceNote ? h("small", { text: item.priceNote }) : null);
+        else price.replaceChildren(h("b", { text: usd(item.options ? item.options.find((o) => o.id === option).price : item.price) }));
+      };
+      setPrice();
+      const sub = [];
       if (item.options) {
-        const seg = h("div", { class: "shop-seg", role: "radiogroup", "aria-label": `${item.name}: how long` });
-        item.options.forEach((o) => {
-          const b = h("button", { class: "shop-seg-btn", type: "button", role: "radio", "aria-checked": String(o.id === option), text: o.name });
-          b.addEventListener("click", () => {
-            option = o.id;
-            seg.querySelectorAll("button").forEach((x) => x.setAttribute("aria-checked", String(x === b)));
-            amount.textContent = usd(o.price);
-          });
-          seg.append(b);
-        });
-        card.append(seg);
+        const sel = h("select", { class: "st-opt", "aria-label": `${item.name}: how long` }, ...item.options.map((o) => h("option", { value: o.id, text: o.name })));
+        sel.addEventListener("change", () => { option = sel.value; setPrice(); });
+        sub.push(sel);
       }
-      const meta = item.limit === 1 ? "One per player" : item.limit ? `Up to ${item.limit} per player${owned ? ` · you have ${owned}` : ""}` : "";
-      if (meta && !maxed) card.append(h("p", { class: "text-3 small shop-limit", text: meta }));
-      let btn;
-      if (maxed) btn = h("span", { class: "shop-owned-text text-3 small", text: "In your collection" });
-      else if (!sale) btn = h("span", { class: "shop-soon-text", text: "Soon" });
+      const meta = maxed ? "Owned" : item.limit === 1 ? "One per player" : item.limit ? `Up to ${item.limit}${owned ? ` · you have ${owned}` : ""}` : "";
+      let action;
+      if (maxed) action = h("span", { class: "st-tag ok" }, iconEl("check"), "Owned");
+      else if (!sale) action = null;  // the section header says "Coming soon" once
       else {
-        btn = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Buy" });
-        btn.addEventListener("click", () => {
+        action = h("button", { class: "btn btn-primary btn-sm st-buy", type: "button", text: "Buy" });
+        action.addEventListener("click", () => {
           const o = item.options?.find((x) => x.id === option);
           checkout({ id: item.id, option: () => option, name: o ? `${item.name} (${o.name})` : item.name, price: o ? o.price : item.price,
             icon: item.icon || "cart", cat: cat.id, tags: ["shop", `cat:${cat.id}`, `item:${item.id}`], isPlan: false });
         });
       }
-      card.append(h("div", { class: "shop-foot" }, amount, btn));
-      grid.append(card);
+      const row = h("article", { class: `st-item${maxed ? " is-owned" : ""}${sale ? "" : " is-soon"}` },
+        h("span", { class: "st-ic" }, iconEl(item.icon || "cart")),
+        h("div", { class: "st-item-main" },
+          h("div", { class: "st-item-name" }, h("b", { text: item.name }), item.badge && !maxed ? h("span", { class: "st-badge", text: item.badge }) : null),
+          h("p", { class: "st-item-desc", text: item.description }),
+          meta && !maxed ? h("span", { class: "st-item-meta", text: meta }) : null,
+          ...sub),
+        h("div", { class: "st-item-side" }, price, h("div", { class: "st-item-actions" }, maxed ? null : heart(item.id, item.name), action)));
+      list.append(row);
     }
-    sec.append(grid);
-    box.append(sec);
+    box.append(h("section", { class: "st-cat" },
+      h("div", { class: "st-cat-head" }, h("h3", { text: CAT_NAMES[cat.id] || cat.name }), sale ? null : h("span", { class: "st-tag", text: "Coming soon" }), h("p", { class: "text-3 small", text: cat.blurb })),
+      list));
   }
 }
 
@@ -389,22 +377,17 @@ function renderShop() {
 function renderStrip() {
   const strip = document.getElementById("store-me");
   if (!me.signedIn) {
-    strip.replaceChildren(h("span", { class: "text-2", text: "Sign in to buy things, top up credits and use promo codes." }), h("a", { class: "btn btn-secondary btn-sm", href: "/community", text: "Sign in" }));
+    strip.replaceChildren(h("a", { class: "btn btn-secondary btn-sm", href: "/community", text: "Sign in to buy" }));
     strip.hidden = false;
     return;
   }
-  const bal = h("div", { class: "store-balance" },
-    h("span", { class: "store-balance-icon" }, iconEl("coins")),
-    h("div", {}, h("span", { class: "text-3 small", text: "Galaxy Credits" }), h("b", { class: "store-balance-amount", text: me.infinite ? "∞ Unlimited" : usd(me.credits || 0) })));
-  const top = h("a", { class: "btn btn-primary btn-sm", href: "#credits", text: "Top up" });
-  const giftBtn = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Gift credits" });
+  const giftBtn = h("button", { class: "btn btn-ghost btn-sm", type: "button" }, iconEl("gift"), "Gift");
   giftBtn.addEventListener("click", giftDialog);
-  const row = h("div", { class: "store-me-row" }, bal, h("div", { class: "store-me-actions" }, me.infinite ? null : top, giftBtn));
-  const bits = [row];
-  if (!me.linked) bits.push(h("p", { class: "text-3 small", style: "margin:0", text: "Link your Minecraft account with /link in game so we know who to give things to." }));
-  if (me.promos?.length) {
-    bits.push(h("span", { class: "store-promo-pill" }, iconEl("gift"), me.promos.length === 1 ? `You have a promo code: ${me.promos[0].code} (${me.promos[0].label})` : `You have ${me.promos.length} promo codes`));
-  }
+  const bal = h("div", { class: "st-balance" },
+    h("span", { class: "st-balance-k", text: "Galaxy Credits" }), h("b", { text: me.infinite ? "Unlimited" : usd(me.credits || 0) }));
+  const bits = [h("div", { class: "st-me-row" }, bal, me.infinite ? null : h("a", { class: "btn btn-secondary btn-sm", href: "#credits", text: "Top up" }), giftBtn)];
+  if (!me.linked) bits.push(h("p", { class: "text-3 small st-me-note", text: "Type /link in game so we know which player gets what you buy." }));
+  if (me.promos?.length) bits.push(h("p", { class: "st-me-note st-promo" }, iconEl("gift"), me.promos.length === 1 ? `Promo code for you: ${me.promos[0].code} (${me.promos[0].label})` : `You have ${me.promos.length} promo codes`));
   strip.replaceChildren(...bits);
   strip.hidden = false;
 }
@@ -413,12 +396,7 @@ function renderStrip() {
 function renderCredits() {
   const box = document.getElementById("credit-packs");
   box.replaceChildren(...(me.packs || []).map((p) => {
-    const card = h("article", { class: `panel credit-pack${p.badge ? " best" : ""}` });
-    if (p.badge) card.append(h("span", { class: "shop-badge", text: p.badge }));
-    card.append(
-      h("div", { class: "credit-amount", text: usd(p.credit) }),
-      h("p", { class: "credit-sub text-2 small", text: p.bonus ? `${usd(p.price)} + ${usd(p.bonus)} bonus` : "Galaxy Credits" }));
-    const btn = h("button", { class: "btn btn-primary btn-sm", type: "button", text: `Buy for ${usd(p.price)}` });
+    const btn = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: usd(p.price) });
     btn.addEventListener("click", async () => {
       if (!me.signedIn) { location.href = "/community"; return; }
       btn.disabled = true;
@@ -432,8 +410,11 @@ function renderCredits() {
         btn.disabled = false;
       }
     });
-    card.append(btn);
-    return card;
+    return h("article", { class: `st-pack${p.badge ? " best" : ""}` },
+      p.badge ? h("span", { class: "st-badge", text: p.badge }) : null,
+      h("b", { class: "st-pack-amount", text: usd(p.credit) }),
+      h("span", { class: "text-3 small", text: p.bonus ? `includes ${usd(p.bonus)} bonus` : "Galaxy Credits" }),
+      btn);
   }));
 }
 
@@ -519,8 +500,6 @@ function openItem(key) {
 }
 
 function renderAll() {
-  renderFeatured();
-  renderCats();
   renderStrip();
   renderCredits();
   renderPlans();
@@ -551,7 +530,6 @@ function watchTabs() {
     return;
   }
   renderAll();
-  document.querySelectorAll("[data-store-tab]").forEach((t) => t.prepend(iconEl({ shop: "cart", credits: "coins" }[t.dataset.storeTab] || "crown")));
   watchTabs();
   if (["#shop", "#credits", "#donate"].includes(location.hash)) document.querySelector(location.hash).scrollIntoView();
   const params = new URLSearchParams(location.search);
