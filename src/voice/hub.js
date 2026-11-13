@@ -402,6 +402,12 @@ export class VoiceHub extends DurableObject {
       }
       return;
     }
+    if (msg.type === "ah_sale") {  // for the Auction House price history
+      return import("../routes/community.js").then((m) => m.recordAhSale(this.env, msg)).catch((e) => console.error("ah sale failed", e));
+    }
+    if (msg.type === "gamechat") {  // someone chatted in Minecraft: show it in #Chat
+      return import("../routes/gamechat.js").then((m) => m.fromGame(this.env, msg)).catch((e) => console.error("game chat failed", e));
+    }
     if (msg.type === "rewards_done") {  // the plugin gave these rewards (money, crate keys)
       return import("../routes/rewards.js").then((m) => m.rewardsDone(this.env, msg.ids)).catch((e) => console.error("rewards done failed", e));
     }
@@ -428,6 +434,7 @@ export class VoiceHub extends DurableObject {
         kind: String(m.kind || "").slice(0, 12), label: String(m.label || "").slice(0, 40), x: Number(m.x) || 0, z: Number(m.z) || 0 }));
       const plots = (Array.isArray(msg.plots) ? msg.plots : []).slice(0, 2000).map((p) => ({
         kind: String(p.kind || "plot").slice(0, 8), label: String(p.label || "").slice(0, 40), owner: String(p.owner || "").slice(0, 32),
+        id: p.id != null ? String(p.id).slice(0, 20) : null, ownerXuid: p.owner_xuid ? String(p.owner_xuid).slice(0, 20) : null, public: Boolean(p.public),
         x1: Number(p.x1) || 0, z1: Number(p.z1) || 0, x2: Number(p.x2) || 0, z2: Number(p.z2) || 0 }));
       const st = msg.status && typeof msg.status === "object" ? msg.status : {};
       const status = { sent: Number(st.sent) || 0, error: st.error ? String(st.error).slice(0, 200) : null, method: st.method ? String(st.method).slice(0, 10) : null };

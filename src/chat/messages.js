@@ -20,7 +20,8 @@ export function formatMessage(r) {
     createdAt: r.created_at,
     seen: Boolean(r.seen_at),          // another member has seen it (it can't be edited after that)
     editedAt: r.edited_at || null,
-    author: { id: Number(r.author_id), username: r.username, role: r.role_key, color: r.color, rank: rankOf(r) },
+    author: { id: r.author_id ? Number(r.author_id) : 0, username: r.username || r.game_name || "Player", role: r.role_key || "member", color: r.color || null, rank: rankOf(r) },
+    fromGame: Boolean(r.game_xuid),
     replyTo: r.reply_to
       ? {
           id: Number(r.reply_to),
@@ -36,7 +37,7 @@ export function formatMessage(r) {
 }
 
 const SELECT = `
-  SELECT m.id, m.channel_id, m.content, m.created_at, m.reply_to, m.seen_at, m.edited_at, m.pinned_at, m.poll_id, m.image_id, mi.width AS image_w, mi.height AS image_h,
+  SELECT m.id, m.channel_id, m.content, m.created_at, m.game_xuid, m.game_name, m.reply_to, m.seen_at, m.edited_at, m.pinned_at, m.poll_id, m.image_id, mi.width AS image_w, mi.height AS image_h,
          u.id AS author_id, u.username, r.key AS role_key, r.color,
          rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient, rk.position AS rank_position,
          p.content AS reply_content, pu.username AS reply_username,
@@ -47,9 +48,9 @@ const SELECT = `
                      FROM reactions WHERE message_id = m.id GROUP BY emoji) x
          ), '[]'::json) AS reactions
     FROM messages m
-    JOIN users u ON u.id = m.user_id
-    JOIN roles r ON r.id = u.role_id
-    LEFT JOIN players pl ON pl.uuid = u.mc_uuid
+    LEFT JOIN users u ON u.id = m.user_id
+    LEFT JOIN roles r ON r.id = u.role_id
+    LEFT JOIN players pl ON pl.xuid = COALESCE(m.game_xuid, (SELECT x.xuid FROM players x WHERE x.uuid = u.mc_uuid LIMIT 1))
     LEFT JOIN player_top_rank prk ON prk.xuid = pl.xuid
     LEFT JOIN ranks rk ON rk.id = prk.rank_id
     LEFT JOIN messages p ON p.id = m.reply_to

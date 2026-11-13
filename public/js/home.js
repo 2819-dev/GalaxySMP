@@ -53,3 +53,14 @@ fetch("/api/goals/current", { credentials: "same-origin" }).then((r) => r.json()
   if (g.top?.length) box.append(el("p", "goal-top", `Top helpers: ${g.top.slice(0, 3).map((t) => t.name).join(", ")}`));
   box.hidden = false;
 }).catch(() => {});
+
+// New members: the Getting started checklist, right under the top section
+import("/js/checklist.js").then(async ({ checklistCard }) => {
+  const card = await checklistCard();
+  if (!card) return;
+  const hero = document.querySelector("main .hero");
+  const wrap = document.createElement("div");
+  wrap.className = "container ck-wrap";
+  wrap.append(card);
+  hero?.after(wrap);
+}).catch(() => {});

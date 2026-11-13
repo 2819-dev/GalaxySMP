@@ -573,7 +573,7 @@ class Plots:
         if not self.take_tool(player, "shovel"):
             player.send_message("§cYou need a Plot Claiming Shovel to claim a plot.")
             return
-        plot.update({"owner": str(player.xuid), "owner_name": player.name, "members": {}, "claimed_at": time.time()})
+        plot.update({"owner": str(player.xuid), "owner_name": player.name, "members": {}, "claimed_at": time.time(), "public": False})
         self.save(pid)
         self.restore_edge(plot)
         player.send_message(f"§a§lYou claimed {self.label(plot)}! §r§7Your shovel broke. Use your §aPlot Manager§7 (clock) to manage it.")
@@ -753,7 +753,7 @@ class Plots:
             plot.pop("shop_name", None)
             plot.pop("sign", None)
         # "resetting" right away, so nobody can claim it before the reset has finished.
-        plot.update({"owner": None, "owner_name": None, "members": {}, "status": "resetting"})
+        plot.update({"owner": None, "owner_name": None, "members": {}, "status": "resetting", "public": False})
         self.save(pid)
         self.run(self._job_reset(pid))
         if by_admin:
@@ -921,12 +921,57 @@ class Plots:
             elif not self.has_tool(player, "manager"):
                 self.give_tool(player, "manager")
                 player.send_message("§aHere's your Plot Manager.")
+        elif what in ("public", "private"):
+            self.set_public_cmd(player, what == "public")
         elif what == "list" and player.is_op:
             lines = [f"§f#{p['id']} {self.label(p)} §7{p['kind']} ({p['x1']},{p['z1']})-({p['x2']},{p['z2']}) "
                      f"{p.get('owner_name') or 'unclaimed'}" for p in self.plots.values()]
             player.send_message("\n".join(lines) or "§7No plots yet.")
         else:
             self.open_manager(player)
+
+    # ---------- public plots (shown on the website map, with photos and likes) ----------
+    def set_public_cmd(self, player, public):
+        mine = [p for p in self.owned(player.xuid) if not p.get("shop")]
+        here = None
+        try:
+            loc = player.location
+            here = next((p for p in mine if min(p["x1"], p["x2"]) <= loc.x <= max(p["x1"], p["x2"]) + 1
+                         and min(p["z1"], p["z2"]) <= loc.z <= max(p["z1"], p["z2"]) + 1), None)
+        except Exception:
+            pass
+        plot = here or (mine[0] if len(mine) == 1 else None)
+        if plot is None:
+            return player.send_message("§eStand in the plot you want to change." if mine else "§eYou don't have a plot yet.")
+        self.set_public(plot, public)
+        if public:
+            player.send_message(f"§a{self.label(plot)} is now public. §7Players can find it on the map at galaxymc.us/map. "
+                                "Add photos there. §e/plot private§7 hides it again.")
+        else:
+            player.send_message(f"§a{self.label(plot)} is now private. §7It no longer shows on the website map.")
+
+    def set_public(self, plot, public):
+        plot["public"] = bool(public)
+        self.save(plot["id"])
+        lm = getattr(self.plugin, "livemap", None)
+        voice = getattr(self.plugin, "_voice", None)
+        if lm is not None and voice is not None:
+            try:
+                lm.send_markers(voice)  # update the website map right away
+            except Exception:
+                pass
+
+    def public_from_website(self, msg):
+        """The owner flipped the switch on the website map."""
+        plot = self.plots.get(msg.get("id")) or self.plots.get(str(msg.get("id"))) or next((p for k, p in self.plots.items() if str(k) == str(msg.get("id"))), None)
+        if plot is None or str(plot.get("owner") or "") != str(msg.get("xuid") or "") or plot.get("shop"):
+            ans = {"ok": False, "message": "That isn't your plot."}
+        else:
+            self.set_public(plot, bool(msg.get("public")))
+            ans = {"ok": True}
+        voice = getattr(self.plugin, "_voice", None)
+        if voice:
+            voice.send_json({"type": "answer", "req": msg.get("req"), **ans})
 
     def give_to(self, sender, kind, name):
         """An operator gives another (online) player a Plot Claiming Shovel or Plot Manager."""

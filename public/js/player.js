@@ -199,10 +199,14 @@ async function load() {
       h("div", { class: "pp-progress-bar" }, h("span", { style: `width:${pct}%` })),
       h("span", { class: "text-3 small", text: `${unlocked.length} of ${total} unlocked` })) : null,
     total
-      ? h("div", { class: "badges" }, [...unlocked, ...p.achievements.filter((a) => !a.unlocked)].map((a) =>
-        h("div", { class: `badge${a.unlocked ? "" : " locked"}`, title: a.desc },
+      ? h("div", { class: "badges" }, [...[...unlocked].sort((a, b) => (a.pct ?? 100) - (b.pct ?? 100)), ...p.achievements.filter((a) => !a.unlocked)].map((a) => {
+        // rarity: the share of players who have it
+        const tier = a.pct == null ? null : a.pct <= 5 ? ["legendary", "Legendary"] : a.pct <= 15 ? ["epic", "Epic"] : a.pct <= 35 ? ["rare", "Rare"] : null;
+        return h("div", { class: `badge${a.unlocked ? "" : " locked"}${tier ? ` r-${tier[0]}` : ""}`, title: a.desc },
           h("span", { class: "e" }, iconEl(a.unlocked ? achIcon(a.id) : "lock")),
-          h("div", {}, h("b", { text: a.name }), h("span", { text: a.desc })))))
+          h("div", {}, h("b", { text: a.name }), h("span", { text: a.desc }),
+            a.pct != null ? h("span", { class: "ach-rarity" }, tier ? h("i", { class: `ach-tier ${tier[0]}`, text: tier[1] }) : null, `${a.pct}% of players`) : null));
+      }))
       : h("p", { class: "text-3", style: "margin:0", text: "Achievements appear once the server has sent them." }),
     h("p", { class: "text-3 small", style: "margin:12px 0 0" }, "Earn achievements with ", h("code", { text: "/achievements" }), ", ", h("code", { text: "/quests" }), " and ", h("code", { text: "/daily" }), " in game. ",
       h("a", { href: "/leaderboard", text: "See the leaderboards" }), "."));

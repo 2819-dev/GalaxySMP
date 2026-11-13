@@ -5,6 +5,8 @@ import { rankTag } from "/js/rank-paint.js";
 import { moneyDollars } from "/js/money.js";
 import { h, openDialog, postJson } from "/js/dialog.js";
 import { faceSvg } from "/js/face.js";
+import { cardEl, giftCardDialog, myCardsEl, sentDialog } from "/js/giftcards.js";
+import { DESIGNS } from "/js/giftcard-designs.js";
 
 const usd = (n) => `$${Number(n).toFixed(2)}`;
 let data = null;   // /api/store/plans
@@ -290,7 +292,7 @@ function renderPlans() {
       h("span", { class: `ap-kicker${current ? " current" : ""}`, text: kicker }),
       h("h3", { class: "ap-name", text: plan.name }),
       h("p", { class: "ap-tagline", text: plan.id === "pro" ? "Every perk we offer." : plan.id === "plus" ? "More land, more style." : "Everything you need to play." }),
-      stage(plan.id, `plan-${plan.id}`),
+      stage(plan.id, `plan-${plan.id}`, PLAN_ICON[plan.id]),
       plan.tag ? h("div", { class: "ap-plan-tag" }, rankTag(plan.tag)) : null,
       h("ul", { class: "ap-perks" }, ...(HIGHLIGHTS[plan.id] || []).map((t) => h("li", { text: t }))),
       h("button", { class: "ap-link", type: "button", onclick: () => perksDialog(plan) }, `See all ${(plan.perkGroups || []).reduce((n, g) => n + g.items.length, 0) || ""} perks`.replace("  ", " "), iconEl("arrow")),
@@ -362,19 +364,23 @@ const pix = (key, size = 96, cls = "ap-pix") => {
   img.src = ["", "img", "ranks", `rank_${PIX[key] || "gift"}.png`].join("/");
   return img;
 };
-// The picture area of a card: the pixel art on a soft colored stage
-const stage = (key, tone) => h("div", { class: `ap-stage tone-${tone}` }, pix(key), h("span", { class: "ap-floor" }));
+// The picture area of a card: a big line icon in the category's color
+const ICON_FOR = {
+  free: "user", plus: "star", pro: "gem", credits: "wallet",
+  money_1k: "wallet", money_10k: "coins", money_100k: "bank", money_1m: "crown",
+};
+const stage = (key, tone, icon) => h("div", { class: `ap-art tone-${tone}` }, iconEl(icon || ICON_FOR[key] || "cart"));
 function renderFilters() { /* categories are shelves now */ }
 
 // Sticky category bar: always visible while you scroll, and shows which section you're in.
 function renderCats() {
   const nav = document.getElementById("ap-cats");
   if (!nav) return;
-  const target = (id) => (id === "ranks" ? "subscriptions" : id === "credits" ? "credits" : `shelf-${id}`);
-  const items = [["ranks", "Ranks"], ...data.shop.map((c) => [c.id, CAT_NAMES[c.id] || c.name]), ["credits", "Credits"]];
+  const target = (id) => (id === "ranks" ? "subscriptions" : id === "credits" || id === "giftcards" ? id : `shelf-${id}`);
+  const items = [["ranks", "Ranks"], ...data.shop.map((c) => [c.id, CAT_NAMES[c.id] || c.name]), ["giftcards", "Gift cards"], ["credits", "Credits"]];
   nav.replaceChildren(...items.map(([id, name]) => h("a", { class: "ap-cat", href: `#${target(id)}`, "data-target": target(id),
     onclick: (e) => { e.preventDefault(); document.getElementById(target(id))?.scrollIntoView({ behavior: "smooth", block: "start" }); } },
-    pix(`cat_${id}`, 22, "ap-cat-pix"), h("span", { text: name }))));
+    h("span", { class: `ap-cat-ic2 c-${id}` }, iconEl(id === "ranks" ? "star" : id === "credits" ? "wallet" : id === "giftcards" ? "gift" : CAT_ICON[id] || "cart")), h("span", { text: name }))));
   const links = [...nav.querySelectorAll(".ap-cat")];
   const io = new IntersectionObserver((entries) => {
     for (const en of entries) {
@@ -429,7 +435,7 @@ function itemCard(item, cat, sale) {
     item.badge && !maxed ? h("span", { class: "ap-kicker", text: item.badge }) : h("span", { class: "ap-kicker blank", text: "" }),
     h("h3", { class: "ap-name", text: item.name }),
     h("p", { class: "ap-desc", text: item.description }),
-    stage(item.id, cat.id),
+    stage(item.id, cat.id, item.icon),
     sel,
     h("div", { class: "ap-foot" }, price, buy));
 }
@@ -465,6 +471,28 @@ function renderStrip() {
   if (me.promos?.length) bits.push(h("p", { class: "st-me-note st-promo" }, iconEl("gift"), me.promos.length === 1 ? `Promo code for you: ${me.promos[0].code} (${me.promos[0].label})` : `You have ${me.promos.length} promo codes`));
   strip.replaceChildren(...bits);
   strip.hidden = false;
+}
+
+// ---------- Gift cards ----------
+async function renderGiftCards() {
+  const row = document.getElementById("giftcard-shelf");
+  if (!row) return;
+  shelf(row, DESIGNS.map((d) => {
+    const send = h("button", { class: "ap-buy", type: "button", text: "Send" });
+    send.addEventListener("click", () => giftCardDialog({ me, design: d.id, onDone: refreshCards }));
+    return h("article", { class: "ap-card ap-gift" },
+      h("span", { class: "ap-kicker", text: d.group }),
+      h("h3", { class: "ap-name", text: d.name }),
+      h("div", { class: "ap-gift-art" }, cardEl(d.id, 2500)),
+      h("div", { class: "ap-foot" }, h("div", { class: "ap-price" }, h("b", { text: "$5 to $50" }), h("small", { text: "In Galaxy Credits" })), send));
+  }));
+  refreshCards();
+}
+async function refreshCards() {
+  const box = document.getElementById("giftcard-mine");
+  if (!box || !me.signedIn) return;
+  const el = await myCardsEl();
+  box.replaceChildren(...(el ? [el] : []));
 }
 
 // ---------- Credits: top-up packs ----------
@@ -581,6 +609,7 @@ function renderAll() {
   renderPlans();
   renderFilters();
   renderShop();
+  renderGiftCards();
   renderCats();  // after the shelves exist, so the bar can follow them
 }
 
@@ -612,7 +641,17 @@ function watchTabs() {
   const params = new URLSearchParams(location.search);
   if (params.get("item")) openItem(params.get("item"));
   const paid = params.get("paid");
-  if (paid) {
+  if (paid === "giftcard") {  // card payment for a gift card: show its link once the payment is confirmed
+    history.replaceState(null, "", "/store#giftcards");
+    const id = Number(params.get("card"));
+    const tryShow = async (n) => {
+      const { getJson } = await import("/js/dialog.js");
+      const d = await getJson("/api/giftcards/mine").catch(() => ({ cards: [] }));
+      const c = d.cards.find((x) => x.id === id);
+      if (c) { sentDialog(c); refreshCards(); } else if (n < 5) setTimeout(() => tryShow(n + 1), 2000);
+    };
+    tryShow(0);
+  } else if (paid) {
     history.replaceState(null, "", "/store");
     // Stripe tells us about the payment a moment later: check the balance again shortly
     setTimeout(async () => { await refreshMine(); renderAll(); }, 3000);

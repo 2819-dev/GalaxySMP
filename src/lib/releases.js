@@ -35,6 +35,29 @@ Invite links now open the request-to-join page, so every new player is still app
 - **See all perks.** Each plan has a "See all perks" button that lists everything it includes, grouped by category.
 - **Easier browsing.** A category bar stays at the top as you scroll and shows where you are. Tap "See all" on any row to see every item at once instead of swiping.`,
   },
+  {
+    id: "2026-11-15",
+    title: "Gift cards, #Chat in game, public plots on the map and more",
+    body: `**Gift cards**
+Send Galaxy Credits as a beautifully designed gift card, with designs for birthdays, thank-yous, the winter holidays, Chanukah, Pesach, Rosh Hashanah, Purim and more. Add a personal message, pay with credits or a card, and share the private link. Your friend opens a wrapped gift box on screen and redeems the credits in one tap. Find them in the Store under Gift cards.
+
+**#Chat is now part of the game**
+Messages in #Chat appear in Minecraft chat, and what players say in game appears in #Chat, so you can talk with everyone online from your phone.
+
+**Public plots on the map**
+Free plots now show as green boxes on the map. Want others to see your build? Type /plot public in game, or tap your plot on the map. Public plots show your plot's name, photos and likes when someone taps them. Private plots no longer appear on the map.
+
+**Auction House prices**
+Every listing now shows the item's average price over the last 30 days and whether it's a good deal. Tap "Price history" for a chart.
+
+**Achievement rarity**
+Profiles now show how rare each achievement is, with Rare, Epic and Legendary tags for the hardest ones.
+
+**Also new**
+- "Add to calendar" on every event in #Events.
+- New members get a Getting Started checklist with a $2,500 reward for finishing it.
+- The Store is back to clean line icons.`,
+  },
 ];
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.

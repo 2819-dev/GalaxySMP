@@ -115,6 +115,36 @@ const timeLeft = (exp) => {
 const TILE_COLORS = ["#2457eb", "#8a4fd8", "#16a36b", "#d4532f", "#c48a12", "#1d8fb3", "#b8336a"];
 const tileColor = (id) => TILE_COLORS[[...id].reduce((a, c) => a + c.charCodeAt(0), 0) % TILE_COLORS.length];
 
+// Price history: the average price (each) of an item over the last 30 days, and how this listing compares
+function marketLine(l) {
+  const each = l.price / Math.max(1, l.amount);
+  const row = h("div", { class: "ah-market" });
+  if (l.market?.unit) {
+    const r = each / l.market.unit;
+    const tag = r <= 0.9 ? ["good", "Good price"] : r >= 1.15 ? ["high", "Above average"] : ["fair", "Fair price"];
+    row.append(h("span", { class: `ah-deal ${tag[0]}`, text: tag[1] }), h("span", { class: "text-3 small", text: `Avg ${money(l.market.unit)} each` }));
+  } else row.append(h("span", { class: "text-3 small", text: "No recent sales" }));
+  row.append(h("button", { class: "ah-hist", type: "button", text: "Price history", onclick: () => historyDialog(l) }));
+  return row;
+}
+async function historyDialog(l) {
+  let d;
+  try { d = await getJson(`/api/community/auction/history?item=${encodeURIComponent(l.item)}`); } catch (e) { ctx?.toast?.(e.message); return; }
+  const { lineChart } = await import("/js/charts.js");
+  const body = h("div", { class: "ah-history" });
+  if (!d.summary) body.append(h("p", { class: "text-2", style: "margin:0", text: "This item hasn't sold in the last 30 days, so there's no price history yet." }));
+  else {
+    body.append(h("div", { class: "ah-hist-stats" },
+      h("div", {}, h("span", { text: "Average" }), h("b", { text: money(d.summary.avg) })),
+      h("div", {}, h("span", { text: "Lowest" }), h("b", { text: money(d.summary.low) })),
+      h("div", {}, h("span", { text: "Highest" }), h("b", { text: money(d.summary.high) })),
+      h("div", {}, h("span", { text: "Sales" }), h("b", { text: String(d.summary.sales) }))));
+    if (d.days.length > 1) body.append(lineChart({ title: "Average price each, last 30 days", points: d.days.map((x) => ({ label: x.day.slice(5), value: x.unit / 100, tip: [x.day, `${money(x.unit)} each · ${x.sales} sale${x.sales === 1 ? "" : "s"}`] })), format: (v) => `$${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}` }));
+    body.append(h("p", { class: "text-3 small", style: "margin:8px 0 0", text: `This listing: ${money(l.price / Math.max(1, l.amount))} each.` }));
+  }
+  openDialog({ title: `${l.label}: price history`, body, actions: [{ label: "Close" }] });
+}
+
 function renderAuction(p) {
   const state = { q: "", sort: "new", data: null };
   const search = h("input", { class: "input", type: "search", placeholder: "Search items", "aria-label": "Search items" });
@@ -146,6 +176,7 @@ function renderAuction(p) {
         h("div", { class: "ah-top" }, tile, h("div", {}, h("div", { class: "ah-name", text: `${l.amount}x ${l.label}` }),
           h("div", { class: "ah-meta", text: `${l.seller} · ${timeLeft(l.expires)}` }))),
         l.enchants?.length ? h("div", { class: "ah-ench" }, l.enchants.map((e) => h("span", { text: e }))) : null,
+        marketLine(l),
         h("div", { class: "ah-buy" }, h("span", { class: "ah-price", text: money(l.price) }), buy)));
     }
   };

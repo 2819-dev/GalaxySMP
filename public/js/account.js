@@ -187,10 +187,13 @@ const SECTIONS = {
   },
   profile() {
     const p = data.profile;
+    const ck = h("div");
+    import("/js/checklist.js").then(async ({ checklistCard }) => { const c = await checklistCard(); if (c) ck.replaceWith(c); }).catch(() => {});
     const face = h("img", { class: "acc-face", alt: "", width: 72, height: 72 });
     face.src = p.head || faceSvg(p.username);
     face.addEventListener("error", () => { face.src = faceSvg(p.username); }, { once: true });
     return [
+      ck,
       h("section", { class: "panel acc-hero" }, face,
         h("div", { class: "acc-hero-main" },
           h("h2", { text: p.username }),

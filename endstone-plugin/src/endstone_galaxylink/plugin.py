@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.38.0"
+VERSION = "2.39.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -99,7 +99,7 @@ class GalaxyLink(Plugin):
         "homes": _cmd("List your homes.", "/homes", "galaxylink.command.homes"),
         "back": _cmd("Go back to where you died or last teleported from.", "/back", "galaxylink.command.back"),
         "plan": _cmd("See your subscription plan.", "/plan", "galaxylink.command.plan"),
-        "plot": _cmd("Manage your plot. /plot shovel gets a claiming shovel.", "/plot [action: message]", "galaxylink.command.plot", ["plots"]),
+        "plot": _cmd("Manage your plot. /plot shovel gets a claiming shovel, /plot public shows it on the website map.", "/plot [action: message]", "galaxylink.command.plot", ["plots"]),
         "daily": _cmd("Claim your daily reward.", "/daily", "galaxylink.command.daily", ["reward"]),
         "quests": _cmd("See today's quests.", "/quests", "galaxylink.command.quests", ["quest"]),
         "achievements": _cmd("See your achievements.", "/achievements", "galaxylink.command.achievements", ["ach"]),
@@ -228,6 +228,8 @@ class GalaxyLink(Plugin):
         self.ranktags = RankTags(self)
         from endstone_galaxylink.rewards import Rewards
         self.rewards = Rewards(self)  # money and keys from the website (referrals, season pass, server goals)
+        from endstone_galaxylink.gamechat import GameChat
+        self.gamechat = GameChat(self)  # #Chat on the website <-> game chat
         from endstone_galaxylink.jobboard import JobBoard
         self.jobboard = JobBoard(self)  # #Jobs on the website: holds the reward when a job is posted
         from endstone_galaxylink.shifts import Shifts
@@ -501,6 +503,7 @@ class GalaxyLink(Plugin):
     def on_player_chat(self, event: PlayerChatEvent):
         if self.moderation.on_chat(event):  # muted players can't chat
             return
+        raw = event.message  # before the filter scrambles anything (the website filters it again)
         self.chatfilter.on_chat(event)  # scrambles bad words with §k (when it's on)
         pics = getattr(self, "ranktags", None)
         style = self.ranks.display_tag(event.player)
@@ -524,6 +527,8 @@ class GalaxyLink(Plugin):
             self.logger.info(f"<{p.name}> {event.message}")
         else:
             event.format = self.ranks.chat_format(event.player)
+        if not event.is_cancelled and getattr(self, "gamechat", None) is not None:
+            self.gamechat.to_website(event.player, raw)  # shows in #Chat on galaxymc.us
 
     @event_handler
     def on_actor_spawn(self, event: ActorSpawnEvent):

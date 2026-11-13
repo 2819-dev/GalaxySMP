@@ -203,6 +203,19 @@ export async function topup(request, env) {
   return json({ ok: true, url: session.url });
 }
 
+// A gift card paid by card: a Stripe checkout for the card's amount (activated by the webhook)
+export async function createGiftCheckout(env, sql, user, card, origin) {
+  const amount = Number(card.amount_cents);
+  const [pay] = await sql`INSERT INTO payments (user_id, kind, item, amount_cents) VALUES (${user.id}, 'giftcard', ${String(card.id)}, ${amount}) RETURNING id`;
+  const session = await createCheckout(env, {
+    paymentId: pay.id, userId: user.id, name: `GalaxySMP Gift Card: ${usd(amount)}`,
+    description: `A ${usd(amount)} GalaxySMP gift card from ${user.username}. It can be redeemed for Galaxy Credits.`,
+    amountCents: amount, origin, successPath: `/store?paid=giftcard&card=${card.id}#giftcards`, cancelPath: "/store#giftcards",
+  });
+  await sql`UPDATE payments SET stripe_session = ${session.id} WHERE id = ${pay.id}`;
+  return session.url;
+}
+
 // POST /api/store/gift { to: username, amount: dollars }
 export async function gift(request, env) {
   const user = await requireUser(request, env);
@@ -245,6 +258,10 @@ export async function gift(request, env) {
 async function fulfil(env, sql, payId) {
   const [pay] = await sql`UPDATE payments SET status = 'paid', paid_at = now() WHERE id = ${payId} AND status = 'pending' RETURNING *`;
   if (!pay) return; // already done (Stripe can send an event twice)
+  if (pay.kind === "giftcard") {
+    await (await import("./giftcards.js")).activatePaid(sql, Number(pay.item));
+    return;
+  }
   if (pay.kind === "topup") {
     await change(sql, pay.user_id, pay.credit_cents, "topup", `${usd(pay.amount_cents)} top-up${pay.credit_cents > pay.amount_cents ? ` + ${usd(pay.credit_cents - pay.amount_cents)} bonus` : ""}`, String(pay.id));
     return;
@@ -271,7 +288,10 @@ async function fulfil(env, sql, payId) {
 async function refunded(env, sql, intentId) {
   const [pay] = await sql`UPDATE payments SET status = 'refunded' WHERE payment_intent = ${intentId} AND status = 'paid' RETURNING *`;
   if (!pay) return;
-  if (pay.kind === "topup") {
+  if (pay.kind === "giftcard") {
+    // not redeemed yet: the card stops working. Already redeemed: the credit stays (the owner can sort it out)
+    await sql`UPDATE gift_cards SET status = 'refunded' WHERE id = ${Number(pay.item)} AND status IN ('active', 'pending')`;
+  } else if (pay.kind === "topup") {
     await change(sql, pay.user_id, -pay.credit_cents, "refund", `${usd(pay.amount_cents)} top-up refunded`, String(pay.id), { allowNegative: true });
   } else {
     const player = await linkedPlayer(sql, pay.user_id);
@@ -343,7 +363,7 @@ export async function paymentsOverview(request, env) {
                (SELECT coalesce(sum(delta_cents), 0)::bigint FROM credit_ledger WHERE reason = 'staff') AS given
           FROM users`,
   ]);
-  const name = (r) => (r.kind === "topup" ? `${usd(r.credit_cents)} credits` : (SHOP_ITEMS[r.item]?.name || PLANS[r.item]?.name || r.item));
+  const name = (r) => (r.kind === "giftcard" ? `${usd(r.amount_cents)} gift card` : r.kind === "topup" ? `${usd(r.credit_cents)} credits` : (SHOP_ITEMS[r.item]?.name || PLANS[r.item]?.name || r.item));
   return json({
     ok: true,
     stripe: await stripeStatus(env),

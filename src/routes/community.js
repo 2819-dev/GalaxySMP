@@ -14,11 +14,35 @@ export async function auctionList(request, env) {
   await requireUser(request, env);
   const data = await voiceStub(env).fetch("https://voice/internal/ah").then((r) => r.json());
   const now = Date.now() / 1000;
-  return json({
-    ok: true,
-    updated: data.at,
-    listings: (data.listings || []).filter((l) => !l.expires || l.expires > now),
-  });
+  const listings = (data.listings || []).filter((l) => !l.expires || l.expires > now);
+  // average price per item (each) over the last 30 days, so buyers can tell a good deal
+  const items = [...new Set(listings.map((l) => String(l.item)))];
+  const avg = items.length ? await getDb(env)`SELECT item_id, round(avg(unit_cents))::bigint AS unit, count(*)::int AS n FROM ah_sales
+                                               WHERE item_id = ANY(${items}) AND sold_at > now() - interval '30 days' GROUP BY item_id`.catch(() => []) : [];
+  const byItem = new Map(avg.map((r) => [r.item_id, { unit: Number(r.unit), sales: r.n }]));
+  return json({ ok: true, updated: data.at, listings: listings.map((l) => ({ ...l, market: byItem.get(String(l.item)) || null })) });
+}
+
+// GET /api/community/auction/history?item=minecraft:diamond : daily average price (each) for the last 30 days
+export async function auctionHistory(request, env, ctx, url) {
+  await requireUser(request, env);
+  const item = String(url.searchParams.get("item") || "").slice(0, 80);
+  const sql = getDb(env);
+  const days = await sql`SELECT (sold_at AT TIME ZONE 'America/New_York')::date::text AS day, round(avg(unit_cents))::bigint AS unit, count(*)::int AS n, sum(amount)::int AS qty
+                           FROM ah_sales WHERE item_id = ${item} AND sold_at > now() - interval '30 days' GROUP BY 1 ORDER BY 1`;
+  const [all] = await sql`SELECT round(avg(unit_cents))::bigint AS unit, min(unit_cents)::bigint AS lo, max(unit_cents)::bigint AS hi, count(*)::int AS n
+                            FROM ah_sales WHERE item_id = ${item} AND sold_at > now() - interval '30 days'`;
+  return json({ ok: true, item, days: days.map((d) => ({ day: d.day, unit: Number(d.unit), sales: d.n, qty: d.qty })),
+    summary: all?.n ? { avg: Number(all.unit), low: Number(all.lo), high: Number(all.hi), sales: all.n } : null });
+}
+
+// From the plugin: an Auction House item was sold (in game or on the website)
+export async function recordAhSale(env, msg) {
+  const amount = Math.max(1, Math.round(Number(msg.amount) || 1));
+  const price = Math.max(0, Math.round(Number(msg.price) || 0));
+  const item = String(msg.item || "").slice(0, 80);
+  if (!item || !price) return;
+  await getDb(env)`INSERT INTO ah_sales (item_id, label, amount, price_cents, unit_cents) VALUES (${item}, ${String(msg.label || "").slice(0, 80)}, ${amount}, ${price}, ${Math.round(price / amount)})`;
 }
 
 export async function auctionBuy(request, env, ctx, url, params) {

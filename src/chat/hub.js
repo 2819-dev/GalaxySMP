@@ -322,6 +322,7 @@ export class CommunityHub extends DurableObject {
     const message = await loadMessage(sql, r.id);
     this.send(ws, { type: "sent", nonce: msg.nonce, id: message.id });
     await this.broadcastChannel(channelId, { type: "message", message });
+    if (check.text) this.ctx.waitUntil(import("../routes/gamechat.js").then((m) => m.toGame(this.env, sql, channelId, user.id, check.text)).catch(() => {}));
     this.ctx.waitUntil(this.pushFor(sql, user, channelId, r.id, check.text || "📷 Sent a picture").catch((e) => console.error("push failed", e)));
   }
 

@@ -299,7 +299,9 @@ class LiveMap:
             if str(p.get("dim", "")).lower() != "overworld" or p.get("status") == "saving":
                 continue
             kind = "area" if p.get("kind") == "area" else "shop" if p.get("shop") else "plot"
+            # (the website only shows a player's plot to others once it's public; it shows free plots to everyone)
             plots.append({"kind": kind, "label": self.plugin.plots.label(p) if kind != "plot" or p.get("name") else "",
-                          "owner": p.get("owner_name") or "", "x1": p["x1"], "z1": p["z1"], "x2": p["x2"], "z2": p["z2"]})
+                          "owner": p.get("owner_name") or "", "owner_xuid": p.get("owner") or None, "public": bool(p.get("public")),
+                          "id": p.get("id"), "x1": p["x1"], "z1": p["z1"], "x2": p["x2"], "z2": p["z2"]})
         voice.send_json({"type": "map_markers", "markers": markers, "plots": plots[:2000],
                          "status": {"sent": self.sent, "error": self.last_error, "method": self.method}})

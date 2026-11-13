@@ -231,7 +231,12 @@ export async function profile(request, env, ctx, url, params) {
         money: await rankAt("balance_cents", Number(p.balance_cents)), playtime: await rankAt("playtime_s", Number(p.playtime_s)),
         mined: await rankAt("mined", Number(p.mined)),
       },
-      achievements: defs.map((a) => ({ ...a, unlocked: have.has(a.id) })),
+      achievements: await (async () => {
+        // rarity: the share of players who have each achievement
+        const counts = new Map((await sql`SELECT a AS id, count(*)::int AS n FROM players, unnest(achievements) a GROUP BY a`).map((r) => [r.id, r.n]));
+        const [{ total }] = await sql`SELECT count(*)::int AS total FROM players WHERE cardinality(achievements) > 0`;
+        return defs.map((a) => ({ ...a, unlocked: have.has(a.id), pct: total ? Math.max(1, Math.round(((counts.get(a.id) || 0) / total) * 100)) : null }));
+      })(),
       // the owner can pick this player's picture: Xbox picture or player head (their own Pro+ picture comes first)
       ...(me.owner ? { picture: { xuid: p.xuid, source: p.pic_source || "auto", hasHead: Boolean(p.has_head), custom: p.pic_source === "custom" && Boolean(p.has_custom) } } : {}),
       badges: p.user_id ? (await badgesFor(env, sql, [{ id: p.user_id, username: p.user_name, platform: p.user_platform }])).get(Number(p.user_id)) : [],

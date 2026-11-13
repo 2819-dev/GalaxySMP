@@ -82,7 +82,8 @@ function eventCard(e, canManage, reload, toast) {
       reload();
     } catch (err) { toast(err.message); }
   });
-  const actions = h("div", { class: "ev-actions" }, happening ? h("span", { class: "sg-status done", text: "Happening now" }) : remind);
+  const cal = h("a", { class: "btn btn-ghost btn-sm", href: `/api/community/events/${e.id}/calendar`, download: `galaxysmp-event-${e.id}.ics` }, iconEl("calendar"), "Add to calendar");
+  const actions = h("div", { class: "ev-actions" }, happening ? h("span", { class: "sg-status done", text: "Happening now" }) : remind, happening ? null : cal);
   if (canManage) {
     actions.append(
       h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Edit", onclick: () => eventDialog(e, reload, toast) }),

@@ -16,6 +16,9 @@ import * as mod from "./routes/mod.js";
 import * as staffroom from "./routes/staffroom.js";
 import * as shifts from "./routes/shifts.js";
 import * as jobs from "./routes/jobs.js";
+import * as plotshow from "./routes/plotshow.js";
+import * as checklist from "./routes/checklist.js";
+import * as giftcards from "./routes/giftcards.js";
 import * as looks from "./routes/looks.js";
 import * as wrapped from "./routes/wrapped.js";
 import * as wishlist from "./routes/wishlist.js";
@@ -159,6 +162,15 @@ const routes = [
   ["GET", "/api/wrapped", (req, env) => wrapped.list(req, env)],
   ["GET", "/api/wrapped/:key", wrapped.get],
   ["POST", "/api/wrapped/:key/share", wrapped.share],
+  ["POST", "/api/giftcards", (req, env) => giftcards.buy(req, env)],
+  ["GET", "/api/giftcards/mine", (req, env) => giftcards.mine(req, env)],
+  ["GET", "/api/giftcards/open", giftcards.peek],
+  ["POST", "/api/giftcards/redeem", (req, env) => giftcards.redeem(req, env)],
+  ["GET", "/api/checklist", (req, env) => checklist.get(req, env)],
+  ["POST", "/api/checklist/claim", (req, env) => checklist.claim(req, env)],
+  ["GET", "/api/map/plots/:id", plotshow.plotCard],
+  ["POST", "/api/map/plots/:id", plotshow.plotAction],
+  ["GET", "/api/map/plot-photo/:id", plotshow.plotPhoto],
   ["GET", "/api/looks", (req, env) => looks.mine(req, env)],
   ["POST", "/api/looks", (req, env) => looks.choose(req, env)],
   ["GET", "/api/jobs", (req, env) => jobs.list(req, env)],
@@ -224,9 +236,11 @@ const routes = [
   ["POST", "/api/mod/economy/:action", economy.adminEconomyAction],
   ["GET", "/api/help", help.getHelp],
   ["GET", "/api/community/auction", (req, env) => community.auctionList(req, env)],
+  ["GET", "/api/community/auction/history", community.auctionHistory],
   ["GET", "/api/community/events", (req, env) => features.eventsList(req, env)],
   ["POST", "/api/community/events", (req, env) => features.eventSave(req, env)],
   ["POST", "/api/community/events/:id/:action", features.eventAction],
+  ["GET", "/api/community/events/:id/calendar", features.eventCalendar],
   ["GET", "/api/community/news", features.newsList],
   ["POST", "/api/community/news", (req, env) => features.newsSave(req, env)],
   ["POST", "/api/community/news/:id/delete", features.newsDelete],

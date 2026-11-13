@@ -15,7 +15,12 @@ let follow = null;
 let firstLoad = true;
 let dirty = true;
 
-const COLORS = { plot: "rgba(109, 220, 140, .9)", shop: "rgba(255, 196, 60, .95)", area: "rgba(111, 170, 255, .9)" };
+const COLORS = { plot: "rgba(109, 220, 140, .9)", shop: "rgba(255, 196, 60, .95)", area: "rgba(111, 170, 255, .9)", public: "rgba(190, 140, 255, .95)", mine: "rgba(220, 225, 240, .8)" };
+// Which plots to draw: free plots (green), public player plots (purple, tap for details), your own, shops and areas.
+// Other players' private plots aren't shown at all.
+const drawable = (p) => p.kind !== "plot" || p.available || p.public || p.mine;
+const plotColor = (p) => (p.kind !== "plot" ? COLORS[p.kind] || COLORS.plot : p.public ? COLORS.public : p.mine ? COLORS.mine : COLORS.plot);
+const plotAt = (wx, wz) => info.plots.filter(drawable).find((q) => wx >= Math.min(q.x1, q.x2) && wx <= Math.max(q.x1, q.x2) + 1 && wz >= Math.min(q.z1, q.z2) && wz <= Math.max(q.z1, q.z2) + 1);
 
 function resize() {
   const r = canvas.getBoundingClientRect();
@@ -109,14 +114,19 @@ function draw() {
   // plots and shops
   g.lineWidth = Math.max(1, dpr * (view.scale >= 2 ? 2 : 1));
   for (const p of info.plots) {
+    if (!drawable(p)) continue;
     const [ax, az] = toScreen(Math.min(p.x1, p.x2), Math.min(p.z1, p.z2));
     const [bx, bz] = toScreen(Math.max(p.x1, p.x2) + 1, Math.max(p.z1, p.z2) + 1);
     if (bx < 0 || bz < 0 || ax > canvas.width || az > canvas.height) continue;
-    g.strokeStyle = COLORS[p.kind] || COLORS.plot;
-    g.fillStyle = (COLORS[p.kind] || COLORS.plot).replace(/[\d.]+\)$/, ".12)");
+    const col = plotColor(p);
+    g.strokeStyle = col;
+    g.fillStyle = col.replace(/[\d.]+\)$/, p.public ? ".2)" : ".12)");
+    g.setLineDash(p.kind === "plot" && p.mine && !p.public ? [6 * dpr, 4 * dpr] : []);
     g.fillRect(ax, az, bx - ax, bz - az);
     g.strokeRect(ax, az, bx - ax, bz - az);
-    if (p.label && view.scale >= 1.5 && bx - ax > 60 * dpr) label(p.label, (ax + bx) / 2, az + 14 * dpr, 11);
+    g.setLineDash([]);
+    const text = p.kind === "plot" ? (p.public ? p.label || `${p.owner}'s plot` : p.mine ? "Your plot (private)" : "") : p.label;
+    if (text && view.scale >= 1.5 && bx - ax > 60 * dpr) label(text, (ax + bx) / 2, az + 14 * dpr, 11);
   }
   // spawn and other markers
   for (const m of info.markers) {
@@ -210,7 +220,7 @@ function renderSide() {
   }) : [Object.assign(document.createElement("p"), { className: "text-3 small", textContent: "Nobody is online in the Overworld." })]));
   const places = [
     ...info.markers.map((m) => ({ name: m.label, sub: "Spawn", x: m.x, z: m.z })),
-    ...info.plots.filter((p) => p.label).map((p) => ({ name: p.label, sub: p.kind === "shop" ? `Shop${p.owner ? ` · ${p.owner}` : ""}` : p.kind === "area" ? "Area" : `Plot · ${p.owner}`, x: (p.x1 + p.x2) / 2, z: (p.z1 + p.z2) / 2 })),
+    ...info.plots.filter((p) => drawable(p) && (p.kind !== "plot" || p.public) && (p.label || p.public)).map((p) => ({ ...p, label: p.label || `${p.owner}'s plot` })).map((p) => ({ name: p.label, sub: p.kind === "shop" ? `Shop${p.owner ? ` · ${p.owner}` : ""}` : p.kind === "area" ? "Area" : `Plot · ${p.owner}`, x: (p.x1 + p.x2) / 2, z: (p.z1 + p.z2) / 2 })),
   ];
   $("map-places").replaceChildren(...(places.length ? places.slice(0, 60).map((p) => sideButton(p.name, p.sub, () => { follow = null; goTo(p.x, p.z, Math.max(view.scale, 2.5)); closeSide(); })) :
     [Object.assign(document.createElement("p"), { className: "text-3 small", textContent: "No places yet." })]));
@@ -288,7 +298,19 @@ canvas.addEventListener("pointermove", (e) => {
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (dx || dy) { follow = null; view.x -= dx / view.scale; view.z -= dy / view.scale; dirty = true; }
 });
-const up = (e) => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null; };
+let downAt = null;
+canvas.addEventListener("pointerdown", (e) => { downAt = { x: e.clientX, y: e.clientY }; });
+const up = (e) => {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch = null;
+  if (e.type === "pointerup" && downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 6) {
+    const r = canvas.getBoundingClientRect();
+    const [wx, wz] = toWorld(e.clientX - r.left, e.clientY - r.top);
+    const plot = plotAt(wx, wz);
+    if (plot && plot.kind === "plot" && (plot.public || plot.mine)) import("/js/map-plot.js").then((m) => m.openPlot(plot.id, () => refresh()));
+  }
+  downAt = null;
+};
 canvas.addEventListener("pointerup", up);
 canvas.addEventListener("pointercancel", up);
 canvas.addEventListener("pointerleave", () => { $("map-tip").hidden = true; });
@@ -309,8 +331,14 @@ canvas.addEventListener("keydown", (e) => {
 function hover(sx, sy, wx, wz) {
   const tip = $("map-tip");
   const p = info.players.find((q) => Math.abs(q.x - wx) * view.scale < 14 && Math.abs(q.z - wz) * view.scale < 14);
-  const plot = !p && info.plots.find((q) => wx >= Math.min(q.x1, q.x2) && wx <= Math.max(q.x1, q.x2) + 1 && wz >= Math.min(q.z1, q.z2) && wz <= Math.max(q.z1, q.z2) + 1);
-  const lines = p ? [p.name, "Online now"] : plot ? [plot.label || (plot.owner ? `${plot.owner}'s plot` : "Unclaimed plot"), plot.kind === "shop" ? "Shop plot" : plot.kind === "area" ? "Protected area" : plot.owner ? `Owner: ${plot.owner}` : "Free to claim"] : null;
+  const plot = !p && plotAt(wx, wz);
+  const lines = p ? [p.name, "Online now"]
+    : !plot ? null
+      : plot.kind === "shop" ? [plot.label || "Shop", `Shop${plot.owner ? ` · ${plot.owner}` : ""}`]
+        : plot.kind === "area" ? [plot.label || "Area", "Protected area"]
+          : plot.available ? ["Free plot", "Available to claim with /plot claim"]
+            : plot.public ? [plot.label || `${plot.owner}'s plot`, `By ${plot.owner} · ${plot.likes || 0} like${plot.likes === 1 ? "" : "s"} · tap to view`]
+              : ["Your plot", "Private · tap to make it public"];
   if (!lines) { tip.hidden = true; return; }
   tip.replaceChildren(...lines.map((l, i) => Object.assign(document.createElement(i ? "span" : "b"), { textContent: l })));
   tip.style.left = `${sx}px`;

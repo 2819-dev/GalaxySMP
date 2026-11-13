@@ -16,6 +16,16 @@ export async function renderAccountButton(slot) {
   try { me = (await (await fetch("/api/me/header", { credentials: "same-origin" })).json()).user; } catch { /* offline */ }
   if (me?.acting) actingBanner(me);
   setSkin(me?.skin || null);
+  // came to sign in from a page that wants you back (e.g. a gift card): return there once
+  if (me) {
+    try {
+      const back = JSON.parse(localStorage.getItem("gx_return") || "null");
+      if (back) {
+        localStorage.removeItem("gx_return");
+        if (Date.now() - back.at < 30 * 60e3 && back.url?.startsWith("/") && location.pathname !== back.url.split("?")[0]) { location.replace(back.url); return; }
+      }
+    } catch { /* storage blocked */ }
+  }
   // New members finish the welcome steps first (the rules and privacy pages stay readable)
   if (me?.onboarding && !["/welcome", "/rules", "/privacy"].includes(location.pathname)) {
     location.replace("/welcome");

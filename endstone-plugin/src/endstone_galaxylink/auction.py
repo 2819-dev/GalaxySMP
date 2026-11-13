@@ -102,6 +102,9 @@ class AuctionHouse:
             self.plugin.progress.bump(seller, "ah_sold", 1, name=seller_name)
         except Exception:
             pass
+        voice = getattr(self.plugin, "_voice", None)
+        if voice is not None:  # for the price history on galaxymc.us
+            voice.send_json({"type": "ah_sale", "item": item_id, "label": label, "amount": amount, "price": price})
         dropped = money.give(player, money.rebuild(json.loads(item)))
         where = " (your inventory was full, so it dropped at your feet)" if dropped else ""
         seller_p = next((p for p in self.plugin.server.online_players if str(p.xuid) == seller), None)

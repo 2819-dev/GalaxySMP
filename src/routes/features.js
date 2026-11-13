@@ -61,6 +61,22 @@ const eventOut = (e) => ({
   startsAt: e.starts_at, endsAt: e.ends_at, reminders: Number(e.reminders || 0), reminding: Boolean(e.reminding),
 });
 
+// GET /api/community/events/:id/calendar: the event as a calendar file (.ics) for any phone or computer calendar
+export async function eventCalendar(request, env, ctx, url, params) {
+  const [e] = await getDb(env)`SELECT * FROM events WHERE id = ${Number(params.id) || 0} AND deleted_at IS NULL`;
+  if (!e) throw new HttpError(404, "That event no longer exists.");
+  const stamp = (d) => new Date(d).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const esc = (t) => String(t || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  const end = e.ends_at || new Date(new Date(e.starts_at).getTime() + 2 * 36e5);
+  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//GalaxySMP//Events//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
+    `UID:event-${e.id}@galaxymc.us`, `DTSTAMP:${stamp(new Date())}`, `DTSTART:${stamp(e.starts_at)}`, `DTEND:${stamp(end)}`,
+    `SUMMARY:${esc(`GalaxySMP: ${e.title}`)}`, `DESCRIPTION:${esc(`${e.description || ""}\n\nJoin GalaxySMP: galaxymc.us/join`)}`,
+    e.location ? `LOCATION:${esc(`${e.location} (GalaxySMP)`)}` : "LOCATION:GalaxySMP", `URL:https://galaxymc.us/community#events`,
+    "BEGIN:VALARM", "TRIGGER:-PT15M", "ACTION:DISPLAY", `DESCRIPTION:${esc(e.title)} starts in 15 minutes`, "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  return new Response(ics, { headers: { "Content-Type": "text/calendar; charset=utf-8", "Content-Disposition": `attachment; filename="galaxysmp-event-${e.id}.ics"`, "Cache-Control": "no-store" } });
+}
+
 export async function eventsList(request, env) {
   const user = await requireUser(request, env);
   const sql = getDb(env);
@@ -363,6 +379,24 @@ function mondayOf(d) {
   return x;
 }
 
+// Checks uploaded photos (base64 from the browser). Returns [{ mime, w, h, b64 }] or throws a friendly error.
+export function decodeImages(imgs) {
+  return imgs.map((img) => {
+    const mime = String(img.mime || "");
+    const magic = IMAGE_TYPES[mime];
+    if (!magic) throw new HttpError(400, "Photos must be JPEG, WebP or PNG.");
+    const b64 = String(img.data || "").replace(/\s+/g, "");
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64) || b64.length % 4) throw new HttpError(400, "A photo couldn't be read.");
+    if ((b64.length * 3) / 4 > MAX_IMAGE_BYTES) throw new HttpError(400, "A photo is too large. Try a smaller one.");
+    let head;
+    try { head = atob(b64.slice(0, 8)); } catch { throw new HttpError(400, "A photo couldn't be read."); }
+    if (head.charCodeAt(0) !== magic[0] || head.charCodeAt(1) !== magic[1]) throw new HttpError(400, "A photo couldn't be read.");
+    const w = Math.round(Number(img.width)), h = Math.round(Number(img.height));
+    if (!(w > 0 && w <= 4096 && h > 0 && h <= 4096)) throw new HttpError(400, "A photo couldn't be read.");
+    return { mime, w, h, b64 };
+  });
+}
+
 export async function buildsList(request, env, ctx, url) {
   const user = await requireUser(request, env);
   const sort = ["new", "top", "week"].includes(url.searchParams.get("sort")) ? url.searchParams.get("sort") : "new";
@@ -400,20 +434,7 @@ export async function buildCreate(request, env) {
   const imgs = Array.isArray(body.images) ? body.images.slice(0, MAX_IMAGES + 1) : [];
   if (!imgs.length) throw new HttpError(400, "Add at least one photo.");
   if (imgs.length > MAX_IMAGES) throw new HttpError(400, `Up to ${MAX_IMAGES} photos per build.`);
-  const decoded = imgs.map((img) => {
-    const mime = String(img.mime || "");
-    const magic = IMAGE_TYPES[mime];
-    if (!magic) throw new HttpError(400, "Photos must be JPEG, WebP or PNG.");
-    const b64 = String(img.data || "").replace(/\s+/g, "");
-    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64) || b64.length % 4) throw new HttpError(400, "A photo couldn't be read.");
-    if ((b64.length * 3) / 4 > MAX_IMAGE_BYTES) throw new HttpError(400, "A photo is too large. Try a smaller one.");
-    let head;
-    try { head = atob(b64.slice(0, 8)); } catch { throw new HttpError(400, "A photo couldn't be read."); }
-    if (head.charCodeAt(0) !== magic[0] || head.charCodeAt(1) !== magic[1]) throw new HttpError(400, "A photo couldn't be read.");
-    const w = Math.round(Number(img.width)), h = Math.round(Number(img.height));
-    if (!(w > 0 && w <= 4096 && h > 0 && h <= 4096)) throw new HttpError(400, "A photo couldn't be read.");
-    return { mime, w, h, b64 };
-  });
+  const decoded = decodeImages(imgs);
   const sql = getDb(env);
   await filterOrThrow(sql, [title, description, location]);
   const [recent] = await sql`SELECT count(*)::int AS n FROM builds WHERE user_id = ${user.id} AND created_at > now() - interval '1 day'`;
