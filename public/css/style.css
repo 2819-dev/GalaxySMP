@@ -2531,3 +2531,7 @@ html[data-theme="light"] .tl-card.k-rank { --tl: #7a3cc9; } html[data-theme="lig
 .goal-top { margin: 6px 0 0; font-size: .82rem; color: var(--text-3); }
 .nw-tag.release { background: rgba(138, 92, 255, .16); color: #b79bff; }
 html[data-theme="light"] .nw-tag.release { color: #6b3fd6; }
+.ap-state { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.ap-state-text { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.ap-closed h3 { margin: 0 0 6px; }
+.ap-closed p { margin: 0; white-space: pre-wrap; }

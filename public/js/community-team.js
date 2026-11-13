@@ -86,6 +86,12 @@ function memberView(wrap, d, { toast, setTimer }) {
     }, 15000));
     return;
   }
+  // closed by the owner: their message instead of the form
+  if (d.state?.closed) {
+    wrap.replaceChildren(intro, h("section", { class: "panel ap-closed" }, h("h3", { text: "Applications are closed" }),
+      h("p", { class: "text-2", text: d.state.message || "We're not looking for new Moderators right now. Check back later!" })));
+    return;
+  }
   // the form
   const inputs = {};
   const fields = d.questions.map((q) => {
@@ -119,9 +125,30 @@ function ownerView(wrap, d, { toast, setTimer }) {
     b.addEventListener("click", () => { status = k; filter.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); load(); });
     filter.append(b);
   }
+  const stateBar = h("div", { class: "ap-state" });
+  const drawState = (st) => {
+    const btn = st.closed
+      ? h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Reopen applications", onclick: async () => {
+        try { const r = await postJson("/api/applications/state", { closed: false }); toast(r.message); drawState({ closed: false }); } catch (e) { toast(e.message); } } })
+      : h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Close applications", onclick: () => {
+        const msg = h("textarea", { class: "input", id: "ap-closed-msg", rows: 3, maxlength: 300, placeholder: "e.g. We have enough Moderators for now. Applications open again in January!" });
+        openDialog({
+          title: "Close applications?",
+          body: h("div", { class: "form" }, field("Message players see", msg, "Optional. Applications already sent stay open for you to answer.")),
+          actions: [{ label: "Cancel" }, { label: "Close applications", kind: "primary", onClick: async () => {
+            const r = await postJson("/api/applications/state", { closed: true, message: msg.value });
+            toast(r.message); drawState({ closed: true, message: msg.value.trim() });
+          } }],
+        });
+      } });
+    stateBar.replaceChildren(h("div", { class: "ap-state-text" },
+      h("span", { class: `sg-status ${st.closed ? "declined" : "done"}`, text: st.closed ? "Closed" : "Open" }),
+      h("span", { class: "text-3 small", text: st.closed ? (st.message ? `Players see: "${st.message}"` : "Players see that applications are closed.") : "Members can apply." })), btn);
+  };
+  drawState(d.state || { closed: false });
   wrap.replaceChildren(
     h("div", { class: "tl-intro" }, h("h2", { text: "Applications" }), h("p", { class: "text-3", text: "Moderator applications. Only you can see these. Accepting makes them a Moderator on the website." })),
-    filter, h("div", { class: "jr-layout", style: "margin-top:12px" }, list, pane));
+    stateBar, filter, h("div", { class: "jr-layout", style: "margin-top:12px" }, list, pane));
   async function load() {
     let n;
     try { n = await getJson(`/api/applications?status=${status}`); } catch (e) { list.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }

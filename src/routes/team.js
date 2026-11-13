@@ -100,6 +100,24 @@ async function messages(sql, id) {
     .map((m) => ({ id: Number(m.id), fromOwner: m.from_owner, body: m.body, at: m.created_at }));
 }
 
+// Applications open or closed (the owner closes them with a short message players see).
+async function appState(sql) {
+  const [r] = await sql`SELECT value FROM economy_config WHERE key = 'applications'`;
+  return { closed: Boolean(r?.value?.closed), message: r?.value?.message || "" };
+}
+
+// POST /api/applications/state { closed, message }  (the owner)
+export async function setAppState(request, env) {
+  const me = await requireUser(request, env);
+  if (!ownerOf(env, me)) throw new HttpError(403, "Only the owner can open or close applications.");
+  const b = await readJson(request);
+  const sql = getDb(env);
+  const value = { closed: Boolean(b.closed), message: Boolean(b.closed) ? String(b.message || "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 300) : "" };
+  await sql`INSERT INTO economy_config (key, value, updated_by) VALUES ('applications', ${JSON.stringify(value)}::jsonb, ${me.username})
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = EXCLUDED.updated_by`;
+  return json({ ok: true, message: value.closed ? "Applications are closed." : "Applications are open again." });
+}
+
 // GET /api/applications?status=open  -> the owner: everyone's; others: their own
 export async function listApplications(request, env, ctx, url) {
   const me = await requireUser(request, env);
@@ -111,14 +129,14 @@ export async function listApplications(request, env, ctx, url) {
         FROM staff_applications a JOIN users u ON u.id = a.user_id LEFT JOIN players pl ON pl.uuid = u.mc_uuid
        WHERE a.status = ${status} ORDER BY a.last_at DESC LIMIT 100`;
     const [{ n }] = await sql`SELECT count(*)::int AS n FROM staff_applications WHERE status = 'open'`;
-    return json({ ok: true, owner: true, open: n, questions: QUESTIONS, applications: rows.map(appOut) });
+    return json({ ok: true, owner: true, open: n, state: await appState(sql), questions: QUESTIONS, applications: rows.map(appOut) });
   }
   const [mine] = await sql`SELECT * FROM staff_applications WHERE user_id = ${me.id} ORDER BY id DESC LIMIT 1`;
   if (mine?.user_unread && !me.acting_by) await sql`UPDATE staff_applications SET user_unread = 0 WHERE id = ${mine.id}`;
   const staff = can(me, "mod_panel");
   const waitDays = mine && mine.status === "declined" ? Math.ceil(14 - (Date.now() - new Date(mine.decided_at)) / 864e5) : 0;
   return json({
-    ok: true, owner: false, questions: QUESTIONS, staff,
+    ok: true, owner: false, questions: QUESTIONS, staff, state: await appState(sql),
     canApply: !staff && (!mine || mine.status === "withdrawn" || (mine.status === "declined" && waitDays <= 0)),
     waitDays: Math.max(0, waitDays),
     application: mine ? { ...appOut(mine), messages: await messages(sql, mine.id) } : null,
@@ -136,6 +154,8 @@ export async function createApplication(request, env) {
   if (mine?.status === "open") throw new HttpError(409, "You already have an application waiting.");
   if (mine?.status === "accepted") throw new HttpError(409, "Your application was already accepted.");
   if (mine?.status === "declined" && Date.now() - new Date(mine.decided_at) < 14 * 864e5) throw new HttpError(429, "You can apply again 2 weeks after your last application.");
+  const state = await appState(sql);
+  if (state.closed) throw new HttpError(409, state.message ? `Applications are closed: ${state.message}` : "Applications are closed right now.");
   const body = await readJson(request);
   const list = await words(sql);
   const answers = {};

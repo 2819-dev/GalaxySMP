@@ -104,6 +104,7 @@ const routes = [
   ["GET", "/api/applications", team.listApplications],
   ["POST", "/api/applications", (req, env) => team.createApplication(req, env)],
   ["POST", "/api/applications/withdraw", (req, env) => team.withdrawApplication(req, env)],
+  ["POST", "/api/applications/state", (req, env) => team.setAppState(req, env)],
   ["GET", "/api/applications/:id", team.getApplication],
   ["POST", "/api/applications/:id/messages", team.appMessage],
   ["POST", "/api/applications/:id/decide", team.decideApplication],
