@@ -7,12 +7,11 @@ import { requireUser } from "../lib/auth.js";
 import { limit as rateLimit } from "../lib/ratelimit.js";
 import { checkMessage, compileWordList } from "../lib/filter.js";
 import { change } from "../store/credits.js";
-import { DESIGNS, AMOUNTS } from "../../public/js/giftcard-designs.js";
+import { AMOUNTS, TEMPLATE, GREETINGS, styleOf } from "../../public/js/giftcard-designs.js";
 import { notify } from "./notify.js";
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O, 1/I
 const usd = (c) => `$${(c / 100).toFixed(2).replace(/\.00$/, "")}`;
-const DESIGN_IDS = new Set(DESIGNS.map((d) => d.id));
 
 function newCode() {
   const bytes = crypto.getRandomValues(new Uint8Array(12));
@@ -23,7 +22,7 @@ const cleanCode = (v) => String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "")
 const fmtCode = (raw) => `GALX-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
 
 const out = (c, withCode) => ({
-  id: Number(c.id), design: c.design, amount: Number(c.amount_cents), message: c.message || "", from: c.from_name, to: c.to_name || "",
+  id: Number(c.id), design: c.design, style: c.style || styleOf(c.design), amount: Number(c.amount_cents), message: c.message || "", from: c.from_name, to: c.to_name || "",
   status: c.status, createdAt: c.created_at, redeemedAt: c.redeemed_at, redeemedBy: c.redeemed_by_name || null,
   ...(withCode ? { code: c.code, link: `/gift?c=${encodeURIComponent(c.code)}` } : {}),
 });
@@ -43,16 +42,18 @@ export async function buy(request, env) {
   await rateLimit(env, "AUTH_LIMITER", `gc:${user.id}`);
   const body = await readJson(request);
   const sql = getDb(env);
-  const design = DESIGN_IDS.has(body.design) ? body.design : null;
-  if (!design) throw new HttpError(400, "Choose a design.");
+  // the card the buyer built: background, artwork, foil, pattern and greeting (a template fills these in)
+  const design = TEMPLATE[body.template] ? body.template : "custom";
+  const style = styleOf({ template: body.template, ...(body.style || {}) });
+  if (!GREETINGS.includes(style.greeting)) style.greeting = await cleanText(sql, style.greeting, 28) || "A gift for you";
   const amount = Math.round(Number(body.amount));
   if (!AMOUNTS.includes(amount)) throw new HttpError(400, "Choose an amount.");
   const message = await cleanText(sql, body.message, 160);
   const toName = await cleanText(sql, body.toName, 32);
   const code = newCode();
   const method = body.method === "card" ? "card" : "credits";
-  const [card] = await sql`INSERT INTO gift_cards (code, design, amount_cents, message, from_name, to_name, buyer_id, status)
-                           VALUES (${code}, ${design}, ${amount}, ${message}, ${user.username}, ${toName}, ${user.id}, 'pending') RETURNING *`;
+  const [card] = await sql`INSERT INTO gift_cards (code, design, style, amount_cents, message, from_name, to_name, buyer_id, status)
+                           VALUES (${code}, ${design}, ${JSON.stringify(style)}::jsonb, ${amount}, ${message}, ${user.username}, ${toName}, ${user.id}, 'pending') RETURNING *`;
   if (method === "credits") {
     const left = user.owner ? 1 : await change(sql, user.id, -amount, "purchase", `Gift card (${usd(amount)})`, `giftcard:${card.id}`);
     if (left === null) {

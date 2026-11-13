@@ -477,15 +477,23 @@ function renderStrip() {
 async function renderGiftCards() {
   const row = document.getElementById("giftcard-shelf");
   if (!row) return;
-  shelf(row, DESIGNS.map((d) => {
-    const send = h("button", { class: "ap-buy", type: "button", text: "Send" });
+  const own = h("button", { class: "ap-buy", type: "button", text: "Start" });
+  own.addEventListener("click", () => giftCardDialog({ me, design: "luxe", onDone: refreshCards }));
+  const custom = h("article", { class: "ap-card ap-gift ap-gift-own" },
+    h("span", { class: "ap-kicker", text: "New" }),
+    h("h3", { class: "ap-name", text: "Design your own" }),
+    h("p", { class: "ap-desc", text: "Choose the background, artwork, foil and greeting." }),
+    h("div", { class: "ap-gift-art stack" }, cardEl("purim", 5000, { size: "mini" }), cardEl("chanukah", 2500, { size: "mini" }), cardEl("luxe", 1000)),
+    h("div", { class: "ap-foot" }, h("div", { class: "ap-price" }, h("b", { text: "$5 to $50" }), h("small", { text: "In Galaxy Credits" })), own));
+  shelf(row, [custom, ...DESIGNS.map((d) => {
+    const send = h("button", { class: "ap-buy", type: "button", text: "Customize" });
     send.addEventListener("click", () => giftCardDialog({ me, design: d.id, onDone: refreshCards }));
     return h("article", { class: "ap-card ap-gift" },
       h("span", { class: "ap-kicker", text: d.group }),
       h("h3", { class: "ap-name", text: d.name }),
       h("div", { class: "ap-gift-art" }, cardEl(d.id, 2500)),
       h("div", { class: "ap-foot" }, h("div", { class: "ap-price" }, h("b", { text: "$5 to $50" }), h("small", { text: "In Galaxy Credits" })), send));
-  }));
+  })]);
   refreshCards();
 }
 async function refreshCards() {

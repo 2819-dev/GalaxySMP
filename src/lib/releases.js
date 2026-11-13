@@ -63,6 +63,11 @@ Profiles now show how rare each achievement is, with Rare, Epic and Legendary ta
     title: "Gift cards get a new premium look",
     body: `Every gift card design has been redrawn with bold abstract artwork, rich gradients and a glassy finish. When someone opens your gift, the card now spins out of the box to show its designed back before landing in front of them.`,
   },
+  {
+    id: "2026-11-15c",
+    title: "Design your own gift card",
+    body: `Gift cards are now yours to design. Choose a background, add abstract artwork, pick a foil finish (gold, silver, rose gold or holographic) with a foil pattern, and choose a greeting or write your own. The ready-made designs are still there as one-tap starting points. Open the Store and tap "Design your own" under Gift cards.`,
+  },
 ];
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.

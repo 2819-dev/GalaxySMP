@@ -36,6 +36,10 @@ const PENDING = [
     "CREATE TABLE IF NOT EXISTS plot_likes (plot_id text NOT NULL, user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (plot_id, user_id))",
     "INSERT INTO schema_migrations (version) VALUES ('0049_game_chat_gifts_plots') ON CONFLICT DO NOTHING",
   ]],
+  ["0050_giftcard_style", [
+    "ALTER TABLE gift_cards ADD COLUMN IF NOT EXISTS style jsonb",
+    "INSERT INTO schema_migrations (version) VALUES ('0050_giftcard_style') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;
