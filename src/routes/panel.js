@@ -14,7 +14,7 @@ import { sendPlans } from "./plans.js";
 import { SHOP_ITEMS, SHOP } from "../store/shop.js";
 
 const MOD = 50;
-export const LATEST_PLUGIN = "2.35.0"; // the GalaxyLink version made for this website
+export const LATEST_PLUGIN = "2.36.0"; // the GalaxyLink version made for this website
 export const LATEST_ICONS = "1.9.0"; // the GalaxySMP Icons resource pack version that goes with it
 const older = (a, b) => { const x = String(a).split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
 const ADMIN = 100;
@@ -206,6 +206,10 @@ export async function playerCard(request, env, ctx, url, params) {
       picSource: p.pic_source || "auto", hasHead: Boolean(p.head), hasCustomPic: Boolean(p.custom_pic),
       firstSeen: p.first_seen, extraPlots: p.extra_plots,
       stats: { playtimeH: Math.round(Number(p.playtime_s || 0) / 360) / 10, mined: Number(p.mined || 0), placed: Number(p.placed || 0), kills: Number(p.kills || 0), deaths: Number(p.deaths || 0), quests: p.quests_done, streak: p.streak, achievements: (p.achievements || []).length },
+      // exact numbers for "Edit stats" (owner)
+      editStats: { playtime: Math.round(Number(p.playtime_s || 0) / 36) / 100, mined: Number(p.mined || 0), placed: Number(p.placed || 0), kills: Number(p.kills || 0),
+        deaths: Number(p.deaths || 0), quests: Number(p.quests_done || 0), streak: Number(p.streak || 0), best_streak: Number(p.best_streak || 0),
+        bw_games: Number(p.bw_games || 0), bw_wins: Number(p.bw_wins || 0), bw_kills: Number(p.bw_kills || 0), bw_finals: Number(p.bw_finals || 0), bw_beds: Number(p.bw_beds || 0) },
       account: p.user_id ? {
         id: Number(p.user_id), username: p.username, role: p.role_name, power: Number(p.role_power), joined: p.joined_site,
         ...(await sql`SELECT u.real_name, u.real_name_hidden, u.found_via, u.bio, u.interests, u.onboarded_at, inv.username AS invited_by
@@ -233,11 +237,19 @@ export async function playerCard(request, env, ctx, url, params) {
   });
 }
 
+// Leaderboard stats the owner can set: website name -> [players column, multiplier] (playtime is typed in hours).
+// The plugin uses the same names (progress.py set_stats), with playtime in seconds.
+export const STAT_FIELDS = {
+  playtime: ["playtime_s", 3600], mined: ["mined", 1], placed: ["placed", 1], kills: ["kills", 1], deaths: ["deaths", 1],
+  quests: ["quests_done", 1], streak: ["streak", 1], best_streak: ["best_streak", 1],
+  bw_games: ["bw_games", 1], bw_wins: ["bw_wins", 1], bw_kills: ["bw_kills", 1], bw_finals: ["bw_finals", 1], bw_beds: ["bw_beds", 1],
+};
+
 const GAME_ACTIONS = { warn: MOD, mute: "mute_members", unmute: "mute_members", kick: MOD, ban: "ban_members", unban: "ban_members" };
 
 export async function playerAction(request, env, ctx, url, params) {
   const action = String(params.action);
-  const needed = ["givekey", "note-delete", "shopgive", "setop", "picture"].includes(action) ? ADMIN : GAME_ACTIONS[action] ?? (action === "note" ? MOD : null);
+  const needed = ["givekey", "note-delete", "shopgive", "setop", "picture", "stats"].includes(action) ? ADMIN : GAME_ACTIONS[action] ?? (action === "note" ? MOD : null);
   if (needed == null) throw new HttpError(400, "Unknown action.");
   const user = await requireStaff(request, env, needed);
   const body = await readJson(request, action === "picture" ? 400_000 : 8192);
@@ -260,6 +272,41 @@ export async function playerAction(request, env, ctx, url, params) {
     return json({ ok: true });
   }
   if (action === "shopgive") return json(await giveShopItem(env, sql, p, body, user));
+  if (action === "stats") {  // the owner sets leaderboard stats; play keeps counting up from them
+    if (!user.owner) throw new HttpError(403, "Only the owner can change stats.");
+    const want = {};
+    for (const [key, [col, mult]] of Object.entries(STAT_FIELDS)) {
+      const v = body.stats?.[key];
+      if (v === undefined || v === null || v === "") continue;
+      const n = Math.round(Number(v) * mult);
+      if (!Number.isFinite(n) || n < 0 || n > 1e12) throw new HttpError(400, "Stats must be 0 or more.");
+      want[key] = { col, value: n };
+    }
+    if (!Object.keys(want).length) throw new HttpError(400, "Change at least one number.");
+    const [cur] = await sql.query(`SELECT ${Object.values(want).map((w) => w.col).join(", ")} FROM players WHERE xuid = $1`, [p.xuid]);
+    const delta = {};
+    for (const [k, w] of Object.entries(want)) delta[w.col] = w.value - Number(cur?.[w.col] || 0);
+    await sql.query(`UPDATE players SET ${Object.values(want).map((w, i) => `${w.col} = $${i + 2}`).join(", ")} WHERE xuid = $1`, [p.xuid, ...Object.values(want).map((w) => w.value)]);
+    // what was set by hand doesn't count for the season pass or a running server goal
+    const { currentSeason } = await import("./season.js");
+    const season = await currentSeason(sql);
+    const d = (c) => delta[c] || 0;
+    await sql`INSERT INTO season_progress (season_id, xuid, base_play, base_quests, base_bw)
+              VALUES (${season.id}, ${p.xuid}, ${d("playtime_s")}, ${d("quests_done")}, ${d("bw_wins")})
+              ON CONFLICT (season_id, xuid) DO UPDATE SET base_play = season_progress.base_play + ${d("playtime_s")},
+                base_quests = season_progress.base_quests + ${d("quests_done")}, base_bw = season_progress.base_bw + ${d("bw_wins")}`;
+    const { STATS } = await import("./goals.js");
+    const [goal] = await sql`SELECT id, stat FROM server_goals WHERE closed_at IS NULL ORDER BY id DESC LIMIT 1`;
+    if (goal && d(STATS[goal.stat][0])) {
+      await sql`INSERT INTO server_goal_base (goal_id, xuid, value) VALUES (${goal.id}, ${p.xuid}, ${d(STATS[goal.stat][0])})
+                ON CONFLICT (goal_id, xuid) DO UPDATE SET value = server_goal_base.value + ${d(STATS[goal.stat][0])}`;
+    }
+    const { queueReward, sendRewards } = await import("./rewards.js");
+    await queueReward(sql, { xuid: p.xuid, name: p.gamertag, stats: Object.fromEntries(Object.entries(want).map(([k, w]) => [k, w.value])), reason: "Stats set by the owner" });
+    const sent = await sendRewards(env, sql).catch(() => 0);
+    await audit(sql, user.id, "player.stats", { player: p.gamertag, stats: Object.fromEntries(Object.entries(want).map(([k, w]) => [k, w.value])) });
+    return json({ ok: true, message: sent ? `${p.gamertag}'s stats are updated.` : `Saved. The server is offline, so the game gets the new numbers when it's back.` });
+  }
   if (action === "picture") {  // profile picture: Minecraft head, Xbox picture or a custom upload
     await setPicture(env, sql, p.xuid, { source: String(body.source || ""), image: body.image || null, refreshXbox: Boolean(body.refreshXbox) });
     await audit(sql, user.id, "player.picture", { player: p.gamertag, source: body.source });

@@ -314,6 +314,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
         act("Profile picture", "btn-secondary", () => pictureDialog(p, xuid, reload)),
         act("Change plan", "btn-secondary", () => planDialog(p, xuid, reload)),
         act("Change money", "btn-secondary", () => moneyDialog(p, xuid, reload)),
+        owner ? act("Edit stats", "btn-secondary", () => statsDialog(p, xuid, reload), false, "trophy") : null,
         act("Give a Shop item", "btn-secondary", () => shopDialog(p, d.shop, xuid, reload), false, "cart")) : null,
       owner && acc ? h("h4", { text: `Galaxy Credits: $${Number(acc.credits || 0).toFixed(2)}` }) : null,
       owner && acc ? h("div", { class: "pc-actions" },
@@ -575,3 +576,29 @@ async function squarePicture(file) {
   return { mime: "image/jpeg", data, url: URL.createObjectURL(blob) };
 }
 
+
+// Owner: set a player's leaderboard stats. Play keeps counting up from the new numbers.
+const STAT_LABELS = [["playtime", "Hours played", 0.01], ["mined", "Blocks mined"], ["placed", "Blocks placed"], ["kills", "Mobs defeated"],
+  ["deaths", "Deaths"], ["quests", "Quests completed"], ["streak", "Daily streak (days)"], ["best_streak", "Best daily streak"],
+  ["bw_games", "Bedwars games"], ["bw_wins", "Bedwars wins"], ["bw_kills", "Bedwars kills"], ["bw_finals", "Bedwars final kills"], ["bw_beds", "Bedwars beds broken"]];
+function statsDialog(p, xuid, reload) {
+  const now = p.editStats || {};
+  const inputs = {};
+  const fields = STAT_LABELS.map(([key, label, step]) => {
+    inputs[key] = h("input", { class: "input", id: `st-${key}`, type: "number", min: 0, step: step || 1, inputmode: step ? "decimal" : "numeric", value: String(now[key] ?? 0) });
+    return field(label, inputs[key]);
+  });
+  openDialog({
+    title: `${p.name}'s stats`,
+    body: h("div", { class: "form" },
+      h("p", { class: "text-2 small", style: "margin:0", text: "Change any number. Leaderboards update right away, and playing keeps counting up from here. Changes here don't count toward the season pass or a server goal." }),
+      h("div", { class: "grid grid-2", style: "gap:10px" }, ...fields)),
+    actions: [{ label: "Cancel" }, { label: "Save stats", kind: "primary", onClick: async () => {
+      const stats = {};
+      for (const [key] of STAT_LABELS) if (inputs[key].value !== "" && Number(inputs[key].value) !== Number(now[key] ?? 0)) stats[key] = Number(inputs[key].value);
+      if (!Object.keys(stats).length) throw new Error("Nothing changed.");
+      const r = await postJson(`/api/mod/players/${xuid}/stats`, { stats });
+      reload(r.message);
+    } }],
+  });
+}

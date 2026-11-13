@@ -237,6 +237,38 @@ class Progress:
             self.db.execute("INSERT OR REPLACE INTO player_stats (xuid, name, data) VALUES (?,?,?)", (x, s.get("name") or name, json.dumps(s)))
             self.db.commit()
 
+    EDITABLE = ("playtime", "mined", "placed", "kills", "deaths", "quests", "streak", "best_streak",
+                "bw_games", "bw_wins", "bw_kills", "bw_finals", "bw_beds")
+
+    def set_stats(self, xuid, name, values):
+        """The owner set some leaderboard stats on the website; play keeps counting up from them."""
+        x = str(xuid)
+        s = self.cache.get(x)
+        online = s is not None
+        if not online:
+            s = self.load(x) or json.loads(json.dumps(NEW_STATS))
+            for k, v in NEW_STATS.items():
+                s.setdefault(k, json.loads(json.dumps(v)))
+            s.setdefault("name", name)
+        for k, v in (values or {}).items():
+            if k in self.EDITABLE:
+                s[k] = max(0, int(v))
+        if online:
+            self.dirty.add(x)
+            self.unsent.add(x)
+            self.save()
+            p = next((q for q in self.plugin.server.online_players if str(q.xuid) == x), None)
+            if p is not None:
+                self.check_achievements(p)
+        else:
+            self.db.execute("INSERT OR REPLACE INTO player_stats (xuid, name, data) VALUES (?,?,?)", (x, s.get("name") or name, json.dumps(s)))
+            self.db.commit()
+        voice = getattr(self.plugin, "_voice", None)  # tell the website the new numbers right away
+        if voice is not None and getattr(voice, "ws", None):
+            voice.send_json({"type": "stats", "players": [self.row(x, {**NEW_STATS, **s})],
+                             "online": [str(p.xuid) for p in self.plugin.server.online_players]})
+        self.unsent.discard(x)
+
     def on_break(self, player, block_type, states):
         self.add(player, "mined")
         if ore("diamond")(block_type):

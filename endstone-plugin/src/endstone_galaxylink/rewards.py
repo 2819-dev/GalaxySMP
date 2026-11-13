@@ -29,6 +29,8 @@ class Rewards:
             xuid, name = str(r.get("xuid") or ""), str(r.get("name") or "")[:32]
             if not xuid.isdigit():
                 continue
+            if isinstance(r.get("stats"), dict) and r["stats"]:  # leaderboard stats set by the owner
+                self.plugin.progress.set_stats(xuid, name, r["stats"])
             cents = max(0, int(r.get("cents") or 0))
             keys = {k: max(0, min(100, int(v or 0))) for k, v in (r.get("keys") or {}).items() if k in KEY_NAMES}
             if cents:
@@ -39,7 +41,8 @@ class Rewards:
             seen.add(rid)
             self.given.append(rid)
             done.append(rid)
-            self.tell(xuid, cents, keys, str(r.get("reason") or "")[:120])
+            if cents or any(keys.values()):
+                self.tell(xuid, cents, keys, str(r.get("reason") or "")[:120])
         self.given = self.given[-3000:]
         self.eco.set_config("rewards_given", self.given)
         if done:
