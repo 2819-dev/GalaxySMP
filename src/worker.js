@@ -244,6 +244,8 @@ const routes = [
   ["POST", "/api/panel/badges/:id", badges.changeBadge],
   ["GET", "/api/panel/presence", (req, env) => presence.getMyPresence(req, env)],
   ["POST", "/api/panel/presence", (req, env) => presence.setMyPresence(req, env)],
+  ["GET", "/api/account/presence", (req, env) => presence.getMyPresence(req, env)],
+  ["POST", "/api/account/presence", (req, env) => presence.setMyPresence(req, env)],
   ["POST", "/api/account/activity", (req, env) => presence.setShowActivity(req, env)],
   ["POST", "/api/account/profile", (req, env) => onboarding.editProfile(req, env)],
   ["POST", "/api/onboarding", (req, env) => onboarding.finishOnboarding(req, env)],

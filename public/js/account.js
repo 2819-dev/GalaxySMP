@@ -102,6 +102,17 @@ function picturesCard() {
   return card("Pictures", "Your banner shows at the top of your profile and profile card. Pictures must follow the rules: staff can remove them.", wrap);
 }
 
+// Custom status (Galaxy Pro+): shown on your profile card instead of your game or Xbox activity.
+function statusCard() {
+  const box = h("section", { class: "panel acc-card" }, h("p", { class: "text-3", text: "Loading…" }));
+  import("/js/presence-panel.js").then(({ setupMyPresence }) => setupMyPresence({ toast, box, locked: () => {
+    box.replaceChildren(h("div", { class: "acc-card-head" }, h("h2", { text: "Custom status" }),
+      h("p", { class: "text-3 small", text: "Show what you're up to on your profile card, like Discord's rich presence: \"Building the new spawn\", with an icon and a timer." })),
+      h("p", { class: "text-2", style: "margin:0" }, "A ", h("b", { text: "Galaxy Pro+" }), " perk. ", h("a", { href: "/store", text: "See plans" }), "."));
+  } }));
+  return box;
+}
+
 // Invite friends: your link, who joined with it, and (in your first week) who invited you.
 function inviteCard() {
   const body = h("div", { class: "stack", style: "gap:10px" }, h("p", { class: "text-3", text: "Loading…" }));
@@ -166,6 +177,7 @@ const SECTIONS = {
         row("Last in game", p.inGame ? "Now" : fmtDate(p.lastSeen)),
         p.mutedUntil ? row("Chat", `Muted until ${new Date(p.mutedUntil).toLocaleString()}`) : null),
       h("p", { class: "text-3 small", text: "Your profile picture is your Minecraft head (or your Xbox picture until your head arrives). Your name and rank come from the game." }),
+      statusCard(),
       inviteCard(),
       picturesCard(),
       editProfileCard(),

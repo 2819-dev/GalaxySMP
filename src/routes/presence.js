@@ -1,5 +1,5 @@
 // Rich presence on profile cards (like Discord's "Playing ..."). In order:
-//   1. the owner's custom status (Control Panel)
+//   1. a custom status (Galaxy Pro+ members and the owner; set in Account > Profile)
 //   2. playing on GalaxySMP right now (with how long)
 //   3. Xbox Live presence from OpenXBL (what they're playing elsewhere, or "Online"), unless they hid it
 import { getDb } from "../lib/db.js";
@@ -67,11 +67,13 @@ export async function getPresence(request, env, ctx, url, params) {
   await requireUser(request, env);
   const sql = getDb(env);
   const [u] = await sql`
-    SELECT u.id, u.username, u.platform, u.show_activity, u.custom_presence, p.xuid, p.online_at, p.session_start
+    SELECT u.id, u.username, u.platform, u.show_activity, u.custom_presence, p.xuid, p.online_at, p.session_start,
+           (SELECT s.plan FROM subscriptions s WHERE s.xuid = p.xuid AND (s.expires_at IS NULL OR s.expires_at > now())) AS plan
       FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${Number(params.id) || 0} AND NOT u.banned`;
   if (!u) throw new HttpError(404, "That member doesn't exist.");
 
-  const custom = isOwner(env, u.username, u.platform === "bedrock") ? liveCustom(u.custom_presence) : null;
+  // only while they have Galaxy Pro+ (it comes back if they renew)
+  const custom = u.plan === "pro" || isOwner(env, u.username, u.platform === "bedrock") ? liveCustom(u.custom_presence) : null;
   if (custom) {
     return json({ ok: true, activity: { kind: "custom", label: custom.label || "Status", title: custom.title, details: custom.details || null, state: custom.state || null, icon: custom.icon || "star", since: custom.timer ? custom.since : null } });
   }
@@ -94,10 +96,18 @@ export async function getPresence(request, env, ctx, url, params) {
   return json({ ok: true, activity: null });
 }
 
-// ---------- the owner's custom status (Control Panel) ----------
+// ---------- your own custom status: a Galaxy Pro+ perk (and the owner) ----------
+export async function canCustomStatus(env, sql, user) {
+  if (isOwner(env, user.username, user.platform === "bedrock")) return true;
+  const [r] = await sql`SELECT s.plan FROM users u JOIN players p ON p.uuid = u.mc_uuid
+                          JOIN subscriptions s ON s.xuid = p.xuid AND (s.expires_at IS NULL OR s.expires_at > now())
+                         WHERE u.id = ${user.id}`;
+  return r?.plan === "pro";
+}
+
 async function requireOwner(request, env) {
   const user = await requireUser(request, env);
-  if (!isOwner(env, user.username, user.platform === "bedrock")) throw new HttpError(403, "Only the owner can set a custom status.");
+  if (!(await canCustomStatus(env, getDb(env), user))) throw new HttpError(403, "A custom status is a Galaxy Pro+ perk.");
   return user;
 }
 

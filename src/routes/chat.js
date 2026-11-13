@@ -73,7 +73,7 @@ export async function bootstrap(request, env) {
       // Minecraft head picture (if the server has sent it), plan, and when they joined the community
       head: headUrlFor(m),
       plan: m.plan || null, inGame: Boolean(m.in_game), since: m.created_at, banner: bannerUrl(m),
-      status: isOwner(env, m.username, m.plat === "bedrock") && m.custom_presence?.title && (!m.custom_presence.until || new Date(m.custom_presence.until) > new Date())
+      status: (m.plan === "pro" || isOwner(env, m.username, m.plat === "bedrock")) && m.custom_presence?.title && (!m.custom_presence.until || new Date(m.custom_presence.until) > new Date())
         ? `${m.custom_presence.label && m.custom_presence.label !== "Status" ? `${m.custom_presence.label} ` : ""}${m.custom_presence.title}` : null,
       badges: badgeMap.get(Number(m.id)) || [],
       bio: m.bio || null, interests: (m.interests || []).map((i) => INTEREST_NAME[i]).filter(Boolean), color: m.profile_color || null,

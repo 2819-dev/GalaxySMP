@@ -1,13 +1,13 @@
-// Control Panel > Overview (owner): your own custom status, shown on your profile card like Discord's rich presence.
+// Your own custom status, shown on your profile card like Discord's rich presence: a Galaxy Pro+ perk
+// (Account > Profile), and the owner's in Control Panel > Overview.
 import { h, getJson, postJson, field, select } from "/js/dialog.js";
 import { iconEl } from "/js/site.js";
 import { activityBlock } from "/js/activity.js";
 
-export async function setupMyPresence({ toast }) {
-  const box = document.getElementById("my-presence");
+export async function setupMyPresence({ toast, box = document.getElementById("my-presence"), locked = null }) {
   if (!box) return;
   let d;
-  try { d = await getJson("/api/panel/presence"); } catch { return; }
+  try { d = await getJson("/api/account/presence"); } catch { if (locked) locked(); return; }
   const cur = d.presence || {};
   const label = select("pr-label", [["Status", "Status"], ["Playing", "Playing"], ["Building", "Building"], ["Working on", "Working on"], ["Watching", "Watching"], ["Listening to", "Listening to"]], cur.label || "Status");
   const title = h("input", { class: "input", id: "pr-title", maxlength: 40, placeholder: "e.g. Building the new spawn", value: cur.title || "" });
@@ -37,13 +37,13 @@ export async function setupMyPresence({ toast }) {
   const live = h("span", { class: `promo-status ${d.live ? "on" : "off"}`, text: d.live ? "Showing on your profile" : "Not set" });
   save.addEventListener("click", async () => {
     try {
-      await postJson("/api/panel/presence", { label: label.value, title: title.value, details: details.value, state: state.value, icon, timer: timer.checked, hours: Number(hours.value) });
+      await postJson("/api/account/presence", { label: label.value, title: title.value, details: details.value, state: state.value, icon, timer: timer.checked, hours: Number(hours.value) });
       toast("Your status is on your profile.");
       live.className = "promo-status on"; live.textContent = "Showing on your profile"; clear.hidden = false;
     } catch (e) { toast(e.message); }
   });
   clear.addEventListener("click", async () => {
-    await postJson("/api/panel/presence", { clear: true }).catch(() => {});
+    await postJson("/api/account/presence", { clear: true }).catch(() => {});
     toast("Status cleared. Your profile shows your game or Xbox activity again.");
     live.className = "promo-status off"; live.textContent = "Not set"; clear.hidden = true;
   });
