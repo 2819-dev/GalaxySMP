@@ -11,7 +11,7 @@ import { toPlugin } from "./economy.js";
 import { openTicketCount } from "./support.js";
 import { headUrlFor, setPicture } from "./heads.js";
 import { sendPlans } from "./plans.js";
-import { SHOP_ITEMS, SHOP } from "../store/shop.js";
+import { SHOP_ITEMS, GAME_SHOP as SHOP } from "../store/shop.js";
 
 const MOD = 50;
 export const LATEST_PLUGIN = "2.38.0"; // the GalaxyLink version made for this website
@@ -355,7 +355,7 @@ export async function playerAction(request, env, ctx, url, params) {
 // Give a Store item (what a payment will do automatically once payments open).
 export async function giveShopItem(env, sql, p, body, user, source = "staff") {
   const item = SHOP_ITEMS[String(body.item || "")];
-  if (!item) throw new HttpError(400, "Choose a Shop item.");
+  if (!item || item.physical) throw new HttpError(400, "Choose a Shop item.");
   const option = item.options ? item.options.find((o) => o.id === body.option) : null;
   if (item.options && !option) throw new HttpError(400, "Choose how long.");
   if (item.limit) {

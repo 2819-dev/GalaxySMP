@@ -232,8 +232,8 @@ async function load() {
         social.isMe ? h("a", { class: "btn btn-ghost btn-sm", href: "/store" }, iconEl("plus"), "Add from the Store") : null),
       wl.length ? h("div", { class: "wl-grid" }, ...wl.map((it) => h("div", { class: `wl-item${it.isPlan ? " plan" : ""}` },
         h("div", { class: "wl-top" }, h("span", { class: "wl-ic" }, iconEl(it.icon)),
-          h("div", {}, h("div", { class: "wl-name", text: it.name }), h("div", { class: "wl-price", text: `${it.from ? "from " : ""}${usd(it.price)}${it.per ? ` / ${it.per}` : ""}` }))),
-        social.isMe ? null : h("a", { class: "btn btn-primary btn-sm", href: `/store?gift=${social.id}&giftName=${encodeURIComponent(social.username)}&item=${encodeURIComponent(it.key)}` }, iconEl("gift"), "Gift this"))))
+          h("div", {}, h("div", { class: "wl-name", text: it.name }), h("div", { class: "wl-price", text: it.priceText || `${it.from ? "from " : ""}${usd(it.price)}${it.per ? ` / ${it.per}` : ""}` }))),
+        social.isMe ? null : it.soon ? h("span", { class: "text-3 small", text: "Coming soon" }) : h("a", { class: "btn btn-primary btn-sm", href: `/store?gift=${social.id}&giftName=${encodeURIComponent(social.username)}&item=${encodeURIComponent(it.key)}` }, iconEl("gift"), "Gift this"))))
         : h("p", { class: "text-3", style: "margin:0", text: "Tap the heart on anything in the Store to add it here. Friends can gift you things from your wishlist." }),
       social.isMe ? h("p", { class: "text-3 small", style: "margin:10px 0 0", text: social.wishlistHidden ? "Only you can see your wishlist. Change this in Account settings." : "Everyone signed in can see this. You can hide it in Account settings." }) : null);
   }

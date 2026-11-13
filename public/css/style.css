@@ -2855,3 +2855,6 @@ body.wr-open { overflow: hidden; }
 .wr-card-img { width: 100%; height: 100%; display: block; }
 .wr-share { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 @media (prefers-reduced-motion: reduce) { .wr-bg i, .wr-hero-bg i, .wr-spark svg, .wr-go { animation: none !important; } }
+.shop-price.tbd { display: inline-flex; flex-direction: column; line-height: 1.1; }
+.shop-price.tbd small { font-size: .75rem; font-weight: 600; color: var(--text-3); }
+.shop-item.cat-devices .shop-icon { background: linear-gradient(135deg, #4febfd, #8a5cff); }

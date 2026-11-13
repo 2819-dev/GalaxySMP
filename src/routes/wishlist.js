@@ -21,8 +21,8 @@ export function describeItem(key) {
   if (PAID_PLANS.includes(key)) return { key, name: PLANS[key].name, icon: "star", price: Math.round(PLANS[key].price * 100), isPlan: true, category: "plan", per: "month" };
   const i = SHOP_ITEMS[key];
   if (!i) return null;
-  const price = i.options ? Math.min(...i.options.map((o) => o.price)) : i.price;
-  return { key, name: i.name, icon: i.icon || "cart", price, from: Boolean(i.options), isPlan: false, category: i.category, description: i.description || "" };
+  const price = i.options ? Math.min(...i.options.map((o) => o.price)) : i.price ?? null;
+  return { key, name: i.name, icon: i.icon || "cart", price, priceText: i.priceText ? `${i.priceText} (${i.priceNote})` : null, soon: Boolean(i.physical), from: Boolean(i.options), isPlan: false, category: i.category, description: i.description || "" };
 }
 
 export async function wishlistFor(sql, userId) {

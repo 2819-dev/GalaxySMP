@@ -294,7 +294,7 @@ function renderFeatured() {
     btn);
 }
 
-const CAT_TILES = { money: ["coins", "Money"], plots: ["homes", "Land"], effects: ["moon", "Effects"], cosmetics: ["sparkles", "Cosmetics"] };
+const CAT_TILES = { devices: ["cube", "Galaxy Cube"], money: ["coins", "Money"], plots: ["homes", "Land"], effects: ["moon", "Effects"], cosmetics: ["sparkles", "Cosmetics"] };
 function renderCats() {
   const nav = document.getElementById("store-cats");
   if (!nav) return;
@@ -309,7 +309,7 @@ function renderCats() {
     ...data.shop.map((c) => {
       const [icon, name] = CAT_TILES[c.id] || ["cart", c.name];
       const from = Math.min(...c.items.map((i) => (i.options ? Math.min(...i.options.map((o) => o.price)) : i.price)).filter((x) => x != null));
-      return tile(icon, name, Number.isFinite(from) ? `From ${usd(from)}` : "", () => { filter = c.id; renderFilters(); renderShop(); go("shop"); }, `c-${c.id}`);
+      return tile(icon, name, Number.isFinite(from) ? `From ${usd(from)}` : c.id === "devices" ? "Coming soon" : "", () => { filter = c.id; renderFilters(); renderShop(); go("shop"); }, `c-${c.id}`);
     }),
     tile("coins", "Credits", "Top up and gift", () => go("credits"), "c-credits"),
     tile("heart", "Donate", "Help the server", () => go("donate"), "c-donate"));
@@ -348,7 +348,9 @@ function renderShop() {
       card.append(h("div", { class: "shop-icon" }, iconEl(item.icon || "cart")),
         h("h4", { class: "shop-name", text: item.name }), h("p", { class: "text-2 shop-desc", text: item.description }));
       let option = item.options ? item.options[0].id : null;
-      const amount = h("span", { class: "shop-price", text: usd(item.options ? item.options[0].price : item.price) });
+      const amount = item.priceText
+        ? h("span", { class: "shop-price tbd" }, item.priceText, item.priceNote ? h("small", { text: item.priceNote }) : null)
+        : h("span", { class: "shop-price", text: usd(item.options ? item.options[0].price : item.price) });
       if (item.options) {
         const seg = h("div", { class: "shop-seg", role: "radiogroup", "aria-label": `${item.name}: how long` });
         item.options.forEach((o) => {

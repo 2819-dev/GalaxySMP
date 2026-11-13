@@ -10,7 +10,7 @@ import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
 import { isOwner } from "../lib/names.js";
-import { SHOP, SHOP_ITEMS } from "./shop.js";
+import { GAME_SHOP as SHOP, SHOP_ITEMS } from "./shop.js";
 import PLANS from "../../endstone-plugin/src/endstone_galaxylink/plans.json";
 
 const ADMIN = 100;

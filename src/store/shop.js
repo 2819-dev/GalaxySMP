@@ -3,6 +3,15 @@
 // Payments aren't open yet: Admins give these from the panel (Players > a player > Give a Shop item).
 export const SHOP = [
   {
+    // Real things we ship (not given in game). "Coming soon" until "devices" is added to ON_SALE.
+    id: "devices", name: "Galaxy Cube", blurb: "Our own device: join GalaxySMP from any console and use voice chat with real buttons.",
+    physical: true,
+    items: [
+      { id: "galaxy_cube", name: "Galaxy Cube", priceText: "TBD", priceNote: "$20 to $50", icon: "cube", badge: "New", physical: true,
+        description: "Sits next to your console: join GalaxySMP from Xbox, PlayStation or Switch, and talk in voice chat with TALK and MUTE buttons. Built and 3D-printed by GalaxySMP." },
+    ],
+  },
+  {
     id: "money", name: "Money", blurb: "In-game money, added to your balance straight away.",
     items: [
       { id: "money_1k", name: "$1K", price: 50, cents: 100000, icon: "wallet", description: "A little extra spending money." },
@@ -51,4 +60,6 @@ export const SHOP = [
 ];
 
 export const SHOP_ITEMS = Object.fromEntries(SHOP.flatMap((c) => c.items.map((i) => [i.id, { ...i, category: c.id }])));
+// Things given in game (the Galaxy Cube is shipped, so staff can't "give" it and promo codes don't list it).
+export const GAME_SHOP = SHOP.filter((c) => !c.physical);
 export const COSMETIC_IDS = SHOP.find((c) => c.id === "cosmetics").items.map((i) => i.id);
