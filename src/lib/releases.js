@@ -28,6 +28,13 @@ Invite links now open the request-to-join page, so every new player is still app
 - The Galaxy Cube page now explains the new way consoles connect.
 - Names without a rank are now easy to read in light mode.`,
   },
+  {
+    id: "2026-11-14b",
+    title: "Store update: new artwork, all perks at a glance and easier browsing",
+    body: `- **New artwork.** Every rank and item in the Store now has its own pixel-art picture.
+- **See all perks.** Each plan has a "See all perks" button that lists everything it includes, grouped by category.
+- **Easier browsing.** A category bar stays at the top as you scroll and shows where you are. Tap "See all" on any row to see every item at once instead of swiping.`,
+  },
 ];
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.

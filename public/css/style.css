@@ -3127,3 +3127,48 @@ html[data-skin][data-theme="light"] body { background: radial-gradient(1200px 70
 .btn-sm { border-radius: 10px; }
 .input, select.input, textarea.input { border-radius: 12px; }
 .dialog { border-radius: 22px; }
+
+/* ---------- Store v5: pixel-art graphics, sticky category bar, See all ---------- */
+.ap-nav { position: sticky; top: calc(var(--header-h) + 6px); z-index: 20; display: flex; gap: 6px; overflow-x: auto; margin: 22px -16px 0; padding: 8px 16px;
+  scrollbar-width: none; background: color-mix(in srgb, var(--bg) 78%, transparent); backdrop-filter: saturate(180%) blur(18px); -webkit-backdrop-filter: saturate(180%) blur(18px);
+  border-bottom: 1px solid var(--border); }
+.ap-nav::-webkit-scrollbar { display: none; }
+.ap-nav .ap-cat { flex: none; flex-direction: row; gap: 7px; height: 38px; padding: 0 14px 0 10px; border-radius: 99px; color: var(--text-2); font: 600 .88rem var(--font); text-decoration: none; transition: background .15s, color .15s; }
+.ap-nav .ap-cat:hover { background: var(--surface-2); color: var(--text); }
+.ap-nav .ap-cat.active { background: var(--text); color: var(--bg); }
+.ap-cat-pix { width: 22px; height: 22px; image-rendering: pixelated; flex: none; }
+html[data-theme="light"] .ap-nav { background: rgba(245, 245, 247, .82); }
+.ap-sec, .ap-sub { scroll-margin-top: calc(var(--header-h) + 70px); }
+
+.ap-h2-row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.ap-seeall { flex: none; background: none; border: 0; padding: 4px 0; color: var(--accent-text); font: 600 .95rem var(--font); cursor: pointer; }
+html[data-theme="light"] .ap-seeall, html[data-theme="light"] .ap-link { color: #0066cc; }
+.ap-shelf.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); overflow: visible; scroll-snap-type: none; }
+.ap-shelf.grid .ap-card { width: auto; }
+.ap-shelf-wrap.is-grid .ap-arrow { display: none; }
+
+.ap-stage { position: relative; flex: 1; min-height: 150px; margin: 10px -8px 4px; border-radius: 18px; display: grid; place-items: center; overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 100%, var(--tone-a), var(--tone-b) 70%); }
+.ap-pix { position: relative; z-index: 1; width: 96px; height: 96px; image-rendering: pixelated; filter: drop-shadow(0 10px 14px rgba(0,0,0,.28)); transition: transform .35s cubic-bezier(.2,.9,.3,1.3); }
+.ap-card:hover .ap-pix { transform: translateY(-6px) scale(1.06); }
+.ap-floor { position: absolute; bottom: 22px; left: 50%; width: 84px; height: 14px; transform: translateX(-50%); border-radius: 50%; background: rgba(0,0,0,.22); filter: blur(6px); }
+.ap-card.wide .ap-stage { min-height: 200px; }
+.ap-card.wide .ap-pix { width: 128px; height: 128px; }
+.tone-plan-free { --tone-a: rgba(47,191,113,.30); --tone-b: rgba(47,191,113,.06); }
+.tone-plan-plus { --tone-a: rgba(79,235,253,.32); --tone-b: rgba(61,170,244,.06); }
+.tone-plan-pro { --tone-a: rgba(164,107,255,.38); --tone-b: rgba(138,92,255,.07); }
+.tone-devices { --tone-a: rgba(61,170,244,.32); --tone-b: rgba(61,170,244,.05); }
+.tone-money { --tone-a: rgba(240,180,41,.34); --tone-b: rgba(240,180,41,.06); }
+.tone-plots { --tone-a: rgba(47,191,113,.30); --tone-b: rgba(47,191,113,.05); }
+.tone-effects { --tone-a: rgba(255,79,216,.28); --tone-b: rgba(109,139,255,.06); }
+.tone-cosmetics { --tone-a: rgba(255,111,174,.30); --tone-b: rgba(255,111,174,.05); }
+.tone-credits { --tone-a: rgba(47,224,122,.30); --tone-b: rgba(20,184,166,.05); }
+
+.ap-link { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; background: none; border: 0; padding: 2px 0; margin-top: 2px; color: var(--accent-text); font: 600 .9rem var(--font); cursor: pointer; }
+.ap-link svg { width: 14px; height: 14px; }
+.ap-perks-all { display: flex; flex-direction: column; gap: 14px; max-height: 60vh; overflow-y: auto; }
+.ap-perks-all h4 { margin: 0 0 6px; font-size: .74rem; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); }
+.ap-perks-all ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ap-perks-all li { display: flex; gap: 10px; color: var(--text-2); line-height: 1.4; }
+.ap-perks-all li svg { width: 17px; height: 17px; flex: none; margin-top: 2px; color: var(--ok); }
+@media (max-width: 520px) { .ap-stage { min-height: 130px; } .ap-pix { width: 84px; height: 84px; } }

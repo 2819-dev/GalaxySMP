@@ -290,9 +290,10 @@ function renderPlans() {
       h("span", { class: `ap-kicker${current ? " current" : ""}`, text: kicker }),
       h("h3", { class: "ap-name", text: plan.name }),
       h("p", { class: "ap-tagline", text: plan.id === "pro" ? "Every perk we offer." : plan.id === "plus" ? "More land, more style." : "Everything you need to play." }),
-      h("div", { class: "ap-art plan" }, iconEl(PLAN_ICON[plan.id] || "star")),
+      stage(plan.id, `plan-${plan.id}`),
       plan.tag ? h("div", { class: "ap-plan-tag" }, rankTag(plan.tag)) : null,
       h("ul", { class: "ap-perks" }, ...(HIGHLIGHTS[plan.id] || []).map((t) => h("li", { text: t }))),
+      h("button", { class: "ap-link", type: "button", onclick: () => perksDialog(plan) }, `See all ${(plan.perkGroups || []).reduce((n, g) => n + g.items.length, 0) || ""} perks`.replace("  ", " "), iconEl("arrow")),
       h("div", { class: "ap-foot" },
         h("div", { class: "ap-price" }, h("b", { text: plan.price ? `${usdShort(plan.price)}/mo.` : "Free" }), plan.price ? h("small", { text: `plus ${moneyDollars(plan.gameCost)} in game` }) : null),
         buy)].filter(Boolean));
@@ -300,6 +301,18 @@ function renderPlans() {
   });
   shelf(document.getElementById("plans"), cards);
   renderCompare();
+}
+
+// Every perk of a plan, grouped (from plans.json)
+function perksDialog(plan) {
+  const groups = plan.perkGroups || [{ name: "Perks", items: plan.perks || [] }];
+  openDialog({
+    title: plan.name,
+    body: h("div", { class: "ap-perks-all" },
+      plan.includes ? h("p", { class: "text-2", style: "margin:0 0 6px", text: plan.includes }) : null,
+      ...groups.map((g) => h("section", {}, h("h4", { text: g.name }), h("ul", {}, ...g.items.map((t) => h("li", {}, iconEl("check"), h("span", { text: t }))))))),
+    actions: [{ label: "Close" }, ...(plan.price && (data.onSale || []).includes("plans") ? [{ label: `Buy ${plan.name.replace(/^Galaxy /, "")}`, kind: "primary", onClick: () => { buyPlan(plan); } }] : [])],
+  });
 }
 
 function renderCompare() {
@@ -334,16 +347,55 @@ const CAT_LINES = {
   cosmetics: "Stand out wherever you go.",
 };
 const CAT_ICON = { devices: "cube", money: "coins", plots: "homes", effects: "moon", cosmetics: "sparkles" };
+// Pixel-art graphics (the same set as the rank badges) for every plan, category and item.
+const PIX = {
+  free: "tree", plus: "star", pro: "wingeddiamond",
+  money_1k: "coin", money_10k: "goldingot", money_100k: "moneybag", money_1m: "crown",
+  extra_plot: "tree", extra_shop_plot: "flag", night_vision: "potion",
+  trail_hearts: "heart", trail_flames: "flame", trail_notes: "music", trail_stars: "shootingstar", trail_soul: "ghost",
+  trail_cherry: "flower", trail_sparkle: "amethyst", trail_galaxy: "planet", join_firework: "rocket", join_sound: "bell", join_message: "book",
+  galaxy_cube: "gamepad", credits: "emerald",
+  cat_ranks: "wingeddiamond", cat_devices: "gamepad", cat_money: "coin", cat_plots: "tree", cat_effects: "potion", cat_cosmetics: "heart", cat_credits: "emerald",
+};
+const pix = (key, size = 96, cls = "ap-pix") => {
+  const img = h("img", { class: cls, alt: "", width: size, height: size, loading: "lazy", decoding: "async" });
+  img.src = ["", "img", "ranks", `rank_${PIX[key] || "gift"}.png`].join("/");
+  return img;
+};
+// The picture area of a card: the pixel art on a soft colored stage
+const stage = (key, tone) => h("div", { class: `ap-stage tone-${tone}` }, pix(key), h("span", { class: "ap-floor" }));
 function renderFilters() { /* categories are shelves now */ }
 
-// The round category buttons under the headline
+// Sticky category bar: always visible while you scroll, and shows which section you're in.
 function renderCats() {
   const nav = document.getElementById("ap-cats");
   if (!nav) return;
-  const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  const tile = (id, icon, name) => h("button", { class: `ap-cat c-${id}`, type: "button", onclick: () => go(id === "ranks" ? "subscriptions" : id === "credits" ? "credits" : `shelf-${id}`) },
-    h("span", { class: "ap-cat-ic" }, iconEl(icon)), h("span", { text: name }));
-  nav.replaceChildren(tile("ranks", "star", "Ranks"), ...data.shop.map((c) => tile(c.id, CAT_ICON[c.id] || "cart", CAT_NAMES[c.id] || c.name)), tile("credits", "wallet", "Credits"));
+  const target = (id) => (id === "ranks" ? "subscriptions" : id === "credits" ? "credits" : `shelf-${id}`);
+  const items = [["ranks", "Ranks"], ...data.shop.map((c) => [c.id, CAT_NAMES[c.id] || c.name]), ["credits", "Credits"]];
+  nav.replaceChildren(...items.map(([id, name]) => h("a", { class: "ap-cat", href: `#${target(id)}`, "data-target": target(id),
+    onclick: (e) => { e.preventDefault(); document.getElementById(target(id))?.scrollIntoView({ behavior: "smooth", block: "start" }); } },
+    pix(`cat_${id}`, 22, "ap-cat-pix"), h("span", { text: name }))));
+  const links = [...nav.querySelectorAll(".ap-cat")];
+  const io = new IntersectionObserver((entries) => {
+    for (const en of entries) {
+      if (!en.isIntersecting) continue;
+      links.forEach((l) => l.classList.toggle("active", l.dataset.target === en.target.id));
+      const on = links.find((l) => l.dataset.target === en.target.id);
+      if (on) nav.scrollTo({ left: on.offsetLeft - nav.clientWidth / 2 + on.offsetWidth / 2, behavior: "smooth" });  // only the bar, never the page
+    }
+  }, { rootMargin: "-30% 0px -60% 0px" });
+  items.forEach(([id]) => { const el = document.getElementById(target(id)); if (el) io.observe(el); });
+}
+
+// "See all" turns a sideways row into a grid (and back)
+function seeAll(row) {
+  const b = h("button", { class: "ap-seeall", type: "button", text: "See all" });
+  b.addEventListener("click", () => {
+    const open = row.classList.toggle("grid");
+    row.parentElement.classList.toggle("is-grid", open);
+    b.textContent = open ? "Show less" : "See all";
+  });
+  return b;
 }
 
 function itemCard(item, cat, sale) {
@@ -377,7 +429,7 @@ function itemCard(item, cat, sale) {
     item.badge && !maxed ? h("span", { class: "ap-kicker", text: item.badge }) : h("span", { class: "ap-kicker blank", text: "" }),
     h("h3", { class: "ap-name", text: item.name }),
     h("p", { class: "ap-desc", text: item.description }),
-    h("div", { class: `ap-art cat-${cat.id}` }, iconEl(item.icon || "cart")),
+    stage(item.id, cat.id),
     sel,
     h("div", { class: "ap-foot" }, price, buy));
 }
@@ -389,7 +441,8 @@ function renderShop() {
     const row = h("div", { class: "ap-shelf" });
     const wrap = h("div", { class: "ap-shelf-wrap" }, row);
     const sec = h("section", { class: "ap-sub", id: `shelf-${cat.id}` },
-      h("h2", { class: "ap-h2" }, h("b", { text: `${CAT_NAMES[cat.id] || cat.name}.` }), " ", h("span", { text: CAT_LINES[cat.id] || cat.blurb })), wrap);
+      h("div", { class: "ap-h2-row" }, h("h2", { class: "ap-h2" }, h("b", { text: `${CAT_NAMES[cat.id] || cat.name}.` }), " ", h("span", { text: CAT_LINES[cat.id] || cat.blurb })),
+        cat.items.length > 2 ? seeAll(row) : null), wrap);
     shelf(row, cat.items.map((i) => itemCard(i, cat, sale)));
     return sec;
   }));
@@ -435,7 +488,7 @@ function renderCredits() {
       h("span", { class: "ap-kicker", text: p.badge || (p.bonus ? "Bonus included" : "Galaxy Credits") }),
       h("h3", { class: "ap-name", text: `${usd(p.credit)} in credits` }),
       h("p", { class: "ap-desc", text: p.bonus ? `Includes ${usd(p.bonus)} of bonus credit.` : "Spend on anything in the Store, or gift to a friend." }),
-      h("div", { class: "ap-art credits" }, iconEl("wallet")),
+      stage("credits", "credits"),
       h("div", { class: "ap-foot" }, h("div", { class: "ap-price" }, h("b", { text: usd(p.price) })), btn));
   });
   shelf(document.getElementById("credit-packs"), cards);
@@ -523,12 +576,12 @@ function openItem(key) {
 }
 
 function renderAll() {
-  renderCats();
   renderStrip();
   renderCredits();
   renderPlans();
   renderFilters();
   renderShop();
+  renderCats();  // after the shelves exist, so the bar can follow them
 }
 
 async function refreshMine() {
