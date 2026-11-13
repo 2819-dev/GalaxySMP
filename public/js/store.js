@@ -7,7 +7,6 @@ import { h, openDialog, postJson } from "/js/dialog.js";
 import { faceSvg } from "/js/face.js";
 
 const usd = (n) => `$${Number(n).toFixed(2)}`;
-const PERKS_SHOWN = 6;
 let data = null;   // /api/store/plans
 let me = { signedIn: false, owned: {}, promos: [] }; // /api/store/mine
 
@@ -200,7 +199,14 @@ function celebrate(name, message, gift = false) {
   });
 }
 
-// ---------- Subscriptions ----------
+// ---------- Ranks (plans) ----------
+const usdShort = (n) => (Number(n) % 1 ? usd(n) : `$${Number(n)}`);
+const PERKS_OPEN = 2;  // perk groups shown before "Show all perks"
+const GROUP_ICON = { Looks: "sparkles", "Land & homes": "homes", "Money & rewards": "coins", "Money & trading": "coins", Community: "users",
+  "Getting around": "map", Rewards: "gift" };
+function buyPlan(plan) {
+  checkout({ id: plan.id, option: () => null, name: plan.name, price: plan.price, icon: "star", cat: "plan", tags: ["subs", `plan:${plan.id}`], isPlan: true });
+}
 function renderPlans() {
   const wrap = document.getElementById("plans");
   wrap.replaceChildren();
@@ -209,40 +215,83 @@ function renderPlans() {
     const card = h("article", { class: `panel plan-card plan-${plan.id}${current ? " is-current" : ""}` });
     if (current) card.append(h("span", { class: "plan-badge current", text: "Your plan" }));
     else if (plan.id === "pro") card.append(h("span", { class: "plan-badge", text: "Best value" }));
-    card.append(h("h3", { class: "plan-name", text: plan.name }));
-    if (plan.tag) card.append(h("div", { class: "plan-tag" }, rankTag(plan.tag)));
+    card.append(h("div", { class: "plan-top" }, h("h3", { class: "plan-name", text: plan.name }), plan.tag ? h("div", { class: "plan-tag" }, rankTag(plan.tag)) : null));
     const price = h("div", { class: "plan-price" });
     if (plan.price) {
-      price.append(h("span", { class: "plan-amount", text: usd(plan.price) }), h("span", { class: "plan-per", text: "/month" }));
+      price.append(h("span", { class: "plan-amount", text: usdShort(plan.price) }), h("span", { class: "plan-per", text: "/month" }));
       card.append(price, h("p", { class: "plan-game", text: `+ ${moneyDollars(plan.gameCost)} in-game money / month` }));
     } else {
       price.append(h("span", { class: "plan-amount", text: "Free" }));
-      card.append(price, h("p", { class: "plan-game", text: "For everyone, always" }));
-    }
-    const ul = h("ul", { class: "plan-perks" });
-    plan.perks.forEach((p, i) => ul.append(h("li", { text: p, hidden: i >= PERKS_SHOWN })));
-    card.append(ul);
-    if (plan.perks.length > PERKS_SHOWN) {
-      const more = h("button", { class: "plan-more", type: "button", text: `Show all ${plan.perks.length} perks` });
-      more.addEventListener("click", () => {
-        const open = more.dataset.open === "1";
-        ul.querySelectorAll("li").forEach((li, i) => { li.hidden = open && i >= PERKS_SHOWN; });
-        more.dataset.open = open ? "0" : "1";
-        more.textContent = open ? `Show all ${plan.perks.length} perks` : "Show fewer";
-      });
-      card.append(more);
+      card.append(price, h("p", { class: "plan-game free", text: "For everyone, always" }));
     }
     if (plan.price) {
       const sellable = (data.onSale || []).includes("plans");
-      const btn = h("button", { class: `btn ${sellable ? "btn-primary" : "btn-secondary is-soon"}`, type: "button", text: !sellable ? "Coming soon" : current ? "Add 30 days" : "Get 30 days" });
+      const btn = h("button", { class: `btn ${sellable ? "btn-primary" : "btn-secondary is-soon"} plan-buy`, type: "button", text: !sellable ? "Coming soon" : current ? "Add 30 days" : "Get 30 days" });
       if (!sellable) btn.setAttribute("aria-disabled", "true");
-      else btn.addEventListener("click", () => checkout({ id: plan.id, option: () => null, name: plan.name, price: plan.price, icon: "star", cat: "plan", tags: ["subs", `plan:${plan.id}`], isPlan: true }));
+      else btn.addEventListener("click", () => buyPlan(plan));
       card.append(btn);
     } else {
-      card.append(h("a", { class: "btn btn-secondary", href: "/join", text: "How to join" }));
+      card.append(h("a", { class: "btn btn-secondary plan-buy", href: "/join", text: "How to join" }));
+    }
+    if (plan.includes) card.append(h("p", { class: "plan-includes", text: plan.includes }));
+    const groups = plan.perkGroups || [{ name: "Perks", items: plan.perks }];
+    const list = h("div", { class: "plan-groups" });
+    groups.forEach((g, gi) => list.append(h("div", { class: "plan-group", hidden: gi >= PERKS_OPEN },
+      h("h4", { class: "plan-group-name" }, iconEl(GROUP_ICON[g.name] || "check"), g.name),
+      h("ul", { class: "plan-perks" }, ...g.items.map((t) => h("li", { text: t }))))));
+    card.append(list);
+    if (groups.length > PERKS_OPEN) {
+      const total = groups.reduce((n, g) => n + g.items.length, 0);
+      const more = h("button", { class: "plan-more", type: "button", text: `Show all ${total} perks` });
+      more.addEventListener("click", () => {
+        const open = more.dataset.open === "1";
+        list.querySelectorAll(".plan-group").forEach((el, gi) => { el.hidden = open && gi >= PERKS_OPEN; });
+        more.dataset.open = open ? "0" : "1";
+        more.textContent = open ? `Show all ${total} perks` : "Show fewer";
+      });
+      card.append(more);
     }
     wrap.append(card);
   }
+}
+
+// ---------- Banner: featured deal and category tiles ----------
+function renderFeatured() {
+  const box = document.getElementById("store-featured");
+  const pro = data.plans.find((p) => p.id === "pro");
+  if (!box || !pro) return;
+  const sellable = (data.onSale || []).includes("plans");
+  const btn = h("button", { class: "btn btn-primary", type: "button", text: sellable ? `Get Pro+ for ${usdShort(pro.price)}` : "See Pro+" });
+  btn.addEventListener("click", () => (sellable ? buyPlan(pro) : document.getElementById("subscriptions").scrollIntoView({ behavior: "smooth" })));
+  const top = (pro.perkGroups || []).flatMap((g) => g.items).filter((t) => !/^Everything/.test(t)).slice(0, 4);
+  box.replaceChildren(
+    h("span", { class: "sx-feat-k" }, iconEl("crown"), "Featured"),
+    h("div", { class: "sx-feat-tag" }, rankTag(pro.tag)),
+    h("b", { class: "sx-feat-name", text: pro.name }),
+    h("div", { class: "sx-feat-price" }, h("span", { text: usdShort(pro.price) }), h("small", { text: "/month" })),
+    h("ul", { class: "sx-feat-list" }, ...top.map((t) => h("li", { text: t.replace(/ \(.*\)$/, "") }))),
+    btn);
+}
+
+const CAT_TILES = { money: ["coins", "Money"], plots: ["homes", "Land"], effects: ["moon", "Effects"], cosmetics: ["sparkles", "Cosmetics"] };
+function renderCats() {
+  const nav = document.getElementById("store-cats");
+  if (!nav) return;
+  const tile = (icon, name, sub, onClick, cls = "") => {
+    const b = h("button", { class: `sx-cat ${cls}`, type: "button" }, h("span", { class: "sx-cat-ic" }, iconEl(icon)), h("b", { text: name }), h("small", { text: sub }));
+    b.addEventListener("click", onClick);
+    return b;
+  };
+  const go = (id) => document.getElementById(id).scrollIntoView({ behavior: "smooth" });
+  nav.replaceChildren(
+    tile("star", "Ranks", "Galaxy+ and Pro+", () => go("subscriptions"), "c-ranks"),
+    ...data.shop.map((c) => {
+      const [icon, name] = CAT_TILES[c.id] || ["cart", c.name];
+      const from = Math.min(...c.items.map((i) => (i.options ? Math.min(...i.options.map((o) => o.price)) : i.price)).filter((x) => x != null));
+      return tile(icon, name, Number.isFinite(from) ? `From ${usd(from)}` : "", () => { filter = c.id; renderFilters(); renderShop(); go("shop"); }, `c-${c.id}`);
+    }),
+    tile("coins", "Credits", "Top up and gift", () => go("credits"), "c-credits"),
+    tile("heart", "Donate", "Help the server", () => go("donate"), "c-donate"));
 }
 
 // ---------- Shop ----------
@@ -429,6 +478,8 @@ function giftDialog() {
 }
 
 function renderAll() {
+  renderFeatured();
+  renderCats();
   renderStrip();
   renderCredits();
   renderPlans();
@@ -459,7 +510,7 @@ function watchTabs() {
     return;
   }
   renderAll();
-  document.querySelectorAll("[data-store-tab]").forEach((t) => t.prepend(iconEl({ shop: "cart", credits: "coins" }[t.dataset.storeTab] || "star")));
+  document.querySelectorAll("[data-store-tab]").forEach((t) => t.prepend(iconEl({ shop: "cart", credits: "coins" }[t.dataset.storeTab] || "crown")));
   watchTabs();
   if (["#shop", "#credits", "#donate"].includes(location.hash)) document.querySelector(location.hash).scrollIntoView();
   const params = new URLSearchParams(location.search);

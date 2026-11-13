@@ -71,11 +71,31 @@ function head(p) {
   return img;
 }
 
+// Map paper (like an in-game map item): shown where nobody has explored yet.
+let paper = null;
+function paperPattern() {
+  if (paper) return paper;
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const x = c.getContext("2d");
+  x.fillStyle = "#dcc79a";
+  x.fillRect(0, 0, 64, 64);
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 64 * 64 / 3; i++) {  // speckles, like the paper texture
+    const v = rnd();
+    x.fillStyle = v < 0.5 ? "rgba(150, 118, 70, .10)" : "rgba(255, 245, 220, .14)";
+    x.fillRect(Math.floor(rnd() * 64), Math.floor(rnd() * 64), 1, 1);
+  }
+  paper = g.createPattern(c, "repeat");
+  return paper;
+}
+
 function draw() {
   dirty = false;
   const dpr = window.devicePixelRatio || 1;
   g.setTransform(1, 0, 0, 1, 0, 0);
-  g.fillStyle = "#0b0e1f";
+  g.fillStyle = paperPattern();
   g.fillRect(0, 0, canvas.width, canvas.height);
   g.imageSmoothingEnabled = view.scale < 1;
   const size = info.regionSize;

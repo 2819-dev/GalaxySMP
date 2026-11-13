@@ -1,7 +1,8 @@
 """Live server map for galaxymc.us/map.
 
-Little by little, the land around online players is drawn from above: the colour of the top block of
-every column, shaded by height like a Minecraft map (16 x 16 colours per chunk). Chunks are sent to
+Little by little, the land around online players is drawn from above exactly like a Minecraft paper map:
+Minecraft's own map colour for the top block of every column, shaded by height the way a map item does,
+and water darker where it's deep (16 x 16 colours per chunk). Chunks are sent to
 the website, which keeps them, so the map fills in as people explore. Only the Overworld is mapped.
 
 Every few seconds the website also gets who is online and where (the map shows their heads), and once
@@ -17,70 +18,97 @@ import time
 RADIUS = 5              # chunks around each player
 PER_RUN = 3             # chunks drawn per run (every 2 seconds)
 REDRAW_SECONDS = 600
+STYLE = 2               # map look version (2 = Minecraft map item); the website redraws older chunks
 LIVE_EVERY = 5          # seconds between live player updates
 MARKERS_EVERY = 60
 
-# Colours for common top blocks (Minecraft map colours, a little brighter). Anything else is
-# matched by name further down.
-COLORS = {
-    "grass_block": (109, 153, 48), "dirt": (134, 96, 67), "coarse_dirt": (119, 85, 59), "podzol": (91, 63, 24),
-    "rooted_dirt": (144, 103, 76), "mycelium": (111, 99, 105), "farmland": (116, 76, 45), "dirt_path": (148, 122, 65),
-    "mud": (60, 57, 61), "clay": (160, 166, 179), "gravel": (131, 127, 126), "sand": (219, 207, 163),
-    "red_sand": (190, 102, 33), "sandstone": (216, 203, 155), "red_sandstone": (186, 99, 29),
-    "stone": (125, 125, 125), "cobblestone": (122, 122, 122), "mossy_cobblestone": (110, 118, 94), "deepslate": (80, 80, 82),
-    "andesite": (136, 136, 136), "diorite": (188, 188, 188), "granite": (149, 103, 85), "tuff": (108, 109, 102),
-    "calcite": (223, 224, 220), "bedrock": (85, 85, 85), "obsidian": (21, 18, 30),
-    "water": (52, 92, 196), "flowing_water": (52, 92, 196), "ice": (145, 183, 253), "packed_ice": (141, 180, 250),
-    "blue_ice": (116, 167, 253), "snow": (249, 254, 254), "snow_layer": (249, 254, 254), "powder_snow": (248, 253, 253),
-    "lava": (207, 92, 20), "flowing_lava": (207, 92, 20), "magma": (142, 63, 31),
-    "oak_leaves": (60, 110, 36), "spruce_leaves": (54, 86, 54), "birch_leaves": (88, 120, 52), "jungle_leaves": (48, 120, 20),
-    "acacia_leaves": (76, 110, 30), "dark_oak_leaves": (44, 92, 22), "mangrove_leaves": (66, 112, 30),
-    "cherry_leaves": (229, 172, 194), "azalea_leaves": (90, 116, 44), "flowering_azalea_leaves": (110, 116, 70),
-    "oak_log": (102, 81, 50), "spruce_log": (58, 37, 16), "birch_log": (216, 215, 210), "jungle_log": (85, 67, 25),
-    "acacia_log": (103, 96, 86), "dark_oak_log": (60, 46, 26), "cherry_log": (54, 33, 44), "mangrove_log": (84, 66, 36),
-    "cactus": (85, 127, 43), "pumpkin": (198, 118, 24), "melon_block": (111, 145, 30), "hay_block": (166, 136, 38),
-    "netherrack": (111, 54, 52), "glass": (190, 214, 222), "white_wool": (233, 236, 236), "white_concrete": (207, 213, 214),
-    "bricks": (150, 97, 83), "stone_bricks": (122, 121, 122), "quartz_block": (235, 229, 222), "smooth_stone": (158, 158, 158),
-    "glowstone": (171, 131, 84), "sea_lantern": (172, 199, 190), "lily_pad": (32, 128, 48), "kelp": (52, 92, 196),
-    "seagrass": (52, 92, 196), "short_grass": (109, 153, 48), "tall_grass": (109, 153, 48), "fern": (95, 140, 50),
+# Minecraft's map colours (the ones a paper map item uses), and which block gets which.
+MC = {
+    "grass": (127, 178, 56), "sand": (247, 233, 163), "wool": (199, 199, 199), "fire": (255, 0, 0), "ice": (160, 160, 255),
+    "metal": (167, 167, 167), "plant": (0, 124, 0), "snow": (255, 255, 255), "clay": (164, 168, 184), "dirt": (151, 109, 77),
+    "stone": (112, 112, 112), "water": (64, 64, 255), "wood": (143, 119, 72), "quartz": (255, 252, 245),
+    "orange": (216, 127, 51), "magenta": (178, 76, 216), "light_blue": (102, 153, 216), "yellow": (229, 229, 51),
+    "lime": (127, 204, 25), "pink": (242, 127, 165), "gray": (76, 76, 76), "light_gray": (153, 153, 153), "cyan": (76, 127, 153),
+    "purple": (127, 63, 178), "blue": (51, 76, 178), "brown": (102, 76, 51), "green": (102, 127, 51), "red": (153, 51, 51),
+    "black": (25, 25, 25), "gold": (250, 238, 77), "diamond": (92, 219, 213), "lapis": (74, 128, 255), "emerald": (0, 217, 58),
+    "podzol": (129, 86, 49), "nether": (112, 2, 0), "deepslate": (100, 100, 100), "raw_iron": (216, 175, 147),
+    "t_white": (209, 177, 161), "t_orange": (159, 82, 36), "t_magenta": (149, 87, 108), "t_light_blue": (112, 108, 138),
+    "t_yellow": (186, 133, 36), "t_lime": (103, 117, 53), "t_pink": (160, 77, 78), "t_gray": (57, 41, 35),
+    "t_light_gray": (135, 107, 98), "t_cyan": (87, 92, 92), "t_purple": (122, 73, 88), "t_blue": (76, 62, 92),
+    "t_brown": (76, 50, 35), "t_green": (76, 82, 42), "t_red": (142, 60, 46), "t_black": (37, 22, 16),
+    "crimson": (189, 48, 49), "warped": (22, 126, 134), "warped_wart": (20, 180, 133),
 }
-# Keywords for blocks not listed above (first match wins).
+BLOCKS = {
+    "grass_block": "grass", "dirt": "dirt", "coarse_dirt": "dirt", "rooted_dirt": "dirt", "farmland": "dirt", "dirt_path": "dirt",
+    "podzol": "podzol", "mycelium": "purple", "mud": "t_cyan", "clay": "clay", "gravel": "stone", "sand": "sand",
+    "red_sand": "orange", "sandstone": "sand", "red_sandstone": "orange", "stone": "stone", "cobblestone": "stone",
+    "mossy_cobblestone": "stone", "andesite": "stone", "diorite": "quartz", "granite": "dirt", "tuff": "t_gray",
+    "calcite": "t_white", "deepslate": "deepslate", "bedrock": "stone", "obsidian": "black", "crying_obsidian": "black",
+    "water": "water", "flowing_water": "water", "ice": "ice", "packed_ice": "ice", "blue_ice": "ice", "frosted_ice": "ice",
+    "snow": "snow", "snow_layer": "snow", "powder_snow": "snow", "lava": "fire", "flowing_lava": "fire", "magma": "nether",
+    "cherry_leaves": "pink", "pumpkin": "orange", "carved_pumpkin": "orange", "melon_block": "lime", "hay_block": "yellow",
+    "netherrack": "nether", "bricks": "red", "brick_block": "red", "quartz_block": "quartz", "glowstone": "sand",
+    "sea_lantern": "quartz", "gold_block": "gold", "diamond_block": "diamond", "emerald_block": "emerald",
+    "lapis_block": "lapis", "iron_block": "metal", "raw_iron_block": "raw_iron", "white_wool": "snow", "terracotta": "orange",
+    "hardened_clay": "orange", "end_stone": "sand", "slime": "grass", "honey_block": "orange", "bookshelf": "wood",
+    "crafting_table": "wood", "chest": "wood", "barrel": "wood", "tnt": "fire", "moss_block": "green", "moss_carpet": "green",
+    "amethyst_block": "purple", "copper_block": "orange", "prismarine": "cyan", "dark_prismarine": "diamond",
+    "basalt": "black", "blackstone": "black", "soul_sand": "brown", "soul_soil": "brown", "crimson_nylium": "crimson",
+    "warped_nylium": "warped", "nether_wart_block": "red", "warped_wart_block": "warped_wart",
+}
+# Wood colours by type (logs from above, planks, slabs, stairs, fences...)
+WOODS = {"oak": "wood", "spruce": "podzol", "birch": "sand", "jungle": "dirt", "acacia": "orange", "dark_oak": "brown",
+         "mangrove": "red", "cherry": "t_white", "bamboo": "yellow", "crimson": "crimson", "warped": "warped", "pale_oak": "quartz"}
+DYES = ["light_blue", "light_gray", "white", "orange", "magenta", "yellow", "lime", "pink", "gray", "cyan", "purple",
+        "blue", "brown", "green", "red", "black", "silver"]
+# Keywords for everything else (first match wins).
 KEYWORDS = [
-    ("leaves", (64, 108, 36)), ("log", (102, 81, 50)), ("wood", (102, 81, 50)), ("planks", (162, 130, 78)),
-    ("water", (52, 92, 196)), ("ice", (145, 183, 253)), ("snow", (249, 254, 254)), ("sand", (219, 207, 163)),
-    ("terracotta", (152, 94, 67)), ("concrete", (160, 160, 160)), ("wool", (210, 210, 210)), ("glass", (190, 214, 222)),
-    ("brick", (150, 97, 83)), ("andesite", (136, 136, 136)), ("diorite", (188, 188, 188)), ("granite", (149, 103, 85)),
-    ("deepslate", (80, 80, 82)), ("cobble", (122, 122, 122)), ("tuff", (108, 109, 102)), ("stone", (125, 125, 125)), ("slab", (150, 150, 150)), ("stairs", (150, 150, 150)),
-    ("flower", (190, 60, 70)), ("tulip", (200, 80, 80)), ("rose", (190, 30, 40)), ("dandelion", (230, 210, 40)),
-    ("mushroom", (150, 110, 90)), ("coral", (180, 80, 140)), ("crop", (120, 160, 50)), ("wheat", (186, 160, 70)),
-    ("carrots", (120, 160, 50)), ("potatoes", (120, 160, 50)), ("vine", (60, 110, 36)), ("grass", (109, 153, 48)),
-    ("dirt", (134, 96, 67)), ("copper", (190, 110, 80)), ("prismarine", (99, 156, 151)), ("quartz", (235, 229, 222)),
-    ("nether", (111, 54, 52)), ("blackstone", (42, 36, 41)), ("basalt", (80, 80, 86)), ("end_stone", (219, 222, 158)),
-    ("purpur", (169, 125, 169)), ("bamboo", (95, 145, 40)), ("moss", (89, 109, 45)), ("amethyst", (133, 97, 191)),
+    ("leaves", "plant"), ("grass", "plant"), ("fern", "plant"), ("flower", "plant"), ("tulip", "plant"), ("rose", "plant"),
+    ("dandelion", "plant"), ("poppy", "plant"), ("orchid", "plant"), ("allium", "plant"), ("daisy", "plant"), ("bluet", "plant"),
+    ("sapling", "plant"), ("vine", "plant"), ("lily", "plant"), ("cactus", "plant"), ("bush", "plant"), ("crop", "plant"),
+    ("wheat", "plant"), ("carrots", "plant"), ("potatoes", "plant"), ("beetroot", "plant"), ("bamboo", "plant"),
+    ("kelp", "water"), ("seagrass", "water"), ("coral", "pink"), ("mushroom", "brown"),
+    ("water", "water"), ("ice", "ice"), ("snow", "snow"), ("sand", "sand"), ("glass", "quartz"), ("quartz", "quartz"),
+    ("brick", "red"), ("deepslate", "deepslate"), ("cobble", "stone"), ("stone", "stone"), ("andesite", "stone"),
+    ("ore", "stone"), ("copper", "orange"), ("prismarine", "cyan"), ("nether", "nether"), ("blackstone", "black"),
+    ("purpur", "magenta"), ("amethyst", "purple"), ("moss", "green"), ("rail", "metal"), ("iron", "metal"),
+    ("dirt", "dirt"), ("mud", "t_cyan"), ("rail", "metal"), ("torch", "wood"), ("door", "wood"), ("sign", "wood"),
 ]
-COLORS_DYED = {"white": (233, 236, 236), "orange": (240, 118, 19), "magenta": (189, 68, 179), "light_blue": (58, 175, 217),
-               "yellow": (248, 197, 39), "lime": (112, 185, 25), "pink": (237, 141, 172), "gray": (62, 68, 71),
-               "light_gray": (142, 142, 134), "cyan": (21, 137, 145), "purple": (121, 42, 172), "blue": (53, 57, 157),
-               "brown": (114, 71, 40), "green": (84, 109, 27), "red": (161, 39, 34), "black": (20, 21, 25)}
-UNKNOWN = (120, 120, 120)
+UNKNOWN = MC["stone"]
 _cache = {}
 
 
 def color_of(block_id):
+    """The Minecraft map colour of a block."""
     c = _cache.get(block_id)
     if c is not None:
         return c
     name = block_id.split(":", 1)[-1]
-    c = COLORS.get(name)
-    if c is None and any(name.endswith(s) for s in ("_wool", "_concrete", "_terracotta", "_carpet", "_stained_glass", "_concrete_powder")):
-        for dye, col in sorted(COLORS_DYED.items(), key=lambda kv: -len(kv[0])):
-            if name.startswith(dye + "_"):
-                c = col
+    key = BLOCKS.get(name)
+    if key is None and any(w in name for w in ("_log", "_wood", "_planks", "_slab", "_stairs", "_fence", "_stem", "_hyphae", "_trapdoor")):
+        for wood in sorted(WOODS, key=len, reverse=True):
+            if name.startswith(wood + "_") or name.startswith("stripped_" + wood + "_"):
+                key = WOODS[wood]
                 break
-    if c is None:
-        c = next((col for key, col in KEYWORDS if key in name), UNKNOWN)
+    if key is None and any(name.endswith(s) for s in ("_wool", "_concrete", "_carpet", "_stained_glass", "_concrete_powder", "_terracotta",
+                                                       "_glazed_terracotta", "_shulker_box", "_candle", "_bed", "_banner")):
+        for dye in DYES:
+            if name.startswith(dye + "_"):
+                d = "light_gray" if dye == "silver" else dye
+                key = ("t_" + d) if name.endswith("_terracotta") and "glazed" not in name else ("snow" if d == "white" and name.endswith("_wool") else d)
+                break
+    if key is None and "leaves" in name and name.startswith("cherry"):
+        key = "pink"
+    if key is None:
+        key = next((k for word, k in KEYWORDS if word in name), None)
+    c = MC.get(key, UNKNOWN) if key else UNKNOWN
     _cache[block_id] = c
     return c
+
+
+# Minecraft's map shading: a block higher than the one north of it is brightest, the same height is a bit
+# darker, lower is darker still (255, 220, 180 out of 255).
+BRIGHT, NORMAL, DARK = 1.0, 220 / 255, 180 / 255
 
 
 def shade(c, f):
@@ -178,7 +206,7 @@ class LiveMap:
             for k in sorted(self.drawn, key=self.drawn.get)[:5000]:
                 self.drawn.pop(k, None)
         if chunks:
-            voice.send_json({"type": "map_chunks", "dim": "overworld", "chunks": chunks})
+            voice.send_json({"type": "map_chunks", "dim": "overworld", "style": STYLE, "chunks": chunks})
             self.sent += len(chunks)
             if self.last_error and self.last_error.startswith("Map drawing failed"):
                 self.last_error = None
@@ -223,12 +251,25 @@ class LiveMap:
                     c = (0, 0, 0)
                     blank += 1
                 else:
-                    c = color_of(str(kind))
-                    above = heights.get((i, j - 1)) if j else north[i]
-                    if above is not None and "water" not in str(kind):
-                        c = shade(c, 1.12 if y > above else 0.82 if y < above else 1.0)
-                    elif "water" in str(kind):
-                        c = shade(c, 0.95 + ((i + j) % 2) * 0.05)
+                    name = str(kind)
+                    c = color_of(name)
+                    if c == MC["water"]:
+                        # deep water is darker, with Minecraft's checkered look in between
+                        depth = 1
+                        while depth < 10:
+                            try:
+                                below = str(dim.get_block_at(x0 + i, y - depth, z0 + j).type)
+                            except Exception:
+                                break
+                            if "water" not in below and "kelp" not in below and "seagrass" not in below:
+                                break
+                            depth += 1
+                        d = depth * 0.1 + ((i + j) & 1) * 0.2
+                        c = shade(c, BRIGHT if d < 0.5 else DARK if d > 0.9 else NORMAL)
+                    else:
+                        above = heights.get((i, j - 1)) if j else north[i]
+                        f = NORMAL if above is None else BRIGHT if y > above else DARK if y < above else NORMAL
+                        c = shade(c, f)
                 k = (j * 16 + i) * 3
                 out[k], out[k + 1], out[k + 2] = c
         if len(errors) == 256:

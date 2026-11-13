@@ -8,19 +8,63 @@
   "tag": null,
   "perks": [
    "1 plot to build on (claim it with your Plot Claiming Shovel)",
-   "1 shop plot in the Shop District (sell to other players with shop chests)",
+   "1 shop plot in the Shop District",
    "1 home (/sethome)",
-   "10 Auction House listings",
    "$1K starting money",
    "Shop, /sell and the Auction House",
+   "10 Auction House listings",
    "Teleport requests, /spawn and /back",
+   "Visit players' warps (/warp)",
+   "Daily rewards, quests and achievements",
+   "Season Pass free reward track",
    "Proximity voice chat and community chat on galaxymc.us",
    "Standard support",
    "Event access"
   ],
   "plots": 1,
   "shopPlots": 1,
-  "cosmetics": []
+  "cosmetics": [],
+  "perkGroups": [
+   {
+    "name": "Land & homes",
+    "items": [
+     "1 plot to build on (claim it with your Plot Claiming Shovel)",
+     "1 shop plot in the Shop District",
+     "1 home (/sethome)"
+    ]
+   },
+   {
+    "name": "Money & trading",
+    "items": [
+     "$1K starting money",
+     "Shop, /sell and the Auction House",
+     "10 Auction House listings"
+    ]
+   },
+   {
+    "name": "Getting around",
+    "items": [
+     "Teleport requests, /spawn and /back",
+     "Visit players' warps (/warp)"
+    ]
+   },
+   {
+    "name": "Rewards",
+    "items": [
+     "Daily rewards, quests and achievements",
+     "Season Pass free reward track"
+    ]
+   },
+   {
+    "name": "Community",
+    "items": [
+     "Proximity voice chat and community chat on galaxymc.us",
+     "Standard support",
+     "Event access"
+    ]
+   }
+  ],
+  "includes": null
  },
  "plus": {
   "name": "Galaxy+",
@@ -36,14 +80,16 @@
   },
   "perks": [
    "Everything in Galaxy Free",
-   "GALAXY+ badge with a star icon in an aurora gradient (green to purple), in chat and above your head",
+   "GALAXY+ badge with a star icon in an aurora gradient, in chat and above your head",
+   "Sparkle particle trail (/cosmetics)",
+   "A banner on your profile",
    "3 plots",
    "2 shop plots",
    "Build up to 2 elevators in your plots (/elevator)",
    "5 homes",
    "20 Auction House listings",
-   "Sparkle particle trail (/cosmetics)",
    "+25% daily rewards",
+   "Pictures and polls in community chat",
    "Level 2 support",
    "Level 2 event access",
    "Host your own events"
@@ -52,11 +98,47 @@
   "shopPlots": 2,
   "cosmetics": [
    "trail_sparkle"
-  ]
+  ],
+  "perkGroups": [
+   {
+    "name": "Looks",
+    "items": [
+     "GALAXY+ badge with a star icon in an aurora gradient, in chat and above your head",
+     "Sparkle particle trail (/cosmetics)",
+     "A banner on your profile"
+    ]
+   },
+   {
+    "name": "Land & homes",
+    "items": [
+     "3 plots",
+     "2 shop plots",
+     "Build up to 2 elevators in your plots (/elevator)",
+     "5 homes"
+    ]
+   },
+   {
+    "name": "Money & rewards",
+    "items": [
+     "20 Auction House listings",
+     "+25% daily rewards"
+    ]
+   },
+   {
+    "name": "Community",
+    "items": [
+     "Pictures and polls in community chat",
+     "Level 2 support",
+     "Level 2 event access",
+     "Host your own events"
+    ]
+   }
+  ],
+  "includes": "Everything in Galaxy Free, plus:"
  },
  "pro": {
   "name": "Galaxy Pro+",
-  "price": 5,
+  "price": 6.5,
   "gameCost": 1000,
   "homes": 10,
   "ahSlots": 30,
@@ -68,15 +150,20 @@
   },
   "perks": [
    "Everything in Galaxy+",
-   "PRO+ badge with a winged diamond in a royal gradient (pink to blue), in chat and above your head",
+   "PRO+ badge with a winged diamond in a royal gradient, in chat and above your head",
+   "Sparkle and Galaxy particle trails + a firework when you join (/cosmetics)",
+   "Your own profile picture",
+   "Custom status on your profile card, like Discord's rich presence",
+   "A banner on your profile",
    "5 plots",
    "3 shop plots",
    "Build up to 4 elevators in your plots (/elevator)",
    "10 homes",
+   "Your own public warp (/setwarp)",
    "30 Auction House listings",
-   "Sparkle and Galaxy particle trails + a firework when you join (/cosmetics)",
-   "Custom status on your profile card, like Discord's rich presence (Account > Profile)",
    "+50% daily rewards",
+   "Season Pass Pro+ reward track (bigger rewards every tier)",
+   "Pictures and polls in community chat",
    "Priority support",
    "Priority event access",
    "Host your own events"
@@ -87,6 +174,46 @@
    "trail_sparkle",
    "trail_galaxy",
    "join_firework"
-  ]
+  ],
+  "perkGroups": [
+   {
+    "name": "Looks",
+    "items": [
+     "PRO+ badge with a winged diamond in a royal gradient, in chat and above your head",
+     "Sparkle and Galaxy particle trails + a firework when you join (/cosmetics)",
+     "Your own profile picture",
+     "Custom status on your profile card, like Discord's rich presence",
+     "A banner on your profile"
+    ]
+   },
+   {
+    "name": "Land & homes",
+    "items": [
+     "5 plots",
+     "3 shop plots",
+     "Build up to 4 elevators in your plots (/elevator)",
+     "10 homes",
+     "Your own public warp (/setwarp)"
+    ]
+   },
+   {
+    "name": "Money & rewards",
+    "items": [
+     "30 Auction House listings",
+     "+50% daily rewards",
+     "Season Pass Pro+ reward track (bigger rewards every tier)"
+    ]
+   },
+   {
+    "name": "Community",
+    "items": [
+     "Pictures and polls in community chat",
+     "Priority support",
+     "Priority event access",
+     "Host your own events"
+    ]
+   }
+  ],
+  "includes": "Everything in Galaxy+, plus:"
  }
 }

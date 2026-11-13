@@ -21,12 +21,49 @@
   <div id="site-header" class="site-header-slot"></div>
 
   <main id="main">
-    <div class="container" style="max-width:900px">
-      <header class="page-head">
-        <h1>Store</h1>
-        <p>Support GalaxySMP and get something nice in return.</p>
-      </header>
-      <div class="panel store-me" id="store-me" hidden></div>
+    <div class="container sx-wrap">
+      <section class="sx-hero" aria-labelledby="sx-title">
+        <div class="sx-hero-main">
+          <span class="sx-kicker">Official store</span>
+          <h1 id="sx-title">GalaxySMP Store</h1>
+          <p>Ranks, money, land and cosmetics for your Minecraft account. Everything you buy helps keep the server running.</p>
+          <div class="store-me" id="store-me" hidden></div>
+        </div>
+        <div class="sx-featured" id="store-featured"></div>
+      </section>
+
+      <nav class="sx-cats" id="store-cats" aria-label="Store categories"></nav>
+
+      <nav class="store-tabs" aria-label="Store sections">
+        <a href="#subscriptions" class="store-tab" data-store-tab="subscriptions">Ranks</a>
+        <a href="#shop" class="store-tab" data-store-tab="shop">Shop</a>
+        <a href="#credits" class="store-tab" data-store-tab="credits">Credits</a>
+      </nav>
+
+      <section id="subscriptions" class="store-section" aria-labelledby="subs-title">
+        <div class="sx-sec-head">
+          <h2 id="subs-title" class="store-h2">Ranks</h2>
+          <p class="text-2 store-sub">Monthly plans with more land, homes and listings, a rank badge and exclusive perks. Each purchase adds 30 days.</p>
+        </div>
+        <div class="plan-grid" id="plans"><p class="text-3">Loading plans…</p></div>
+      </section>
+
+      <section id="shop" class="store-section" aria-labelledby="shop-title">
+        <div class="sx-sec-head">
+          <h2 id="shop-title" class="store-h2">Shop</h2>
+          <p class="text-2 store-sub">One-time buys: money, more land, effects and exclusive cosmetics.</p>
+        </div>
+        <div class="shop-filters" id="shop-filters" role="toolbar" aria-label="Show"></div>
+        <div id="shop-items"><p class="text-3">Loading…</p></div>
+      </section>
+
+      <section id="credits" class="store-section" aria-labelledby="credits-title">
+        <div class="sx-sec-head">
+          <h2 id="credits-title" class="store-h2">Galaxy Credits</h2>
+          <p class="text-2 store-sub">Top up once, then buy anything in one tap. Bigger packs come with free bonus credit, and you can gift credits to friends.</p>
+        </div>
+        <div class="credit-grid" id="credit-packs"></div>
+      </section>
 
       <section class="panel donate-card" id="donate" aria-labelledby="donate-title">
         <div class="donate-icon" data-icon="heart" aria-hidden="true"></div>
@@ -37,44 +74,15 @@
         <a class="btn btn-primary donate-btn" href="https://bisecthosting.com/donate/galaxysmp-54394079" target="_blank" rel="noopener">Donate</a>
       </section>
 
-      <nav class="store-tabs" aria-label="Store sections">
-        <a href="#subscriptions" class="store-tab" data-store-tab="subscriptions">Subscriptions</a>
-        <a href="#shop" class="store-tab" data-store-tab="shop">Shop</a>
-        <a href="#credits" class="store-tab" data-store-tab="credits">Credits</a>
-      </nav>
-
-      <section id="subscriptions" class="store-section" aria-labelledby="subs-title">
-        <h2 id="subs-title" class="store-h2">Subscriptions</h2>
-        <p class="text-2 store-sub">Plans with more plots, homes, listings and exclusive cosmetics. Each purchase gives 30 days; buy again any time to add more.</p>
-        <div class="plan-grid" id="plans"><p class="text-3">Loading plans…</p></div>
-      </section>
-
-      <section id="shop" class="store-section" aria-labelledby="shop-title">
-        <h2 id="shop-title" class="store-h2">Shop</h2>
-        <p class="text-2 store-sub">One-time purchases: money, more land, effects and exclusive cosmetics.</p>
-        <div class="shop-filters" id="shop-filters" role="toolbar" aria-label="Show"></div>
-        <div id="shop-items"><p class="text-3">Loading…</p></div>
-      </section>
-
-      <section id="credits" class="store-section" aria-labelledby="credits-title">
-        <h2 id="credits-title" class="store-h2">Galaxy Credits</h2>
-        <p class="text-2 store-sub">Top up once, then buy things in one tap. Bigger packs come with free bonus credit. You can also gift credits to friends.</p>
-        <div class="credit-grid" id="credit-packs"></div>
-      </section>
-
-      <section class="panel" style="margin-top:20px">
-        <h2 style="font-size:1.1rem">How it works</h2>
-        <ul class="text-2" style="margin:0;padding-left:1.2em;line-height:1.7">
-          <li>Paid plans last 30 days per purchase and also cost $1K of in-game money each month. The in-game part is taken automatically when you're online; if you don't have it, your perks pause until you do.</li>
-          <li>Plans are linked to your Minecraft account. Type <code>/plan</code> in game to see yours.</li>
-          <li>Shop items are yours to keep (Night Vision lasts the time you choose). Pick cosmetics in game with <code>/cosmetics</code>. Money is added to your balance straight away.</li>
-          <li>Things marked <strong>Coming soon</strong> can't be bought yet. Staff may give them for events and giveaways.</li>
-          <li>Got a promo code? Type it at checkout. If staff made one just for you, checkout tells you.</li>
-          <li>Galaxy Credits can be spent on anything in the Store or gifted to other members. They can't be swapped back for real money.</li>
-          <li>Card payments are handled by Stripe on its own secure page. We never see your card number.</li>
-          <li>Donations are handled by our server host, BisectHosting, on their own page.</li>
-          <li>Players under 18 should ask a parent or guardian before buying or donating anything.</li>
-        </ul>
+      <section class="sx-faq" aria-labelledby="faq-title">
+        <h2 id="faq-title" class="store-h2">Questions</h2>
+        <details><summary>How do ranks work?</summary><p>Each purchase gives 30 days, and buying again adds 30 more. Paid ranks also cost $1K of in-game money each month, taken automatically when you're online. If you don't have it, your perks pause until you do. Type <code>/plan</code> in game to see yours.</p></details>
+        <details><summary>When do I get what I bought?</summary><p>Right away if you're online, or the next time you join. Money goes straight to your balance, and you can pick cosmetics with <code>/cosmetics</code>. Shop items are yours to keep (Night Vision lasts the time you choose).</p></details>
+        <details><summary>What are Galaxy Credits?</summary><p>Store money you can spend on anything here or gift to other members. They can't be swapped back for real money.</p></details>
+        <details><summary>I have a promo code</summary><p>Type it at checkout. If staff made one just for you, checkout tells you about it.</p></details>
+        <details><summary>Is paying safe?</summary><p>Card payments are handled by Stripe on its own secure page, and we never see your card number. Donations are handled by our server host, BisectHosting.</p></details>
+        <details><summary>What does "Coming soon" mean?</summary><p>Those things can't be bought yet. Staff may give them out for events and giveaways.</p></details>
+        <p class="text-3 small" style="margin:12px 0 0">Under 18? Ask a parent or guardian before buying or donating anything.</p>
       </section>
     </div>
   </main>
