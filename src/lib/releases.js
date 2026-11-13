@@ -58,6 +58,11 @@ Profiles now show how rare each achievement is, with Rare, Epic and Legendary ta
 - New members get a Getting Started checklist with a $2,500 reward for finishing it.
 - The Store is back to clean line icons.`,
   },
+  {
+    id: "2026-11-15b",
+    title: "Gift cards get a new premium look",
+    body: `Every gift card design has been redrawn with bold abstract artwork, rich gradients and a glassy finish. When someone opens your gift, the card now spins out of the box to show its designed back before landing in front of them.`,
+  },
 ];
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.

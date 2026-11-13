@@ -9,16 +9,16 @@ const usd = (c) => `$${(c / 100).toFixed(2).replace(/\.00$/, "")}`;
 // The card: 1.586:1 like a real gift card, with a pattern, the design's motif, greeting and amount.
 export function cardEl(designId, amount, { to = "", from = "", size = "" } = {}) {
   const d = DESIGN[designId] || DESIGNS[0];
-  const card = h("div", { class: `gc-card p-${d.pattern}${size ? ` ${size}` : ""}`, role: "img", "aria-label": `${d.name} gift card, ${usd(amount)}` });
+  const card = h("div", { class: `gc-card d-${d.id}${size ? ` ${size}` : ""}`, role: "img", "aria-label": `${d.name} gift card, ${usd(amount)}` });
   card.style.background = d.bg;
   card.style.color = d.ink;
   card.style.setProperty("--gc-accent", d.accent);
-  const motif = h("div", { class: "gc-motif" });
-  motif.innerHTML = d.motif; // fixed SVG from our own design list
+  const artEl = h("div", { class: "gc-art" });
+  artEl.innerHTML = d.art; // fixed SVG from our own design list
   card.append(
-    h("div", { class: "gc-pattern" }),
+    artEl,
+    h("div", { class: "gc-gloss" }),
     h("div", { class: "gc-top" }, h("span", { class: "gc-brand" }, h("b", { text: "GalaxySMP" }), h("span", { text: "GIFT CARD" }))),
-    motif,
     h("div", { class: "gc-bottom" },
       h("div", {}, h("div", { class: "gc-greet", text: d.greeting }), to ? h("div", { class: "gc-to", text: `For ${to}` }) : from ? h("div", { class: "gc-to", text: `From ${from}` }) : null),
       h("div", { class: "gc-amount", text: usd(amount) })),
@@ -111,7 +111,15 @@ export function giftBox(card, { onOpened } = {}) {
   scene.style.setProperty("--box-a", d.box[0]);
   scene.style.setProperty("--box-b", d.box[1]);
   scene.style.setProperty("--ribbon", d.ribbon);
-  const cardWrap = h("div", { class: "gb-card" }, cardEl(card.design, card.amount, { from: card.from }));
+  // the card has a front and a back, so it can spin in 3D when it comes out of the box
+  const back = h("div", { class: "gc-card gc-back" }, h("div", { class: "gc-gloss" }), h("b", { class: "gc-back-logo", text: "GalaxySMP" }), h("span", { class: "gc-back-sub", text: "GIFT CARD" }));
+  back.style.background = d.bg;
+  back.style.color = d.ink;
+  const backArt = h("div", { class: "gc-art blur" });
+  backArt.innerHTML = d.art;
+  back.prepend(backArt);
+  const cardWrap = h("div", { class: "gb-card" }, h("div", { class: "gb-flip" },
+    h("div", { class: "gb-face front" }, cardEl(card.design, card.amount, { from: card.from })), h("div", { class: "gb-face backside" }, back)));
   const box = h("div", { class: "gb-box" },
     h("div", { class: "gb-base" }, h("span", { class: "gb-rib v" })),
     h("div", { class: "gb-lid" }, h("span", { class: "gb-rib v" }), h("span", { class: "gb-bow l" }), h("span", { class: "gb-bow r" }), h("span", { class: "gb-knot" })));
@@ -137,7 +145,8 @@ export function giftBox(card, { onOpened } = {}) {
       if (i % 3 === 0) p.style.borderRadius = "50%";
       burst.append(p);
     }
-    setTimeout(() => { scene.classList.add("opened"); onOpened?.(); }, 1900);
+    setTimeout(() => { scene.classList.add("opened"); }, 1900);
+    setTimeout(() => { onOpened?.(); }, 3300); // after the card has finished spinning
   };
   box.addEventListener("click", open);
   hint.addEventListener("click", open);
