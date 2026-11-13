@@ -257,7 +257,7 @@ export async function socialProfile(request, env, ctx, url, params) {
   const sql = getDb(env);
   const [u] = await sql`
     SELECT u.id, u.username, u.created_at, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color, u.banner_at, (u.banner IS NOT NULL) AS has_banner,
-           u.showcase, u.wishlist_hidden
+           u.showcase, u.wishlist_hidden, u.look_title, u.look_frame
       FROM players p JOIN users u ON u.mc_uuid = p.uuid
      WHERE lower(p.gamertag) = ${name} AND NOT u.banned
      ORDER BY p.last_seen DESC LIMIT 1`;
@@ -274,6 +274,7 @@ export async function socialProfile(request, env, ctx, url, params) {
       showcase: await (await import("./showcase.js")).showcaseFor(sql, u.id, u.showcase),
       wishlist: u.wishlist_hidden && !me ? null : await (await import("./wishlist.js")).wishlistFor(sql, u.id),
       wishlistHidden: Boolean(u.wishlist_hidden),
+      ...(await import("./looks.js")).looksOut(u),
     },
   }, 200, { "Cache-Control": "no-store" });
 }

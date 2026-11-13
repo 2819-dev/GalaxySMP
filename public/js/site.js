@@ -335,6 +335,14 @@ export function startStatus(onData) {
   setInterval(() => { if (document.visibilityState === "visible") update(); }, 60_000);
 }
 
+// ---------- Website theme (a Season Pass unlock): colors for the whole site, saved on the account ----------
+export function setSkin(v) {
+  try { v ? localStorage.setItem("gx_skin", v) : localStorage.removeItem("gx_skin"); } catch { /* storage blocked */ }
+  if (v) document.documentElement.dataset.skin = v;
+  else delete document.documentElement.dataset.skin;
+}
+try { const v = localStorage.getItem("gx_skin"); if (v) document.documentElement.dataset.skin = v; } catch { /* storage blocked */ }
+
 // ---------- Light / dark mode: Auto (follows the device), Light or Dark. Saved in this browser. ----------
 const THEMES = ["auto", "light", "dark"];
 function themePref() { try { return localStorage.getItem("gx_theme") || "auto"; } catch { return "auto"; } }

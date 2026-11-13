@@ -15,7 +15,7 @@ import { SHOP_ITEMS } from "../store/shop.js";
 
 async function profileRow(sql, userId) {
   const [u] = await sql`
-    SELECT u.id, u.username, u.platform, u.created_at, u.muted_until, r.power, u.real_name, u.real_name_hidden, u.wishlist_hidden, u.onboarded_at, u.show_activity, u.bio, u.interests, u.profile_color,
+    SELECT u.id, u.username, u.platform, u.created_at, u.muted_until, r.power, u.real_name, u.real_name_hidden, u.wishlist_hidden, u.look_theme, u.look_title, u.look_frame, u.onboarded_at, u.show_activity, u.bio, u.interests, u.profile_color,
            p.xuid, p.gamertag, p.head_at, p.gamerpic_at, p.balance_cents, p.playtime_s, p.streak, p.extra_plots, p.extra_shop_plots,
            p.cosmetics, p.night_vision_until, p.first_seen, p.last_seen, (p.online_at > now() - interval '150 seconds') AS in_game,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient,
@@ -45,6 +45,7 @@ export async function headerMe(request, env) {
       panel: Number(u.power) < 50 ? null : isOwner(env, user.username, user.platform === "bedrock") ? "Control Panel" : Number(u.power) >= 100 ? "Admin Panel" : "Staff Panel",
       onboarding: !u.onboarded_at && !user.acting_by, // still has to do the welcome steps
       acting: user.acting_by ? { by: user.acting_by_name } : null,  // the owner is looking as this member
+      skin: u.look_theme || null,  // the website theme they picked (Season Pass unlock)
     },
   }, 200, { "Cache-Control": "no-store" });
 }

@@ -1,6 +1,6 @@
 // How to Join > "Request to join": type your gamertag, then chat with the owner until you're added.
 // No account needed. The private token is kept in this browser (and in a link you can save).
-import { toast } from "/js/site.js";
+import { toast, inviteRef } from "/js/site.js";
 import { h, field } from "/js/dialog.js";
 import { renderThread, composer } from "/js/jr-chat.js";
 
@@ -32,7 +32,7 @@ function showForm() {
     e.preventDefault();
     send.disabled = true;
     try {
-      const d = await api("/api/join-requests", { gamertag: tag.value, message: msg.value.trim() || undefined });
+      const d = await api("/api/join-requests", { gamertag: tag.value, message: msg.value.trim() || undefined, ref: inviteRef() || undefined });
       store.set(d.token);
       history.replaceState(null, "", `/join?r=${d.token}#join-request`);
       openChat(d.token);
@@ -75,3 +75,15 @@ if (fromLink) store.set(fromLink);
 const saved = fromLink || store.get();
 if (saved) openChat(saved);
 else document.getElementById("jr-start")?.addEventListener("click", showForm);
+
+// Came with a friend's invite link: say who invited them. Everyone still asks to join and waits for the owner.
+(async () => {
+  const ref = inviteRef();
+  if (!ref || !intro) return;
+  try {
+    const d = await api(`/api/referrals/who?ref=${encodeURIComponent(ref)}`);
+    if (!d.name) return;
+    intro.replaceChildren(h("b", { text: `${d.name} invited you to GalaxySMP!` }), " Send a request to join below. Every new player is approved by the owner before they can play.");
+    if (location.hash !== "#join-request") document.getElementById("join-request")?.scrollIntoView({ behavior: "smooth" });
+  } catch { /* the normal text stays */ }
+})();

@@ -2963,3 +2963,62 @@ body.wr-open { overflow: hidden; }
 .st-pack .btn { margin-top: 8px; width: 100%; justify-content: center; }
 .st-donate { margin-top: 32px; background: var(--surface); border-color: var(--border); box-shadow: none; }
 .st-faq { margin-top: 32px; }
+
+/* ---------- Season Pass looks: website themes, profile frames, titles ---------- */
+html[data-skin="ocean"] { --accent: #1593c4; --accent-hover: #1ea6da; --accent-press: #1179a2; --accent-tint: rgba(21,147,196,.2); --accent-text: #7fe3ff;
+  --skin-1: rgba(26,163,201,.22); --skin-2: rgba(79,235,253,.14); --skin-3: rgba(6,90,140,.22); }
+html[data-skin="forest"] { --accent: #23a35e; --accent-hover: #2bb86b; --accent-press: #1c874d; --accent-tint: rgba(35,163,94,.2); --accent-text: #8ff0b4;
+  --skin-1: rgba(47,191,113,.2); --skin-2: rgba(182,243,106,.1); --skin-3: rgba(10,90,50,.25); }
+html[data-skin="sunset"] { --accent: #e8592b; --accent-hover: #f26a3c; --accent-press: #c94a20; --accent-tint: rgba(232,89,43,.2); --accent-text: #ffb38a;
+  --skin-1: rgba(255,122,61,.22); --skin-2: rgba(255,79,139,.16); --skin-3: rgba(120,30,60,.25); }
+html[data-skin="cherry"] { --accent: #e0478c; --accent-hover: #ec5b9b; --accent-press: #c23577; --accent-tint: rgba(224,71,140,.2); --accent-text: #ffb3d4;
+  --skin-1: rgba(255,111,174,.2); --skin-2: rgba(255,194,220,.12); --skin-3: rgba(110,20,70,.25); }
+html[data-skin="aurora"] { --accent: #19b884; --accent-hover: #22cc93; --accent-press: #139a6e; --accent-tint: rgba(25,184,132,.2); --accent-text: #8affd2;
+  --skin-1: rgba(63,224,168,.22); --skin-2: rgba(164,107,255,.2); --skin-3: rgba(30,120,160,.2); }
+html[data-skin="royal"] { --accent: #c99a1c; --accent-hover: #d9aa2a; --accent-press: #a87f12; --accent-tint: rgba(245,197,66,.2); --accent-text: #ffe08a;
+  --skin-1: rgba(245,197,66,.18); --skin-2: rgba(138,92,255,.22); --skin-3: rgba(80,40,140,.25); }
+html[data-skin]:not([data-theme="light"]) body {
+  background: radial-gradient(1200px 700px at 85% -10%, var(--skin-1), transparent 60%), radial-gradient(900px 600px at -10% 20%, var(--skin-2), transparent 60%),
+    radial-gradient(1000px 800px at 50% 110%, var(--skin-3), transparent 60%), var(--bg); background-attachment: fixed; }
+html[data-skin][data-theme="light"] body {
+  background: radial-gradient(1200px 700px at 85% -10%, var(--skin-2), transparent 60%), radial-gradient(900px 600px at -10% 20%, var(--skin-1), transparent 60%), var(--bg); }
+html[data-skin="aurora"]:not([data-theme="light"]) body, html[data-skin="royal"]:not([data-theme="light"]) body { background-size: 160% 160%, 160% 160%, 160% 160%, auto; animation: skin-drift 24s ease-in-out infinite alternate; }
+@keyframes skin-drift { to { background-position: 30% 20%, 70% 60%, 40% 80%, 0 0; } }
+@media (prefers-reduced-motion: reduce) { html[data-skin] body { animation: none !important; } }
+
+.look-title { display: inline-block; font-size: .78rem; font-weight: 800; letter-spacing: .03em; padding: 2px 9px; border-radius: 99px;
+  background: var(--accent-tint); color: var(--accent-text); }
+.profile-card .look-title { margin: 4px 0 2px; }
+.lf { border-radius: 22px; }
+.lf > img, .lf.pc-avatar img { position: relative; }
+.lf-iron > img, .pc-avatar.lf-iron img { box-shadow: 0 0 0 3px #cfd3da, 0 0 0 6px rgba(150,155,165,.4); }
+.lf-gold > img, .pc-avatar.lf-gold img { box-shadow: 0 0 0 3px #f5c542, 0 0 0 6px rgba(245,197,66,.35), 0 0 18px rgba(245,197,66,.45); }
+.lf-diamond > img, .pc-avatar.lf-diamond img { box-shadow: 0 0 0 3px #6ff3ff, 0 0 0 6px rgba(111,243,255,.3), 0 0 20px rgba(111,243,255,.5); }
+.lf-emerald > img, .pc-avatar.lf-emerald img { box-shadow: 0 0 0 3px #2fe07a, 0 0 0 6px rgba(47,224,122,.3), 0 0 18px rgba(47,224,122,.45); }
+.lf-nebula > img, .pc-avatar.lf-nebula img { animation: lf-nebula 4s linear infinite; }
+@keyframes lf-nebula {
+  0%, 100% { box-shadow: 0 0 0 3px #a46bff, 0 0 0 6px rgba(255,79,216,.35), 0 0 22px rgba(164,107,255,.6); }
+  50% { box-shadow: 0 0 0 3px #4febfd, 0 0 0 6px rgba(164,107,255,.35), 0 0 22px rgba(79,235,253,.6); }
+}
+
+/* the picker in Account settings */
+.lk-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.lk-opt { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 104px; padding: 10px 6px; border-radius: 14px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text); cursor: pointer; font: 600 .8rem var(--font); text-align: center; }
+.lk-opt[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-tint); }
+.lk-opt.locked { opacity: .5; cursor: default; }
+.lk-swatch { width: 64px; height: 40px; border-radius: 10px; border: 1px solid rgba(255,255,255,.15); }
+.lk-face { width: 44px; height: 44px; border-radius: 12px; image-rendering: pixelated; background: var(--surface-3); }
+.lk-sub { font-size: .7rem; color: var(--text-3); font-weight: 500; }
+.lk-head { margin: 14px 0 8px; font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+.ss-ic.look { background: linear-gradient(135deg, #8a5cff, #4febfd); color: #fff; }
+.ss-ic.look.title { background: linear-gradient(135deg, #ff4fd8, #8a5cff); }
+.ss-ic.look.frame { background: linear-gradient(135deg, #f5c542, #ff7a3d); }
+.ss-card.has-look .ss-card-text { display: flex; flex-direction: column; gap: 2px; }
+.ss-card.has-look .ss-card-text span { font-weight: 500; font-size: .74rem; color: var(--text-3); }
+.ss-look { color: var(--accent-text); }
+/* themed buttons, tabs and highlights follow the theme's accent */
+html[data-skin] .btn-primary { background: linear-gradient(135deg, var(--accent-hover), var(--accent) 55%, var(--accent-press)); box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 40%, transparent), inset 0 1px 0 rgba(255,255,255,.18); }
+html[data-skin] .btn-primary:hover { background: linear-gradient(135deg, var(--accent-text), var(--accent-hover) 55%, var(--accent)); box-shadow: 0 8px 28px color-mix(in srgb, var(--accent) 50%, transparent); }
+html[data-skin] .store-tab.active, html[data-skin] .seg button[aria-pressed="true"].on { background: var(--accent); }
+html[data-skin="royal"] .btn-primary, html[data-skin="royal"] .btn-primary:hover { color: #1a1030; }

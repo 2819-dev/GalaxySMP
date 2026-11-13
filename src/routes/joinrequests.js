@@ -70,9 +70,13 @@ export async function createJoinRequest(request, env) {
   const [open] = await sql`SELECT id FROM join_requests WHERE lower(gamertag) = lower(${gamertag}) AND status = 'open'`;
   if (open) throw new HttpError(409, "There's already a request for this gamertag. Open it from the browser or link you used.");
   const t = token();
-  const [r] = await sql`INSERT INTO join_requests (token, gamertag, ip_hash, owner_unread) VALUES (${t}, ${gamertag}, ${ip}, 1) RETURNING id`;
+  // invited with someone's invite link: remember who, so the owner sees it (they still have to be approved)
+  const { inviterFor } = await import("./referrals.js");
+  const inviter = body.ref ? await inviterFor(sql, String(body.ref)).catch(() => null) : null;
+  const [r] = await sql`INSERT INTO join_requests (token, gamertag, ip_hash, owner_unread, invited_by) VALUES (${t}, ${gamertag}, ${ip}, 1, ${inviter}) RETURNING id`;
   await sql`INSERT INTO join_request_messages (request_id, from_owner, body) VALUES (${r.id}, false, ${text})`;
-  await tellOwner(env, sql, `Join request: ${gamertag}`, text);
+  const [inv] = inviter ? await sql`SELECT username FROM users WHERE id = ${inviter}` : [];
+  await tellOwner(env, sql, `Join request: ${gamertag}${inv ? ` (invited by ${inv.username})` : ""}`, text);
   return json({ ok: true, token: t });
 }
 
@@ -119,7 +123,8 @@ export async function listJoinRequests(request, env, ctx, url) {
   const rows = await sql`
     SELECT r.id, r.gamertag, r.status, r.owner_unread, r.created_at, r.last_at, r.decided_at,
            (SELECT body FROM join_request_messages m WHERE m.request_id = r.id ORDER BY m.id DESC LIMIT 1) AS last_body,
-           EXISTS (SELECT 1 FROM players p WHERE lower(p.gamertag) = lower(r.gamertag)) AS played_before
+           EXISTS (SELECT 1 FROM players p WHERE lower(p.gamertag) = lower(r.gamertag)) AS played_before,
+           (SELECT username FROM users WHERE id = r.invited_by) AS invited_by_name
       FROM join_requests r WHERE r.status = ${status} ORDER BY r.last_at DESC LIMIT 100`;
   // the tab's badge: requests waiting for a decision, plus answered ones with new messages
   const [{ n, attention }] = await sql`SELECT count(*) FILTER (WHERE status = 'open')::int AS n,
@@ -127,7 +132,7 @@ export async function listJoinRequests(request, env, ctx, url) {
   return json({
     ok: true, open: n, attention,
     requests: rows.map((r) => ({ id: Number(r.id), gamertag: r.gamertag, status: r.status, unread: r.owner_unread, createdAt: r.created_at,
-      lastAt: r.last_at, decidedAt: r.decided_at, last: r.last_body, playedBefore: r.played_before })),
+      lastAt: r.last_at, decidedAt: r.decided_at, last: r.last_body, playedBefore: r.played_before, invitedBy: r.invited_by_name || null })),
   });
 }
 
@@ -135,9 +140,10 @@ export async function listJoinRequests(request, env, ctx, url) {
 export async function getJoinRequestOwner(request, env, ctx, url, params) {
   await requireOwner(request, env);
   const sql = getDb(env);
-  const [r] = await sql`UPDATE join_requests SET owner_unread = 0 WHERE id = ${Number(params.id) || 0} RETURNING id, gamertag, status, created_at, decided_at`;
+  const [r] = await sql`UPDATE join_requests SET owner_unread = 0 WHERE id = ${Number(params.id) || 0} RETURNING id, gamertag, status, created_at, decided_at, invited_by`;
   if (!r) throw new HttpError(404, "That request no longer exists.");
-  return json({ ok: true, request: { id: Number(r.id), gamertag: r.gamertag, status: r.status, createdAt: r.created_at, decidedAt: r.decided_at }, messages: await messagesOf(sql, r.id) });
+  const [inv] = r.invited_by ? await sql`SELECT username FROM users WHERE id = ${r.invited_by}` : [];
+  return json({ ok: true, request: { id: Number(r.id), gamertag: r.gamertag, status: r.status, createdAt: r.created_at, decidedAt: r.decided_at, invitedBy: inv?.username || null }, messages: await messagesOf(sql, r.id) });
 }
 
 // POST /api/panel/join-requests/:id/messages { body }

@@ -109,13 +109,14 @@ function openProfile(member, anchor) {
   const banner = el("div", "pc-banner");
   banner.style.background = member.color ? `linear-gradient(120deg, ${member.color}, ${member.color}88)` : rankCss(rank) || "linear-gradient(90deg, #4FEBFD, #3DAAF4, #2149DD)";
   if (member.banner) banner.style.background = `url("${member.banner}") center / cover no-repeat`;
-  const pic = el("div", "pc-avatar" + (online ? " online" : ""));
+  const pic = el("div", "pc-avatar" + (online ? " online" : "") + (member.frame ? ` lf lf-${member.frame}` : ""));
   const big = avatar(member.username, false, member);
   pic.append(big);
   const name = el("div", "pc-name");
   name.append(paint(member.username, rank));
   const ri = roleIcon(rank);
   if (ri) name.append(ri);
+  const title = member.title ? el("div", "look-title", member.title) : null;
   const status = el("div", "pc-status", member.inGame ? "Playing on GalaxySMP" : online ? "Online" : "Offline");
   status.classList.add(member.inGame ? "playing" : online ? "on" : "off");
   const roles = el("div", "pc-roles");
@@ -142,6 +143,7 @@ function openProfile(member, anchor) {
     if (member.realNameHidden) user.append(el("span", "pc-hidden", member.id === state.me?.id ? " (only you and staff see this)" : " (hidden from players)"));
   }
   body.append(name, user);
+  if (title) body.append(title);
   if (member.badges?.length) body.append(badgeRow(member.badges, 28));
   body.append(status);
   const actSlot = el("div", "pc-activity");

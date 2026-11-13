@@ -16,6 +16,7 @@ import * as mod from "./routes/mod.js";
 import * as staffroom from "./routes/staffroom.js";
 import * as shifts from "./routes/shifts.js";
 import * as jobs from "./routes/jobs.js";
+import * as looks from "./routes/looks.js";
 import * as wrapped from "./routes/wrapped.js";
 import * as wishlist from "./routes/wishlist.js";
 import * as seasonRoutes from "./routes/season.js";
@@ -51,6 +52,7 @@ import * as helpcenter from "./routes/helpcenter.js";
 import * as uploads from "./routes/uploads.js";
 import * as actas from "./routes/actas.js";
 import { isActingRequest } from "./lib/auth.js";
+import { ensureSchema } from "./lib/autoschema.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -157,6 +159,8 @@ const routes = [
   ["GET", "/api/wrapped", (req, env) => wrapped.list(req, env)],
   ["GET", "/api/wrapped/:key", wrapped.get],
   ["POST", "/api/wrapped/:key/share", wrapped.share],
+  ["GET", "/api/looks", (req, env) => looks.mine(req, env)],
+  ["POST", "/api/looks", (req, env) => looks.choose(req, env)],
   ["GET", "/api/jobs", (req, env) => jobs.list(req, env)],
   ["POST", "/api/jobs", (req, env) => jobs.create(req, env)],
   ["POST", "/api/jobs/:id", jobs.action],
@@ -171,6 +175,7 @@ const routes = [
   ["GET", "/api/mod/goals", (req, env) => goals.manage(req, env)],
   ["POST", "/api/mod/goals", (req, env) => goals.manage(req, env)],
   ["GET", "/api/referrals", (req, env) => referrals.mine(req, env)],
+  ["GET", "/api/referrals/who", referrals.who],
   ["POST", "/api/referrals/inviter", (req, env) => referrals.setInviter(req, env)],
   ["GET", "/api/showcase/options", (req, env) => showcase.options(req, env)],
   ["POST", "/api/showcase", (req, env) => showcase.save(req, env)],
@@ -335,12 +340,13 @@ export default {
   async scheduled(event, env, ctx) {
     // Local testing only (DEBUG_PUSH is set in .dev.vars, never on the live site): post the recap now.
     if (env.DEBUG_PUSH && event.cron === "recap-test") return ctx.waitUntil(import("./routes/recap.js").then((m) => m.weeklyRecap(env, true)));
-    if (event.cron === "*/5 * * * *") ctx.waitUntil(features.tick(env).catch((e) => console.error("5-minute jobs failed", e)));
+    if (event.cron === "*/5 * * * *") ctx.waitUntil(ensureSchema(env).then(() => features.tick(env)).catch((e) => console.error("5-minute jobs failed", e)));
     else ctx.waitUntil(notifyRoutes.daily(env, event.cron).catch((e) => console.error("daily notifications failed", e)));
   },
 
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/api/")) await ensureSchema(env);
     // One public address: send www.galaxymc.us and the old workers.dev pages to galaxymc.us.
     // (The Minecraft plugin's /api/ calls keep working on any address.)
     if (url.hostname === "www.galaxymc.us" || (url.hostname.endsWith(".workers.dev") && !url.pathname.startsWith("/api/"))) {

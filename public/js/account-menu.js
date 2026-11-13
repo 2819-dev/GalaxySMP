@@ -1,6 +1,6 @@
 // Your profile picture in the top right of every page. Tapping it opens a small profile card with
 // View full profile, Account (settings), quick links and Sign out. Signed out: a "Sign in" button.
-import { icon } from "/js/site.js";
+import { icon, setSkin } from "/js/site.js";
 import { faceSvg } from "/js/face.js";
 
 const make = (tag, cls, text) => {
@@ -15,6 +15,7 @@ export async function renderAccountButton(slot) {
   let me = null;
   try { me = (await (await fetch("/api/me/header", { credentials: "same-origin" })).json()).user; } catch { /* offline */ }
   if (me?.acting) actingBanner(me);
+  setSkin(me?.skin || null);
   // New members finish the welcome steps first (the rules and privacy pages stay readable)
   if (me?.onboarding && !["/welcome", "/rules", "/privacy"].includes(location.pathname)) {
     location.replace("/welcome");

@@ -6,6 +6,12 @@ import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
 import { queueReward } from "./rewards.js";
+import { tierUnlock } from "../../public/js/looks-catalog.js";
+import { giveUnlock } from "./looks.js";
+
+// Each tier's rewards, plus the website look it unlocks (themes, titles, frames: see looks-catalog.js).
+const withUnlocks = (s) => (s.tiers || []).map((t, i) => ({ ...t,
+  free: { ...t.free, unlock: tierUnlock("free", i + 1, s.id) }, pro: { ...t.pro, unlock: tierUnlock("pro", i + 1, s.id) } }));
 
 export const XP = { minute: 1, quest: 30, achievement: 50, bw_win: 40 };
 const TIERS = 30;
@@ -70,7 +76,7 @@ export async function season(request, env) {
                                 ORDER BY xp DESC LIMIT 10`, [s.id]);
   return json({
     ok: true, xpRules: XP,
-    season: { id: s.id, name: s.name, startsAt: s.starts_at, endsAt: s.ends_at, tiers: s.tiers },
+    season: { id: s.id, name: s.name, startsAt: s.starts_at, endsAt: s.ends_at, tiers: withUnlocks(s) },
     me: mine, top: top.filter((t) => Number(t.xp) > 0).map((t) => ({ name: t.gamertag, xp: Number(t.xp) })),
   }, 200, { "Cache-Control": "private, no-store" });
 }
@@ -100,5 +106,9 @@ export async function claim(request, env) {
   await queueReward(sql, { xuid: me.xuid, name: me.gamertag, cents: reward.cents, keys: reward.keys, reason: `${s.name} tier ${tier}${track === "pro" ? " (Pro+)" : ""}` });
   const { sendRewards } = await import("./rewards.js");
   await sendRewards(env, sql).catch(() => {});
-  return json({ ok: true, message: "Claimed! It's on its way to you in game (the next time you're on, if you're offline)." });
+  const unlock = tierUnlock(track, tier, s.id);
+  if (unlock) await giveUnlock(sql, user.id, unlock.kind, unlock.id, `season:${s.id}:${tier}:${track}`);
+  return json({ ok: true, unlock,
+    message: unlock ? `Claimed! You unlocked the ${unlock.name}${unlock.kind === "title" ? " title" : unlock.kind === "theme" ? " theme" : ""}. Use it in Account settings > Looks. The money is on its way in game.`
+      : "Claimed! It's on its way to you in game (the next time you're on, if you're offline)." });
 }

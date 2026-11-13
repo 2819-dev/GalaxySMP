@@ -26,7 +26,7 @@ export function setupJoins({ loaders, toast, setBadge }) {
       const row = h("button", { type: "button", class: `jr-row${r.id === openId ? " active" : ""}`, onclick: () => openChat(r.id) },
         h("div", { class: "jr-row-top" }, h("b", { text: r.gamertag }), r.unread ? h("span", { class: "count-badge", "data-n": String(r.unread), text: String(r.unread) }) : null),
         h("span", { class: "jr-row-last", text: r.last || "" }),
-        h("span", { class: "jr-row-meta", text: `${when(r.lastAt)}${r.playedBefore ? " · has played before" : ""}` }));
+        h("span", { class: "jr-row-meta", text: `${when(r.lastAt)}${r.invitedBy ? ` · invited by ${r.invitedBy}` : ""}${r.playedBefore ? " · has played before" : ""}` }));
       return row;
     }));
   };
@@ -44,7 +44,7 @@ export function setupJoins({ loaders, toast, setBadge }) {
       try { data = await getJson(`/api/panel/join-requests/${id}`); } catch (e) { pane.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
       const r = data.request;
       const [label, cls] = STATUS[r.status];
-      head.replaceChildren(h("b", { text: r.gamertag }), h("span", { class: `sg-status ${cls}`, text: label }), h("span", { class: "text-3 small", text: `Asked ${when(r.createdAt)}` }));
+      head.replaceChildren(h("b", { text: r.gamertag }), h("span", { class: `sg-status ${cls}`, text: label }), h("span", { class: "text-3 small", text: `Asked ${when(r.createdAt)}${r.invitedBy ? ` · invited by ${r.invitedBy}` : ""}` }));
       actions.replaceChildren(...[
         r.status !== "approved" ? h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Approve and add to server", onclick: () => decide(r, "approved") }) : null,
         r.status === "open" ? h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Decline", onclick: () => decide(r, "declined") }) : null,

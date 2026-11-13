@@ -26,6 +26,14 @@ export async function inviterFor(sql, code) {
   return u ? Number(u.id) : null;
 }
 
+// GET /api/referrals/who?ref=...: the name on an invite link (shown on the How to Join page). Public.
+export async function who(request, env, ctx, url) {
+  const id = await inviterFor(getDb(env), String(url.searchParams.get("ref") || ""));
+  if (!id) return json({ ok: true, name: null });
+  const [u] = await getDb(env)`SELECT username FROM users WHERE id = ${id}`;
+  return json({ ok: true, name: u?.username || null }, 200, { "Cache-Control": "public, max-age=300" });
+}
+
 // GET /api/referrals
 export async function mine(request, env) {
   const user = await requireUser(request, env);
@@ -36,7 +44,7 @@ export async function mine(request, env) {
   const [me] = await sql`SELECT u.referred_by, u.created_at, r.username AS inviter FROM users u LEFT JOIN users r ON r.id = u.referred_by WHERE u.id = ${user.id}`;
   const qualified = friends.filter((f) => f.referral_rewarded_at).length;
   return json({
-    ok: true, code: refCode(user.id), link: `${new URL(request.url).origin}/?ref=${refCode(user.id)}`,
+    ok: true, code: refCode(user.id), link: `${new URL(request.url).origin}/join?ref=${refCode(user.id)}#join-request`,
     rewards: { inviter: INVITER_CENTS, friend: FRIEND_CENTS, hours: NEEDED_SECS / 3600, badgeAt: BADGE_AT },
     qualified, badge: qualified >= BADGE_AT,
     friends: friends.map((f) => ({ name: f.username, joined: f.created_at, done: Boolean(f.referral_rewarded_at), minutes: Math.floor(Number(f.secs) / 60) })),

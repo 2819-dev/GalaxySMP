@@ -79,11 +79,12 @@ async function load() {
   const face = h("img", { class: "pp-avatar", alt: "", width: 112, height: 112 });
   face.src = p.head || faceSvg(p.name);
   face.addEventListener("error", () => { face.src = faceSvg(p.name); }, { once: true });
-  const avatarWrap = h("div", { class: `pp-avatar-wrap${p.online ? " online" : ""}` }, face, h("span", { class: "pp-ring", title: p.online ? "Playing on GalaxySMP" : "Offline" }));
+  const avatarWrap = h("div", { class: `pp-avatar-wrap${p.online ? " online" : ""}${social?.frame ? ` lf lf-${social.frame}` : ""}` }, face, h("span", { class: "pp-ring", title: p.online ? "Playing on GalaxySMP" : "Offline" }));
 
   const nameEl = h("h1", { class: "pp-name" });
   nameEl.append(paint(p.name, p.rank));
   const sub = h("div", { class: "pp-sub" });
+  if (social?.title) sub.append(h("span", { class: "look-title", text: social.title }));
   if (social?.username && social.username !== p.name) sub.append(h("span", { text: social.username }));
   if (social?.realName) sub.append(h("span", { class: "pp-real", text: social.realName }));
   const tags = h("div", { class: "pp-tags" },

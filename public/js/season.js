@@ -6,6 +6,8 @@ import { money } from "/js/money.js";
 const root = document.getElementById("ss-root");
 const KEY = { common: "Common key", rare: "Rare key", galaxy: "Galaxy key" };
 const rewardText = (r) => [r.cents ? `${money(r.cents)}` : null, ...Object.entries(r.keys || {}).map(([k, n]) => `${n > 1 ? `${n} ` : ""}${KEY[k]}${n > 1 ? "s" : ""}`)].filter(Boolean).join(" + ");
+// Website looks unlocked by a tier (themes, titles, frames)
+const unlockText = (u) => (u.kind === "theme" ? `${u.name} theme` : u.kind === "title" ? `"${u.name}" title` : u.name);
 const daysLeft = (d) => Math.max(0, Math.ceil((new Date(d) - Date.now()) / 864e5));
 
 async function load() {
@@ -34,6 +36,7 @@ async function load() {
     h("div", { class: "ss-rules" },
       ...[["clock", `${d.xpRules.minute} XP`, "every minute you play"], ["check", `${d.xpRules.quest} XP`, "each quest"], ["trophy", `${d.xpRules.achievement} XP`, "each achievement"], ["sword", `${d.xpRules.bw_win} XP`, "each Bedwars win"]]
         .map(([ic, v, l]) => h("div", { class: "ss-rule" }, iconEl(ic), h("b", { text: v }), h("span", { class: "text-3 small", text: l })))),
+    h("p", { class: "text-3 small", style: "margin:10px 0 0" }, "Some tiers also unlock website themes, profile titles and profile frames. Use them in ", h("a", { href: "/account#looks", text: "Account settings > Looks" }), "."),
     !me ? h("p", { class: "notice", text: "Link your Minecraft account (Account > Link) to earn XP and claim rewards." })
       : !me.pro ? h("p", { class: "text-3 small", style: "margin:10px 0 0" }, "The ", h("b", { text: "Pro+ track" }), " needs Galaxy Pro+. ", h("a", { href: "/store", text: "See plans" }), ".") : null);
 
@@ -50,7 +53,9 @@ async function load() {
     const locked = track === "pro" && !me?.pro;
     const r = t[track];
     const keyKind = Object.keys(r.keys || {})[0];
-    const ic = h("span", { class: "ss-ic" }, iconEl(keyKind ? "key" : "coins"));
+    const u = r.unlock;
+    const ic = u ? h("span", { class: `ss-ic look ${u.kind}` }, iconEl(u.kind === "theme" ? "contrast" : u.kind === "title" ? "tag" : "user")) : h("span", { class: "ss-ic" }, iconEl(keyKind ? "key" : "coins"));
+    if (u?.colors) ic.style.background = `linear-gradient(135deg, ${u.colors[1]}, ${u.colors[2]})`;
     let foot;
     if (claimed) foot = h("span", { class: "ss-done", text: "Claimed ✓" });
     else if (open && me && !locked) {
@@ -59,8 +64,9 @@ async function load() {
       foot = b;
     } else foot = h("span", { class: "ss-lock" }, iconEl("lock"), locked && open ? "Pro+" : `${t.xp.toLocaleString()} XP`);
     const state = claimed ? "claimed" : open && me && !locked ? "ready" : "locked";
-    return h("div", { class: `ss-card ${track} ${state}`, title: rewardText(r) },
-      ic, h("div", { class: "ss-card-text", text: rewardText(r) }), foot);
+    const text = u ? `${unlockText(u)} + ${rewardText(r)}` : rewardText(r);
+    return h("div", { class: `ss-card ${track} ${state}${u ? " has-look" : ""}`, title: text },
+      ic, u ? h("div", { class: "ss-card-text" }, h("b", { class: "ss-look", text: unlockText(u) }), h("span", { text: rewardText(r) })) : h("div", { class: "ss-card-text", text: rewardText(r) }), foot);
   };
   const strip = h("div", { class: "ss-strip", role: "region", "aria-label": "Season rewards", tabindex: 0 },
     h("div", { class: "ss-labels" },

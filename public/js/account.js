@@ -1,5 +1,5 @@
 // Account (settings): profile, notifications, subscription, purchases & payments, security, privacy.
-import { toast, iconEl, isInstalled } from "/js/site.js";
+import { toast, iconEl, isInstalled, setSkin } from "/js/site.js";
 import { faceSvg } from "/js/face.js";
 import { moneyDollars } from "/js/money.js";
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
@@ -128,7 +128,7 @@ function inviteCard() {
       } catch { /* cancelled */ }
     });
     const parts = [
-      h("p", { class: "text-2", style: "margin:0" }, `When a friend makes an account with your link and plays for ${d.rewards.hours} hour, you get `,
+      h("p", { class: "text-2", style: "margin:0" }, `Your link opens the "Request to join" page: friends still ask to join and wait for the owner to approve them. When an approved friend makes an account and plays for ${d.rewards.hours} hour, you get `,
         h("b", { text: moneyDollars(d.rewards.inviter / 100) }), " and they get ", h("b", { text: moneyDollars(d.rewards.friend / 100) }), ` in game. Invite ${d.rewards.badgeAt} friends who play to earn the Recruiter badge.`),
       h("div", { class: "acc-invite" }, link, copy),
       h("div", { class: "acc-invite-stats" },
@@ -153,6 +153,38 @@ function inviteCard() {
 }
 
 const SECTIONS = {
+  // Looks unlocked in the Season Pass: website theme, profile title and profile frame
+  async looks() {
+    const d = await getJson("/api/looks");
+    const p = data.profile;
+    const pick = async (kind, item, btn) => {
+      try {
+        await postJson("/api/looks", { kind, item });
+        d.chosen[kind] = item;
+        if (kind === "theme") setSkin(item);
+        btn.parentElement.querySelectorAll(".lk-opt").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+        toast(item ? "Saved." : "Back to the default.");
+      } catch (e) { toast(e.message); }
+    };
+    const opt = (kind, item, label, visual, sub) => {
+      const b = h("button", { class: "lk-opt", type: "button", "aria-pressed": String((d.chosen[kind] || null) === item) }, visual, h("span", { text: label }), sub ? h("span", { class: "lk-sub", text: sub }) : null);
+      b.addEventListener("click", () => pick(kind, item, b));
+      return b;
+    };
+    const lockedOf = (kind) => d.locked.filter((l) => l.kind === kind).map((l) =>
+      h("div", { class: "lk-opt locked", title: `Season Pass tier ${l.tier}${l.track === "pro" ? " (Pro+ track)" : ""}` }, iconEl("lock"), h("span", { text: l.name }), h("span", { class: "lk-sub", text: `Tier ${l.tier}${l.track === "pro" ? " · Pro+" : ""}` })));
+    const swatch = (c) => { const s = h("span", { class: "lk-swatch" }); s.style.background = c ? `linear-gradient(135deg, ${c[0]} 0 35%, ${c[1]} 35% 70%, ${c[2]} 70%)` : "linear-gradient(135deg, #0a0c1b 0 35%, #2457eb 35% 70%, #4febfd 70%)"; return s; };
+    const faceImg = (frame) => { const w = h("span", { class: `lf${frame ? ` lf-${frame}` : ""}`, style: "display:inline-flex" }); const i = h("img", { class: "lk-face", alt: "" }); i.src = p.head || faceSvg(p.username); w.append(i); return w; };
+    return [
+      card("Website theme", "Changes the colors of galaxymc.us for you, on every device you sign in on. Works with light and dark mode.",
+        h("div", { class: "lk-row" }, opt("theme", null, "Galaxy", swatch(null), "Default"), ...d.themes.map((t) => opt("theme", t.id, t.name, swatch(t.colors), t.animated ? "Animated" : null)), ...lockedOf("theme"))),
+      card("Profile title", "Shows under your name on your profile and profile card.",
+        h("div", { class: "lk-row" }, opt("title", null, "No title", h("span", { class: "lk-swatch", style: "display:grid;place-items:center;background:var(--surface-3)" }, "–")), ...d.titles.map((t) => opt("title", t.id, t.name, h("span", { class: "look-title", text: t.name }))), ...lockedOf("title"))),
+      card("Profile frame", "A border around your picture on your profile and profile card.",
+        h("div", { class: "lk-row" }, opt("frame", null, "No frame", faceImg(null)), ...d.frames.map((f) => opt("frame", f.id, f.name, faceImg(f.id), f.animated ? "Animated" : null)), ...lockedOf("frame"))),
+      h("p", { class: "text-3 small", style: "margin:0" }, "Unlock more by playing and claiming rewards in the ", h("a", { href: "/season", text: "Season Pass" }), ". The best ones are on the Galaxy Pro+ track."),
+    ];
+  },
   profile() {
     const p = data.profile;
     const face = h("img", { class: "acc-face", alt: "", width: 72, height: 72 });
@@ -385,7 +417,7 @@ window.addEventListener("hashchange", () => load(location.hash.slice(1)));
   try { me = (await getJson("/api/me")).user; } catch { /* signed out */ }
   if (!me) { $("acc-signedout").hidden = false; return; }
   $("acc-app").hidden = false;
-  const icons = { profile: "user", notifications: "bell", subscription: "star", purchases: "card", security: "lock2", privacy: "shield" };
+  const icons = { profile: "user", looks: "sparkles", notifications: "bell", subscription: "star", purchases: "card", security: "lock2", privacy: "shield" };
   document.querySelectorAll("[data-sec]").forEach((a) => a.prepend(iconEl(icons[a.dataset.sec])));
   load(location.hash.slice(1));
 })();

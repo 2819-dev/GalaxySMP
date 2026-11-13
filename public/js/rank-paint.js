@@ -75,7 +75,8 @@ export function paint(text, rank, icon) {
     k++;
     const part = document.createElement("span");
     part.textContent = ch;
-    part.style.color = hexOf(code);
+    // plain white (no rank, or a white rank) follows the page's text color, so it's dark in light mode
+    part.style.color = code === "f" && !stops ? "var(--text)" : hexOf(code);
     span.append(part);
   });
   return span;
