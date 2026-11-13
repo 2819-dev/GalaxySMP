@@ -3411,3 +3411,20 @@ html[data-theme="light"] .ap-art.tone-plan-plus { color: #1aa3c9; } html[data-th
 .sl-crash-log{margin-top:6px}
 .sl-crash-log summary{cursor:pointer;color:var(--text-2)}
 .sl-crash-log pre{margin:6px 0 0;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:var(--surface-2,rgba(127,127,127,.08));border-radius:8px;padding:8px 10px;font-size:11px;line-height:1.45}
+
+/* ---------- Server map: 3D view (map3d.js) ---------- */
+#map-view[hidden] { display: none; }
+.map3d-gl, .map3d-layer { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.map3d-gl[hidden], .map3d-layer[hidden] { display: none; }
+.map3d-gl { touch-action: none; cursor: grab; outline: none; background: linear-gradient(#8fb6e0, #a8c9eb); }
+.map3d-gl:active { cursor: grabbing; }
+.map3d-layer { pointer-events: none; }
+.map3d-note { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2; max-width: min(360px, calc(100% - 48px));
+  padding: 12px 16px; border-radius: 12px; background: rgba(8, 10, 24, .78); color: #fff; font-size: .88rem; text-align: center; pointer-events: none; }
+.map-3d-btn[aria-pressed="true"] { background: var(--accent, #6d8bff); color: #fff; border-color: transparent; }
+body.map-in-3d .map-stage::after { border-color: rgba(30, 40, 70, .55); border-image: none; box-shadow: none; border-width: 0; }
+body.map-in-3d .map-empty { display: none; }
+.map3d-hint { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 2; padding: 7px 14px; border-radius: 999px;
+  background: rgba(8, 10, 24, .72); color: #fff; font-size: .8rem; white-space: nowrap; pointer-events: none; transition: opacity .6s; }
+.map3d-hint.fade { opacity: 0; }
+@media (max-width: 420px) { .map3d-hint { white-space: normal; text-align: center; width: max-content; max-width: calc(100% - 32px); } }

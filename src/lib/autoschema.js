@@ -40,6 +40,10 @@ const PENDING = [
     "ALTER TABLE gift_cards ADD COLUMN IF NOT EXISTS style jsonb",
     "INSERT INTO schema_migrations (version) VALUES ('0050_giftcard_style') ON CONFLICT DO NOTHING",
   ]],
+  ["0051_map_heights", [
+    "ALTER TABLE map_chunks ADD COLUMN IF NOT EXISTS heights bytea",
+    "INSERT INTO schema_migrations (version) VALUES ('0051_map_heights') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

@@ -174,9 +174,45 @@ function goTo(x, z, scale) {
   view.x = x; view.z = z;
   if (scale) view.scale = scale;
   dirty = true;
+  if (in3d) m3d.goTo(x, z);
+}
+
+// ---------- 3D view (map3d.js, loaded the first time it's opened) ----------
+let m3d = null, in3d = false;
+async function toggle3d() {
+  const btn = $("map-3d");
+  if (!in3d) {
+    if (!m3d) {
+      btn.disabled = true;
+      const mod = await import("/js/map3d.js");
+      m3d = mod.createMap3D({
+        stage: canvas.parentElement, info: () => info, head,
+        onPlotTap: (plot) => { if (plot.kind === "plot" && (plot.public || plot.mine)) import("/js/map-plot.js").then((m) => m.openPlot(plot.id, () => refresh())); },
+      });
+      btn.disabled = false;
+      if (!m3d) { btn.hidden = true; return; }  // no WebGL on this device
+    }
+    in3d = true;
+    follow = null;
+    canvas.hidden = true;
+    $("map-tip").hidden = true;
+    $("map-coords").textContent = "";
+    document.body.classList.add("map-in-3d");
+    m3d.show(view.x, view.z);
+  } else {
+    in3d = false;
+    const t = m3d.hide();
+    canvas.hidden = false;
+    document.body.classList.remove("map-in-3d");
+    goTo(t.x, t.z);
+  }
+  btn.textContent = in3d ? "2D" : "3D";
+  btn.setAttribute("aria-pressed", String(in3d));
+  btn.setAttribute("aria-label", in3d ? "Back to the flat map" : "Show the map in 3D");
 }
 
 function zoom(f, sx, sy) {
+  if (in3d) { m3d.zoom(f); return; }
   const r = canvas.getBoundingClientRect();
   sx ??= r.width / 2; sy ??= r.height / 2;
   const [wx, wz] = toWorld(sx, sy);
@@ -249,6 +285,7 @@ async function refresh() {
     }
     renderSide();
     dirty = true;
+    if (in3d) m3d.update();
   } catch { /* try again next time */ }
 }
 
@@ -346,6 +383,7 @@ function hover(sx, sy, wx, wz) {
   tip.hidden = false;
 }
 
+$("map-3d").addEventListener("click", toggle3d);
 $("map-zoom-in").addEventListener("click", () => zoom(1.5));
 $("map-zoom-out").addEventListener("click", () => zoom(1 / 1.5));
 $("map-home").addEventListener("click", () => {

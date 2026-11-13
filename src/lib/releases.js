@@ -85,6 +85,11 @@ Profiles now show how rare each achievement is, with Rare, Epic and Legendary ta
 - **Rank order.** The member list on the website now follows the rank order exactly, and rank changes show the right tag straight away.
 - **Stability.** The live map no longer reads parts of the world that aren't loaded, and unexpected server stops are now reported to staff so they can be fixed quickly.`,
   },
+  {
+    id: "2026-11-16c",
+    title: "The live map is now in 3D",
+    body: `Tap **3D** on the live map to see the world as blocks at their real heights: hills, mountains, lakes and builds, with players, spawn and plots on top. Drag to turn, use two fingers to move and pinch to zoom. Tap **2D** to go back to the flat map. The 3D view fills in as players explore, so new areas appear over the next few days.`,
+  },
 ];
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.

@@ -227,6 +227,7 @@ const routes = [
   ["GET", "/api/voice/rooms", (req, env) => panel.publicVoiceRooms(req, env)],
   ["POST", "/api/panel/voice-rooms", (req, env) => panel.voiceRooms(req, env)],
   ["GET", "/api/map/region/:rx/:rz", livemap.mapRegion],
+  ["GET", "/api/map/heights/:rx/:rz", livemap.mapHeights],
   ["POST", "/api/appeals", (req, env) => appeals.createAppeal(req, env)],
   ["GET", "/api/appeals/:token", appeals.getAppeal],
   ["GET", "/api/mod/appeals", appeals.listAppeals],

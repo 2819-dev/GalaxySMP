@@ -2,7 +2,8 @@
 
 Little by little, the land around online players is drawn from above exactly like a Minecraft paper map:
 Minecraft's own map colour for the top block of every column, shaded by height the way a map item does,
-and water darker where it's deep (16 x 16 colours per chunk). Chunks are sent to
+and water darker where it's deep (16 x 16 colours per chunk), plus the height of every column for the
+website's 3D view. Chunks are sent to
 the website, which keeps them, so the map fills in as people explore. Only the Overworld is mapped.
 
 Every few seconds the website also gets who is online and where (the map shows their heads), and once
@@ -19,7 +20,7 @@ import time
 RADIUS = 5              # chunks around each player
 PER_RUN = 3             # chunks drawn per run (every 2 seconds)
 REDRAW_SECONDS = 600
-STYLE = 2               # map look version (2 = Minecraft map item); the website redraws older chunks
+STYLE = 3               # map look version (2 = Minecraft map item, 3 = with heights for the 3D view)
 LIVE_EVERY = 5          # seconds between live player updates
 MARKERS_EVERY = 60
 
@@ -214,10 +215,12 @@ class LiveMap:
             return
         chunks = []
         for _, (cx, cz), dim in todo:
-            rgb = self.draw_chunk(dim, cx, cz)
+            drawn = self.draw_chunk(dim, cx, cz)
             self.drawn[(cx, cz)] = now
-            if rgb is not None:
-                chunks.append({"cx": cx, "cz": cz, "rgb": base64.b64encode(rgb).decode("ascii")})
+            if drawn is not None:
+                rgb, heights = drawn
+                chunks.append({"cx": cx, "cz": cz, "rgb": base64.b64encode(rgb).decode("ascii"),
+                               "h": base64.b64encode(heights).decode("ascii")})
         if len(self.drawn) > 20000:  # forget the oldest so memory stays small
             for k in sorted(self.drawn, key=self.drawn.get)[:5000]:
                 self.drawn.pop(k, None)
@@ -291,7 +294,17 @@ class LiveMap:
                 out[k], out[k + 1], out[k + 2] = c
         if len(errors) == 256:
             raise RuntimeError(f"couldn't read the ground ({type(errors[0]).__name__}: {errors[0]})")
-        return None if blank == 256 else bytes(out)
+        if blank == 256:
+            return None
+        # heights for the 3D view: y + 65 as 16-bit numbers (0 = nothing there)
+        hb = bytearray(512)
+        for j in range(16):
+            for i in range(16):
+                y = heights.get((i, j))
+                v = 0 if y is None else max(1, min(65535, int(y) + 65))
+                k = (j * 16 + i) * 2
+                hb[k], hb[k + 1] = v & 255, v >> 8
+        return bytes(out), bytes(hb)
 
     # ---------- players and markers ----------
     def send_live(self, voice):
