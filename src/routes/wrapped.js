@@ -312,7 +312,7 @@ export async function share(request, env, ctx, url, params) {
   if (!d) throw new HttpError(409, "Open your recap first.");
   const bits = [`${d.hours}h played`, d.mined ? `${d.mined.toLocaleString("en-US")} blocks mined` : null, d.placed ? `${d.placed.toLocaleString("en-US")} placed` : null, d.type?.name].filter(Boolean);
   await postTimeline(sql, { kind: "wrapped", xuid: me.xuid, name: me.gamertag, title: `shared their ${p.title}`, detail: bits.join(" · "), icon: "sparkles", dedupe: `wrapped:${me.xuid}:${p.key}` });
-  return json({ ok: true, message: "Posted on #Timeline!" });
+  return json({ ok: true, message: "Shared to #Timeline." });
 }
 
 // Every 5 minutes: when a recap comes out, tell everyone once (notification + a post in #Updates).

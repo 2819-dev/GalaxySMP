@@ -182,7 +182,7 @@ function confirmBuy(l, done) {
       label: `Buy for ${money(l.price)}`, kind: "primary",
       onClick: async () => {
         const res = await postJson(`/api/community/auction/${l.id}/buy`, {});
-        ctx.toast(res.message || "Bought!");
+        ctx.toast(res.message || "Purchase complete.");
         done();
       },
     }],
@@ -208,7 +208,7 @@ function renderSuggestions(p) {
     let data;
     try { data = await getJson(`/api/community/suggestions?sort=${sort}`); } catch (e) { list.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
     list.replaceChildren();
-    if (!data.suggestions.length) list.append(h("div", { class: "panel empty", text: "No suggestions yet. Be the first!" }));
+    if (!data.suggestions.length) list.append(h("div", { class: "panel empty", text: "No suggestions yet. Share the first one." }));
     for (const s of data.suggestions) list.append(extra.suggestionCard(s, data.canModerate, load, ctx.toast));
   }
   for (const [btn, key] of [[top, "top"], [newest, "new"]]) {

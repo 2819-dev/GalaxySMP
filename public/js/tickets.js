@@ -183,7 +183,7 @@ export function newTicketDialog(toast, done, quick = null) {
       label: "Open ticket", kind: "primary",
       onClick: async () => {
         const r = await postJson("/api/support/tickets", { subject: subject.value, label: label.value, body: body.value });
-        toast("Ticket opened! Staff will reply here.");
+        toast("Ticket opened. Our staff will reply here.");
         done(r.id);
       },
     }],

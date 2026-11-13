@@ -212,7 +212,7 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
 
 function celebrate(name, message, gift = false) {
   openDialog({
-    title: gift ? "Gift sent!" : "It's yours!",
+    title: gift ? "Gift sent." : "It's yours!",
     body: h("div", { class: "co-done" }, h("div", { class: "co-done-icon" }, iconEl("check")), h("p", { class: "text-2", text: message || `${name} is yours!` }),
       h("p", { class: "text-3 small", text: "Pick cosmetics in game with /cosmetics." })),
     actions: [{ label: "Done", kind: "primary" }],
@@ -259,31 +259,46 @@ const COMPARE = [
 function buyPlan(plan) {
   checkout({ id: plan.id, option: () => null, name: plan.name, price: plan.price, icon: "star", cat: "plan", tags: ["subs", `plan:${plan.id}`], isPlan: true });
 }
+// One sideways-scrolling row of cards ("shelf"), with arrow buttons on computers.
+function shelf(el, cards) {
+  el.replaceChildren(...cards);
+  const wrap = el.parentElement;
+  if (!wrap?.classList.contains("ap-shelf-wrap") || wrap.querySelector(".ap-arrow")) return;
+  const arrow = (dir) => {
+    const b = h("button", { class: `ap-arrow ${dir}`, type: "button", "aria-label": dir === "prev" ? "Scroll back" : "Scroll forward" }, iconEl("arrow"));
+    b.addEventListener("click", () => el.scrollBy({ left: (dir === "prev" ? -1 : 1) * el.clientWidth * 0.8, behavior: "smooth" }));
+    return b;
+  };
+  wrap.append(arrow("prev"), arrow("next"));
+}
+const PLAN_ICON = { free: "user", plus: "star", pro: "gem" };
 function renderPlans() {
-  const wrap = document.getElementById("plans");
-  wrap.replaceChildren();
   const sellable = (data.onSale || []).includes("plans");
-  for (const plan of data.plans) {
+  const cards = data.plans.map((plan) => {
     const current = me.signedIn && me.linked && (me.plan || "free") === plan.id;
-    const card = h("article", { class: `st-plan plan-${plan.id}${plan.id === "pro" ? " featured" : ""}${current ? " is-current" : ""}` });
+    const card = h("article", { class: `ap-card ap-plan plan-${plan.id}${current ? " is-current" : ""}` });
     if (plan.price) card.append(heart(plan.id, plan.name));
-    const label = current ? "Your plan" : plan.id === "pro" ? "Most perks" : null;
-    card.append(
-      h("div", { class: "st-plan-top" }, h("h3", { class: "st-plan-name", text: plan.name }), label ? h("span", { class: `st-plan-label${current ? " current" : ""}`, text: label }) : null),
-      ...(plan.tag ? [h("div", { class: "st-plan-tag" }, rankTag(plan.tag))] : []),
-      h("div", { class: "st-plan-price" }, h("b", { text: plan.price ? usdShort(plan.price) : "Free" }), plan.price ? h("span", { text: "/ month" }) : null),
-      h("p", { class: "st-plan-sub", text: plan.price ? `Plus ${moneyDollars(plan.gameCost)} in-game money a month` : "For everyone, always" }),
-      h("ul", { class: "st-plan-perks" }, ...(HIGHLIGHTS[plan.id] || []).map((t) => h("li", {}, iconEl("check"), h("span", { text: t })))));
-    let btn;
-    if (!plan.price) btn = h("a", { class: "btn btn-secondary st-plan-btn", href: "/join", text: "How to join" });
-    else if (!sellable) btn = h("span", { class: "btn btn-secondary st-plan-btn is-soon", "aria-disabled": "true", text: "Coming soon" });
+    const kicker = current ? "Your plan" : plan.id === "pro" ? "Best value" : plan.price ? "Popular" : "Included";
+    let buy;
+    if (!plan.price) buy = h("a", { class: "ap-buy ghost", href: "/join", text: "Get started" });
+    else if (!sellable) buy = h("span", { class: "ap-buy soon", text: "Coming soon" });
     else {
-      btn = h("button", { class: `btn ${plan.id === "pro" ? "btn-primary" : "btn-secondary"} st-plan-btn`, type: "button", text: current ? "Add 30 days" : `Get ${plan.name.replace(/^Galaxy /, "")}` });
-      btn.addEventListener("click", () => buyPlan(plan));
+      buy = h("button", { class: "ap-buy", type: "button", text: current ? "Renew" : "Buy" });
+      buy.addEventListener("click", () => buyPlan(plan));
     }
-    card.append(btn);
-    wrap.append(card);
-  }
+    card.append(...[
+      h("span", { class: `ap-kicker${current ? " current" : ""}`, text: kicker }),
+      h("h3", { class: "ap-name", text: plan.name }),
+      h("p", { class: "ap-tagline", text: plan.id === "pro" ? "Every perk we offer." : plan.id === "plus" ? "More land, more style." : "Everything you need to play." }),
+      h("div", { class: "ap-art plan" }, iconEl(PLAN_ICON[plan.id] || "star")),
+      plan.tag ? h("div", { class: "ap-plan-tag" }, rankTag(plan.tag)) : null,
+      h("ul", { class: "ap-perks" }, ...(HIGHLIGHTS[plan.id] || []).map((t) => h("li", { text: t }))),
+      h("div", { class: "ap-foot" },
+        h("div", { class: "ap-price" }, h("b", { text: plan.price ? `${usdShort(plan.price)}/mo.` : "Free" }), plan.price ? h("small", { text: `plus ${moneyDollars(plan.gameCost)} in game` }) : null),
+        buy)].filter(Boolean));
+    return card;
+  });
+  shelf(document.getElementById("plans"), cards);
   renderCompare();
 }
 
@@ -308,69 +323,76 @@ function renderCompare() {
   box.replaceChildren(det);
 }
 
-// ---------- Shop ----------
+// ---------- Shop: one shelf per category ----------
 let filter = "all";
 const CAT_NAMES = { devices: "Galaxy Cube", money: "Money", plots: "Land", effects: "Effects", cosmetics: "Cosmetics" };
-function renderFilters() {
-  const bar = document.getElementById("shop-filters");
-  bar.className = "st-filters";
-  const cats = [{ id: "all", name: "All" }, ...data.shop.map((c) => ({ id: c.id, name: CAT_NAMES[c.id] || c.name }))];
-  bar.replaceChildren(...cats.map((c) => {
-    const b = h("button", { class: "st-filter", type: "button", "aria-pressed": String(filter === c.id), text: c.name });
-    b.addEventListener("click", () => { filter = c.id; renderFilters(); renderShop(); });
-    return b;
-  }));
+const CAT_LINES = {
+  devices: "Our first device. Coming soon.",
+  money: "Added to your balance instantly.",
+  plots: "More room to build. Yours to keep.",
+  effects: "Handy boosts that last while you play.",
+  cosmetics: "Stand out wherever you go.",
+};
+const CAT_ICON = { devices: "cube", money: "coins", plots: "homes", effects: "moon", cosmetics: "sparkles" };
+function renderFilters() { /* categories are shelves now */ }
+
+// The round category buttons under the headline
+function renderCats() {
+  const nav = document.getElementById("ap-cats");
+  if (!nav) return;
+  const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const tile = (id, icon, name) => h("button", { class: `ap-cat c-${id}`, type: "button", onclick: () => go(id === "ranks" ? "subscriptions" : id === "credits" ? "credits" : `shelf-${id}`) },
+    h("span", { class: "ap-cat-ic" }, iconEl(icon)), h("span", { text: name }));
+  nav.replaceChildren(tile("ranks", "star", "Ranks"), ...data.shop.map((c) => tile(c.id, CAT_ICON[c.id] || "cart", CAT_NAMES[c.id] || c.name)), tile("credits", "wallet", "Credits"));
+}
+
+function itemCard(item, cat, sale) {
+  const owned = ownedCount(item.id);
+  const maxed = item.limit && owned >= item.limit;
+  let option = item.options ? item.options[0].id : null;
+  const price = h("div", { class: "ap-price" });
+  const setPrice = () => {
+    const small = item.priceText ? item.priceNote : item.limit === 1 ? "One per player" : item.limit ? `Up to ${item.limit} per player` : "";
+    price.replaceChildren(h("b", { text: item.priceText || usd(item.options ? item.options.find((o) => o.id === option).price : item.price) }), ...(small ? [h("small", { text: small })] : []));
+  };
+  setPrice();
+  let buy;
+  if (maxed) buy = h("span", { class: "ap-buy owned" }, iconEl("check"), "Owned");
+  else if (!sale) buy = h("span", { class: "ap-buy soon", text: "Coming soon" });
+  else {
+    buy = h("button", { class: "ap-buy", type: "button", text: "Buy" });
+    buy.addEventListener("click", () => {
+      const o = item.options?.find((x) => x.id === option);
+      checkout({ id: item.id, option: () => option, name: o ? `${item.name} (${o.name})` : item.name, price: o ? o.price : item.price,
+        icon: item.icon || "cart", cat: cat.id, tags: ["shop", `cat:${cat.id}`, `item:${item.id}`], isPlan: false });
+    });
+  }
+  let sel = null;
+  if (item.options) {
+    sel = h("select", { class: "ap-opt", "aria-label": `${item.name}: how long` }, ...item.options.map((o) => h("option", { value: o.id, text: o.name })));
+    sel.addEventListener("change", () => { option = sel.value; setPrice(); });
+  }
+  return h("article", { class: `ap-card ap-item cat-${cat.id}${maxed ? " is-owned" : ""}${cat.id === "devices" ? " wide" : ""}` },
+    maxed ? null : heart(item.id, item.name),
+    item.badge && !maxed ? h("span", { class: "ap-kicker", text: item.badge }) : h("span", { class: "ap-kicker blank", text: "" }),
+    h("h3", { class: "ap-name", text: item.name }),
+    h("p", { class: "ap-desc", text: item.description }),
+    h("div", { class: `ap-art cat-${cat.id}` }, iconEl(item.icon || "cart")),
+    sel,
+    h("div", { class: "ap-foot" }, price, buy));
 }
 
 function renderShop() {
   const box = document.getElementById("shop-items");
-  box.replaceChildren();
-  for (const cat of data.shop) {
-    if (filter !== "all" && filter !== cat.id) continue;
+  box.replaceChildren(...data.shop.map((cat) => {
     const sale = itemOnSale(cat);
-    const list = h("div", { class: "st-list" });
-    for (const item of cat.items) {
-      const owned = ownedCount(item.id);
-      const maxed = item.limit && owned >= item.limit;
-      let option = item.options ? item.options[0].id : null;
-      const price = h("span", { class: "st-price" });
-      const setPrice = () => {
-        if (item.priceText) price.replaceChildren(h("b", { text: item.priceText }), item.priceNote ? h("small", { text: item.priceNote }) : null);
-        else price.replaceChildren(h("b", { text: usd(item.options ? item.options.find((o) => o.id === option).price : item.price) }));
-      };
-      setPrice();
-      const sub = [];
-      if (item.options) {
-        const sel = h("select", { class: "st-opt", "aria-label": `${item.name}: how long` }, ...item.options.map((o) => h("option", { value: o.id, text: o.name })));
-        sel.addEventListener("change", () => { option = sel.value; setPrice(); });
-        sub.push(sel);
-      }
-      const meta = maxed ? "Owned" : item.limit === 1 ? "One per player" : item.limit ? `Up to ${item.limit}${owned ? ` · you have ${owned}` : ""}` : "";
-      let action;
-      if (maxed) action = h("span", { class: "st-tag ok" }, iconEl("check"), "Owned");
-      else if (!sale) action = null;  // the section header says "Coming soon" once
-      else {
-        action = h("button", { class: "btn btn-primary btn-sm st-buy", type: "button", text: "Buy" });
-        action.addEventListener("click", () => {
-          const o = item.options?.find((x) => x.id === option);
-          checkout({ id: item.id, option: () => option, name: o ? `${item.name} (${o.name})` : item.name, price: o ? o.price : item.price,
-            icon: item.icon || "cart", cat: cat.id, tags: ["shop", `cat:${cat.id}`, `item:${item.id}`], isPlan: false });
-        });
-      }
-      const row = h("article", { class: `st-item${maxed ? " is-owned" : ""}${sale ? "" : " is-soon"}` },
-        h("span", { class: "st-ic" }, iconEl(item.icon || "cart")),
-        h("div", { class: "st-item-main" },
-          h("div", { class: "st-item-name" }, h("b", { text: item.name }), item.badge && !maxed ? h("span", { class: "st-badge", text: item.badge }) : null),
-          h("p", { class: "st-item-desc", text: item.description }),
-          meta && !maxed ? h("span", { class: "st-item-meta", text: meta }) : null,
-          ...sub),
-        h("div", { class: "st-item-side" }, price, h("div", { class: "st-item-actions" }, maxed ? null : heart(item.id, item.name), action)));
-      list.append(row);
-    }
-    box.append(h("section", { class: "st-cat" },
-      h("div", { class: "st-cat-head" }, h("h3", { text: CAT_NAMES[cat.id] || cat.name }), sale ? null : h("span", { class: "st-tag", text: "Coming soon" }), h("p", { class: "text-3 small", text: cat.blurb })),
-      list));
-  }
+    const row = h("div", { class: "ap-shelf" });
+    const wrap = h("div", { class: "ap-shelf-wrap" }, row);
+    const sec = h("section", { class: "ap-sub", id: `shelf-${cat.id}` },
+      h("h2", { class: "ap-h2" }, h("b", { text: `${CAT_NAMES[cat.id] || cat.name}.` }), " ", h("span", { text: CAT_LINES[cat.id] || cat.blurb })), wrap);
+    shelf(row, cat.items.map((i) => itemCard(i, cat, sale)));
+    return sec;
+  }));
 }
 
 // ---------- Member strip: balance, promo codes ----------
@@ -394,28 +416,29 @@ function renderStrip() {
 
 // ---------- Credits: top-up packs ----------
 function renderCredits() {
-  const box = document.getElementById("credit-packs");
-  box.replaceChildren(...(me.packs || []).map((p) => {
-    const btn = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: usd(p.price) });
+  const cards = (me.packs || []).map((p) => {
+    const btn = h("button", { class: "ap-buy", type: "button", text: "Buy" });
     btn.addEventListener("click", async () => {
       if (!me.signedIn) { location.href = "/community"; return; }
       btn.disabled = true;
       try {
         const r = await postJson("/api/store/topup", { pack: p.id });
         if (r.url) { location.href = r.url; return; }
-        toast(r.message || "Card payments open soon.");
+        toast(r.message || "Card payments are opening soon.");
       } catch (e) {
         toast(e.message);
       } finally {
         btn.disabled = false;
       }
     });
-    return h("article", { class: `st-pack${p.badge ? " best" : ""}` },
-      p.badge ? h("span", { class: "st-badge", text: p.badge }) : null,
-      h("b", { class: "st-pack-amount", text: usd(p.credit) }),
-      h("span", { class: "text-3 small", text: p.bonus ? `includes ${usd(p.bonus)} bonus` : "Galaxy Credits" }),
-      btn);
-  }));
+    return h("article", { class: "ap-card ap-pack" },
+      h("span", { class: "ap-kicker", text: p.badge || (p.bonus ? "Bonus included" : "Galaxy Credits") }),
+      h("h3", { class: "ap-name", text: `${usd(p.credit)} in credits` }),
+      h("p", { class: "ap-desc", text: p.bonus ? `Includes ${usd(p.bonus)} of bonus credit.` : "Spend on anything in the Store, or gift to a friend." }),
+      h("div", { class: "ap-art credits" }, iconEl("wallet")),
+      h("div", { class: "ap-foot" }, h("div", { class: "ap-price" }, h("b", { text: usd(p.price) })), btn));
+  });
+  shelf(document.getElementById("credit-packs"), cards);
 }
 
 function giftDialog() {
@@ -500,6 +523,7 @@ function openItem(key) {
 }
 
 function renderAll() {
+  renderCats();
   renderStrip();
   renderCredits();
   renderPlans();

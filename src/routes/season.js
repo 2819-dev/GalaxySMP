@@ -109,6 +109,6 @@ export async function claim(request, env) {
   const unlock = tierUnlock(track, tier, s.id);
   if (unlock) await giveUnlock(sql, user.id, unlock.kind, unlock.id, `season:${s.id}:${tier}:${track}`);
   return json({ ok: true, unlock,
-    message: unlock ? `Claimed! You unlocked the ${unlock.name}${unlock.kind === "title" ? " title" : unlock.kind === "theme" ? " theme" : ""}. Use it in Account settings > Looks. The money is on its way in game.`
-      : "Claimed! It's on its way to you in game (the next time you're on, if you're offline)." });
+    message: unlock ? `Reward claimed. You unlocked the ${unlock.name}${unlock.kind === "title" ? " title" : unlock.kind === "theme" ? " theme" : ""}. Choose it in Account settings > Looks. Any money or keys will be delivered in game.`
+      : "Reward claimed. It will be delivered in game (the next time you join, if you're offline)." });
 }

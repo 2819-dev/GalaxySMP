@@ -64,7 +64,7 @@ function answersBlock(questions, answers) {
 function memberView(wrap, d, { toast, setTimer }) {
   const intro = h("div", { class: "tl-intro" }, h("h2", { text: "Applications" }),
     h("p", { class: "text-3", text: "Help keep GalaxySMP friendly and fun. Moderators help players, keep chat kind and handle reports. Only the owner reads applications." }));
-  if (d.staff) { wrap.replaceChildren(intro, h("div", { class: "panel empty", text: "You're already on the staff team. Thanks for helping out!" })); return; }
+  if (d.staff) { wrap.replaceChildren(intro, h("div", { class: "panel empty", text: "You're already a member of the staff team." })); return; }
   const a = d.application;
   if (a && (a.status === "open" || a.status === "accepted" || (a.status === "declined" && !d.canApply))) {
     const [label, cls] = STATUS[a.status];
@@ -106,7 +106,7 @@ function memberView(wrap, d, { toast, setTimer }) {
     send.disabled = true;
     try {
       await postJson("/api/applications", { answers: Object.fromEntries(Object.entries(inputs).map(([k, el]) => [k, el.value])) });
-      toast("Application sent. Good luck!");
+      toast("Application submitted. We'll be in touch.");
       reload();
     } catch (err) { toast(err.message); } finally { send.disabled = false; }
   });

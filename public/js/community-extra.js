@@ -54,7 +54,7 @@ export function renderEvents(p, { toast, setTimer }) {
     try { d = await getJson("/api/community/events"); } catch (e) { upcoming.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
     add.hidden = !d.canManage;
     add.onclick = () => eventDialog(null, load, toast);
-    upcoming.replaceChildren(...(d.upcoming.length ? d.upcoming.map((e) => eventCard(e, d.canManage, load, toast)) : [h("div", { class: "panel empty", text: "No events planned yet. Check back soon!" })]));
+    upcoming.replaceChildren(...(d.upcoming.length ? d.upcoming.map((e) => eventCard(e, d.canManage, load, toast)) : [h("div", { class: "panel empty", text: "No upcoming events. Check back soon." })]));
     const now = Date.now() / 1000;
     live.replaceChildren(...(d.minigames.length ? d.minigames.map((g) => {
       const open = g.signupEnds > now;
@@ -306,7 +306,7 @@ export function renderBuilds(p, { toast }) {
     const winner = d.builds.find((b) => b.id === d.botwId);
     botw.replaceChildren(...(winner && sort === "new" ? [h("div", { class: "bd-botw-label" }, iconEl("trophy2"), "Build of the Week"), buildCard(winner, d, load, toast, true)] : []));
     const rest = d.builds.filter((b) => !(winner && sort === "new" && b.id === winner.id));
-    grid.replaceChildren(...(rest.length ? rest.map((b) => buildCard(b, d, load, toast)) : [h("div", { class: "panel empty", text: sort === "week" ? "No builds posted this week yet." : "No builds yet. Share yours!" })]));
+    grid.replaceChildren(...(rest.length ? rest.map((b) => buildCard(b, d, load, toast)) : [h("div", { class: "panel empty", text: sort === "week" ? "No builds posted this week yet." : "No builds yet. Share the first one." })]));
   }
   load();
 }
@@ -420,7 +420,7 @@ function buildDialog(done, toast) {
       if (!photos.length) throw new Error("Add at least one photo.");
       await postJson("/api/community/builds", { title: title.value, description: desc.value, location: where.value,
         images: photos.map(({ mime, data, width, height }) => ({ mime, data, width, height })) });
-      toast("Build posted!");
+      toast("Build shared.");
       done();
     } }],
   });
@@ -541,7 +541,7 @@ export function newSuggestion(done, toast) {
       label: "Post", kind: "primary",
       onClick: async () => {
         await postJson("/api/community/suggestions", { title: title.value, body: body.value, anonymous: anon.checked });
-        toast("Suggestion posted!");
+        toast("Suggestion submitted.");
         done();
       },
     }],

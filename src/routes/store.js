@@ -76,7 +76,7 @@ async function prepare(sql, user, body) {
   if (body.giftTo) {
     [giftTo] = await sql`SELECT id, username, banned FROM users WHERE id = ${Number(body.giftTo) || 0}`;
     if (!giftTo || giftTo.banned) throw new HttpError(404, "There's no member with that name.");
-    if (Number(giftTo.id) === Number(user.id)) throw new HttpError(400, "That's you! Turn off gifting to buy it for yourself.");
+    if (Number(giftTo.id) === Number(user.id)) throw new HttpError(400, "You can't send a gift to yourself. Turn off gifting to buy it for yourself.");
   }
   const p = await linkedPlayer(sql, giftTo ? giftTo.id : user.id);
   if (!p) throw new HttpError(409, giftTo ? `${giftTo.username} hasn't linked their Minecraft account yet, so they can't get Store items.` : "Link your Minecraft account first (type /link in game), so we know who to give it to.");
@@ -166,7 +166,7 @@ export async function checkout(request, env) {
   }
 
   // card
-  if (!stripeReady(env)) return json({ ok: false, comingSoon: true, message: "Card payments open very soon. Check back shortly!" });
+  if (!stripeReady(env)) return json({ ok: false, comingSoon: true, message: "Card payments aren't available yet. Please check back soon." });
   const amount = Math.max(MIN_CHARGE, final);
   const [pay] = await sql`INSERT INTO payments (user_id, kind, item, option, promo_id, amount_cents, gift_to)
                           VALUES (${user.id}, 'item', ${prod.key}, ${prod.option}, ${promo?.id || null}, ${amount}, ${giftTo?.id || null}) RETURNING id`;
@@ -188,7 +188,7 @@ export async function topup(request, env) {
   const body = await readJson(request);
   const pack = PACK[String(body.pack || "")];
   if (!pack) throw new HttpError(404, "Choose a credit pack.");
-  if (!stripeReady(env)) return json({ ok: false, comingSoon: true, message: "Card payments open very soon. Check back shortly!" });
+  if (!stripeReady(env)) return json({ ok: false, comingSoon: true, message: "Card payments aren't available yet. Please check back soon." });
   const sql = getDb(env);
   const [pay] = await sql`INSERT INTO payments (user_id, kind, item, amount_cents, credit_cents)
                           VALUES (${user.id}, 'topup', ${pack.id}, ${pack.price}, ${pack.credit}) RETURNING id`;
@@ -218,7 +218,7 @@ export async function gift(request, env) {
   if (!to || to.banned) throw new HttpError(404, "There's no member with that name.");
   if (Number(to.id) === Number(user.id)) throw new HttpError(400, "You can't gift credits to yourself.");
   if (ownerOf(env, user)) {
-    if (cents > 100_000_00) throw new HttpError(400, "That's a lot! Gifts go up to $100,000 at a time.");
+    if (cents > 100_000_00) throw new HttpError(400, "Gifts are limited to $100,000 at a time.");
     await change(sql, to.id, cents, "staff", `Gift from ${user.username}`, String(user.id));
     await audit(sql, user.id, "credits.give", { to: to.username, cents });
     await recordGift(env, sql, { giverId: user.id, receiverId: to.id, kind: "credits", cents, paid: false });

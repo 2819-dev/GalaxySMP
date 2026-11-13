@@ -195,7 +195,7 @@ const STEPS = [
     next: () => (a.notify ? "Next" : "Not now"),
   },
   {
-    id: "done", icon: "check", title: "You're all set!",
+    id: "done", icon: "check", title: "You're all set.",
     body: () => [
       h("p", { class: "text-2 ob-lead", text: `Welcome to the galaxy, ${a.first.trim()}! Here's where to go next:` }),
       h("div", { class: "ob-links" },

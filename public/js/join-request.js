@@ -23,7 +23,7 @@ async function api(path, body) {
 
 function showForm() {
   const tag = h("input", { class: "input", id: "jr-gamertag", maxlength: 16, autocomplete: "nickname", placeholder: "e.g. Steve1234" });
-  const msg = h("textarea", { class: "input", id: "jr-message", rows: 3, maxlength: 500, placeholder: "Say hi! How did you hear about GalaxySMP? (optional)" });
+  const msg = h("textarea", { class: "input", id: "jr-message", rows: 3, maxlength: 500, placeholder: "Introduce yourself and tell us how you found GalaxySMP (optional)." });
   const send = h("button", { class: "btn btn-primary", type: "submit", text: "Send request" });
   const form = h("form", { class: "form", style: "max-width:520px" },
     field("Your Xbox gamertag", tag, "Exactly as it shows in Minecraft, including spaces."),

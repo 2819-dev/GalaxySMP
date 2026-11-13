@@ -118,7 +118,7 @@ export function renderReports(root, { toast, setTimer }) {
         [`"${String(r.content || "").slice(0, 200)}"${r.deleted ? " (deleted)" : ""}`, r.reports.map((x) => `${x.reporter}: ${x.reason}`).join(" · ")],
         () => decide(`Message by ${r.author.username}`, (outcome, note) => postJson(`/api/mod/reports/${r.messageId}/resolve`, { outcome, note })), r.firstReported) })),
     ].sort((a, b) => new Date(a.at) - new Date(b.at));
-    box.replaceChildren(...(items.length ? items.map((i) => i.el) : [h("p", { class: "text-3", text: "No open reports. Nice and quiet." })]));
+    box.replaceChildren(...(items.length ? items.map((i) => i.el) : [h("p", { class: "text-3", text: "No open reports." })]));
   }
   load();
   setTimer(setInterval(load, 30_000));

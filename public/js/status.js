@@ -40,7 +40,7 @@ function render(s) {
   } else if (s.online) {
     hero.classList.add("is-online");
     const n = s.players && s.players.online;
-    show("Online", n === 0 ? "No one is playing right now. Be the first to join!" : s.motd);
+    show("Online", n === 0 ? "No one is online right now." : s.motd);
   } else {
     hero.classList.add("is-offline");
     show("Offline", "The server may be restarting. Please check back shortly.");

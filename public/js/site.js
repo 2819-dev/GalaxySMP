@@ -510,7 +510,7 @@ window.addEventListener("beforeinstallprompt", (e) => {
   installBanner();
   document.dispatchEvent(new Event("gsmp-installable"));
 });
-window.addEventListener("appinstalled", () => { document.querySelector(".install-banner")?.remove(); toast("GalaxySMP app installed!"); });
+window.addEventListener("appinstalled", () => { document.querySelector(".install-banner")?.remove(); toast("The GalaxySMP app is installed."); });
 // iPhone / iPad: voice chat only works in the installed GalaxySMP app (in Safari it stops as soon as you switch
 // to Minecraft). Apple doesn't let sites install themselves, so the voice page shows the steps until it's opened
 // from the Home Screen. The rest of the website works normally in Safari.
@@ -554,7 +554,7 @@ function forceInstallScreen() {
       <p class="text-3 small" style="margin-top:14px">Free, no App Store needed. <a href="/" target="_top">Back to the website</a></p>
     </div>`;
   wall.querySelector("[data-copy-link]")?.addEventListener("click", async (e) => {
-    try { await navigator.clipboard.writeText("https://galaxymc.us" + location.pathname); e.target.textContent = "Link copied!"; }
+    try { await navigator.clipboard.writeText("https://galaxymc.us" + location.pathname); e.target.textContent = "Link copied."; }
     catch { e.target.textContent = "galaxymc.us"; }
   });
   document.documentElement.classList.add("install-locked");

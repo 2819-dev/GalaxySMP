@@ -162,7 +162,7 @@ export function renderJobs(root, { toast, setTimer }) {
     const shown = lists[tab] || [];
     const empty = {
       open: "No open jobs right now. Post one, or check back later.",
-      mine: "You haven't posted any jobs. Need something gathered or built? Post a job!",
+      mine: "You haven't posted any jobs yet.",
       doing: "You're not doing any jobs. Open jobs are in the first tab.",
       busy: "No jobs in progress.",
     }[tab];

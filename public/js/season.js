@@ -30,7 +30,7 @@ async function load() {
     h("div", { class: "ss-hero-top" },
       h("div", {}, h("div", { class: "ss-level-k", text: "Tier" }), h("div", { class: "ss-level", text: `${level}` }), h("div", { class: "text-3 small", text: `of ${s.tiers.length}` })),
       h("div", { class: "ss-hero-main" },
-        h("div", { class: "ss-xp-line" }, h("b", { text: `${xp.toLocaleString()} XP` }), h("span", { class: "text-3 small", text: next ? `${(next.xp - xp).toLocaleString()} XP to tier ${level + 1}` : "Every tier unlocked!" })),
+        h("div", { class: "ss-xp-line" }, h("b", { text: `${xp.toLocaleString()} XP` }), h("span", { class: "text-3 small", text: next ? `${(next.xp - xp).toLocaleString()} XP to tier ${level + 1}` : "Every tier unlocked." })),
         h("div", { class: "ss-bar" }, h("span", { style: `width:${pct}%` })),
         h("div", { class: "text-3 small", text: `${daysLeft(s.endsAt)} days left · ends ${new Date(s.endsAt).toLocaleDateString([], { month: "short", day: "numeric" })}` }))),
     h("div", { class: "ss-rules" },
@@ -83,7 +83,7 @@ async function load() {
   const top = h("section", { class: "panel" }, h("h2", { class: "ss-h2", text: "Top this season" }),
     d.top.length ? h("ol", { class: "leaderboard" }, ...d.top.map((t, i) => h("li", {}, h("span", { class: "lb-rank", text: String(i + 1) }),
       h("a", { class: "lb-name", href: `/player/${encodeURIComponent(t.name)}`, text: t.name }), h("span", { class: "lb-val", text: `${t.xp.toLocaleString()} XP` }))))
-      : h("p", { class: "text-3", text: "Nobody has earned XP yet this season. Be the first!" }));
+      : h("p", { class: "text-3", text: "No one has earned XP yet this season." }));
 
   root.replaceChildren(hero, tiers, top, h("p", { class: "text-3 small", text: "Rewards go to you in game: right away if you're online, or the next time you join. A new season starts by itself when this one ends." }));
   // start the strip at the first reward you can claim (or where you are now)

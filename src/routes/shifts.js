@@ -53,7 +53,7 @@ export async function shiftAction(sql, userId, action, source = "web") {
   if (action === "start") {
     if (open) return { ok: false, message: "You're already on shift." };
     await sql`INSERT INTO staff_shifts (user_id, source) VALUES (${userId}, ${source}) ON CONFLICT DO NOTHING`;
-    return { ok: true, message: "You're on shift. Have a good one!" };
+    return { ok: true, message: "You're now on shift." };
   }
   if (!open) return { ok: false, message: "You're not on shift." };
   if (action === "break") {

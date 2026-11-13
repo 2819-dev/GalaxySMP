@@ -164,7 +164,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
     try { d = await getJson(`/api/mod/tickets?status=${ticketFilter}`); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
     setBadge("tickets", d.open);
     box.replaceChildren();
-    if (!d.tickets.length) box.append(h("div", { class: "panel empty", text: ticketFilter === "active" ? "No open tickets. All caught up!" : "No tickets here." }));
+    if (!d.tickets.length) box.append(h("div", { class: "panel empty", text: ticketFilter === "active" ? "No open tickets." : "No tickets here." }));
     for (const t of d.tickets) {
       box.append(h("button", { class: `panel tk-row prio-${t.priority}${t.staffUnread ? " unread" : ""}`, type: "button", onclick: () => openTicket(t.id) },
         headImg(t.user?.head, 36, t.user?.username),
