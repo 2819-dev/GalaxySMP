@@ -15,6 +15,8 @@ export const KINDS = {
   reward: { name: "Daily reward reminder", hint: "Around noon (US Eastern) if you haven't claimed /daily yet", default: true },
   events: { name: "Events", hint: "New events, and a reminder 15 minutes before events you asked to be reminded about", default: true },
   news: { name: "Updates & polls", hint: "New posts in #Updates (when staff choose to notify) and new polls", default: true },
+  jobs: { name: "Jobs", hint: "When someone offers to do your job, takes it or finishes it, and when you're hired or paid", default: true },
+  wishlist: { name: "Wishlist sales", hint: "When something on your Store wishlist is on sale", default: true },
   trades: { name: "Trades", hint: "Trade offers to you, and answers to your offers", default: true },
   community: { name: "Suggestions & builds", hint: "Replies to your suggestions, and Build of the Week", default: true },
   summary: { name: "Daily summary", hint: "Each evening: who played today, your money and streak", default: true },

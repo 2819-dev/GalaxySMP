@@ -15,6 +15,9 @@ import { bootstrap, history, connect, search as chatSearch, pins as chatPins, pi
 import * as mod from "./routes/mod.js";
 import * as staffroom from "./routes/staffroom.js";
 import * as shifts from "./routes/shifts.js";
+import * as jobs from "./routes/jobs.js";
+import * as wrapped from "./routes/wrapped.js";
+import * as wishlist from "./routes/wishlist.js";
 import * as seasonRoutes from "./routes/season.js";
 import * as goals from "./routes/goals.js";
 import * as referrals from "./routes/referrals.js";
@@ -149,6 +152,14 @@ const routes = [
   ["POST", "/api/mod/chatfilter", (req, env) => mod.chatFilterSet(req, env)],
   ["GET", "/api/mod/audit", mod.listAudit],
   ["GET", "/api/staff-room/logs", staffroom.staffLogs],
+  ["POST", "/api/wishlist", (req, env) => wishlist.toggle(req, env)],
+  ["POST", "/api/account/wishlist", (req, env) => wishlist.privacy(req, env)],
+  ["GET", "/api/wrapped", (req, env) => wrapped.list(req, env)],
+  ["GET", "/api/wrapped/:key", wrapped.get],
+  ["POST", "/api/wrapped/:key/share", wrapped.share],
+  ["GET", "/api/jobs", (req, env) => jobs.list(req, env)],
+  ["POST", "/api/jobs", (req, env) => jobs.create(req, env)],
+  ["POST", "/api/jobs/:id", jobs.action],
   ["GET", "/api/shifts", (req, env) => shifts.overview(req, env)],
   ["POST", "/api/shifts/action", (req, env) => shifts.action(req, env)],
   ["POST", "/api/shifts/loa", (req, env) => shifts.requestLoa(req, env)],

@@ -572,6 +572,9 @@ export async function tick(env) {
     ["referrals", () => import("./referrals.js").then((m) => m.checkReferrals(env, sql))],
     ["goals", () => import("./goals.js").then((m) => m.goalsTick(env, sql))],
     ["shifts", () => import("./shifts.js").then((m) => m.shiftsTick(env, sql))],
+    ["jobs", () => import("./jobs.js").then((m) => m.jobsTick(env, sql))],
+    ["wishlist", () => import("./wishlist.js").then((m) => m.wishlistSales(env, sql))],
+    ["wrapped", () => import("./wrapped.js").then((m) => m.wrappedTick(env, sql))],
     ["rewards", () => import("./rewards.js").then((m) => m.sendRewards(env, sql))],
   ];
   for (const [name, run] of jobs) await run().catch((e) => console.error(`${name} job failed`, e));

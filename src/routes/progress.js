@@ -82,10 +82,12 @@ async function recordHistory(sql, changed, onlineIds) {
   const ids = [...new Set([...changed, ...onlineIds])];
   if (ids.length) {
     await sql`
-      INSERT INTO player_stats_daily (xuid, day, playtime_s, balance_cents, mined, placed)
-      SELECT xuid, (now() AT TIME ZONE 'America/New_York')::date, coalesce(playtime_s, 0), coalesce(balance_cents, 0), coalesce(mined, 0), coalesce(placed, 0)
+      INSERT INTO player_stats_daily (xuid, day, playtime_s, balance_cents, mined, placed, kills, quests, achievements, bw_wins, bw_kills)
+      SELECT xuid, (now() AT TIME ZONE 'America/New_York')::date, coalesce(playtime_s, 0), coalesce(balance_cents, 0), coalesce(mined, 0), coalesce(placed, 0),
+             coalesce(kills, 0), coalesce(quests_done, 0), coalesce(cardinality(achievements), 0), coalesce(bw_wins, 0), coalesce(bw_kills, 0)
         FROM players WHERE xuid = ANY(${ids})
-      ON CONFLICT (xuid, day) DO UPDATE SET playtime_s = EXCLUDED.playtime_s, balance_cents = EXCLUDED.balance_cents, mined = EXCLUDED.mined, placed = EXCLUDED.placed`;
+      ON CONFLICT (xuid, day) DO UPDATE SET playtime_s = EXCLUDED.playtime_s, balance_cents = EXCLUDED.balance_cents, mined = EXCLUDED.mined, placed = EXCLUDED.placed,
+        kills = EXCLUDED.kills, quests = EXCLUDED.quests, achievements = EXCLUDED.achievements, bw_wins = EXCLUDED.bw_wins, bw_kills = EXCLUDED.bw_kills`;
   }
   if (onlineIds.length) {
     const extended = await sql`
@@ -255,7 +257,7 @@ export async function socialProfile(request, env, ctx, url, params) {
   const sql = getDb(env);
   const [u] = await sql`
     SELECT u.id, u.username, u.created_at, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color, u.banner_at, (u.banner IS NOT NULL) AS has_banner,
-           u.showcase
+           u.showcase, u.wishlist_hidden
       FROM players p JOIN users u ON u.mc_uuid = p.uuid
      WHERE lower(p.gamertag) = ${name} AND NOT u.banned
      ORDER BY p.last_seen DESC LIMIT 1`;
@@ -270,6 +272,8 @@ export async function socialProfile(request, env, ctx, url, params) {
       bio: u.bio || null, interests: (u.interests || []).map((i) => INTEREST_NAME[i]).filter(Boolean), color: u.profile_color || null,
       banner: bannerUrl(u),
       showcase: await (await import("./showcase.js")).showcaseFor(sql, u.id, u.showcase),
+      wishlist: u.wishlist_hidden && !me ? null : await (await import("./wishlist.js")).wishlistFor(sql, u.id),
+      wishlistHidden: Boolean(u.wishlist_hidden),
     },
   }, 200, { "Cache-Control": "no-store" });
 }

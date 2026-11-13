@@ -60,6 +60,7 @@ export async function mine(request, env) {
     ok: true, signedIn: true, username: user.username, linked: Boolean(p), owned, plan,
     infinite: ownerOf(env, user), credits: ownerOf(env, user) ? 1e9 : (await balance(sql, user.id)) / 100, history: await history(sql, user.id, 15),
     promos: await memberPromos(sql, user), packs: publicPacks(), cards: stripeReady(env),
+    wishlist: (await sql`SELECT item FROM wishlist WHERE user_id = ${user.id}`).map((r) => r.item),
   });
 }
 
@@ -96,6 +97,7 @@ async function prepare(sql, user, body) {
 }
 
 async function deliver(env, sql, player, prod, by, source) {
+  await (await import("./wishlist.js")).gotItem(sql, player.xuid, prod.key).catch(() => {});
   if (prod.isPlan) return grantPlan(env, sql, player, prod, by, source);
   return giveShopItem(env, sql, { xuid: player.xuid, gamertag: player.gamertag }, { item: prod.key, option: prod.option }, by, source);
 }

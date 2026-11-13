@@ -222,7 +222,23 @@ async function load() {
         : h("p", { class: "text-3", style: "margin:0", text: "Pin up to 3 of your achievements or builds here for everyone to see." }));
   }
 
-  box.replaceChildren(...[hero, showcase].filter(Boolean), h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, stats, bedwars, charts), h("div", { class: "pp-col" }, achievements)));
+  // ---- wishlist (like Discord's): Store things they'd like, with a Gift button ----
+  let wishlist = null;
+  const wl = social?.wishlist;
+  if (wl && (wl.length || social.isMe)) {
+    const usd = (c) => `$${(c / 100).toFixed(2)}`;
+    wishlist = h("section", { class: "panel pp-wishlist" },
+      h("div", { class: "pp-sc-head" }, h("h2", {}, iconEl("heart"), " Wishlist"),
+        social.isMe ? h("a", { class: "btn btn-ghost btn-sm", href: "/store" }, iconEl("plus"), "Add from the Store") : null),
+      wl.length ? h("div", { class: "wl-grid" }, ...wl.map((it) => h("div", { class: `wl-item${it.isPlan ? " plan" : ""}` },
+        h("div", { class: "wl-top" }, h("span", { class: "wl-ic" }, iconEl(it.icon)),
+          h("div", {}, h("div", { class: "wl-name", text: it.name }), h("div", { class: "wl-price", text: `${it.from ? "from " : ""}${usd(it.price)}${it.per ? ` / ${it.per}` : ""}` }))),
+        social.isMe ? null : h("a", { class: "btn btn-primary btn-sm", href: `/store?gift=${social.id}&giftName=${encodeURIComponent(social.username)}&item=${encodeURIComponent(it.key)}` }, iconEl("gift"), "Gift this"))))
+        : h("p", { class: "text-3", style: "margin:0", text: "Tap the heart on anything in the Store to add it here. Friends can gift you things from your wishlist." }),
+      social.isMe ? h("p", { class: "text-3 small", style: "margin:10px 0 0", text: social.wishlistHidden ? "Only you can see your wishlist. Change this in Account settings." : "Everyone signed in can see this. You can hide it in Account settings." }) : null);
+  }
+
+  box.replaceChildren(...[hero, showcase].filter(Boolean), h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, stats, bedwars, charts), h("div", { class: "pp-col" }, wishlist, achievements)));
 }
 
 // Playtime per day (bars) and money over the last 30 days (line), from the daily history.

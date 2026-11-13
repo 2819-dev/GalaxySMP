@@ -218,8 +218,8 @@ export async function createRoute(request, env) {
   const note = clean(body.note, 120) || null;
   try {
     const [row] = await sql`
-      INSERT INTO promo_codes (code, kind, value, targets, members, max_uses, per_player, expires_at, note, created_by)
-      VALUES (${code}, ${kind}, ${value}, ${targets}, ${members}, ${maxUses}, ${perPlayer}, ${expires}, ${note}, ${user.id})
+      INSERT INTO promo_codes (code, kind, value, targets, members, max_uses, per_player, expires_at, note, created_by, wishlist_alert)
+      VALUES (${code}, ${kind}, ${value}, ${targets}, ${members}, ${maxUses}, ${perPlayer}, ${expires}, ${note}, ${user.id}, ${Boolean(body.wishlistAlert)})
       RETURNING id`;
     await audit(sql, user.id, "promo.create", { code, offer: describe({ kind, value }), members: members?.length || 0 });
     return json({ ok: true, id: Number(row.id), code });

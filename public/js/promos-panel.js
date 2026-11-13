@@ -131,6 +131,7 @@ export function setupPromos({ loaders, toast }) {
     endsAtField.hidden = true;
     ends.addEventListener("change", () => { endsAtField.hidden = ends.value !== "custom"; });
     const note = h("input", { class: "input", id: "pr-note", maxlength: 120, placeholder: "Only staff see this (e.g. Summer event)" });
+    const wish = h("input", { type: "checkbox", id: "pr-wish" });
 
     openDialog({
       title: "New promo code",
@@ -141,7 +142,8 @@ export function setupPromos({ loaders, toast }) {
         field("Who can use it", who), pickerField,
         h("div", { class: "promo-two" }, field("Total uses", maxUses, "Empty = unlimited"), field("Uses per player", perPlayer, "Empty = unlimited")),
         field("Expires", ends), endsAtField,
-        field("Note", note)),
+        field("Note", note),
+        h("label", { class: "check" }, wish, "Tell wishlists: send a notification (with the code) to members who have something it works on in their wishlist")),
       actions: [{ label: "Cancel" }, {
         label: "Create code", kind: "primary", onClick: async () => {
           if (who.value === "members" && !chosen.size) throw new Error("Pick at least one member, or choose Anyone.");
@@ -154,7 +156,7 @@ export function setupPromos({ loaders, toast }) {
             code: code.value, kind: kind.value, value: value.value,
             targets: boxes.filter((b) => b.checked).map((b) => b.value),
             members: who.value === "members" ? [...chosen.keys()] : [],
-            maxUses: maxUses.value, perPlayer: perPlayer.value, expires, note: note.value,
+            maxUses: maxUses.value, perPlayer: perPlayer.value, expires, note: note.value, wishlistAlert: wish.checked,
           });
           toast(`Promo code ${res.code} created.`);
           load();

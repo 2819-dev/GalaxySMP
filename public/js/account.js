@@ -339,9 +339,23 @@ const SECTIONS = {
         h("label", { class: "acc-rn-switch", for: "acc-act" }, box, h("span", { text: "Show my Xbox activity on my profile" })),
         h("p", { class: "text-3 small", style: "margin:8px 0 0", text: "When you're on GalaxySMP it always shows \"Playing Minecraft\". This switch is about what you do on Xbox Live outside the server." }));
     })() : null;
+    const wish = (() => {
+      const box = h("input", { type: "checkbox", id: "acc-wish" });
+      box.checked = data.wishlistHidden;
+      box.addEventListener("change", async () => {
+        try {
+          await postJson("/api/account/wishlist", { hidden: box.checked });
+          data.wishlistHidden = box.checked;
+          toast(box.checked ? "Your wishlist is hidden." : "Your wishlist shows on your profile.");
+        } catch (e) { box.checked = !box.checked; toast(e.message); }
+      });
+      return card("Wishlist", "Things you hearted in the Store show on your profile, so friends can gift them to you.",
+        h("label", { class: "acc-rn-switch", for: "acc-wish" }, box, h("span", { text: "Hide my wishlist from other players" })));
+    })();
     return [
       realName,
       activity,
+      wish,
       card("Blocked members", "Blocked members can't send you direct messages.", blocked),
       card("Your data", null,
         h("p", { class: "text-2", style: "margin:0 0 10px", text: "Read what we store and why in the privacy policy. To have your account and messages deleted, open a ticket in Community → Support." }),

@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.37.0"
+VERSION = "2.38.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -228,6 +228,8 @@ class GalaxyLink(Plugin):
         self.ranktags = RankTags(self)
         from endstone_galaxylink.rewards import Rewards
         self.rewards = Rewards(self)  # money and keys from the website (referrals, season pass, server goals)
+        from endstone_galaxylink.jobboard import JobBoard
+        self.jobboard = JobBoard(self)  # #Jobs on the website: holds the reward when a job is posted
         from endstone_galaxylink.shifts import Shifts
         self.shifts = Shifts(self)    # /shift for staff
         from endstone_galaxylink.cards import PlayerCards

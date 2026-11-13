@@ -13,6 +13,26 @@ let me = { signedIn: false, owned: {}, promos: [] }; // /api/store/mine
 // ---------- What can be bought ----------
 const itemOnSale = (cat) => (data.onSale || []).includes(cat.id);
 const ownedCount = (id) => me.owned?.[id] || 0;
+// Wishlist heart (like Discord's): saves the item to your wishlist, which shows on your profile so friends can gift it.
+function heart(key, name) {
+  const on = () => (me.wishlist || []).includes(key);
+  const b = h("button", { class: "wish-btn", type: "button" }, iconEl("heart"));
+  const sync = () => { b.classList.toggle("on", on()); b.setAttribute("aria-pressed", String(on())); b.setAttribute("aria-label", on() ? `Remove ${name} from your wishlist` : `Add ${name} to your wishlist`); b.title = on() ? "On your wishlist" : "Add to wishlist"; };
+  sync();
+  b.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (!me.signedIn) return toast("Sign in to make a wishlist.");
+    try {
+      const r = await postJson("/api/wishlist", { item: key, on: !on() });
+      me.wishlist = r.wishlist;
+      document.querySelectorAll(`.wish-btn[data-key="${CSS.escape(key)}"]`).forEach((x) => x.dispatchEvent(new Event("wish-sync")));
+      toast(r.message);
+    } catch (err) { toast(err.message); }
+  });
+  b.dataset.key = key;
+  b.addEventListener("wish-sync", sync);
+  return b;
+}
 const promoFits = (p, tags) => !p.targets?.length || p.targets.some((t) => tags.includes(t));
 const priceAfter = (p, price) => {
   let f = price;
@@ -213,6 +233,7 @@ function renderPlans() {
   for (const plan of data.plans) {
     const current = me.signedIn && me.linked && (me.plan || "free") === plan.id;
     const card = h("article", { class: `panel plan-card plan-${plan.id}${current ? " is-current" : ""}` });
+    if (plan.price) card.append(heart(plan.id, plan.name));
     if (current) card.append(h("span", { class: "plan-badge current", text: "Your plan" }));
     else if (plan.id === "pro") card.append(h("span", { class: "plan-badge", text: "Best value" }));
     card.append(h("div", { class: "plan-top" }, h("h3", { class: "plan-name", text: plan.name }), plan.tag ? h("div", { class: "plan-tag" }, rankTag(plan.tag)) : null));
@@ -321,6 +342,7 @@ function renderShop() {
       const owned = ownedCount(item.id);
       const maxed = item.limit && owned >= item.limit;
       const card = h("article", { class: `panel shop-item cat-${cat.id}${maxed ? " is-owned" : ""}${sale ? "" : " is-soon"}` });
+      if (!maxed) card.append(heart(item.id, item.name));
       if (maxed) card.append(h("span", { class: "shop-badge owned" }, iconEl("check"), "Owned"));
       else if (item.badge) card.append(h("span", { class: "shop-badge", text: item.badge }));
       card.append(h("div", { class: "shop-icon" }, iconEl(item.icon || "cart")),
@@ -477,6 +499,23 @@ function giftDialog() {
   setTimeout(() => search.focus(), 50);
 }
 
+// Opens checkout for one item (from "Gift" on someone's wishlist: /store?gift=<id>&giftName=<name>&item=<key>).
+function openItem(key) {
+  const plan = data.plans.find((p) => p.id === key && p.price);
+  if (plan) {
+    if (!(data.onSale || []).includes("plans")) return;
+    return buyPlan(plan);
+  }
+  for (const cat of data.shop) {
+    const item = cat.items.find((i) => i.id === key);
+    if (!item || !itemOnSale(cat)) continue;
+    const o = item.options?.[0];
+    document.getElementById("shop")?.scrollIntoView();
+    return checkout({ id: item.id, option: () => o?.id || null, name: o ? `${item.name} (${o.name})` : item.name, price: o ? o.price : item.price,
+      icon: item.icon || "cart", cat: cat.id, tags: ["shop", `cat:${cat.id}`, `item:${item.id}`], isPlan: false });
+  }
+}
+
 function renderAll() {
   renderFeatured();
   renderCats();
@@ -514,6 +553,7 @@ function watchTabs() {
   watchTabs();
   if (["#shop", "#credits", "#donate"].includes(location.hash)) document.querySelector(location.hash).scrollIntoView();
   const params = new URLSearchParams(location.search);
+  if (params.get("item")) openItem(params.get("item"));
   const paid = params.get("paid");
   if (paid) {
     history.replaceState(null, "", "/store");
