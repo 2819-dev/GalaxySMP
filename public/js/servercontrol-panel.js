@@ -4,6 +4,7 @@ import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 
 const pad = (n) => String(n).padStart(2, "0");
 const localInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const LOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><circle cx="12" cy="15.5" r="1.4" fill="currentColor"/></svg>';
 const nice = (iso) => new Date(iso).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 export function setupServerControl({ loaders, toast }) {
@@ -13,8 +14,45 @@ export function setupServerControl({ loaders, toast }) {
   loaders.serverctl = async () => {
     let d;
     try { d = await getJson("/api/panel/server-control"); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
-    box.replaceChildren(allowlistPanel(), goalPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d));
+    box.replaceChildren(lockdownPanel(d), allowlistPanel(), goalPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d));
   };
+
+  // ---------- lock the whole website ----------
+  function lockdownPanel(d) {
+    const l = d.lockdown || {};
+    const title = h("input", { class: "input", id: "sc-lock-title", maxlength: 80, placeholder: "e.g. We're upgrading GalaxySMP" });
+    title.value = l.title || "";
+    const msg = h("textarea", { class: "input", id: "sc-lock-msg", rows: 4, maxlength: 600, placeholder: "e.g. The website and server are closed while we install a big update. We'll be back on Sunday!" });
+    msg.value = l.message || "";
+    const preview = h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Preview", onclick: () => openDialog({
+      title: "Preview",
+      body: h("div", { class: "lock-preview" },
+        Object.assign(h("div", { class: "lock-preview-icon", "aria-hidden": "true" }), { innerHTML: LOCK_SVG }),
+        h("h3", { text: title.value.trim() || "GalaxySMP is closed right now" }),
+        h("p", { text: msg.value.trim() || "We'll be back soon." })),
+      actions: [{ label: "Close" }],
+    }) });
+    const btn = h("button", { class: `btn ${l.on ? "btn-primary" : "btn-danger"}`, type: "button", text: l.on ? "Unlock the website" : "Lock the website" });
+    btn.addEventListener("click", () => {
+      if (l.on) return save({ action: "lockdown", on: false }).catch((e) => toast(e.message));
+      if (!title.value.trim()) { toast("Add a title first."); title.focus(); return; }
+      openDialog({
+        title: "Lock the whole website?",
+        body: h("div", { class: "text-2" },
+          h("p", { style: "margin:0 0 8px", text: "Everyone except you will only see the lock screen with your title and message. The Minecraft server closes to players too: everyone is moved out with your message and nobody can join." }),
+          h("p", { style: "margin:0", text: "Unlock it here any time. If you get signed out, use \"Owner sign-in\" at the bottom of the lock screen." })),
+        actions: [{ label: "Cancel" }, { label: "Lock the website", kind: "danger", onClick: () => save({ action: "lockdown", on: true, title: title.value, message: msg.value }) }],
+      });
+    });
+    const update = h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Save changes", hidden: !l.on,
+      onclick: () => save({ action: "lockdown", on: true, title: title.value, message: msg.value }).catch((e) => toast(e.message)) });
+    return h("section", { class: `panel sc-card${l.on ? " sc-locked" : ""}` },
+      h("div", { class: "sc-head" }, h("h2", { text: "Lock the website" }),
+        h("span", { class: `sg-status ${l.on ? "declined" : "done"}`, text: l.on ? `Locked since ${nice(l.since || Date.now())}` : "Open" })),
+      h("p", { class: "text-2", text: "Closes the whole website and the Minecraft server. Visitors see a lock icon with your title and message; only you can still use the site." }),
+      field("Title", title), field("Message", msg),
+      h("div", { class: "cx-row" }, btn, update, preview));
+  }
 
   // ---------- allowlist (who can join the Minecraft server) ----------
   function allowlistPanel() {

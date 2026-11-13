@@ -57,6 +57,7 @@ import * as actas from "./routes/actas.js";
 import * as friends from "./routes/friends.js";
 import { isActingRequest } from "./lib/auth.js";
 import { ensureSchema } from "./lib/autoschema.js";
+import { lockdownGate, lockdownState } from "./lib/lockdown.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
@@ -164,6 +165,7 @@ const routes = [
   ["GET", "/api/wrapped/:key", wrapped.get],
   ["POST", "/api/wrapped/:key/share", wrapped.share],
   ["POST", "/api/giftcards", (req, env) => giftcards.buy(req, env)],
+  ["GET", "/api/lockdown", async (req, env) => { const l = await lockdownState(env); return json({ ok: true, on: Boolean(l.on) }, 200, { "Cache-Control": "no-store" }); }],
   ["GET", "/api/friends", (req, env) => friends.list(req, env)],
   ["POST", "/api/friends", (req, env) => friends.act(req, env)],
   ["GET", "/api/giftcards/mine", (req, env) => giftcards.mine(req, env)],
@@ -374,6 +376,9 @@ export default {
     if (url.hostname.startsWith("cube.") && !url.pathname.startsWith("/api/")) {
       return Response.redirect(`https://galaxymc.us/cube${url.search}`, 302);
     }
+    // Website lockdown (Control Panel): everyone but the owners sees the lock screen
+    const locked = await lockdownGate(request, env, url);
+    if (locked) return locked;
     if (!url.pathname.startsWith("/api/")) return serveStatic(request);
     try {
       // "Act as Member" sessions are look-only: no changes of any kind (except going back / signing out)

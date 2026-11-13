@@ -3446,3 +3446,12 @@ body.map-in-3d .map-empty { display: none; }
 .fr-name small { font-size: .78rem; }
 .fr-on { color: #2fa85a; font-weight: 600; }
 .fr-btns { display: flex; gap: 6px; flex: none; }
+
+/* ---------- Control Panel: lock the website ---------- */
+.sc-card.sc-locked { border-color: rgba(220, 70, 70, .45); box-shadow: 0 0 0 3px rgba(220, 70, 70, .08); }
+.lock-preview { text-align: center; padding: 8px 4px 4px; }
+.lock-preview-icon { width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 20px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, #4f7cff, #8a5cff); box-shadow: 0 10px 30px rgba(90, 100, 255, .35); }
+.lock-preview-icon svg { width: 30px; height: 30px; }
+.lock-preview h3 { margin: 0 0 8px; font-size: 1.25rem; overflow-wrap: anywhere; }
+.lock-preview p { margin: 0; color: var(--text-2); white-space: pre-line; overflow-wrap: anywhere; }

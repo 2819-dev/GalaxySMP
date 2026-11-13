@@ -99,6 +99,11 @@ A new minigame you can host. Galaxy+ and Pro+ members choose Build Contest in th
 **Friends**
 Add friends from their profile or from the new Friends page under Messages in Community. You'll see who is in game right now and get a notification when a friend joins the server.`,
   },
+  {
+    id: "2026-11-17b",
+    title: "Clearer notices during big updates",
+    body: `When GalaxySMP closes for a big update, the website now shows a simple notice explaining what's happening and when we expect to be back, and the server shows the same message if you try to join.`,
+  },
 ];
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.

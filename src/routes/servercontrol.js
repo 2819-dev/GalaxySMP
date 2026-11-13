@@ -24,12 +24,13 @@ async function setKey(sql, key, value, by) {
 }
 
 export async function loadServerControl(sql) {
-  const [maintenance, restart, kit] = await Promise.all([getKey(sql, "maintenance"), getKey(sql, "restart_plan"), getKey(sql, "welcome_kit")]);
+  const [maintenance, restart, kit, lockdown] = await Promise.all([getKey(sql, "maintenance"), getKey(sql, "restart_plan"), getKey(sql, "welcome_kit"), getKey(sql, "lockdown")]);
   const r = restart && restart.at && restart.at * 1000 > Date.now() - 120e3 ? restart : null;
   return {
     maintenance: { on: Boolean(maintenance?.on), message: maintenance?.message || DEFAULT_BANNER, since: maintenance?.since || null },
     restart: r,
     kit: kit || DEFAULT_KIT,
+    lockdown: { on: Boolean(lockdown?.on), title: lockdown?.title || "", message: lockdown?.message || "", since: lockdown?.since || null },
   };
 }
 
@@ -85,6 +86,24 @@ export async function saveServerControl(request, env) {
     }
     await setKey(sql, "maintenance", { on, message: text, since: on ? cur.maintenance.since || new Date().toISOString() : null }, user.username);
     message = on ? "Maintenance mode is on. Only you can join the server, and the website shows your message." : "Maintenance mode is off. Everyone can join again.";
+  } else if (b.action === "lockdown") {
+    // Lock the whole website (lock screen with a title and message) and close the server to players.
+    const on = Boolean(b.on);
+    const cur = await loadServerControl(sql);
+    const title = cleanText(b.title, 80).replace(/\n/g, " ") || cur.lockdown.title || "GalaxySMP is closed right now";
+    const text = cleanText(b.message, 600) || cur.lockdown.message || "We'll be back soon.";
+    await setKey(sql, "lockdown", { on, title, message: text, since: on ? cur.lockdown.since || new Date().toISOString() : null }, user.username);
+    if (on) {
+      // remember whether maintenance was already on before the lockdown, so unlocking doesn't turn it off
+      const [m] = await sql`SELECT value FROM economy_config WHERE key = 'maintenance'`;
+      const byLockdown = m?.value?.on ? Boolean(m.value.byLockdown) : true;
+      await setKey(sql, "maintenance", { on: true, message: `${title}: ${text}`.replace(/\s+/g, " ").slice(0, 300), since: cur.maintenance.since || new Date().toISOString(), byLockdown }, user.username);
+    } else {
+      const [m] = await sql`SELECT value FROM economy_config WHERE key = 'maintenance'`;
+      if (m?.value?.byLockdown) await setKey(sql, "maintenance", { on: false, message: cur.maintenance.message, since: null }, user.username);
+    }
+    (await import("../lib/lockdown.js")).forgetLockdown();
+    message = on ? "The website is locked and the server is closed to players. Only you can use the site." : "The website is open again and players can join the server.";
   } else if (b.action === "restart") {
     const at = Math.floor(new Date(b.at).getTime() / 1000);
     if (!Number.isFinite(at)) throw new HttpError(400, "Pick a date and time.");
