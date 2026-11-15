@@ -3461,8 +3461,8 @@ body.map-in-3d .map-empty { display: none; }
   color: var(--text-2); display: grid; place-items: center; cursor: pointer; padding: 0; transition: color .15s, border-color .15s; }
 .inbox-btn:hover, .inbox-btn[aria-expanded="true"] { color: var(--text); border-color: var(--accent-text); }
 .inbox-btn svg { width: 19px; height: 19px; }
-.inbox-count { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #e5484d; color: #fff;
-  font-size: .68rem; font-weight: 700; line-height: 18px; text-align: center; border: 2px solid var(--bg); box-sizing: content-box; }
+.inbox-count { position: absolute; top: -5px; right: -7px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: #e5484d; color: #fff;
+  font-size: .62rem; font-weight: 700; line-height: 16px; text-align: center; border: 2px solid var(--bg); box-sizing: content-box; }
 .inbox-count[hidden] { display: none; }
 .inbox-card { position: fixed; z-index: 80; width: min(360px, calc(100vw - 16px)); max-height: min(520px, calc(100vh - 90px)); display: flex; flex-direction: column;
   background: var(--surface); border: 1px solid var(--border-strong); border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,.45); overflow: hidden; animation: acct-in .14s ease-out; }

@@ -146,6 +146,11 @@ A new Off-Topic category at the bottom of Community: **OT | General** for chatti
 **Joining from the Friends tab**
 The account that shows GalaxySMP under Play > Friends now runs alongside the server itself, so it's online whenever the server is. Add GalaxyPRO#9842 as a friend to see GalaxySMP in your Friends tab.`,
   },
+  {
+    id: "2026-11-20b",
+    title: "Light and dark mode moved to Account settings",
+    body: `Choose Auto, Light or Dark in Account settings > Appearance. Auto follows your device's setting, and it's the default. The button at the top of every page has been removed to keep the header clean.`,
+  },
 ];
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.

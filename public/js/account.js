@@ -1,5 +1,5 @@
 // Account (settings): profile, notifications, subscription, purchases & payments, security, privacy.
-import { toast, iconEl, isInstalled, setSkin } from "/js/site.js";
+import { toast, iconEl, isInstalled, setSkin, setTheme, themePref } from "/js/site.js";
 import { faceSvg } from "/js/face.js";
 import { moneyDollars } from "/js/money.js";
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
@@ -175,7 +175,15 @@ const SECTIONS = {
       h("div", { class: "lk-opt locked", title: `Season Pass tier ${l.tier}${l.track === "pro" ? " (Pro+ track)" : ""}` }, iconEl("lock"), h("span", { text: l.name }), h("span", { class: "lk-sub", text: `Tier ${l.tier}${l.track === "pro" ? " · Pro+" : ""}` })));
     const swatch = (c) => { const s = h("span", { class: "lk-swatch" }); s.style.background = c ? `linear-gradient(135deg, ${c[0]} 0 35%, ${c[1]} 35% 70%, ${c[2]} 70%)` : "linear-gradient(135deg, #0a0c1b 0 35%, #2457eb 35% 70%, #4febfd 70%)"; return s; };
     const faceImg = (frame) => { const w = h("span", { class: `lf${frame ? ` lf-${frame}` : ""}`, style: "display:inline-flex" }); const i = h("img", { class: "lk-face", alt: "" }); i.src = p.head || faceSvg(p.username); w.append(i); return w; };
+    const modes = h("div", { class: "fr-tabs ap-modes", role: "radiogroup", "aria-label": "Light or dark" });
+    const drawModes = () => modes.replaceChildren(...[["auto", "Auto", "contrast"], ["light", "Light", "sun"], ["dark", "Dark", "moon"]].map(([k, label, ic]) => {
+      const b = h("button", { class: "fr-tab", type: "button", role: "radio", "aria-checked": String(themePref() === k), "aria-selected": String(themePref() === k) }, iconEl(ic), label);
+      b.addEventListener("click", () => { setTheme(k); drawModes(); });
+      return b;
+    }));
+    drawModes();
     return [
+      card("Light or dark", "Auto follows your device's setting. Saved on this device.", modes),
       card("Website theme", "Changes the colors of galaxymc.us for you, on every device you sign in on. Works with light and dark mode.",
         h("div", { class: "lk-row" }, opt("theme", null, "Galaxy", swatch(null), "Default"), ...d.themes.map((t) => opt("theme", t.id, t.name, swatch(t.colors), t.animated ? "Animated" : null)), ...lockedOf("theme"))),
       card("Profile title", "Shows under your name on your profile and profile card.",

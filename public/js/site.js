@@ -198,7 +198,6 @@ function renderHeader() {
         <div class="nav-actions">${chip}<a class="btn btn-primary btn-sm" href="/community">Community</a></div>
       </nav>
       <a class="btn btn-primary btn-sm nav-community" href="/community">Community</a>
-      <button class="theme-btn" type="button" id="theme-btn"></button>
       <div class="acct-slot" id="acct-slot"></div>
     </div>
   </header>
@@ -371,21 +370,13 @@ export function setSkin(v) {
 try { const v = localStorage.getItem("gx_skin"); if (v) document.documentElement.dataset.skin = v; } catch { /* storage blocked */ }
 
 // ---------- Light / dark mode: Auto (follows the device), Light or Dark. Saved in this browser. ----------
-const THEMES = ["auto", "light", "dark"];
-function themePref() { try { return localStorage.getItem("gx_theme") || "auto"; } catch { return "auto"; } }
+export function themePref() { try { return localStorage.getItem("gx_theme") || "auto"; } catch { return "auto"; } }
 function applyTheme() {
   const pref = themePref();
   const light = pref === "light" || (pref === "auto" && window.matchMedia?.("(prefers-color-scheme: light)").matches);
   document.documentElement.dataset.theme = light ? "light" : "dark";
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", light ? "#f4f6fc" : "#0a0c1b");
   swapRankIcons();
-  const b = document.getElementById("theme-btn");
-  if (b) {
-    const label = { auto: "Theme: Auto (follows your device)", light: "Theme: Light", dark: "Theme: Dark" }[pref];
-    b.innerHTML = icon(pref === "light" ? "sun" : pref === "dark" ? "moon" : "contrast");
-    b.title = `${label}. Tap to change.`;
-    b.setAttribute("aria-label", b.title);
-  }
 }
 // Rank icons have a dark pixel outline that looks heavy on a light page: light mode uses copies without it.
 // (paths are built from parts so the asset step doesn't add a version to them)
@@ -417,16 +408,7 @@ export function setTheme(pref) {
 }
 applyTheme();
 window.matchMedia?.("(prefers-color-scheme: light)").addEventListener?.("change", applyTheme);
-function wireThemeButton() {
-  const b = document.getElementById("theme-btn");
-  if (!b) return;
-  applyTheme();
-  b.addEventListener("click", () => {
-    const next = THEMES[(THEMES.indexOf(themePref()) + 1) % THEMES.length];
-    setTheme(next);
-    toast({ auto: "Theme: Auto (follows your device)", light: "Light mode", dark: "Dark mode" }[next]);
-  });
-}
+// (Light / Dark / Auto is chosen in Account settings > Looks; there's no button in the header.)
 
 // A banner under the header on every page: maintenance mode (the owner's message) or a restart coming up.
 async function renderNotice() {
@@ -460,7 +442,6 @@ else {
   renderHeader();
   renderFooter();
   renderNotice();
-  wireThemeButton();
   if (!EMBED) import("/js/account-menu.js").then((m) => m.renderAccountButton(document.getElementById("acct-slot"))).catch(() => {});
 }
 fillConfig();
