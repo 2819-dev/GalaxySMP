@@ -132,6 +132,8 @@ const routes = [
   ["POST", "/api/feed/:id/comments", feed.addComment],
   ["POST", "/api/feed/:id/delete", feed.deletePost],
   ["GET", "/api/panel/server-control", (req, env) => serverctl.getServerControl(req, env)],
+  ["GET", "/api/panel/potm", (req, env, ctx, url) => import("./routes/potm.js").then((m) => m.getPotm(req, env, ctx, url))],
+  ["POST", "/api/panel/potm", (req, env) => import("./routes/potm.js").then((m) => m.savePotmPanel(req, env))],
   ["POST", "/api/panel/server-control", (req, env) => serverctl.saveServerControl(req, env)],
   ["GET", "/api/panel/allowlist", (req, env) => serverctl.getAllowlist(req, env)],
   ["POST", "/api/panel/allowlist", (req, env) => serverctl.changeAllowlist(req, env)],

@@ -14,8 +14,48 @@ export function setupServerControl({ loaders, toast }) {
   loaders.serverctl = async () => {
     let d;
     try { d = await getJson("/api/panel/server-control"); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
-    box.replaceChildren(lockdownPanel(d), friendBotPanel(d), allowlistPanel(), goalPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d), holidayPanel(d));
+    box.replaceChildren(lockdownPanel(d), h("div", { class: "sc-potm-slot" }), friendBotPanel(d), allowlistPanel(), goalPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d), holidayPanel(d));
+    box.querySelector(".sc-potm-slot")?.replaceWith(potmPanel());
   };
+
+  // ---------- Player of the Month (Voting Computers in game) ----------
+  function potmPanel() {
+    const wrap = h("section", { class: "panel sc-card" }, h("div", { class: "sc-head" }, h("h2", { text: "Player of the Month" })), h("p", { class: "text-3", text: "Loading…" }));
+    const send = async (body) => { try { const r = await postJson("/api/panel/potm", body); toast(r.message); draw(); } catch (e) { toast(e.message); } };
+    async function draw(round) {
+      let d;
+      try { d = await getJson(`/api/panel/potm${round ? `?round=${round}` : ""}`); } catch (e) { wrap.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
+      const total = d.totals.reduce((n, t) => n + t.votes, 0);
+      const top = d.totals[0]?.votes || 0;
+      const current = d.viewing === d.round;
+      const rounds = h("select", { class: "input", style: "width:auto", "aria-label": "Round" },
+        ...Array.from({ length: d.round }, (_, i) => d.round - i).map((r) => h("option", { value: r, text: r === d.round ? `Round ${r} (current)` : `Round ${r}`, selected: r === d.viewing })));
+      rounds.addEventListener("change", () => draw(Number(rounds.value)));
+      const votes = h("details", { class: "potm-votes" }, h("summary", { text: `Who voted for who (${d.votes.length})` }),
+        d.votes.length ? h("ul", { class: "potm-list" }, ...d.votes.map((v) => h("li", {}, h("b", { text: v.voter }), h("span", { class: "text-3", text: " voted for " }), h("b", { text: v.target }),
+          h("span", { class: "text-3 small", text: ` · ${new Date(v.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` }))))
+          : h("p", { class: "text-3 small", text: "No votes yet." }));
+      wrap.replaceChildren(
+        h("div", { class: "sc-head" }, h("h2", { text: "Player of the Month" }),
+          h("span", { class: `sg-status ${d.open ? "done" : "declined"}`, text: d.open ? "Voting open" : "Voting closed" })),
+        h("p", { class: "text-2", text: "Players vote at the Voting Computers in game. Staff make a computer with /votecomputer, and can open or close voting from any computer or here. Votes are secret: only you see this list. Badges are given by hand." }),
+        h("div", { class: "cx-row", style: "flex-wrap:wrap;align-items:center" },
+          h("button", { class: `btn ${d.open ? "btn-secondary" : "btn-primary"}`, type: "button", text: d.open ? "Close voting" : "Open voting", onclick: () => send({ action: d.open ? "close" : "open" }) }),
+          h("button", { class: "btn btn-ghost", type: "button", text: "Start a new round", onclick: () => openDialog({
+            title: "Start a new round?", body: h("p", { class: "text-2", style: "margin:0", text: `Round ${d.round} is kept, and the count starts again from zero for next month. Voting will be closed until you open it.` }),
+            actions: [{ label: "Cancel" }, { label: "New round", kind: "primary", onClick: () => send({ action: "new-round" }) }] }) }),
+          d.round > 1 ? rounds : null),
+        h("h3", { class: "potm-h", text: `${current ? "This round" : `Round ${d.viewing}`}: ${total} vote${total === 1 ? "" : "s"}` }),
+        d.totals.length ? h("ol", { class: "potm-totals" }, ...d.totals.map((t) => h("li", { class: t.votes === top ? "lead" : "" },
+          h("span", { class: "potm-name", text: t.name }),
+          h("span", { class: "potm-bar" }, h("i", { style: `width:${Math.round((t.votes / top) * 100)}%` })),
+          h("b", { text: String(t.votes) }))))
+          : h("p", { class: "text-3", text: "No votes yet." }),
+        votes);
+    }
+    draw();
+    return wrap;
+  }
 
   // ---------- Jewish holiday decorations ----------
   function holidayPanel(d) {

@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.46.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.47.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -200,6 +200,10 @@ class VoiceLink:
         elif msg.get("type") == "teams":
             self.plugin.teams.update(msg)
             self.plugin.server.scheduler.run_task(self.plugin, self.plugin.refresh_tags)
+        elif msg.get("type") == "potm":
+            self._on_main(lambda m=msg: self.plugin.potm.update(m))
+        elif msg.get("type") == "potm_result":
+            self._on_main(lambda m=msg: self.plugin.potm.result(m))
         elif msg.get("type") == "teamchat":
             self.plugin.server.scheduler.run_task(self.plugin, lambda m=msg: self.plugin.teams.from_website(m))
         elif msg.get("type") == "ranks":

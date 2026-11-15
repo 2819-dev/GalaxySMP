@@ -95,6 +95,11 @@ const PENDING = [
     "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS official boolean NOT NULL DEFAULT false",
     "INSERT INTO schema_migrations (version) VALUES ('0056_threads_voice_slowmode') ON CONFLICT DO NOTHING",
   ]],
+  ["0057_potm", [
+    "CREATE TABLE IF NOT EXISTS potm_votes (round integer NOT NULL, voter_xuid text NOT NULL, voter_name text NOT NULL, target_xuid text NOT NULL, target_name text NOT NULL, voted_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (round, voter_xuid))",
+    "CREATE INDEX IF NOT EXISTS potm_votes_target_idx ON potm_votes (round, target_xuid)",
+    "INSERT INTO schema_migrations (version) VALUES ('0057_potm') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

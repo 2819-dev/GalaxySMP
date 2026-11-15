@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.46.0"
+VERSION = "2.47.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -110,6 +110,7 @@ class GalaxyLink(Plugin):
         "crates": _cmd("Crates: place them, edit prizes, give keys (staff).", "/crates", "galaxylink.command.crates"),
         "givekey": _cmd("Give crate keys (staff).", "/givekey <player: message>", "galaxylink.command.givekey"),
         "elevator": _cmd("Get the Elevator Tool back, or open it (Galaxy+, Pro+ and staff).", "/elevator", "galaxylink.command.elevator", ["elevators"]),
+        "votecomputer": _cmd("Set up Voting Computers and open or close Player of the Month voting (staff).", "/votecomputer", "galaxylink.command.votecomputer", ["potm"]),
         "ranktags": _cmd("Smooth gradient rank tags (pictures) on or off.", "/ranktags [state: message]", "galaxylink.command.ranktags"),
         "dm": _cmd("Send a direct message to a community member (website and game).", "/dm <player: message>", "galaxylink.command.dm", ["msgweb"]),
         "tc": _cmd("Talk to your team (teams are made on galaxymc.us).", "/tc [message: message]", "galaxylink.command.dm", ["teamchat"]),
@@ -175,6 +176,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.dm": _perm("Allows /dm and /r.", True),
         "galaxylink.command.ranktags": _perm("Allows /ranktags (operators).", "op"),
         "galaxylink.command.elevator": _perm("Allows /elevator (plans decide who can build).", True),
+        "galaxylink.command.votecomputer": _perm("Allows /votecomputer (staff only: checked when used).", True),
         "galaxylink.command.jobs": _perm("Allows /jobs.", True),
         "galaxylink.command.cosmetics": _perm("Allows /cosmetics.", True),
         "galaxylink.command.crates": _perm("Allows /crates (operators, or give it with a rank).", "op"),
@@ -231,6 +233,8 @@ class GalaxyLink(Plugin):
         self.servercontrol = ServerControl(self)  # maintenance mode, scheduled restart, welcome kit (website)
         self.crates = Crates(self)
         self.elevators = Elevators(self)
+        from endstone_galaxylink.potm import PlayerOfTheMonth
+        self.potm = PlayerOfTheMonth(self)  # Player of the Month: Voting Computers
         from endstone_galaxylink.dms import DirectMessages
         self.dms = DirectMessages(self)
         from endstone_galaxylink.cosmetics import Cosmetics, TRAIL_TICKS
@@ -505,6 +509,8 @@ class GalaxyLink(Plugin):
             return
         if self.elevators.on_interact(event):  # call buttons and the floor panel
             return
+        if self.potm.on_interact(event):  # Voting Computers (Player of the Month)
+            return
         if self.minigames.on_interact(event):  # Minigame Computer
             return
         self.plots.on_interact(event)
@@ -638,7 +644,7 @@ class GalaxyLink(Plugin):
         player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "guide", "tpa", "tpahere", "tpaccept",
                        "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd",
                        "report", "mod", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates", "elevator",
-                       "shift", "whois", "warp", "setwarp", "delwarp", "goal"}
+                       "shift", "whois", "warp", "setwarp", "delwarp", "goal", "votecomputer"}
         if name in player_only and not isinstance(sender, Player):
             sender.send_message(f"/{name} can only be used in game.")
             return True
@@ -704,6 +710,7 @@ class GalaxyLink(Plugin):
             "jobs": lambda: self.jobs.menu(sender),
             "cosmetics": lambda: self.cosmetics.menu(sender),
             "elevator": lambda: self.elevators.command(sender),
+            "votecomputer": lambda: self.potm.command(sender),
             "ranktags": lambda: self.ranktags.command(sender, args),
             "crates": lambda: self.crates.admin_menu(sender),
             "givekey": lambda: self.crates.givekey_command(sender, args),

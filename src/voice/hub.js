@@ -301,6 +301,7 @@ export class VoiceHub extends DurableObject {
       this.ctx.waitUntil(import("../routes/rewards.js").then((m) => m.sendRewards(this.env, undefined, (msg) => { this.send(server, msg); return true; })).catch(() => {}));
       this.ctx.waitUntil(this.sendMapSetting());
       this.ctx.waitUntil(import("../routes/teams.js").then(async (m) => this.send(server, await m.teamsState(getDb(this.env)))).catch(() => {}));
+      this.ctx.waitUntil(import("../routes/potm.js").then(async (m) => this.send(server, await m.potmState(getDb(this.env)))).catch(() => {}));
       return new Response(null, { status: 101, webSocket: client });
     }
 
@@ -479,6 +480,9 @@ export class VoiceHub extends DurableObject {
       };
       return getDb(this.env)`INSERT INTO economy_config (key, value, updated_by) VALUES ('friendbot_status', ${JSON.stringify(value)}::jsonb, 'server')
                               ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = 'server'`.catch(() => {});
+    }
+    if (msg.type === "potm_vote" || msg.type === "potm_set" || msg.type === "potm_mine") {  // Player of the Month (Voting Computers)
+      return import("../routes/potm.js").then((m) => m.fromGame(this.env, msg)).catch((e) => console.error("potm failed", e));
     }
     if (msg.type === "teamchat") {  // /tc in game: into the team chat on the website
       return import("../routes/teams.js").then((m) => m.fromGame(this.env, msg)).catch((e) => console.error("team chat failed", e));

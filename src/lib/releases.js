@@ -187,6 +187,13 @@ The GalaxySMP team will now post some ideas in #Suggestions for you to vote on. 
     title: "Plot Showcase is easier to find on phones",
     body: `The map buttons now fit on every phone screen, and **Showcase** sits first in the top-left corner of the map with its own icon. On phones, pinch to zoom the map. You can also go straight to it at galaxymc.us/map#showcase.`,
   },
+  {
+    id: "2026-11-22",
+    title: "Vote for Player of the Month",
+    body: `Look for the **Voting Computers** in game. When voting is open, tap one, choose **Start Voting** and pick the player who made GalaxySMP better this month. You can search by name or browse everyone who has played on the server.
+
+You get one vote each month, and you can change it while voting is open. Your vote is secret: no other players can see who you voted for. When voting is closed, the computers say so, and the floating label above them shows whether voting is open.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

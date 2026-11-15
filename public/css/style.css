@@ -3757,3 +3757,15 @@ html[data-theme="light"] .holiday-greeting { border-color: rgba(184, 134, 47, .3
   #map-zoom-in, #map-zoom-out { display: none; }  /* pinch to zoom on phones */
   .map-tools .map-showcase-btn { order: -1; margin-right: auto; }
 }
+
+/* Control Panel: Player of the Month */
+.potm-h { font-size: 1rem; margin: 6px 0 0; }
+.potm-totals { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.potm-totals li { display: grid; grid-template-columns: minmax(90px, 160px) 1fr auto; align-items: center; gap: 10px; }
+.potm-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.potm-bar { height: 10px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.potm-bar i { display: block; height: 100%; border-radius: 6px; background: var(--border-strong); }
+.potm-totals li.lead .potm-bar i { background: linear-gradient(90deg, #f8d77a, #e0a93a); }
+.potm-totals li.lead .potm-name::before { content: "★ "; color: #e0a93a; }
+.potm-votes summary { cursor: pointer; color: var(--accent-text); font-weight: 600; }
+.potm-list { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow-y: auto; }
