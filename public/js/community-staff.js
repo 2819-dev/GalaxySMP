@@ -47,7 +47,10 @@ function crashDetails(d) {
     ? h("details", { class: "sl-crash-log" }, h("summary", { text: `End of the server log${d.logFile ? ` (${d.logFile})` : ""}` }),
       h("pre", { class: "small", text: d.log.join("\n") }))
     : h("div", { class: "text-3 small", text: "No server log file was found to attach." });
-  return h("div", { class: "sl-reason text-3 small" }, ...facts.map((f) => h("div", { text: f })), log);
+  const trace = d.traceback?.length
+    ? h("details", { class: "sl-crash-log" }, h("summary", { text: "What the plugin was running when it crashed" }), h("pre", { class: "small", text: d.traceback.join("\n") }))
+    : null;
+  return h("div", { class: "sl-reason text-3 small" }, ...facts.map((f) => h("div", { text: f })), trace, log);
 }
 
 export function renderStaffLogs(root, { setTimer }) {

@@ -8,6 +8,7 @@ report (when it happened, who was online, what the plugin was doing, the end of 
 #Staff Logs on the website.
 """
 
+import faulthandler
 import json
 import time
 from pathlib import Path
@@ -32,11 +33,19 @@ class CrashWatch:
             prev = None
         except Exception:
             prev = {}
+        self.fault_file = folder / "crash_traceback.txt"
         if prev is not None:
             self.report = self.build_report(prev)
             plugin.logger.warning(f"The server didn't stop properly last time (last seen {self.report['lastSeen']}). "
                                   f"Last activity: {self.report['doing']}. A crash report goes to #Staff Logs.")
         self.beat(force=True)
+        # If the server crashes hard (a native crash), Python writes what every thread was doing into this file,
+        # down to the exact line. It goes into the next crash report.
+        try:
+            self._fault_fh = open(self.fault_file, "w", encoding="utf-8")
+            faulthandler.enable(file=self._fault_fh, all_threads=True)
+        except Exception as e:
+            plugin.logger.warning(f"Couldn't turn on the crash tracer: {e}")
         self.log_copy = folder / "last_server_log.txt"
         self.last_copy = 0
 
@@ -112,7 +121,16 @@ class CrashWatch:
             "doing": str(prev.get("doing") or "unknown")[:200],
             "players": [str(p)[:32] for p in (prev.get("players") or [])][:40],
             "log": self.log_tail(last),
+            "traceback": self.traceback(),
         }
+
+    def traceback(self):
+        """What Python was doing at the moment of the crash (written by faulthandler), if anything."""
+        try:
+            text = self.fault_file.read_text("utf-8", "replace").strip()
+        except Exception:
+            return []
+        return [ln.rstrip()[:300] for ln in text.splitlines() if ln.strip()][:80]
 
     def log_tail(self, before):
         """The end of the server log from the run that crashed (our own copy, saved every 10 seconds), or else
