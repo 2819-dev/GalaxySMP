@@ -17,6 +17,52 @@ BEAT_SECONDS = 10
 LOG_LINES = 60
 
 
+def _kb(path, key):
+    try:
+        for line in open(path):
+            if line.startswith(key):
+                return int(line.split()[1])
+    except Exception:
+        return None
+    return None
+
+
+def _num(path):
+    try:
+        v = open(path).read().strip()
+        return None if v == "max" else int(v)
+    except Exception:
+        return None
+
+
+def memory():
+    """Memory in MB: the server process, the friend bot (Java) if running, the machine, and the host's limit."""
+    mb = lambda kb: round(kb / 1024) if kb else None
+    out = {"server": mb(_kb("/proc/self/status", "VmRSS")), "machineFree": mb(_kb("/proc/meminfo", "MemAvailable")),
+           "machineTotal": mb(_kb("/proc/meminfo", "MemTotal"))}
+    used = _num("/sys/fs/cgroup/memory.current") or _num("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+    limit = _num("/sys/fs/cgroup/memory.max") or _num("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+    if used:
+        out["containerUsed"] = round(used / 1048576)
+    if limit and limit < 1 << 50:
+        out["containerLimit"] = round(limit / 1048576)
+    try:
+        import os
+        total = 0
+        for pid in os.listdir("/proc"):
+            if pid.isdigit():
+                try:
+                    if b"java" in open(f"/proc/{pid}/cmdline", "rb").read()[:200]:
+                        total += _kb(f"/proc/{pid}/status", "VmRSS") or 0
+                except Exception:
+                    continue
+        if total:
+            out["friendBot"] = mb(total)
+    except Exception:
+        pass
+    return {k: v for k, v in out.items() if v is not None}
+
+
 class CrashWatch:
     def __init__(self, plugin):
         self.plugin = plugin
@@ -65,7 +111,7 @@ class CrashWatch:
             players = [p.name for p in self.plugin.server.online_players]
         except Exception:
             players = []
-        data = {"started": self.started, "t": now, "doing": self.doing, "players": players[:40]}
+        data = {"started": self.started, "t": now, "doing": self.doing, "players": players[:40], "memory": memory()}
         try:
             tmp = self.file.with_suffix(".tmp")
             tmp.write_text(json.dumps(data), "utf-8")
@@ -122,6 +168,7 @@ class CrashWatch:
             "players": [str(p)[:32] for p in (prev.get("players") or [])][:40],
             "log": self.log_tail(last),
             "traceback": self.traceback(),
+            "memory": prev.get("memory") or {},
         }
 
     def traceback(self):

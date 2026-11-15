@@ -247,6 +247,7 @@ const routes = [
   ["GET", "/api/players/:name/social", progress.socialProfile],
   ["GET", "/api/players/:name/history", progress.playerHistory],
   ["GET", "/api/timeline", progress.timeline],
+  ["GET", "/api/uptime", (req, env) => import("./routes/uptime.js").then((m) => m.uptime(req, env))],
   ["GET", "/api/map/info", (req, env) => livemap.mapInfo(req, env)],
   ["POST", "/api/panel/map", (req, env) => panel.setMap(req, env)],
   ["GET", "/api/panel/voice-rooms", (req, env) => panel.voiceRooms(req, env)],

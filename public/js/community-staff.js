@@ -42,6 +42,7 @@ function crashDetails(d) {
     `Last activity: ${d.doing || "unknown"}`,
     d.uptimeMinutes != null ? `Up for ${d.uptimeMinutes} min before it stopped` : null,
     `Online: ${d.players?.length ? d.players.join(", ") : "nobody"}`,
+    d.memory && Object.keys(d.memory).length ? `Memory just before: server ${d.memory.server ?? "?"} MB${d.memory.friendBot ? `, friend bot ${d.memory.friendBot} MB` : ""}${d.memory.containerLimit ? `, host limit ${d.memory.containerUsed ?? "?"}/${d.memory.containerLimit} MB` : d.memory.machineFree != null ? `, ${d.memory.machineFree} MB free of ${d.memory.machineTotal} MB` : ""}` : null,
   ].filter(Boolean);
   const log = d.log?.length
     ? h("details", { class: "sl-crash-log" }, h("summary", { text: `End of the server log${d.logFile ? ` (${d.logFile})` : ""}` }),

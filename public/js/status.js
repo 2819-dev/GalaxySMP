@@ -88,3 +88,36 @@ document.querySelectorAll("#tl-range button").forEach((b) => b.addEventListener(
 }));
 loadTimeline();
 setInterval(loadTimeline, 120000);
+
+// ---------- Uptime: the last 30 days, one bar per day, and recent outages ----------
+async function loadUptime() {
+  const bars = $("up-bars");
+  if (!bars) return;
+  let d;
+  try { d = await fetch("/api/uptime").then((r) => r.json()); } catch { return; }
+  if (!d.ok) return;
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const pct = (v) => (v == null ? "–" : `${v >= 99.95 ? "100" : v.toFixed(1).replace(/\.0$/, "")}%`);
+  const fact = (v, k) => { const f = el("div"); f.append(el("b", "", v), el("span", "", k)); return f; };
+  $("up-sum").replaceChildren(fact(pct(d.week), "last 7 days"), fact(pct(d.month), "last 30 days"),
+    fact(String(d.restartsWeek), d.restartsWeek === 1 ? "unexpected restart this week" : "unexpected restarts this week"));
+  const day = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString([], { month: "short", day: "numeric" });
+  bars.replaceChildren(...d.days.map((x) => {
+    const cls = x.pct == null ? "none" : x.pct >= 99 && !x.restarts ? "good" : x.pct >= 90 ? "ok" : "bad";
+    const b = el("span", `up-bar ${cls}`);
+    b.title = x.pct == null ? `${day(x.day)}: no data` : `${day(x.day)}: online ${pct(x.pct)}${x.restarts ? `, ${x.restarts} unexpected restart${x.restarts > 1 ? "s" : ""}` : ""}`;
+    b.setAttribute("aria-label", b.title);
+    return b;
+  }));
+  const when = (t) => new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const items = [
+    ...d.outages.map((o) => ({ t: o.from, text: `Offline for ${o.minutes < 60 ? `${o.minutes} min` : `${Math.round(o.minutes / 6) / 10} h`}`, cls: "bad" })),
+    ...d.restarts.map((t) => ({ t, text: "Unexpected restart (back within a few minutes)", cls: "ok" })),
+  ].sort((a, b) => b.t - a.t).slice(0, 6);
+  const box = $("up-events");
+  if (!items.length) { box.replaceChildren(el("p", "text-3 small up-none", "No outages in the last 30 days.")); return; }
+  const list = el("ul", "up-list");
+  for (const i of items) { const li = el("li"); li.append(el("i", `up-dot ${i.cls}`), el("span", "", i.text), el("time", "text-3", when(i.t))); list.append(li); }
+  box.replaceChildren(el("h3", "up-h", "Recent"), list);
+}
+loadUptime();

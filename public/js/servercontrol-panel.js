@@ -75,7 +75,7 @@ export function setupServerControl({ loaders, toast }) {
   function friendBotPanel(d) {
     const fb = d.friendbot;
     const STATES = { online: ["done", "Online"], signin: ["pending", "Needs sign-in"], starting: ["pending", "Starting"], installing: ["pending", "Installing"],
-      restarting: ["pending", "Restarting"], error: ["declined", "Problem"], off: ["declined", "Off"] };
+      restarting: ["pending", "Restarting"], waiting: ["pending", "Waiting for memory"], error: ["declined", "Problem"], off: ["declined", "Off"] };
     const fresh = fb && Date.now() - new Date(fb.at).getTime() < 15 * 60e3;
     const [cls, label] = !fb ? ["declined", "Not set up yet"] : STATES[fb.state] || ["pending", fb.state];
     const send = (body) => save({ action: "friendbot", ...body }).catch((e) => toast(e.message));

@@ -204,6 +204,11 @@ You get one vote each month, and you can change it while voting is open. Your vo
     title: "Server stability fix",
     body: `We found and fixed the cause of the recent unexpected restarts, which happened while floating labels (leaderboards, crates, shop signs) were being updated. Labels and shop NPCs now work in a way that can't crash the server.`,
   },
+  {
+    id: "2026-11-22d",
+    title: "Uptime on the Status page",
+    body: `The Status page now shows how much GalaxySMP has been online over the last 7 and 30 days, a bar for each of the last 30 days, and any recent outages or unexpected restarts. We're also making the server lighter on memory so it stays online more reliably.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

@@ -26,10 +26,33 @@ JAR_URL = "https://github.com/MCXboxBroadcast/Broadcaster/releases/latest/downlo
 JRE_API = "https://api.adoptium.net/v3/binary/latest/21/ga/linux/{arch}/jre/hotspot/normal/eclipse"
 JRE_GITHUB = "https://api.github.com/repos/adoptium/temurin21-binaries/releases/latest"
 JAR_REFRESH_DAYS = 7
-MEMORY = "-Xmx192m"
+JAVA_OPTS = ["-Xmx128m", "-Xss256k", "-XX:MaxMetaspaceSize=64m", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1",
+             "-XX:ReservedCodeCacheSize=24m", "-XX:CICompilerCount=1"]  # keep Java small: the Minecraft server comes first
+MIN_FREE_MB = 700    # don't start the bot unless the machine has at least this much free memory
+STOP_FREE_MB = 350   # stop the bot if free memory drops below this (it starts again later when there's room)
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|\[[0-9;]*m")
 URL_RE = re.compile(r"https?://\S+")
 CODE_RE = re.compile(r"Enter the code:\s*([A-Z0-9-]{4,})", re.I)
+
+
+def free_mb():
+    """Free memory on the machine (or the host's container limit), in MB; None if unknown."""
+    def num(path):
+        try:
+            v = open(path).read().strip()
+            return None if v == "max" else int(v)
+        except Exception:
+            return None
+    limit, used = num("/sys/fs/cgroup/memory.max"), num("/sys/fs/cgroup/memory.current")
+    if limit and used and limit < 1 << 50:
+        return round((limit - used) / 1048576)
+    try:
+        for line in open("/proc/meminfo"):
+            if line.startswith("MemAvailable"):
+                return int(line.split()[1]) // 1024
+    except Exception:
+        pass
+    return None
 
 
 class FriendBot:
@@ -201,6 +224,12 @@ class FriendBot:
                 self.wake.wait(3600)
                 self.wake.clear()
                 continue
+            free = free_mb()
+            if free is not None and free < MIN_FREE_MB:
+                self.set_state("waiting", f"Waiting for free memory ({free} MB free, needs {MIN_FREE_MB} MB) so the Minecraft server isn't slowed down.")
+                self.wake.wait(300)
+                self.wake.clear()
+                continue
             try:
                 java = self.java()
                 jar = self.jar()
@@ -227,10 +256,21 @@ class FriendBot:
     def start(self, java, jar, first=False):
         self.set_state("starting", "Starting the friend bot...")
         self.signin = None
-        self.proc = subprocess.Popen([java, MEMORY, "-jar", str(jar)], cwd=str(self.folder), stdin=subprocess.PIPE,
+        self.proc = subprocess.Popen([java, *JAVA_OPTS, "-jar", str(jar)], cwd=str(self.folder), stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
         started = time.time()
         pending_url = None
+        proc = self.proc
+
+        def guard():  # the Minecraft server comes first: stop the bot if memory runs low
+            while proc.poll() is None:
+                time.sleep(15)
+                free = free_mb()
+                if free is not None and free < STOP_FREE_MB and proc.poll() is None:
+                    self.log(f"Memory is low ({free} MB free): stopping the friend bot so the server keeps running.")
+                    self.kill()
+                    return
+        threading.Thread(target=guard, name="friendbot-memory", daemon=True).start()
         for raw in self.proc.stdout:
             if first and (self.folder / "config.yml").exists():
                 time.sleep(1)  # the bot just made its config.yml: put our values in and restart it

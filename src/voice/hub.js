@@ -412,6 +412,7 @@ export class VoiceHub extends DurableObject {
         logFile: msg.log?.file ? clip(msg.log.file, 120) : null,
         log: (Array.isArray(msg.log?.lines) ? msg.log.lines : []).slice(-60).map((l) => clip(l, 300)),
         traceback: (Array.isArray(msg.traceback) ? msg.traceback : []).slice(0, 80).map((l) => clip(l, 300)),
+        memory: Object.fromEntries(Object.entries(msg.memory && typeof msg.memory === "object" ? msg.memory : {}).slice(0, 8).map(([k, v]) => [clip(k, 20), Number(v) || 0])),
       };
       return getDb(this.env)`INSERT INTO audit_log (actor_id, action, details) VALUES (NULL, 'server.crash', ${JSON.stringify(details)}::jsonb)`
         .catch((e) => console.error("crash report failed", e));
