@@ -541,6 +541,8 @@ export class VoiceHub extends DurableObject {
         plugin: String(msg.plugin || "").slice(0, 20),
         iconsPack: String(msg.iconsPack || "").slice(0, 20),
         iconConflicts: Array.isArray(msg.iconConflicts) ? msg.iconConflicts.slice(0, 5).map((x) => String(x).slice(0, 80)) : [],
+        players: Array.isArray(msg.players) ? msg.players.slice(0, 60).filter((p) => p && /^\d{1,20}$/.test(String(p.xuid || "")))
+          .map((p) => ({ xuid: String(p.xuid), name: String(p.name || "").slice(0, 32), doing: String(p.doing || "").slice(0, 40) })) : null,
       };
       return this.ctx.storage.put("server", info);
     }

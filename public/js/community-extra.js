@@ -287,27 +287,39 @@ export function pollDialog(done, toast, { channelId = null, channelName = "" } =
 // =====================================================================
 export function renderBuilds(p, { toast }) {
   let sort = "new";
+  let kind = location.hash === "#builds-screenshots" ? "shot" : "build";  // Builds or the Screenshots wall
   const grid = h("div", { class: "bd-grid" });
   const tabs = h("div", { class: "tabs-mini" });
-  const add = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Share a build" });
+  const add = h("button", { class: "btn btn-primary btn-sm", type: "button" });
   const botw = h("div");
-  p.append(h("div", { class: "cp-wrap bd-wrap" },
-    intro("Show off what you built. Like your favorites: the most liked build each week becomes Build of the Week and its builder gets a badge.",
-      h("div", { class: "cx-row", style: "justify-content:space-between" }, tabs, add)),
+  const intro1 = h("p", { class: "text-2", style: "margin:0" });
+  const kinds = h("div", { class: "staff-tabs bd-kinds", role: "tablist" });
+  const drawKind = () => {
+    kinds.replaceChildren(...[["build", "Builds"], ["shot", "Screenshots"]].map(([k, label]) => h("button", { type: "button", role: "tab", "aria-selected": String(k === kind), text: label,
+      onclick: () => { kind = k; drawKind(); load(); } })));
+    add.textContent = kind === "shot" ? "Share a screenshot" : "Share a build";
+    intro1.textContent = kind === "shot"
+      ? "Your best moments on GalaxySMP: sunsets, funny fails, Bedwars wins. Post up to 4 screenshots with a caption, and like your favorites."
+      : "Show off what you built. Like your favorites: the most liked build each week becomes Build of the Week and its builder gets a badge.";
+  };
+  drawKind();
+  p.append(h("div", { class: "cp-wrap bd-wrap" }, kinds,
+    h("div", { class: "panel cx-intro" }, intro1, h("div", { class: "cx-row", style: "justify-content:space-between;margin-top:10px" }, tabs, add)),
     botw, grid));
   for (const [key, label] of [["new", "New"], ["week", "This week"], ["top", "Top"]]) {
     const b = h("button", { type: "button", "aria-pressed": String(key === sort), text: label });
     b.addEventListener("click", () => { sort = key; tabs.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); load(); });
     tabs.append(b);
   }
-  add.addEventListener("click", () => buildDialog(load, toast));
+  add.addEventListener("click", () => (kind === "shot" ? shotDialog(load, toast) : buildDialog(load, toast)));
   async function load() {
     let d;
-    try { d = await getJson(`/api/community/builds?sort=${sort}`); } catch (e) { grid.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
+    try { d = await getJson(`/api/community/builds?sort=${sort}&kind=${kind}`); } catch (e) { grid.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
     const winner = d.builds.find((b) => b.id === d.botwId);
     botw.replaceChildren(...(winner && sort === "new" ? [h("div", { class: "bd-botw-label" }, iconEl("trophy2"), "Build of the Week"), buildCard(winner, d, load, toast, true)] : []));
     const rest = d.builds.filter((b) => !(winner && sort === "new" && b.id === winner.id));
-    grid.replaceChildren(...(rest.length ? rest.map((b) => buildCard(b, d, load, toast)) : [h("div", { class: "panel empty", text: sort === "week" ? "No builds posted this week yet." : "No builds yet. Share the first one." })]));
+    const what = kind === "shot" ? "screenshots" : "builds";
+    grid.replaceChildren(...(rest.length ? rest.map((b) => buildCard(b, d, load, toast)) : [h("div", { class: "panel empty", text: sort === "week" ? `No ${what} posted this week yet.` : `No ${what} yet. Share the first one.` })]));
   }
   load();
 }
@@ -385,6 +397,43 @@ export async function shrink(file, { max = 1600, aspect = null, limit = 680 * 10
   if (!blob || blob.size >= limit) throw new Error(`${file.name} is too large.`);
   const data = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.readAsDataURL(blob); });
   return { mime: blob.type, data, width: w, height: hgt, preview: URL.createObjectURL(blob) };
+}
+
+// A screenshot for the Screenshots wall: up to 4 pictures and a caption.
+function shotDialog(done, toast) {
+  const photos = [];
+  const caption = h("input", { class: "input", id: "shot-caption", maxlength: 120, placeholder: "e.g. Sunset over spawn (optional)" });
+  const pick = h("input", { type: "file", accept: "image/*", multiple: true, id: "shot-files", class: "sr-only" });
+  const thumbs = h("div", { class: "bd-thumbs" });
+  const status = h("p", { class: "text-3 small", style: "margin:0" });
+  const drawThumbs = () => {
+    thumbs.replaceChildren(...photos.map((ph, i) => h("div", { class: "bd-thumb" }, h("img", { src: ph.preview, alt: `Screenshot ${i + 1}` }),
+      h("button", { type: "button", "aria-label": `Remove screenshot ${i + 1}`, text: "×", onclick: () => { photos.splice(i, 1); drawThumbs(); } }))),
+    ...(photos.length < 4 ? [h("label", { class: "bd-add", for: "shot-files" }, iconEl("image"), photos.length ? "Add more" : "Add screenshots")] : []));
+  };
+  pick.addEventListener("change", async () => {
+    const files = [...pick.files].slice(0, 4 - photos.length);
+    pick.value = "";
+    status.textContent = "Preparing…";
+    for (const f of files) {
+      try { photos.push(await shrink(f)); } catch (e) { toast(e.message); }
+    }
+    status.textContent = "";
+    drawThumbs();
+  });
+  drawThumbs();
+  openDialog({
+    title: "Share a screenshot",
+    body: h("div", { class: "form" },
+      h("div", { class: "field" }, h("span", { class: "field-label", text: "Screenshots (up to 4)" }), thumbs, pick, status), field("Caption", caption)),
+    actions: [{ label: "Cancel" }, { label: "Post", kind: "primary", onClick: async () => {
+      if (!photos.length) throw new Error("Add at least one screenshot.");
+      await postJson("/api/community/builds", { kind: "shot", title: caption.value,
+        images: photos.map(({ mime, data, width, height }) => ({ mime, data, width, height })) });
+      toast("Screenshot shared.");
+      done();
+    } }],
+  });
 }
 
 function buildDialog(done, toast) {

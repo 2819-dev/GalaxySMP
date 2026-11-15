@@ -107,6 +107,11 @@ const PENDING = [
     "CREATE INDEX IF NOT EXISTS bw_match_players_xuid_idx ON bw_match_players (xuid, match_id DESC)",
     "INSERT INTO schema_migrations (version) VALUES ('0058_bedwars_matches') ON CONFLICT DO NOTHING",
   ]],
+  ["0059_screenshots", [
+    "ALTER TABLE builds ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'build'",
+    "CREATE INDEX IF NOT EXISTS builds_kind_idx ON builds (kind, id DESC) WHERE deleted_at IS NULL",
+    "INSERT INTO schema_migrations (version) VALUES ('0059_screenshots') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

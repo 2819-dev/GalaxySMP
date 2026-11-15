@@ -238,6 +238,18 @@ New daily quests: play, win, get kills and break beds in Bedwars. Victory and ki
 - Bedwars leaderboards now have This week and This month. The weekly #1 in wins gets $5,000 and the Weekly Bedwars Champion badge.
 - Turn on "Bedwars games" in Account settings > Notifications to hear when players are waiting for a game.`,
   },
+  {
+    id: "2026-11-23b",
+    title: "Screenshots wall, who's online and achievement compare",
+    body: `**Screenshots wall**
+#Builds now has a Screenshots tab for your best moments on GalaxySMP: sunsets, funny fails, Bedwars wins. Post up to 4 screenshots with a caption and like your favorites.
+
+**Who's online**
+The home page shows who's playing right now and what they're doing, like playing Bedwars or building on their plot. Sign in to see names.
+
+**Compare achievements**
+Compare on any profile now also lists the achievements you both have, and the ones only one of you has.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

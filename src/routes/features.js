@@ -400,6 +400,7 @@ export function decodeImages(imgs) {
 export async function buildsList(request, env, ctx, url) {
   const user = await requireUser(request, env);
   const sort = ["new", "top", "week"].includes(url.searchParams.get("sort")) ? url.searchParams.get("sort") : "new";
+  const kind = url.searchParams.get("kind") === "shot" ? "shot" : "build";  // Builds or the Screenshots wall
   const sql = getDb(env);
   const weekStart = mondayOf(new Date()).toISOString();
   const rows = await sql`
@@ -408,10 +409,10 @@ export async function buildsList(request, env, ctx, url) {
            EXISTS (SELECT 1 FROM build_likes l WHERE l.build_id = b.id AND l.user_id = ${user.id}) AS liked,
            (SELECT json_agg(json_build_object('id', i.id, 'w', i.width, 'h', i.height) ORDER BY i.position) FROM build_images i WHERE i.build_id = b.id) AS images
       FROM builds b JOIN users u ON u.id = b.user_id
-     WHERE b.deleted_at IS NULL AND (${sort} <> 'week' OR b.created_at >= ${weekStart}::timestamptz)
+     WHERE b.deleted_at IS NULL AND b.kind = ${kind} AND (${sort} <> 'week' OR b.created_at >= ${weekStart}::timestamptz)
      ORDER BY CASE WHEN ${sort} = 'new' THEN 0 ELSE (SELECT count(*) FROM build_likes l WHERE l.build_id = b.id) END DESC, b.id DESC
      LIMIT 60`;
-  const [botw] = await sql`SELECT b.id FROM builds b WHERE b.botw_week IS NOT NULL AND b.deleted_at IS NULL ORDER BY b.botw_week DESC LIMIT 1`;
+  const [botw] = kind === "build" ? await sql`SELECT b.id FROM builds b WHERE b.botw_week IS NOT NULL AND b.deleted_at IS NULL ORDER BY b.botw_week DESC LIMIT 1` : [];
   return json({
     ok: true, canModerate: isMod(user), me: Number(user.id), botwId: botw ? Number(botw.id) : null,
     builds: rows.map((b) => ({
@@ -427,19 +428,20 @@ export async function buildCreate(request, env) {
   canPost(user, "post builds");
   await rateLimit(env, "AUTH_LIMITER", `build:${user.id}`);
   const body = await readJson(request, 4_200_000);  // up to 4 photos of ~700 KB (sent as base64)
-  const title = oneLine(body.title, 60);
-  const description = clean(body.description, 500);
-  const location = oneLine(body.location, 60);
-  if (title.length < 3) throw new HttpError(400, "Give your build a name (at least 3 characters).");
+  const shot = body.kind === "shot";  // a screenshot for the Screenshots wall: just pictures and a caption
+  const title = shot ? oneLine(body.title, 120) || "Screenshot" : oneLine(body.title, 60);
+  const description = shot ? "" : clean(body.description, 500);
+  const location = shot ? "" : oneLine(body.location, 60);
+  if (!shot && title.length < 3) throw new HttpError(400, "Give your build a name (at least 3 characters).");
   const imgs = Array.isArray(body.images) ? body.images.slice(0, MAX_IMAGES + 1) : [];
   if (!imgs.length) throw new HttpError(400, "Add at least one photo.");
   if (imgs.length > MAX_IMAGES) throw new HttpError(400, `Up to ${MAX_IMAGES} photos per build.`);
   const decoded = decodeImages(imgs);
   const sql = getDb(env);
   await filterOrThrow(sql, [title, description, location]);
-  const [recent] = await sql`SELECT count(*)::int AS n FROM builds WHERE user_id = ${user.id} AND created_at > now() - interval '1 day'`;
-  if (recent.n >= 3) throw new HttpError(429, "You can post 3 builds a day.");
-  const [b] = await sql`INSERT INTO builds (user_id, title, description, location) VALUES (${user.id}, ${title}, ${description}, ${location}) RETURNING id`;
+  const [recent] = await sql`SELECT count(*)::int AS n FROM builds WHERE user_id = ${user.id} AND kind = ${shot ? "shot" : "build"} AND created_at > now() - interval '1 day'`;
+  if (recent.n >= (shot ? 5 : 3)) throw new HttpError(429, shot ? "You can post 5 screenshots a day." : "You can post 3 builds a day.");
+  const [b] = await sql`INSERT INTO builds (user_id, title, description, location, kind) VALUES (${user.id}, ${title}, ${description}, ${location}, ${shot ? "shot" : "build"}) RETURNING id`;
   for (const [i, img] of decoded.entries()) {
     await sql`INSERT INTO build_images (build_id, position, mime, width, height, data) VALUES (${b.id}, ${i}, ${img.mime}, ${img.w}, ${img.h}, decode(${img.b64}, 'base64'))`;
   }
@@ -614,7 +616,7 @@ async function buildOfTheWeek(env, sql) {
   if (done?.value === week) return;
   const [winner] = await sql`
     SELECT b.id, b.user_id, b.title, count(l.user_id) AS likes FROM builds b JOIN build_likes l ON l.build_id = b.id
-     WHERE b.deleted_at IS NULL AND b.created_at >= ${lastMonday.toISOString()}::timestamptz AND b.created_at < ${thisMonday.toISOString()}::timestamptz
+     WHERE b.deleted_at IS NULL AND b.kind = 'build' AND b.created_at >= ${lastMonday.toISOString()}::timestamptz AND b.created_at < ${thisMonday.toISOString()}::timestamptz
      GROUP BY b.id ORDER BY count(l.user_id) DESC, b.id LIMIT 1`;
   await sql`INSERT INTO economy_config (key, value, updated_by) VALUES ('botw_last', ${JSON.stringify(week)}::jsonb, 'server')
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = 'server'`;

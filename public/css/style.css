@@ -3809,3 +3809,25 @@ html[data-theme="light"] .holiday-greeting { border-color: rgba(184, 134, 47, .3
 .bwh-res { font-weight: 700; font-size: .8rem; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); }
 .bwh-res.win { color: var(--ok); } .bwh-res.loss { color: var(--text-3); }
 .bwh-stats { font-size: .85rem; color: var(--text-2); }
+
+/* Home: who's online now */
+.online-card { margin-top: 14px; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border); }
+.online-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.online-pulse { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 22%, transparent); }
+.online-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.online-p { display: flex; align-items: center; gap: 8px; padding: 5px 12px 5px 5px; border-radius: 999px; background: var(--surface-2); color: var(--text); text-decoration: none; }
+.online-p:hover { text-decoration: none; background: var(--surface-3); }
+.online-p img { width: 32px; height: 32px; border-radius: 50%; image-rendering: pixelated; background: var(--surface-3); }
+.online-t { display: flex; flex-direction: column; line-height: 1.15; }
+.online-t b { font-size: .88rem; }
+.online-t span { font-size: .74rem; color: var(--text-3); }
+.online-blank { width: 32px; height: 32px; border-radius: 50%; background: var(--surface-3); }
+.online-sign { font-size: .85rem; margin-left: 4px; }
+/* Compare: achievements one has and the other doesn't */
+.cmp-ach-wrap { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+.cmp-ach-h { margin: 0 0 8px; font-size: .95rem; }
+.cmp-ach-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cmp-ach { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: .85rem; }
+.cmp-ach li { display: flex; gap: 6px; align-items: baseline; }
+.cmp-ach li svg { width: 15px; height: 15px; flex: none; color: var(--accent-text); align-self: center; }
+.bd-kinds { margin-bottom: 12px; }

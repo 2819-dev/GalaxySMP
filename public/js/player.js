@@ -454,9 +454,24 @@ async function compareDialog(p) {
       return h("div", { class: "cmp-row" },
         h("span", { class: `cmp-v${a > b ? " win" : ""}`, text: fmt(a) }), h("span", { class: "cmp-l text-3 small", text: label }), h("span", { class: `cmp-v r${b > a ? " win" : ""}`, text: fmt(b) }));
     });
+    // achievements one has and the other doesn't
+    const has = (x) => new Set(x.achievements.filter((a) => a.unlocked).map((a) => a.id || a.name));
+    const ha = has(A), hb = has(B);
+    const onlyA = A.achievements.filter((a) => a.unlocked && !hb.has(a.id || a.name));
+    const onlyB = B.achievements.filter((a) => a.unlocked && !ha.has(a.id || a.name));
+    const both = [...ha].filter((k) => hb.has(k)).length;
+    const achList = (list) => list.length
+      ? h("ul", { class: "cmp-ach" }, ...list.slice(0, 12).map((a) => h("li", { title: a.description || "" }, iconEl(achIcon(a.id)), h("span", { text: a.name }))),
+        list.length > 12 ? h("li", { class: "text-3 small", text: `+${list.length - 12} more` }) : null)
+      : h("p", { class: "text-3 small", style: "margin:0", text: "None." });
+    const ach = h("div", { class: "cmp-ach-wrap" },
+      h("h4", { class: "cmp-ach-h", text: `Achievements: ${both} in common` }),
+      h("div", { class: "cmp-ach-cols" },
+        h("div", {}, h("b", { class: "small", text: `Only ${A.name} has (${onlyA.length})` }), achList(onlyA)),
+        h("div", {}, h("b", { class: "small", text: `Only ${B.name} has (${onlyB.length})` }), achList(onlyB))));
     out.replaceChildren(
       h("div", { class: "cmp-head" }, h("b", { text: A.name }), h("span", { class: "text-3 small", text: `${wa} – ${wb}` }), h("b", { class: "r", text: B.name })),
-      ...body);
+      ...body, ach);
   };
   const form = h("form", { class: "fr-add" }, input, h("button", { class: "btn btn-primary", type: "submit", text: "Compare" }));
   form.addEventListener("submit", (e) => { e.preventDefault(); run(); });

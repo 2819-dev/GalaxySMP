@@ -248,6 +248,7 @@ const routes = [
   ["GET", "/api/players/:name/history", progress.playerHistory],
   ["GET", "/api/timeline", progress.timeline],
   ["GET", "/api/uptime", (req, env) => import("./routes/uptime.js").then((m) => m.uptime(req, env))],
+  ["GET", "/api/online", (req, env) => import("./routes/online.js").then((m) => m.online(req, env))],
   ["GET", "/api/bedwars/history", (req, env, ctx, url) => import("./routes/bedwars.js").then((m) => m.history(req, env, ctx, url))],
   ["GET", "/api/bedwars/match/:id", (req, env, ctx, url, params) => import("./routes/bedwars.js").then((m) => m.match(req, env, ctx, url, params))],
   ["GET", "/api/bedwars/live", (req, env) => import("./routes/bedwars.js").then((m) => m.live(req, env))],

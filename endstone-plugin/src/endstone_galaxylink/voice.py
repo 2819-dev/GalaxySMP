@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.48.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.48.1",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -375,6 +375,7 @@ class VoiceLink:
         server = self.plugin.server
         try:
             info = {"type": "server", "online": len(server.online_players), "max": int(server.max_players)}
+            info["players"] = [{"xuid": str(p.xuid), "name": p.name, "doing": self.doing(p)} for p in list(server.online_players)[:60]]
             try:
                 from endstone_galaxylink.plugin import VERSION
                 info["plugin"] = VERSION
@@ -392,6 +393,35 @@ class VoiceLink:
         except Exception:
             return
         threading.Thread(target=self._safe_send, args=(ws, json.dumps(info)), daemon=True).start()
+
+    def doing(self, p):
+        """What a player is up to, in a few words (for "who's online" on the home page)."""
+        pl = self.plugin
+        try:
+            bw = getattr(pl, "bedwars", None)
+            if bw is not None:
+                uid = str(p.unique_id)
+                if uid in bw.queue:
+                    return "Waiting for Bedwars"
+                if uid in bw.players:
+                    return "Playing Bedwars"
+            bc = getattr(pl, "buildcontest", None)
+            if bc is not None and bc.building(p):
+                return "In a Build Contest"
+            dim = p.dimension.name.lower()
+            if "nether" in dim:
+                return "In the Nether"
+            if "end" in dim:
+                return "In the End"
+            plots = getattr(pl, "plots", None)
+            if plots is not None:
+                l = p.location
+                plot = plots.at(p.dimension.name, l.x, l.y, l.z)
+                if plot and plot.get("owner") == str(p.xuid):
+                    return "Building on their plot"
+        except Exception:
+            pass
+        return "Exploring"
 
     def announce_online(self):
         """Tell the website which players are here (so ranks can be given on the website) and everyone's money."""

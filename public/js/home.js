@@ -1,4 +1,5 @@
 import { config, icon, startStatus } from "/js/site.js";
+import { faceSvg } from "/js/face.js";
 
 const worlds = document.getElementById("worlds");
 for (const m of config.gameModes) {
@@ -64,3 +65,38 @@ import("/js/checklist.js").then(async ({ checklistCard }) => {
   wrap.append(card);
   hero?.after(wrap);
 }).catch(() => {});
+
+// ---------- Online now: who's in game and what they're doing (names for signed-in members) ----------
+async function onlineNow() {
+  const box = document.getElementById("home-online");
+  if (!box) return;
+  let d;
+  try { d = await (await fetch("/api/online", { credentials: "same-origin" })).json(); } catch { return; }
+  if (!d.ok || !d.up || !d.count) { box.hidden = true; return; }
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const head = el("div", "online-head");
+  head.append(el("span", "online-pulse"), el("b", "", `${d.count} playing now`));
+  const list = el("div", "online-list");
+  if (d.signedIn) {
+    for (const p of d.players) {
+      const a = el("a", "online-p");
+      a.href = `/player/${encodeURIComponent(p.name)}`;
+      const img = el("img");
+      img.src = p.head; img.alt = ""; img.width = 36; img.height = 36; img.loading = "lazy";
+      img.onerror = () => { img.onerror = null; img.src = faceSvg(p.name); };
+      const t = el("span", "online-t");
+      t.append(el("b", "", p.name), el("span", "", p.doing || "Playing"));
+      a.append(img, t);
+      list.append(a);
+    }
+  } else {
+    for (let i = 0; i < Math.min(d.count, 8); i++) list.append(el("span", "online-blank"));
+    const note = el("a", "online-sign", "Sign in to see who's playing");
+    note.href = "/community";
+    list.append(note);
+  }
+  box.replaceChildren(head, list);
+  box.hidden = false;
+}
+onlineNow();
+setInterval(onlineNow, 60_000);
