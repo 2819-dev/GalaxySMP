@@ -3632,3 +3632,9 @@ body.map-in-showcase .map-coords, body.map-in-showcase .map-tip { display: none;
 .cmp-v.win::after { content: " ▲"; font-size: .7em; }
 .cmp-v.r.win::after { content: ""; }
 .cmp-v.r.win::before { content: "▲ "; font-size: .7em; }
+.fb-signin { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--accent-text) 8%, var(--surface)); margin: 8px 0; }
+.fb-code { font-size: 1.5rem; letter-spacing: .14em; font-weight: 700; padding: 6px 12px; border-radius: 10px; background: var(--surface); user-select: all; }
+.fb-toggle { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; cursor: pointer; }
+.fb-toggle input { margin-top: 4px; }
+.fb-toggle > span { display: flex; flex-direction: column; gap: 2px; }
+.fb-log { max-height: 50vh; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 11px; background: var(--surface-2); padding: 10px; border-radius: 8px; margin: 0; }

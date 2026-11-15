@@ -470,6 +470,16 @@ export class VoiceHub extends DurableObject {
       return import("../routes/friends.js").then((m) => m.friendsJoined(this.env, msg.players)).catch((e) => console.error("friend alerts failed", e))
         .then(() => recordPlayers(this.env, msg.players)).catch((e) => console.error("record players failed", e));
     }
+    if (msg.type === "friendbot") {  // the friend bot's status, for Control Panel > Server control
+      const clip = (v, n) => String(v ?? "").slice(0, n);
+      const value = {
+        state: clip(msg.state, 20), detail: clip(msg.detail, 300), enabled: Boolean(msg.enabled), autoFriend: Boolean(msg.autoFriend),
+        signin: msg.signin && typeof msg.signin === "object" ? { url: /^https:\/\/[a-z0-9.-]*(microsoft|live)\.com\//i.test(String(msg.signin.url || "")) ? clip(msg.signin.url, 200) : "https://www.microsoft.com/link", code: clip(msg.signin.code, 20) } : null,
+        lines: (Array.isArray(msg.lines) ? msg.lines : []).slice(-25).map((l) => clip(l, 300)), at: new Date().toISOString(),
+      };
+      return getDb(this.env)`INSERT INTO economy_config (key, value, updated_by) VALUES ('friendbot_status', ${JSON.stringify(value)}::jsonb, 'server')
+                              ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = 'server'`.catch(() => {});
+    }
     if (msg.type === "teamchat") {  // /tc in game: into the team chat on the website
       return import("../routes/teams.js").then((m) => m.fromGame(this.env, msg)).catch((e) => console.error("team chat failed", e));
     }

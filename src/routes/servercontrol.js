@@ -65,7 +65,8 @@ export async function getServerControl(request, env) {
   const sql = getDb(env);
   const s = await loadServerControl(sql);
   const [owner] = (await pluginMessage(env, sql)).owners;
-  return json({ ok: true, ...s, restart: s.restart && s.restart.at * 1000 > Date.now() ? { at: new Date(s.restart.at * 1000).toISOString(), reason: s.restart.reason || "" } : null, ownerLinked: Boolean(owner) });
+  const [fb] = await sql`SELECT value, updated_at FROM economy_config WHERE key = 'friendbot_status'`;
+  return json({ ok: true, ...s, friendbot: fb ? { ...fb.value, at: fb.updated_at } : null, restart: s.restart && s.restart.at * 1000 > Date.now() ? { at: new Date(s.restart.at * 1000).toISOString(), reason: s.restart.reason || "" } : null, ownerLinked: Boolean(owner) });
 }
 
 const cleanText = (v, max) => String(v ?? "").replace(/\r/g, "").replace(/[\u0000-\u0009\u000b-\u001f]/g, "").trim().slice(0, max);
@@ -104,6 +105,11 @@ export async function saveServerControl(request, env) {
     }
     (await import("../lib/lockdown.js")).forgetLockdown();
     message = on ? "The website is locked and the server is closed to players. Only you can use the site." : "The website is open again and players can join the server.";
+  } else if (b.action === "friendbot") {
+    const msg = { type: "friendbot_settings", ...(b.enabled != null ? { enabled: Boolean(b.enabled) } : {}), ...(b.autoFriend != null ? { autoFriend: Boolean(b.autoFriend) } : {}), restart: Boolean(b.restart) };
+    const sent = await toPlugin(env, msg);
+    if (!sent) throw new HttpError(409, "The Minecraft server isn't connected right now. The friend bot runs on the server, so start the server first.");
+    return json({ ok: true, sent, message: b.restart ? "Restarting the friend bot..." : "Friend bot settings saved." });
   } else if (b.action === "restart") {
     const at = Math.floor(new Date(b.at).getTime() / 1000);
     if (!Number.isFinite(at)) throw new HttpError(400, "Pick a date and time.");

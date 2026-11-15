@@ -137,6 +137,15 @@ Tap Showcase on the map to see everyone's builds, most liked first. Plot owners 
 **Achievements guide and Compare**
 Every profile has an Achievements guide showing how to get each achievement and how many players have it, with yours ticked. Tap Compare on any profile to see two players' stats side by side.`,
   },
+  {
+    id: "2026-11-20",
+    title: "Off-Topic channels and a more reliable Friends tab",
+    body: `**Off-Topic**
+A new Off-Topic category at the bottom of Community: **OT | General** for chatting about anything that isn't GalaxySMP, **OT | Media** for pictures, memes and clips, and **OT | Announcements** for off-topic news from the staff team.
+
+**Joining from the Friends tab**
+The account that shows GalaxySMP under Play > Friends now runs alongside the server itself, so it's online whenever the server is. Add GalaxyPRO#9842 as a friend to see GalaxySMP in your Friends tab.`,
+  },
 ];
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.

@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.45.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.46.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -195,6 +195,8 @@ class VoiceLink:
             return
         if msg.get("type") == "active":
             self.active = bool(msg.get("on"))
+        elif msg.get("type") == "friendbot_settings":
+            self.plugin.friendbot.settings(msg)
         elif msg.get("type") == "teams":
             self.plugin.teams.update(msg)
             self.plugin.server.scheduler.run_task(self.plugin, self.plugin.refresh_tags)
@@ -398,6 +400,10 @@ class VoiceLink:
             self.plugin.minigames.push()
         except Exception as e:
             self.plugin.logger.warning(f"Couldn't send minigames to the website: {e}")
+        try:
+            self.plugin.friendbot.report(force=True)  # Control Panel > Friend bot
+        except Exception:
+            pass
         try:
             self.plugin.crates.push()  # the Crate Odds page
         except Exception as e:

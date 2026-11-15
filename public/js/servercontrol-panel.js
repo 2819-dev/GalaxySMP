@@ -14,8 +14,44 @@ export function setupServerControl({ loaders, toast }) {
   loaders.serverctl = async () => {
     let d;
     try { d = await getJson("/api/panel/server-control"); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
-    box.replaceChildren(lockdownPanel(d), allowlistPanel(), goalPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d));
+    box.replaceChildren(lockdownPanel(d), friendBotPanel(d), allowlistPanel(), goalPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d));
   };
+
+  // ---------- friend bot (GalaxySMP under Play > Friends) ----------
+  function friendBotPanel(d) {
+    const fb = d.friendbot;
+    const STATES = { online: ["done", "Online"], signin: ["pending", "Needs sign-in"], starting: ["pending", "Starting"], installing: ["pending", "Installing"],
+      restarting: ["pending", "Restarting"], error: ["declined", "Problem"], off: ["declined", "Off"] };
+    const fresh = fb && Date.now() - new Date(fb.at).getTime() < 15 * 60e3;
+    const [cls, label] = !fb ? ["declined", "Not set up yet"] : STATES[fb.state] || ["pending", fb.state];
+    const send = (body) => save({ action: "friendbot", ...body }).catch((e) => toast(e.message));
+    const parts = [
+      h("div", { class: "sc-head" }, h("h2", { text: "Friend bot" }), h("span", { class: `sg-status ${cls}`, text: label })),
+      h("p", { class: "text-2", text: "Shows GalaxySMP under Play > Friends > Joinable Friends for everyone who is friends with the bot's Xbox account. It runs on the Minecraft server itself, so it's online whenever the server is, and restarts by itself if it stops." }),
+    ];
+    if (!fb) parts.push(h("p", { class: "note small", text: "Install GalaxyLink 2.46 or newer and restart the server. The bot sets itself up (it downloads what it needs the first time)." }));
+    else {
+      if (fb.detail) parts.push(h("p", { class: "text-3 small", style: "margin:0", text: fb.detail + (fresh ? "" : " (last update from the server was a while ago)") }));
+      if (fb.state === "signin" && fb.signin) {
+        parts.push(h("div", { class: "fb-signin" },
+          h("b", { text: "Sign in once with the bot's Xbox account (not your own)" }),
+          h("span", { class: "text-2 small", text: "1. Open the link. 2. Type this code. 3. Sign in as the bot account." }),
+          h("code", { class: "fb-code", text: fb.signin.code }),
+          h("a", { class: "btn btn-primary btn-sm", href: fb.signin.url, target: "_blank", rel: "noopener noreferrer", text: "Open Microsoft sign-in" })));
+      }
+      const auto = h("input", { type: "checkbox", id: "fb-auto" });
+      auto.checked = Boolean(fb.autoFriend);
+      auto.addEventListener("change", () => send({ autoFriend: auto.checked }));
+      parts.push(h("label", { class: "fb-toggle" }, auto, h("span", {}, h("b", { text: "Accept friend requests by themselves" }),
+        h("span", { class: "text-3 small", text: "Off: accept them yourself on xbox.com while signed in as the bot (safer for the bot's account)." }))));
+      parts.push(h("div", { class: "cx-row" },
+        h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Restart bot", onclick: () => send({ restart: true }) }),
+        h("button", { class: `btn btn-sm ${fb.enabled ? "btn-ghost" : "btn-primary"}`, type: "button", text: fb.enabled ? "Turn off" : "Turn on", onclick: () => send({ enabled: !fb.enabled }) }),
+        fb.lines?.length ? h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Show log", onclick: () => openDialog({
+          title: "Friend bot log", body: h("pre", { class: "fb-log", text: fb.lines.join("\n") }), actions: [{ label: "Close", kind: "primary" }] }) }) : null));
+    }
+    return h("section", { class: "panel sc-card" }, ...parts);
+  }
 
   // ---------- lock the whole website ----------
   function lockdownPanel(d) {

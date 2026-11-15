@@ -80,6 +80,11 @@ const PENDING = [
     "CREATE TABLE IF NOT EXISTS team_messages (id bigserial PRIMARY KEY, team_id bigint NOT NULL REFERENCES teams(id) ON DELETE CASCADE, xuid text, name text NOT NULL, content text NOT NULL, from_game boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now())",
     "CREATE INDEX IF NOT EXISTS team_messages_idx ON team_messages (team_id, id DESC)",
     "INSERT INTO schema_migrations (version) VALUES ('0054_streaks_teams') ON CONFLICT DO NOTHING",
+  ]],  ["0055_off_topic", [
+    "INSERT INTO categories (name, position) SELECT 'Off-Topic', coalesce((SELECT position FROM categories WHERE name = 'Staff'), (SELECT coalesce(max(position), 0) + 1 FROM categories)) WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Off-Topic')",
+    "UPDATE categories SET position = (SELECT position FROM categories WHERE name = 'Off-Topic') + 1 WHERE name = 'Staff' AND position <= (SELECT position FROM categories WHERE name = 'Off-Topic')",
+    "INSERT INTO channels (category_id, slug, name, topic, position, min_post_power, kind) SELECT (SELECT id FROM categories WHERE name = 'Off-Topic'), v.slug, v.name, v.topic, v.pos, v.power, 'text' FROM (VALUES ('ot-announcements', 'OT | Announcements', 'Off-topic news from the staff team.', 0, 50), ('ot-general', 'OT | General', 'Chat about anything that isn''t GalaxySMP.', 1, 10), ('ot-media', 'OT | Media', 'Pictures, memes, videos and clips about anything.', 2, 10)) AS v(slug, name, topic, pos, power) ON CONFLICT (slug) DO NOTHING",
+    "INSERT INTO schema_migrations (version) VALUES ('0055_off_topic') ON CONFLICT DO NOTHING",
   ]],
 ];
 
