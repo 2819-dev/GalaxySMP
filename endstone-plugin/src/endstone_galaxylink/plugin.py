@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.47.0"
+VERSION = "2.47.1"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -567,6 +567,9 @@ class GalaxyLink(Plugin):
         floating = getattr(self, "floating", None)
         if floating is not None and floating.expecting is not None:
             floating.on_spawn(event)  # the floating label we're summoning right now
+        npcs = getattr(self, "npcs", None)
+        if npcs is not None and npcs.expecting is not None:
+            npcs.on_spawn(event)  # the shop NPC we're summoning right now
 
     @event_handler
     def on_player_command(self, event: PlayerCommandEvent):

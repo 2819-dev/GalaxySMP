@@ -194,6 +194,11 @@ The GalaxySMP team will now post some ideas in #Suggestions for you to vote on. 
 
 You get one vote each month, and you can change it while voting is open. Your vote is secret: no other players can see who you voted for. When voting is closed, the computers say so, and the floating label above them shows whether voting is open.`,
   },
+  {
+    id: "2026-11-22b",
+    title: "A more stable server",
+    body: `We fixed a cause of unexpected server restarts. Shop NPCs and floating labels (leaderboards, crates, shop signs and Voting Computers) are now handled more safely when nobody is nearby. If the server ever does stop unexpectedly, staff now get the full details straight away so it can be fixed quickly.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

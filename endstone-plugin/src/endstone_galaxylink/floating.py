@@ -10,7 +10,7 @@ Safe by design: this never looks through all the entities in the world (that cra
 import math
 
 ENTITY = "galaxysmp:floating_text"
-NEAR = 48
+NEAR = 32  # blocks: labels further than this from every player are never touched (their area may be unloaded)
 
 
 def dim_cmd(name):
@@ -41,9 +41,10 @@ class FloatingTexts:
             if old["text"] != text:
                 old["text"] = text
                 self.save()
-                a = self.live(old)
-                if a is not None:
-                    self._name(a, text)
+                if self.near(old):
+                    a = self.live(old)
+                    if a is not None:
+                        self._name(a, text)
             return
         lid = max([v["id"] for v in self.labels.values()] + [0]) + 1
         lab = {"id": lid, "dim": dim, "x": x, "y": y, "z": z, "text": text}
@@ -58,12 +59,13 @@ class FloatingTexts:
             return
         self.save()
         a = self.actors.pop(lab["id"], None)
-        try:
-            if a is not None and a.is_valid:
-                a.remove()
-                return
-        except Exception:
-            pass
+        if a is not None and self.near(lab):
+            try:
+                if a.is_valid:
+                    a.remove()
+                    return
+            except Exception:
+                pass
         self.kill_at(lab)
 
     # ---------- entities ----------
@@ -136,11 +138,16 @@ class FloatingTexts:
         """Every minute: refresh texts and put back missing labels where players are."""
         try:
             for lab in list(self.labels.values()):
+                if not self.near(lab):
+                    # nobody close: let go of the entity (its area can unload; touching an unloaded
+                    # entity can crash the server). It's replaced with a fresh one when a player comes back.
+                    self.actors.pop(lab["id"], None)
+                    continue
                 a = self.live(lab)
                 if a is not None:
                     if a.name_tag != lab["text"]:
                         self._name(a, lab["text"])
-                elif self.near(lab):
+                else:
                     self.summon(lab)
         except Exception as e:  # never let a label problem take anything else down
             self.errors += 1

@@ -7,12 +7,14 @@ hurt and come back if they go missing.
 
 import json
 import math
+import time
 
 from endstone import GameMode
 from endstone.form import ActionForm, ModalForm, TextInput, Toggle
 
 TAG = "gsmp_npc"
 HOLD_TICKS = 10
+NEAR = 32  # blocks: NPCs further than this from every player are left alone
 
 # (label, entity type, spawn event)
 LOOKS = [
@@ -54,7 +56,8 @@ class NpcManager:
         self.db = plugin.economy.db
         self.npcs = {}       # id -> record
         self.actors = {}     # id -> Actor
-        self.pending = []    # (npc id, ticks waited) waiting for a summoned mob to appear
+        self.expecting = None  # (npc id, mob type) being summoned right now
+        self.last_try = {}     # npc id -> when we last summoned it
         self.passthrough = {}  # player uuid -> npc id: let Minecraft's own NPC editor open once
         for nid, data in self.db.execute("SELECT id, data FROM npcs").fetchall():
             self.npcs[nid] = json.loads(data)
@@ -81,55 +84,55 @@ class NpcManager:
         player.send_message("§aShop NPC created. §7Tap it to edit it (operators only). Players who tap it get its menu.")
 
     def spawn(self, nid):
+        """Summons the NPC. We catch the new mob in the spawn event (never by looking through all entities)."""
         rec = self.npcs[nid]
         _, kind, event = LOOKS[rec["look"] if rec["look"] < len(LOOKS) else 0]
         dim = self.dimension_cmd(rec["dim"])
+        self.kill_tagged(nid)  # no duplicates: clear any old copy first
         line = f"summon {kind} {rec['x']} {rec['y']} {rec['z']} {rec['yaw']} 0 {event or 'minecraft:entity_spawned'}"
-        if dim:
-            line = f"execute in {dim} run " + line
-        self.plugin.server.dispatch_command(self.plugin.server.command_sender, line)
-        self.pending.append([nid, 0])
+        self.last_try[nid] = time.time()
+        self.expecting = (nid, kind)
+        try:
+            self.plugin.server.dispatch_command(self.plugin.server.command_sender, f"execute in {dim} run " + line)
+        finally:
+            self.expecting = None
+
+    def kill_tagged(self, nid):
+        dim = self.dimension_cmd(self.npcs[nid]["dim"]) if nid in self.npcs else "overworld"
+        self.plugin.server.dispatch_command(self.plugin.server.command_sender, f"execute in {dim} run kill @e[tag={TAG}_{nid}]")
 
     @staticmethod
     def dimension_cmd(name):
         n = str(name).lower()
         return "nether" if "nether" in n else "the_end" if "end" in n else "overworld"
 
-    def adopt(self):
-        """Tags the mob we just summoned so we know it's this NPC."""
-        still = []
-        for item in self.pending:
-            nid, waited = item
-            rec = self.npcs.get(nid)
-            if not rec:
-                continue
-            _, kind, _ = LOOKS[rec["look"] if rec["look"] < len(LOOKS) else 0]
-            found = None
-            for a in self.plugin.server.level.actors:
-                try:
-                    if a.type != kind or any(t.startswith(TAG) for t in a.scoreboard_tags):
-                        continue
-                    l = a.location
-                    if a.dimension.name == rec["dim"] and math.dist((l.x, l.y, l.z), (rec["x"], rec["y"], rec["z"])) < 1.5:
-                        found = a
-                        break
-                except Exception:
-                    continue
-            if found:
-                self.setup(nid, found)
-            elif waited < 10:
-                still.append([nid, waited + 1])
-        self.pending = still
+    def on_spawn(self, event):
+        """ActorSpawnEvent: the NPC we're summoning right now."""
+        want = self.expecting
+        if want is None:
+            return
+        nid, kind = want
+        try:
+            actor = event.actor
+            if actor.type != kind:
+                return
+        except Exception:
+            return
+        self.expecting = None
+        # set it up on the next tick, once it's fully in the world
+        self.plugin.server.scheduler.run_task(self.plugin, lambda: self.setup(nid, actor), delay=1)
 
     def setup(self, nid, actor):
-        rec = self.npcs[nid]
-        actor.add_scoreboard_tag(TAG)
-        actor.add_scoreboard_tag(f"{TAG}_{nid}")
-        actor.name_tag = rec["name"]
+        rec = self.npcs.get(nid)
+        if rec is None:
+            return
         try:
+            actor.add_scoreboard_tag(TAG)
+            actor.add_scoreboard_tag(f"{TAG}_{nid}")
+            actor.name_tag = rec["name"]
             actor.is_name_tag_always_visible = True
         except Exception:
-            pass
+            return
         self.actors[nid] = actor
 
     def npc_id(self, actor):
@@ -141,17 +144,29 @@ class NpcManager:
             pass
         return None
 
+    def near(self, rec, dist=NEAR):
+        """Is a player close to this spot? Only then is the area surely loaded, so the NPC is safe to touch."""
+        for p in self.plugin.server.online_players:
+            try:
+                if p.dimension.name == rec["dim"] and math.dist((p.location.x, p.location.z), (rec["x"], rec["z"])) < dist:
+                    return True
+            except Exception:
+                continue
+        return False
+
     # ---------- keeping NPCs in place ----------
     def tick(self):
+        """Holds NPCs still, but only those with a player nearby. When nobody is near, we let go of the mob
+        (its area can unload, and touching an unloaded mob can crash the server). When a player comes back,
+        the NPC is replaced with a fresh one."""
         self._ticks += 1
-        if self.pending:
-            self.adopt()
-        if self._ticks % 10 == 0:
-            self.find_missing()
         for nid, actor in list(self.actors.items()):
             rec = self.npcs.get(nid)
+            if rec is None or not self.near(rec):
+                self.actors.pop(nid, None)
+                continue
             try:
-                if rec is None or not actor.is_valid or actor.is_dead:
+                if not actor.is_valid or actor.is_dead:
                     self.actors.pop(nid, None)
                     continue
                 l = actor.location
@@ -162,37 +177,15 @@ class NpcManager:
                     actor.name_tag = rec["name"]
             except Exception:
                 self.actors.pop(nid, None)
+        if self._ticks % 10 == 0:
+            self.find_missing()
 
     def find_missing(self):
-        missing = [nid for nid in self.npcs if nid not in self.actors and not any(p[0] == nid for p in self.pending)]
-        # only look when a player is near a missing NPC (its area is loaded), not all the time
-        missing = [nid for nid in missing if any(
-            p.dimension.name == self.npcs[nid]["dim"] and math.dist((p.location.x, p.location.z), (self.npcs[nid]["x"], self.npcs[nid]["z"])) < 40
-            for p in self.plugin.server.online_players)]
-        if not missing:
-            return
-        seen = {}
-        for a in self.plugin.server.level.actors:
-            nid = self.npc_id(a)
-            if nid is None:
+        now = time.time()
+        for nid, rec in list(self.npcs.items()):
+            if nid in self.actors or now - self.last_try.get(nid, 0) < 10:
                 continue
-            if nid not in self.npcs or nid in seen:
-                try:
-                    a.remove()  # leftover from a removed NPC, or a duplicate
-                except Exception:
-                    pass
-                continue
-            seen[nid] = a
-        for nid in missing:
-            if nid in seen:
-                self.actors[nid] = seen[nid]
-                continue
-            rec = self.npcs[nid]
-            # Only respawn when a player is close by (so the area is loaded and it really is gone).
-            near = any(p.dimension.name == rec["dim"] and
-                       math.dist((p.location.x, p.location.z), (rec["x"], rec["z"])) < 40
-                       for p in self.plugin.server.online_players)
-            if near:
+            if self.near(rec):
                 self.spawn(nid)
 
     def remove(self, nid):
@@ -202,12 +195,8 @@ class NpcManager:
                 actor.remove()
             except Exception:
                 pass
-        for a in self.plugin.server.level.actors:
-            if self.npc_id(a) == nid:
-                try:
-                    a.remove()
-                except Exception:
-                    pass
+        if nid in self.npcs:
+            self.kill_tagged(nid)
         self.npcs.pop(nid, None)
         self.db.execute("DELETE FROM npcs WHERE id = ?", (nid,))
         self.db.commit()

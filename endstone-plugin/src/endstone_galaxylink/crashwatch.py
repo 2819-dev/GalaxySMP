@@ -37,6 +37,8 @@ class CrashWatch:
             plugin.logger.warning(f"The server didn't stop properly last time (last seen {self.report['lastSeen']}). "
                                   f"Last activity: {self.report['doing']}. A crash report goes to #Staff Logs.")
         self.beat(force=True)
+        self.log_copy = folder / "last_server_log.txt"
+        self.last_copy = 0
 
     # ---------- while running ----------
     def mark(self, what):
@@ -65,6 +67,7 @@ class CrashWatch:
     def tick(self):
         """Every second: keep the note fresh, and send a waiting crash report once the website is connected."""
         self.beat()
+        self.copy_log()
         voice = getattr(self.plugin, "_voice", None)
         if self.report and voice is not None and getattr(voice, "ws", None):
             voice.send_json({"type": "server_crash", **self.report})
@@ -74,6 +77,26 @@ class CrashWatch:
         """A proper stop: remove the note."""
         try:
             self.file.unlink()
+        except Exception:
+            pass
+
+    def copy_log(self):
+        """Every 10 seconds: keep a copy of the end of this run's server log in our own folder. The server starts
+        a new log file when it restarts, so this copy is the only way to see what happened just before a crash."""
+        now = time.time()
+        if now - self.last_copy < BEAT_SECONDS:
+            return
+        self.last_copy = now
+        try:
+            src = Path.cwd() / "logs" / "latest.log"
+            with open(src, "rb") as fh:
+                fh.seek(0, 2)
+                size = fh.tell()
+                fh.seek(max(0, size - 30000))
+                data = fh.read()
+            tmp = self.log_copy.with_suffix(".tmp")
+            tmp.write_bytes(data)
+            tmp.replace(self.log_copy)
         except Exception:
             pass
 
@@ -92,8 +115,17 @@ class CrashWatch:
         }
 
     def log_tail(self, before):
-        """The end of the newest server log or crash report written before this start."""
+        """The end of the server log from the run that crashed (our own copy, saved every 10 seconds), or else
+        the newest crash report or log written before this start."""
         cwd = Path.cwd()
+        saved = Path(self.plugin.data_folder) / "last_server_log.txt"
+        try:
+            if saved.is_file() and saved.stat().st_size > 0:
+                text = saved.read_bytes().decode("utf-8", "replace")
+                lines = [ln.rstrip()[:300] for ln in text.splitlines() if ln.strip()][-LOG_LINES:]
+                return {"file": "server log (saved by GalaxyLink before the crash)", "lines": lines}
+        except Exception:
+            pass
         found = []
         for folder in (cwd, cwd / "logs", cwd / "crash_reports", cwd / "crashes", cwd / "crash_dumps", cwd / "CrashDumps"):
             if not folder.is_dir():
