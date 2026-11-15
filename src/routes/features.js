@@ -598,6 +598,7 @@ export async function tick(env) {
     ["wrapped", () => import("./wrapped.js").then((m) => m.wrappedTick(env, sql))],
     ["release notes", () => import("../lib/releases.js").then((m) => m.postReleases(env, sql))],
     ["anniversaries", () => import("./anniversary.js").then((m) => m.anniversaryTick(env, sql))],
+    ["bedwars champion", () => import("./bedwars.js").then((m) => m.weeklyChampion(env, sql))],
     ["pro+ streak freezes", () => proFreezes(sql)],
     ["inbox cleanup", () => sql`DELETE FROM notifications WHERE created_at < now() - interval '60 days'`],
     ["rewards", () => import("./rewards.js").then((m) => m.sendRewards(env, sql))],

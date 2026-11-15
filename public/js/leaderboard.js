@@ -29,7 +29,8 @@ const GROUPS = [
 const groupOf = (key) => GROUPS.find((g) => g.boards.includes(key)) || GROUPS[0];
 export const profileUrl = (name) => `/player/${encodeURIComponent(name)}`;
 
-let board = new URLSearchParams(location.search).get("board") || "money";
+let board = new URLSearchParams(location.search).get("board") || (location.hash === "#bedwars" ? "bw_wins" : "money");
+let bwRange = "all";  // Bedwars: all time, this week or this month
 if (!GROUPS.some((g) => g.boards.includes(board))) board = "money";
 
 function pick(key) {
@@ -54,6 +55,59 @@ function tabs() {
   const sub = $("lb-subtabs");
   sub.hidden = group.boards.length < 2;
   tabRow(sub, group.boards.map((b) => [b, SHORT[b]]), board, pick);
+  let range = document.getElementById("lb-range");
+  if (group.key === "bedwars") {
+    if (!range) {
+      range = document.createElement("div");
+      range.className = "lb-subtabs lb-range";
+      range.id = "lb-range";
+      range.setAttribute("role", "tablist");
+      range.setAttribute("aria-label", "Time range");
+      sub.after(range);
+    }
+    range.hidden = false;
+    tabRow(range, [["all", "All time"], ["week", "This week"], ["month", "This month"]], bwRange, (k) => { bwRange = k; load(); });
+  } else if (range) range.hidden = true;
+  bwLive(group.key === "bedwars");
+}
+
+// ---------- Bedwars: the game running right now ----------
+let liveTimer = null;
+async function bwLive(show) {
+  let card = document.getElementById("bw-live");
+  clearTimeout(liveTimer);
+  if (!show) { if (card) card.hidden = true; return; }
+  if (!card) {
+    card = document.createElement("section");
+    card.id = "bw-live";
+    card.className = "panel bw-live";
+    $("lb-list").closest("section, .panel, div").before(card);
+  }
+  let d = null;
+  try { d = (await (await fetch("/api/bedwars/live")).json()).live; } catch { d = null; }
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  if (!d) {
+    card.hidden = false;
+    card.replaceChildren(el("div", "bw-live-head", null));
+    card.firstChild.append(el("b", "", "No Bedwars game right now"), el("span", "text-3 small", "Join from a Minigame Computer or /bedwars. Turn on \"Bedwars games\" in Account settings > Notifications to hear when players are waiting."));
+    liveTimer = setTimeout(() => bwLive(true), 30_000);
+    return;
+  }
+  const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const head = el("div", "bw-live-head");
+  head.append(el("span", "bw-live-dot"), el("b", "", `Live ${d.mode || "Bedwars"} game`), el("span", "text-3 small", `${mmss(d.elapsed)}${d.next ? ` · ${d.next.label} in ${mmss(Math.max(0, d.next.in))}` : ""}`));
+  const teams = el("div", "bw-live-teams");
+  for (const t of d.teams) {
+    const box = el("div", `bw-team ${t.key}${t.alive ? "" : " out"}`);
+    box.append(el("b", "", `${t.name} ${t.bed ? "· bed ✔" : t.alive ? `· ${t.alive} left` : "· out"}`));
+    for (const p of t.players) box.append(el("span", p.alive ? "" : "text-3", `${p.name} — ${p.kills}K ${p.finals}F ${p.beds}B`));
+    teams.append(box);
+  }
+  const feed = el("ul", "bw-feed");
+  for (const f of d.feed || []) feed.append(el("li", "", `${mmss(f.t)}  ${f.text}`));
+  card.hidden = false;
+  card.replaceChildren(head, teams, d.feed?.length ? feed : el("p", "text-3 small", "No kills yet."));
+  liveTimer = setTimeout(() => bwLive(true), 10_000);
 }
 
 async function load() {
@@ -62,6 +116,12 @@ async function load() {
     const res = await fetch(`/api/leaderboards?board=${encodeURIComponent(board)}`);
     const data = await res.json();
     if (!data.ok) throw new Error();
+    if (groupOf(board).key === "bedwars" && bwRange !== "all") {  // this week / this month, from the match history
+      const top = await (await fetch(`/api/bedwars/top?range=${bwRange}`)).json();
+      const field = { bw_wins: "wins", bw_finals: "finals", bw_beds: "beds" }[board];
+      data.players = (top.players || []).map((p) => ({ name: p.name, value: p[field] || 0 })).filter((p) => p.value > 0).sort((a, b) => b.value - a.value);
+      data.title = `${SHORT[board]} ${bwRange === "week" ? "this week" : "this month"}${bwRange === "week" ? " (the weekly #1 in wins gets $5,000 and a badge)" : ""}`;
+    }
     tabs();
     $("lb-players").textContent = data.totals.players.toLocaleString();
     $("lb-online").textContent = data.totals.online.toLocaleString();

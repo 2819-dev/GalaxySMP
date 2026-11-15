@@ -196,6 +196,9 @@ export class VoiceHub extends DurableObject {
   // ---------- connections ----------
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname === "/internal/bwlive") {
+      return Response.json((await this.ctx.storage.get("bwlive")) || {});
+    }
     if (url.pathname === "/internal/server") {
       const info = await this.ctx.storage.get("server");
       if (info && Date.now() - info.at < 45_000) return Response.json(info);
@@ -482,6 +485,15 @@ export class VoiceHub extends DurableObject {
       };
       return getDb(this.env)`INSERT INTO economy_config (key, value, updated_by) VALUES ('friendbot_status', ${JSON.stringify(value)}::jsonb, 'server')
                               ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = 'server'`.catch(() => {});
+    }
+    if (msg.type === "bw_live") {  // the Bedwars game running now, for the live view on the website
+      return this.ctx.storage.put("bwlive", { ...msg, at: Date.now() });
+    }
+    if (msg.type === "bw_match") {  // a Bedwars game finished: match history
+      return import("../routes/bedwars.js").then((m) => m.recordMatch(this.env, msg)).catch((e) => console.error("bw match failed", e));
+    }
+    if (msg.type === "bw_lobby") {  // players waiting for Bedwars: alerts for members who want them
+      return import("../routes/bedwars.js").then((m) => m.lobbyAlert(this.env, this.ctx.storage, msg)).catch((e) => console.error("bw lobby failed", e));
     }
     if (msg.type === "potm_vote" || msg.type === "potm_set" || msg.type === "potm_mine") {  // Player of the Month (Voting Computers)
       return import("../routes/potm.js").then((m) => m.fromGame(this.env, msg)).catch((e) => console.error("potm failed", e));

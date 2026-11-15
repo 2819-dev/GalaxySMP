@@ -214,6 +214,30 @@ You get one vote each month, and you can change it while voting is open. Your vo
     title: "Rank badges above heads",
     body: `Rank badges above players' heads now stay in place. If anything else changes a player's name tag, the badge is put back straight away. As always, a player with more than one rank shows the highest one in the server's rank order.`,
   },
+  {
+    id: "2026-11-23",
+    title: "Bedwars: team upgrades, parties, modes and more",
+    body: `**Team Upgrades**
+Each island now has a Team Upgrades NPC. Spend diamonds on Sharpened Swords, Reinforced Armor, Maniac Miner (faster mining), a Heal Pool at your base, and traps that blind and slow the next enemy who comes near your bed.
+
+**Parties and modes**
+Make a party in /bedwars > Party and you'll always be on the same team. In the waiting room, vote for Solo, Duos or 4v4.
+
+**Faster games**
+Sudden Death now starts after 10 minutes: every remaining bed breaks, so games always finish.
+
+**Rejoin and spectate**
+If you disconnect while your bed stands, you have 2 minutes to come back to your team. Knocked-out players can watch anyone still playing with /bedwars > Watch a player.
+
+**Quests and effects**
+New daily quests: play, win, get kills and break beds in Bedwars. Victory and kill effects can be won by playing (10, 25 and 50 wins), found in the Season Pass, or bought in the Store. Pick yours with /cosmetics.
+
+**On the website**
+- Every profile now shows recent Bedwars games. Tap one for the full recap.
+- The Leaderboards page shows the game being played right now, live.
+- Bedwars leaderboards now have This week and This month. The weekly #1 in wins gets $5,000 and the Weekly Bedwars Champion badge.
+- Turn on "Bedwars games" in Account settings > Notifications to hear when players are waiting for a game.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

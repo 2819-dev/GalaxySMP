@@ -11,9 +11,16 @@ import { giveUnlock } from "./looks.js";
 
 // Each tier's rewards, plus the website look it unlocks (themes, titles, frames: see looks-catalog.js).
 const withUnlocks = (s) => (s.tiers || []).map((t, i) => ({ ...t,
-  free: { ...t.free, unlock: tierUnlock("free", i + 1, s.id) }, pro: { ...t.pro, unlock: tierUnlock("pro", i + 1, s.id) } }));
+  free: { ...t.free, unlock: tierUnlock("free", i + 1, s.id), cosmetic: SEASON_COSMETICS[`free:${i + 1}`]?.[1] || null },
+  pro: { ...t.pro, unlock: tierUnlock("pro", i + 1, s.id), cosmetic: SEASON_COSMETICS[`pro:${i + 1}`]?.[1] || null } }));
 
 export const XP = { minute: 1, quest: 30, achievement: 50, bw_win: 40 };
+// Bedwars effects some tiers also give (picked in game with /cosmetics). "track:tier" -> [id, name]
+export const SEASON_COSMETICS = {
+  "free:20": ["bw_kill_notes", "Bedwars kill effect: Music Notes"],
+  "pro:12": ["bw_kill_smoke", "Bedwars kill effect: Puff of Smoke"],
+  "pro:24": ["bw_win_dragon", "Bedwars victory: Dragon Roar"],
+};
 const TIERS = 30;
 const XP_PER_TIER = 120;
 const WEEKS = 8;
@@ -108,6 +115,12 @@ export async function claim(request, env) {
   await sendRewards(env, sql).catch(() => {});
   const unlock = tierUnlock(track, tier, s.id);
   if (unlock) await giveUnlock(sql, user.id, unlock.kind, unlock.id, `season:${s.id}:${tier}:${track}`);
+  const cos = SEASON_COSMETICS[`${track}:${tier}`];
+  if (cos) {
+    await sql`UPDATE players SET cosmetics = array_append(coalesce(cosmetics, '{}'), ${cos[0]}) WHERE xuid = ${me.xuid} AND NOT (${cos[0]} = ANY(coalesce(cosmetics, '{}')))`;
+    const { sendPlans } = await import("./plans.js");
+    await sendPlans(env, sql).catch(() => {});
+  }
   return json({ ok: true, unlock,
     message: unlock ? `Reward claimed. You unlocked the ${unlock.name}${unlock.kind === "title" ? " title" : unlock.kind === "theme" ? " theme" : ""}. Choose it in Account settings > Looks. Any money or keys will be delivered in game.`
       : "Reward claimed. It will be delivered in game (the next time you join, if you're offline)." });

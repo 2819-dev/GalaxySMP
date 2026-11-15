@@ -3790,3 +3790,22 @@ html[data-theme="light"] .holiday-greeting { border-color: rgba(184, 134, 47, .3
 .up-dot.bad { background: var(--bad); } .up-dot.ok { background: var(--warn); }
 .up-none { margin: 12px 0 0; }
 @media (max-width: 480px) { .up-bars { gap: 2px; height: 28px; } }
+
+/* Leaderboards: Bedwars live game */
+.lb-range { margin-top: 6px; }
+.bw-live { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.bw-live-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.bw-live-head span.text-3 { flex-basis: 100%; }
+.bw-live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 0 4px color-mix(in srgb, var(--bad) 20%, transparent); animation: vr-pulse 1.4s infinite; }
+.bw-live-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.bw-team { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); border-left: 4px solid var(--border-strong); font-size: .86rem; }
+.bw-team.red { border-color: #e5484d; } .bw-team.blue { border-color: #3e63dd; } .bw-team.green { border-color: #30a46c; } .bw-team.yellow { border-color: #f5d90a; }
+.bw-team.out { opacity: .55; }
+.bw-feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: .85rem; color: var(--text-2); font-variant-numeric: tabular-nums; max-height: 180px; overflow-y: auto; }
+/* Profile: Bedwars match history */
+.bwh-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.bwh-list button { width: 100%; display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.bwh-list button:hover { border-color: var(--border-strong); }
+.bwh-res { font-weight: 700; font-size: .8rem; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); }
+.bwh-res.win { color: var(--ok); } .bwh-res.loss { color: var(--text-3); }
+.bwh-stats { font-size: .85rem; color: var(--text-2); }

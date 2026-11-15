@@ -51,7 +51,8 @@ def ore(name):
 
 # Quest kinds: what counts towards them.
 #   mine: a broken block passing the filter; place: placed blocks; kill: killed mobs passing the filter;
-#   harvest: fully grown crops; sell: dollars earned selling; play: minutes played.
+#   harvest: fully grown crops; sell: dollars earned selling; play: minutes played;
+#   bw_play / bw_win / bw_kill / bw_bed: Bedwars games played, won, kills and beds broken.
 QUESTS = {
     "easy": [
         ("mine_stone_64", "Mine 64 stone", "mine", lambda b: short(b) in STONE, 64),
@@ -61,6 +62,7 @@ QUESTS = {
         ("kill_5", "Defeat 5 hostile mobs", "kill", lambda m: short(m) in HOSTILE, 5),
         ("harvest_32", "Harvest 32 fully grown crops", "harvest", None, 32),
         ("play_20", "Play for 20 minutes", "play", None, 20),
+        ("bw_play_1", "Play a game of Bedwars", "bw_play", None, 1),
     ],
     "medium": [
         ("mine_stone_256", "Mine 256 stone", "mine", lambda b: short(b) in STONE, 256),
@@ -71,6 +73,8 @@ QUESTS = {
         ("harvest_128", "Harvest 128 fully grown crops", "harvest", None, 128),
         ("sell_50", "Sell $50 of items to the Shop", "sell", None, 50),
         ("play_60", "Play for 1 hour", "play", None, 60),
+        ("bw_kill_5", "Get 5 kills in Bedwars", "bw_kill", None, 5),
+        ("bw_bed_1", "Break a bed in Bedwars", "bw_bed", None, 1),
     ],
     "hard": [
         ("diamond_5", "Mine 5 diamond ore", "mine", ore("diamond"), 5),
@@ -81,6 +85,8 @@ QUESTS = {
         ("sell_250", "Sell $250 of items to the Shop", "sell", None, 250),
         ("place_500", "Place 500 blocks", "place", None, 500),
         ("play_120", "Play for 2 hours", "play", None, 120),
+        ("bw_win_1", "Win a game of Bedwars", "bw_win", None, 1),
+        ("bw_bed_2", "Break 2 beds in Bedwars", "bw_bed", None, 2),
     ],
 }
 QUEST_REWARD = {"easy": 2500, "medium": 7500, "hard": 20000}  # $25, $75, $200

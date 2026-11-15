@@ -62,6 +62,10 @@ export const SHOP = [
       { id: "join_firework", name: "Join firework", price: 100, limit: 1, icon: "firework", description: "A firework launches when you join. Included with Galaxy Pro+." },
       { id: "join_sound", name: "Join chime", price: 75, limit: 1, icon: "bell", description: "Everyone online hears a chime when you join." },
       { id: "join_message", name: "Custom join message", price: 150, limit: 1, icon: "message", description: "Write your own message that everyone sees when you join (e.g. \"has entered the galaxy!\")." },
+      { id: "bw_win_rainbow", name: "Bedwars victory: Rainbow Burst", price: 200, limit: 1, icon: "sparkles", description: "A burst of colors when your team wins a Bedwars game. Pick it in game with /cosmetics." },
+      { id: "bw_win_dragon", name: "Bedwars victory: Dragon Roar", price: 300, limit: 1, icon: "flame", description: "A dragon's roar and purple breath when your team wins. Pick it with /cosmetics." },
+      { id: "bw_kill_lightning", name: "Bedwars kill: Lightning", price: 200, limit: 1, icon: "bolt", description: "A crackle of lightning when you knock someone out in Bedwars." },
+      { id: "bw_kill_smoke", name: "Bedwars kill: Puff of Smoke", price: 150, limit: 1, icon: "sparkles", description: "A puff of smoke when you knock someone out in Bedwars." },
     ],
   },
 ];

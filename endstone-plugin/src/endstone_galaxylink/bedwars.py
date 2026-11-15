@@ -40,10 +40,25 @@ IRON_EVERY, GOLD_EVERY = 1.5, 8.0
 DIAMOND_EVERY = {1: 30, 2: 23, 3: 15}
 EMERALD_EVERY = {1: 65, 2: 50, 3: 35}
 TIMELINE = [  # seconds after the start
-    (360, "diamond", 2, "Diamond II"), (720, "emerald", 2, "Emerald II"),
-    (1080, "diamond", 3, "Diamond III"), (1440, "emerald", 3, "Emerald III"),
-    (1800, "beds", 0, "Bed Destruction"), (2400, "end", 0, "Game End"),
+    (150, "diamond", 2, "Diamond II"), (270, "emerald", 2, "Emerald II"),
+    (390, "diamond", 3, "Diamond III"), (510, "emerald", 3, "Emerald III"),
+    (600, "beds", 0, "Sudden Death"), (900, "end", 0, "Game End"),
 ]
+REJOIN_SECONDS = 120     # a player who disconnects can come back to their team within this time
+MODES = {1: "Solo", 2: "Duos", 4: "4v4"}  # players per team
+SHOP_TAG = "gsmp_bw_shop"
+UP_TAG = "gsmp_bw_up"
+UP_NAME = "§b§lTeam Upgrades"
+UP_DIALOG = "Spend diamonds on upgrades for your whole team."
+# Team upgrades, paid with diamonds: key -> (name, description, costs per level)
+UPGRADES = {
+    "sharp": ("Sharpened Swords", "Your team's swords get Sharpness I.", [4]),
+    "prot": ("Reinforced Armor", "Protection for your team's armor.", [2, 4, 8, 16]),
+    "haste": ("Maniac Miner", "Your team mines faster (Haste).", [2, 4]),
+    "heal": ("Heal Pool", "Teammates near your base slowly heal.", [1]),
+    "trap": ("It's a Trap!", "The next enemy who comes near your bed is blinded and slowed, and your team is warned. Up to 3 traps.", [1, 1, 1]),
+}
+TRAP_RANGE = 7
 RESPAWN_SECONDS = 5
 ALLOWED_COMMANDS = {"leave", "bedwars", "bw", "report", "dm", "r", "tell", "msg", "w", "guide", "me"}
 DEFAULT_CFG = {"lobby": None, "bounds": None, "teams": {}, "diamond": [], "emerald": [],
@@ -127,7 +142,9 @@ class Bedwars:
         self.boards = {}         # uuid -> (scoreboard, objective, lines)
         self.warned = {}         # uuid -> time of the last "keep out" message
         self._tick = 0
-        self.shop_actor = {}     # team -> actor
+        self.parties = {}        # leader uid -> [member uids] (Bedwars parties: always put on the same team)
+        self.invites = {}        # invited uid -> (leader uid, time)
+        self.mode_votes = {}     # uid -> players per team they voted for
         self.cleanup_leftovers() # a game that was running when the server stopped
 
     # ---------- storage ----------
@@ -327,10 +344,161 @@ class Bedwars:
             form.add_button("§c§lLeave Bedwars§r\n§8Get your own items back", icon="textures/ui/cancel", on_click=self.confirm_leave)
         else:
             form.add_button("§a§lPlay Bedwars§r\n§8Your items are kept safe until you leave", icon="textures/ui/sword", on_click=self.join)
+        if self.ready() and uid not in self.players:
+            party = self.party_of(uid)
+            inv = self.invites.get(uid)
+            label = f"§lParty§r\n§8{len(party)} in your party" if party else ("§lParty§r\n§aYou have an invite!" if inv else "§lParty§r\n§8Play on the same team as friends")
+            form.add_button(label, icon="textures/ui/FriendsIcon", on_click=self.party_menu)
+            if not self.game:
+                mode = MODES[self.current_mode()]
+                form.add_button(f"§lVote for a mode§r\n§8Next game: {mode}", icon="textures/ui/icon_recipe_item", on_click=self.mode_menu)
+            form.add_button("§lMap voting§r\n§8Coming soon", icon="textures/ui/world_glyph_color", on_click=lambda p: p.send_message("§7Map voting is coming soon, once there's more than one Bedwars map."))
+        if self.game and uid in self.players and not self.players[uid].get("alive"):
+            form.add_button("§lWatch a player§r\n§8Teleport to someone still playing", icon="textures/ui/camera-yo", on_click=self.spectate_menu)
         form.add_button("§lHow to play§r", icon="textures/ui/how_to_play_button_default", on_click=self.how_to)
         if player.is_op:
             form.add_button("§6§lArena setup§r\n§8Admins", icon="textures/ui/hammer_l", on_click=self.setup_menu)
         player.send_form(form)
+
+    # ---------- parties (always put on the same team) ----------
+    def party_of(self, uid):
+        """[leader, members...] of the party this player is in, or []."""
+        for leader, members in self.parties.items():
+            if uid == leader or uid in members:
+                return [leader] + [m for m in members]
+        return []
+
+    def party_menu(self, player):
+        uid = str(player.unique_id)
+        party = self.party_of(uid)
+        inv = self.invites.get(uid)
+        lines = []
+        if party:
+            lines.append("§fYour party (always on the same team):")
+            for m in party:
+                p = self.online(m)
+                lines.append(f" §7• §f{p.name if p else 'Offline player'}{' §e(leader)' if m == party[0] else ''}")
+        else:
+            lines.append("§7Make a party to play on the same team as your friends. Up to 4 players.")
+        form = ActionForm(title="§l§cBedwars Party", content="\n".join(lines))
+        if inv and not party:
+            leader = self.online(inv[0])
+            form.add_button(f"§a§lJoin {leader.name if leader else 'the'} party", on_click=self.party_accept)
+            form.add_button("§lDecline the invite", on_click=lambda p: (self.invites.pop(str(p.unique_id), None), p.send_message("§7Invite declined.")))
+        if not party or party[0] == uid:
+            form.add_button("§lInvite a player", icon="textures/ui/invite_base", on_click=self.party_invite_menu)
+        if party:
+            form.add_button("§c§lLeave the party", on_click=self.party_leave)
+        form.add_button("§l< Back", on_click=self.menu)
+        player.send_form(form)
+
+    def party_invite_menu(self, player):
+        uid = str(player.unique_id)
+        party = self.party_of(uid)
+        if len(party) >= 4:
+            return player.send_message("§cYour party is full (4 players).")
+        others = [p for p in self.plugin.server.online_players if str(p.unique_id) not in party and str(p.unique_id) != uid]
+        form = ActionForm(title="§lInvite to your party", content="§7Who should play with you?" if others else "§7Nobody else is online right now.")
+        for p in others[:60]:
+            form.add_button(p.name, on_click=lambda pl, t=str(p.unique_id): self.party_invite(pl, t))
+        form.add_button("§l< Back", on_click=self.party_menu)
+        player.send_form(form)
+
+    def party_invite(self, player, target_uid):
+        target = self.online(target_uid)
+        if target is None:
+            return player.send_message("§cThat player isn't online any more.")
+        uid = str(player.unique_id)
+        if not self.party_of(uid):
+            self.parties[uid] = []
+        self.invites[target_uid] = (uid, now())
+        player.send_message(f"§aInvited {target.name} to your Bedwars party.")
+        target.send_message(f"§e{player.name} invited you to their Bedwars party. §7Type §f/bedwars party accept§7 or open /bedwars > Party.")
+        self.sound(target, "note.pling", 0.8, 1.4)
+
+    def party_accept(self, player):
+        uid = str(player.unique_id)
+        inv = self.invites.pop(uid, None)
+        if not inv or now() - inv[1] > 300:
+            return player.send_message("§7You don't have a party invite (they last 5 minutes).")
+        leader = inv[0]
+        if self.party_of(uid):
+            self.party_leave(player, quiet=True)
+        members = self.parties.setdefault(leader, [])
+        if len(members) + 1 >= 4:
+            return player.send_message("§cThat party is full.")
+        members.append(uid)
+        for m in self.party_of(uid):
+            p = self.online(m)
+            if p is not None:
+                p.send_message(f"§a{player.name} joined the Bedwars party.")
+        lp = self.online(leader)
+        if lp is not None and (leader in self.queue) and uid not in self.queue and uid not in self.players:
+            self.join(player)  # the leader is already waiting: come along
+
+    def party_leave(self, player, quiet=False):
+        uid = str(player.unique_id)
+        if uid in self.parties:
+            members = self.parties.pop(uid)
+            if members:  # the next player leads
+                self.parties[members[0]] = members[1:]
+        else:
+            for leader, members in self.parties.items():
+                if uid in members:
+                    members.remove(uid)
+                    break
+        self.parties = {k: v for k, v in self.parties.items() if v or k in self.invites.values()}
+        if not quiet:
+            player.send_message("§7You left the party.")
+
+    # ---------- mode vote (Solo, Duos, 4v4) ----------
+    def current_mode(self):
+        default = int(self.cfg.get("max_per_team", 4))
+        votes = [v for u, v in self.mode_votes.items() if u in self.queue]
+        if not votes:
+            return default if default in MODES else 4
+        counts = {m: votes.count(m) for m in MODES}
+        return max(MODES, key=lambda m: (counts[m], m))
+
+    def mode_menu(self, player):
+        uid = str(player.unique_id)
+        mine = self.mode_votes.get(uid)
+        votes = [v for u, v in self.mode_votes.items() if u in self.queue]
+        form = ActionForm(title="§l§cVote for a mode", content=f"§7The mode with the most votes in the waiting room is played.\n§fNext game: §a{MODES[self.current_mode()]}")
+        for m, name in MODES.items():
+            n = votes.count(m)
+            form.add_button(f"§l{name}{' §a(your vote)' if mine == m else ''}§r\n§8{m} per team · {n} vote{'s' if n != 1 else ''}",
+                            on_click=lambda p, m=m: self.vote_mode(p, m))
+        form.add_button("§l< Back", on_click=self.menu)
+        player.send_form(form)
+
+    def vote_mode(self, player, m):
+        uid = str(player.unique_id)
+        if uid not in self.queue:
+            player.send_message("§7Join the waiting room first, then vote.")
+            return self.menu(player)
+        self.mode_votes[uid] = m
+        self.broadcast_lobby(f"§e{player.name} voted for §l{MODES[m]}§r§e. §7Next game: {MODES[self.current_mode()]}")
+        self.mode_menu(player)
+
+    # ---------- spectating (only inside the arena) ----------
+    def spectate_menu(self, player):
+        alive = [(u, st) for u, st in self.players.items() if st.get("alive") and not st.get("gone_at") and self.online(u) is not None]
+        form = ActionForm(title="§lWatch a player", content="§7Teleport to a player who's still in the game." if alive else "§7Nobody left to watch.")
+        for u, st in alive:
+            form.add_button(f"{TEAM[st['team']][2]}§l{st['name']}", on_click=lambda p, u=u: self.spectate(p, u))
+        player.send_form(form)
+
+    def spectate(self, player, target_uid):
+        st = self.players.get(str(player.unique_id))
+        target = self.online(target_uid)
+        if not (self.game and st and not st.get("alive")) or target is None:
+            return
+        from endstone.level import Location
+        l = target.location
+        if self.in_bounds(l.x, l.y, l.z, 2):
+            player.teleport(Location(target.dimension, l.x, l.y + 3, l.z, l.pitch, l.yaw))
+            player.send_message(f"§7Watching {target.name}. §8Type /bedwars to pick someone else.")
 
     def how_to(self, player):
         form = ActionForm(title="§l§cHow to play Bedwars", content=(
@@ -362,6 +530,12 @@ class Bedwars:
         player.send_message("§aYou joined Bedwars. §7Your items are saved and come back when you leave. "
                             "Use the §cLeave Bedwars§7 item or /leave to leave.")
         self.broadcast_lobby(f"§e{player.name} joined §7({len(self.queue)}/{self.capacity()})")
+        self.lobby_changed()
+        for m in self.party_of(uid):  # party members come along
+            mp = self.online(m)
+            if mp is not None and m not in self.queue and m not in self.players and len(self.queue) < self.capacity():
+                mp.send_message(f"§e{player.name} joined Bedwars, so your party joins too.")
+                self.join(mp)
         if self.game:
             player.send_message("§7A game is running. You'll play in the next one.")
 
@@ -398,17 +572,51 @@ class Bedwars:
             self.hud_drop(uid)
             if len(self.queue) < 2:
                 self.countdown_at = None
+            self.lobby_changed()
         if uid in self.players:
-            st = self.players.pop(uid)
+            st = self.players[uid]
             self.hud_drop(uid)
-            if self.game and st.get("alive"):
-                self.broadcast(f"{TEAM[st['team']][2]}{player.name}§7 disconnected.")
-                self.check_winner()
+            if self.game and st.get("alive") and self.game["teams"][st["team"]]["bed"] and not self.game.get("ending"):
+                st["gone_at"] = now()  # their bed stands: they can come back within 2 minutes
+                st["respawn_at"] = None
+                self.broadcast(f"{TEAM[st['team']][2]}{player.name}§7 disconnected. §8They can rejoin within {REJOIN_SECONDS // 60} minutes.")
+            else:
+                self.players.pop(uid)
+                if self.game and st.get("alive"):
+                    st["alive"] = False
+                    self.players[uid] = st  # keep their stats for the match history
+                    self.broadcast(f"{TEAM[st['team']][2]}{player.name}§7 disconnected.")
+                    self.check_winner()
         # their saved items stay saved and come back when they next join
 
     def on_join(self, player):
+        uid = str(player.unique_id)
+        st = self.players.get(uid)
+        if self.game and st and st.get("gone_at") and st.get("alive"):
+            self.plugin.server.scheduler.run_task(self.plugin, lambda: self._rejoin(uid), delay=40)
+            return
+        if self.game and st and not st.get("alive"):  # knocked out while away: watch until the game ends
+            def watch():
+                from endstone import GameMode
+                p = self.online(uid)
+                if p is not None and self.game and uid in self.players:
+                    p.game_mode = GameMode.SPECTATOR
+                    p.teleport(self.spectate_loc())
+                    p.send_message("§7Your team's game is still going. You can watch, or type §f/leave§7 to go back now.")
+            self.plugin.server.scheduler.run_task(self.plugin, watch, delay=40)
+            return
         if self.has_saved(player) and not self.playing(player):
             self.plugin.server.scheduler.run_task(self.plugin, lambda: self._welcome_back(str(player.unique_id)), delay=40)
+
+    def _rejoin(self, uid):
+        p = self.online(uid)
+        st = self.players.get(uid)
+        if p is None or not (self.game and st and st.get("gone_at") and st.get("alive")):
+            return
+        st.pop("gone_at", None)
+        self.respawn(p, st)
+        p.send_message("§aWelcome back! You're back in the Bedwars game with your team.")
+        self.broadcast(f"{TEAM[st['team']][2]}{p.name}§7 rejoined the game.")
 
     def _welcome_back(self, uid):
         p = self.online(uid)
@@ -418,7 +626,7 @@ class Bedwars:
 
     def capacity(self):
         teams = sum(1 for k, *_ in TEAMS if self.team_ready(k))
-        return teams * int(self.cfg.get("max_per_team", 4))
+        return teams * (self.current_mode() if self.queue or self.mode_votes else int(self.cfg.get("max_per_team", 4)))
 
     # ---------- starting ----------
     def start(self):
@@ -429,15 +637,38 @@ class Bedwars:
             self.countdown_at = None
             return
         team_keys = [k for k, *_ in TEAMS if self.team_ready(k)]
-        size = math.ceil(len(players) / len(team_keys))
-        count = math.ceil(len(players) / size)
+        size = self.current_mode()
+        count = max(2, min(len(team_keys), math.ceil(len(players) / size)))
+        size = max(size, math.ceil(len(players) / count))
         keys = team_keys[:count]
-        random.shuffle(players)
+        # parties stay together; everyone else is shuffled into the free spots
+        by_uid = {str(p.unique_id): p for p in players}
+        groups, used = [], set()
+        for leader, members in self.parties.items():
+            g = [by_uid[u] for u in [leader] + members if u in by_uid]
+            if len(g) > 1:
+                groups.append(g[:size])
+                used.update(str(p.unique_id) for p in g[:size])
+        singles = [p for p in players if str(p.unique_id) not in used]
+        random.shuffle(singles)
+        groups.sort(key=len, reverse=True)
+        slots = {k: [] for k in keys}
+        for g in groups:
+            k = max(keys, key=lambda k: (size - len(slots[k]), -keys.index(k)))
+            if size - len(slots[k]) >= len(g):
+                slots[k] += g
+            else:
+                singles = g + singles
+        for p in singles:
+            k = min(keys, key=lambda k: (len(slots[k]), keys.index(k)))
+            slots[k].append(p)
+        players = [p for k in keys for p in slots[k]]
+        assign = {str(p.unique_id): k for k in keys for p in slots[k]}
         self.game = {"started": now(), "teams": {k: {"bed": True, "members": []} for k in keys},
                      "tiers": {"diamond": 1, "emerald": 1}, "next": {}, "done_events": [], "ending": None}
-        for i, p in enumerate(players):
-            key = keys[i % len(keys)]
+        for p in players:
             uid = str(p.unique_id)
+            key = assign[uid]
             self.queue.remove(uid)
             self.game["teams"][key]["members"].append(uid)
             self.players[uid] = {"team": key, "alive": True, "kills": 0, "finals": 0, "beds": 0, "respawn_at": None,
@@ -465,7 +696,18 @@ class Bedwars:
             p.send_message(f"§lBedwars started!§r You're on the {color}{name}§r team. Protect your bed and destroy the others.")
             self.sound(p, "mob.enderdragon.growl", 0.4, 1.4)
         self.countdown_at = None
-        self.plugin.logger.info(f"[Bedwars] Game started with {len(players)} players in {len(keys)} teams")
+        self.game["mode"] = MODES.get(size, f"{size} per team")
+        self.mode_votes = {}
+        self.game["feed"] = []
+        self.plugin.logger.info(f"[Bedwars] Game started: {self.game['mode']}, {len(players)} players in {len(keys)} teams")
+        prog = getattr(self.plugin, "progress", None)
+        for p in players:
+            if prog is not None:
+                try:
+                    prog.progress(p, "bw_play", None, 1)
+                except Exception:
+                    pass
+        self.lobby_changed()
 
     def kit(self, p, st):
         team = st["team"]
@@ -489,60 +731,193 @@ class Bedwars:
             pass
         self.cmd(f"effect {self.qname(p)} clear")
         self.cmd(f"effect {self.qname(p)} saturation 99999 255 true")
+        if self.game:
+            self.apply_upgrades(p)
 
-    # ---------- shops ----------
+    # ---------- shop and upgrades NPCs ----------
+    # Crash-safe: the mobs are placed and found with commands (by tag), and only touched inside the tap/hit
+    # events that hand them to us fresh. We never keep hold of them.
+    def npc_cfg(self):
+        u = self.cfg.get("upgrades_npc") or {}
+        return {"name": u.get("name") or UP_NAME, "dialog": u.get("dialog") if u.get("dialog") is not None else UP_DIALOG,
+                "look": int(u.get("look", 1))}
+
+    def _summon(self, where, kind, event, name, tag, yaw=0):
+        dim = "nether" if "nether" in where.get("dim", "").lower() else "the_end" if "end" in where.get("dim", "").lower() else "overworld"
+        x, y, z = where["x"], where["y"], where["z"]
+        safe = name.replace('"', "'")
+        self.cmd(f'execute in {dim} run summon {kind} {x:.2f} {y:.2f} {z:.2f} {yaw:.1f} 0 {event or "minecraft:entity_spawned"} "{safe}"')
+        self.cmd(f'execute in {dim} run tag @e[type={kind},x={x:.2f},y={y:.2f},z={z:.2f},r=1.5,tag=!{tag}] add {tag}')
+        self.cmd(f"execute in {dim} run effect @e[tag={tag},x={x:.2f},y={y:.2f},z={z:.2f},r=2] slowness infinite 255 true")
+
     def spawn_shops(self, keys):
+        from endstone_galaxylink.npc import LOOKS
+        self.remove_shops()
+        n = self.npc_cfg()
+        _label, up_kind, up_event = LOOKS[n["look"] if 0 <= n["look"] < len(LOOKS) else 1]
         for key in keys:
-            s = self.cfg["teams"][key].get("shop")
-            if not s:
-                continue
-            actor = self.shop_actor.get(key)
-            try:
-                if actor is not None and not actor.is_dead:
-                    continue
-            except Exception:
-                pass
-            try:
-                actor = self.dim().spawn_actor(self.loc(s), "minecraft:villager_v2")
-                actor.name_tag = SHOP_NAME
-                self.shop_actor[key] = actor
-                self.cmd(f"effect @e[type=villager_v2,name=\"{SHOP_NAME}\"] slowness 99999 255 true")
-            except Exception as e:
-                self.plugin.logger.warning(f"Bedwars: couldn't place the {key} Item Shop: {e}")
+            t = self.cfg["teams"][key]
+            if t.get("shop"):
+                self._summon(t["shop"], "minecraft:villager_v2", None, SHOP_NAME, SHOP_TAG, t["shop"].get("yaw", 0))
+            if t.get("upgrades"):
+                self._summon(t["upgrades"], up_kind, up_event, n["name"], UP_TAG, t["upgrades"].get("yaw", 0))
 
     def remove_shops(self):
-        for actor in self.shop_actor.values():
-            try:
-                actor.remove()
-            except Exception:
-                pass
-        self.shop_actor = {}
+        self.cmd(f"kill @e[tag={SHOP_TAG}]")
+        self.cmd(f"kill @e[tag={UP_TAG}]")
 
-    def keep_shops_still(self):
-        for key, actor in list(self.shop_actor.items()):
-            s = self.cfg["teams"].get(key, {}).get("shop")
-            if not s:
-                continue
-            try:
-                l = actor.location
-                if abs(l.x - s["x"]) > 0.6 or abs(l.z - s["z"]) > 0.6:
-                    actor.teleport(self.loc(s))
-            except Exception:
-                pass
+    @staticmethod
+    def npc_kind(actor):
+        try:
+            tags = set(actor.scoreboard_tags)
+        except Exception:
+            tags = set()
+        if SHOP_TAG in tags:
+            return "shop"
+        if UP_TAG in tags:
+            return "up"
+        try:
+            if actor.name_tag == SHOP_NAME:
+                return "shop"
+        except Exception:
+            pass
+        return None
 
     def on_interact_actor(self, event):
-        """Tapping the Item Shop villager opens the shop (and never the villager's trades)."""
-        try:
-            if event.actor.name_tag != SHOP_NAME:
-                return False
-        except Exception:
+        """Tapping the Item Shop or Team Upgrades NPC opens its menu (never the villager's trades)."""
+        kind = self.npc_kind(event.actor)
+        if kind is None:
             return False
         event.is_cancelled = True
         uid = str(event.player.unique_id)
         st = self.players.get(uid)
         if self.game and st and st.get("alive") and not st.get("respawn_at"):
-            self.shop(event.player)
+            if kind == "shop":
+                self.shop(event.player)
+            else:
+                self.upgrades_menu(event.player)
         return True
+
+    # ---------- team upgrades ----------
+    def team_up(self, team):
+        return self.game["teams"][team].setdefault("up", {"sharp": 0, "prot": 0, "haste": 0, "heal": 0, "trap": 0})
+
+    def upgrades_menu(self, player):
+        st = self.players.get(str(player.unique_id))
+        if not (self.game and st):
+            return
+        n = self.npc_cfg()
+        up = self.team_up(st["team"])
+        have = self.count(player, "diamond")
+        form = ActionForm(title=n["name"], content=(n["dialog"] + "\n\n" if n["dialog"] else "") + f"§bDiamonds: {have}")
+        for key, (name, desc, costs) in UPGRADES.items():
+            level = up.get(key, 0)
+            if level >= len(costs):
+                label = f"§l{name}§r\n§a{'Ready: ' + str(level) + '/3' if key == 'trap' else 'Maxed'}"
+            else:
+                cost = costs[level]
+                tier = f" {['I', 'II', 'III', 'IV'][level]}" if len(costs) > 1 and key != "trap" else ""
+                label = f"§l{name}{tier}§r\n{'§b' if have >= cost else '§c'}{cost} Diamond{'s' if cost != 1 else ''}"
+            form.add_button(label, on_click=lambda p, key=key: self.buy_upgrade(p, key))
+        player.send_form(form)
+
+    def buy_upgrade(self, player, key):
+        st = self.players.get(str(player.unique_id))
+        if not (self.game and st and st.get("alive")):
+            return
+        name, desc, costs = UPGRADES[key]
+        up = self.team_up(st["team"])
+        level = up.get(key, 0)
+        if level >= len(costs):
+            player.send_message("§7Your team already has the most of this upgrade.")
+            return self.upgrades_menu(player)
+        cost = costs[level]
+        if self.count(player, "diamond") < cost:
+            player.send_message(f"§cYou need {cost} diamond{'s' if cost != 1 else ''} for {name}.")
+            self.sound(player, "note.bass", 0.8, 0.8)
+            return self.upgrades_menu(player)
+        self.take(player, "diamond", cost)
+        up[key] = level + 1
+        color = TEAM[st["team"]][2]
+        for uid in self.game["teams"][st["team"]]["members"]:
+            p = self.online(uid)
+            if p is not None:
+                p.send_message(f"{color}{player.name}§a bought §l{name}§r§a for the team. §7{desc}")
+                self.sound(p, "random.levelup", 0.5, 1.6)
+                if self.players.get(uid, {}).get("alive"):
+                    self.apply_upgrades(p)
+        self.upgrades_menu(player)
+
+    def apply_upgrades(self, p):
+        """Puts the team's upgrades on this player: Sharpness on swords, Protection on armor, Haste."""
+        st = self.players.get(str(p.unique_id))
+        if not (self.game and st):
+            return
+        up = self.team_up(st["team"])
+        inv = p.inventory
+
+        def enchant(stack, name, level):
+            if stack is None or level <= 0:
+                return stack
+            try:
+                meta = stack.item_meta
+                if meta.get_enchant_level(name) == level:
+                    return None
+                meta.add_enchant(name, level, True)
+                stack.set_item_meta(meta)
+                return stack
+            except Exception:
+                return None
+        if up.get("sharp"):
+            for i in range(inv.size):
+                s = inv.get_item(i)
+                if s is not None and money.item_id(s).endswith("_sword"):
+                    new = enchant(s, "sharpness", 1)
+                    if new is not None:
+                        inv.set_item(i, new)
+        if up.get("prot"):
+            for slot in ("helmet", "chestplate", "leggings", "boots"):
+                new = enchant(getattr(inv, slot), "protection", up["prot"])
+                if new is not None:
+                    setattr(inv, slot, new)
+        if up.get("haste"):
+            self.cmd(f"effect {self.qname(p)} haste infinite {up['haste'] - 1} true")
+
+    def upgrades_tick(self):
+        """Every 2 seconds: the Heal Pool, and traps going off when an enemy comes near a bed."""
+        g = self.game
+        for key, team in g["teams"].items():
+            up = team.get("up") or {}
+            spawn = self.cfg["teams"][key].get("spawn")
+            if up.get("heal") and spawn:
+                for uid in team["members"]:
+                    p = self.online(uid)
+                    st = self.players.get(uid)
+                    if p is None or not st or not st.get("alive") or st.get("respawn_at"):
+                        continue
+                    l = p.location
+                    if math.dist((l.x, l.z), (spawn["x"], spawn["z"])) < 12:
+                        self.cmd(f"effect {self.qname(p)} regeneration 3 0 true")
+            bed = (self.cfg["teams"][key].get("bed") or [None])[0]
+            if up.get("trap") and bed and team["bed"]:
+                for uid, st in self.players.items():
+                    if st["team"] == key or not st.get("alive") or st.get("respawn_at"):
+                        continue
+                    p = self.online(uid)
+                    if p is None:
+                        continue
+                    l = p.location
+                    if math.dist((l.x, l.y, l.z), (bed[0] + 0.5, bed[1], bed[2] + 0.5)) < TRAP_RANGE:
+                        up["trap"] -= 1
+                        self.cmd(f"effect {self.qname(p)} blindness 3 0 true")
+                        self.cmd(f"effect {self.qname(p)} slowness 3 1 true")
+                        p.send_message("§cYou set off a trap!")
+                        for m in team["members"]:
+                            mp = self.online(m)
+                            if mp is not None:
+                                show_title(self.plugin, mp, "§c§lTRAP TRIGGERED!", f"{TEAM[st['team']][2]}{p.name}§f is at your base", 0, 40, 10)
+                                self.sound(mp, "note.pling", 1.0, 0.6)
+                        break
 
     def count(self, player, cur):
         item = CURRENCY[cur]
@@ -619,6 +994,8 @@ class Bedwars:
         elif kind == "effect":
             seconds = 30 if value == "invisibility" else 45
             self.cmd(f"effect {self.qname(player)} {value} {seconds} {amount} true")
+        if kind in ("sword", "armor"):
+            self.apply_upgrades(player)
         self.sound(player, "random.orb", 0.8, 1.4)
         player.send_message(f"§aBought {label}.")
         self.shop_category(player, i)
@@ -724,6 +1101,8 @@ class Bedwars:
         bcolor = TEAM[st["team"]][2]
         self.broadcast(f"§l§fBED DESTROYED > §r{color}{name} Bed§7 was destroyed by {bcolor}{breaker.name}§7!")
         self.pay(breaker, "bed", "breaking a bed")
+        self.feed(f"{breaker.name} broke the {name} bed", st["team"], key)
+        self.quest(breaker, "bw_bed")
         for uid in g["teams"][key]["members"]:
             p = self.online(uid)
             if p is not None:
@@ -776,12 +1155,9 @@ class Bedwars:
         """Friendly fire is off; the waiting room, knocked-out players and the Item Shop can't be hurt;
         a hit that would kill is handled by Bedwars (no death screen, no dropped items)."""
         victim = event.actor
-        try:
-            if getattr(victim, "name_tag", "") == SHOP_NAME:
-                event.is_cancelled = True
-                return True
-        except Exception:
-            pass
+        if self.npc_kind(victim):
+            event.is_cancelled = True
+            return True
         uid = str(getattr(victim, "unique_id", ""))
         if uid in self.queue:
             event.is_cancelled = True
@@ -849,6 +1225,14 @@ class Bedwars:
                 kst["finals"] += 1
                 self.pay(killer, "final", "a final kill")
             self.sound(killer, "random.orb", 0.7, 1.8)
+            self.feed(f"{kst['name']} {'final-killed' if final else 'killed'} {st['name']}", kst["team"], st["team"])
+            self.quest(killer, "bw_kill")
+            cos = getattr(self.plugin, "cosmetics", None)
+            if cos is not None:
+                try:
+                    cos.bw_effect(killer, "kill", player.location)
+                except Exception:
+                    pass
         else:
             self.broadcast(f"{color}{player.name}§7 " + ("fell into the void." if how == "void" else "died.") + (" §b§lFINAL KILL!" if final else ""))
         st["last_hit"] = None
@@ -937,6 +1321,13 @@ class Bedwars:
                 self.sound(p, "random.levelup" if won else "mob.wither.spawn", 0.6, 1.0)
                 if won:
                     self.pay(p, "win", "winning")
+                    self.quest(p, "bw_win")
+                    cos = getattr(self.plugin, "cosmetics", None)
+                    if cos is not None:
+                        try:
+                            cos.bw_effect(p, "win", p.location)
+                        except Exception:
+                            pass
             if prog is not None and p is not None:
                 s = prog.stats(p)
                 s["bw_games"] = s.get("bw_games", 0) + 1
@@ -950,6 +1341,7 @@ class Bedwars:
                 except Exception:
                     pass
         self.plugin.logger.info(f"[Bedwars] Game over: {name} won")
+        self.send_match(winner)
 
     def wrap_up(self):
         """After the end screen: everyone gets their own things back, and the map is reset."""
@@ -983,11 +1375,17 @@ class Bedwars:
                 self.lobby_tick(t)
             if self._tick % 2 == 0:
                 self.hud_all(t)
+            if self._tick % 10 == 0 and (self.game or getattr(self, "_live_was", False)):
+                self._live_was = bool(self.game)
+                self.site(self.live_state())
         except Exception as e:
             self.plugin.logger.warning(f"Bedwars: {e}")
 
     def lobby_tick(self, t):
+        before = len(self.queue)
         self.queue = [u for u in self.queue if self.online(u) is not None]
+        if len(self.queue) != before:
+            self.lobby_changed()
         if len(self.queue) >= 2 and self.ready():
             if self.countdown_at is None:
                 secs = 10 if len(self.queue) >= self.capacity() else int(self.cfg.get("countdown", 30))
@@ -1067,6 +1465,12 @@ class Bedwars:
         # players: respawns, staying inside, falling into the void
         b = self.cfg["bounds"]
         for uid, st in list(self.players.items()):
+            if st.get("gone_at") and t - st["gone_at"] > REJOIN_SECONDS:
+                st.pop("gone_at", None)
+                st["alive"] = False
+                self.broadcast(f"{TEAM[st['team']][2]}{st['name']}§7 didn't come back in time and is out.")
+                self.check_winner()
+                continue
             p = self.online(uid)
             if p is None:
                 continue
@@ -1087,8 +1491,8 @@ class Bedwars:
             elif not self.in_bounds(l.x, l.y, l.z, 2):
                 p.teleport(self.loc(self.cfg["teams"][st["team"]]["spawn"]))
                 p.send_message("§7You can't leave the arena during a game.")
-        if self._tick % 6 == 0:
-            self.keep_shops_still()
+        if self._tick % 4 == 0:
+            self.upgrades_tick()
 
     def _more(self, a, b):
         g = self.game
@@ -1201,6 +1605,58 @@ class Bedwars:
     def hud_drop(self, uid):
         self.boards.pop(uid, None)
 
+    # ---------- for the website: lobby, live game and match history ----------
+    def site(self, payload):
+        voice = getattr(self.plugin, "_voice", None)
+        if voice is not None and getattr(voice, "ws", None):
+            try:
+                voice.send_json(payload)
+            except Exception:
+                pass
+
+    def lobby_changed(self):
+        """Tells the website how many are waiting (for "a Bedwars game is starting" alerts)."""
+        self.site({"type": "bw_lobby", "waiting": len(self.queue), "capacity": self.capacity(), "running": bool(self.game),
+                   "mode": MODES[self.current_mode()] if not self.game else self.game.get("mode")})
+
+    def feed(self, text, team_a=None, team_b=None):
+        g = self.game
+        if g is not None:
+            g.setdefault("feed", []).append({"t": round(now() - g["started"]), "text": text[:120], "a": team_a, "b": team_b})
+            g["feed"] = g["feed"][-20:]
+
+    def quest(self, player, kind):
+        prog = getattr(self.plugin, "progress", None)
+        if prog is not None:
+            try:
+                prog.progress(player, kind, None, 1)
+            except Exception:
+                pass
+
+    def live_state(self):
+        g = self.game
+        if not g:
+            return {"type": "bw_live", "running": False}
+        t = now()
+        elapsed = t - g["started"]
+        upcoming = next(((at, label) for at, _k, _ti, label in TIMELINE if label not in g["done_events"]), None)
+        teams = []
+        for key, team in g["teams"].items():
+            members = [self.players[u] for u in team["members"] if u in self.players]
+            teams.append({"key": key, "name": TEAM[key][1], "bed": bool(team["bed"]),
+                          "alive": sum(1 for m in members if m.get("alive")),
+                          "players": [{"name": m["name"], "alive": bool(m.get("alive")), "kills": m["kills"], "finals": m["finals"], "beds": m["beds"]} for m in members]})
+        return {"type": "bw_live", "running": True, "mode": g.get("mode"), "elapsed": round(elapsed),
+                "next": {"label": upcoming[1], "in": round(upcoming[0] - elapsed)} if upcoming else None,
+                "teams": teams, "feed": list(reversed(g.get("feed", [])))[:12], "ending": bool(g.get("ending"))}
+
+    def send_match(self, winner):
+        g = self.game
+        players = [{"xuid": st.get("xuid"), "name": st["name"], "team": st["team"], "kills": st["kills"], "finals": st["finals"],
+                    "beds": st["beds"], "won": winner is not None and st["team"] == winner} for st in self.players.values()]
+        self.site({"type": "bw_match", "started": int(g["started"]), "seconds": round(now() - g["started"]), "mode": g.get("mode"),
+                   "winner": winner, "players": players, "feed": g.get("feed", [])})
+
     # ---------- helpers ----------
     def broadcast(self, text):
         for uid in self.players:
@@ -1258,6 +1714,15 @@ class Bedwars:
             return self.leave(player)
         if sub == "setup" and player.is_op:
             return self.setup_menu(player)
+        if sub == "party":
+            action = args[1].lower() if len(args) > 1 else ""
+            if action == "accept":
+                return self.party_accept(player)
+            if action == "leave":
+                return self.party_leave(player)
+            return self.party_menu(player)
+        if sub in ("watch", "spectate"):
+            return self.spectate_menu(player)
         self.menu(player)
 
     # ---------- arena setup (admins) ----------
@@ -1283,6 +1748,7 @@ class Bedwars:
         form.add_button("§a§lAdd an emerald generator here", on_click=lambda p: self._gen(p, "emerald"))
         form.add_button("§lRemove all middle generators", on_click=self._clear_gens)
         form.add_button("§lRewards and settings", on_click=self.settings_form)
+        form.add_button("§b§lTeam Upgrades NPC§r\n§8Name, look and dialogue", on_click=self.upgrades_npc_form)
         if self.game:
             form.add_button("§c§lEnd the current game", on_click=lambda p: self.finish(None, "ended by staff"))
         elif len(self.queue) >= 2:
@@ -1327,11 +1793,13 @@ class Bedwars:
         mark = lambda v: "§a✔" if v else "§c✘"
         form = ActionForm(title=f"{color}§l{name} team", content=(
             f"{mark(t.get('spawn'))} §fSpawn point\n{mark(t.get('bed'))} §fBed\n{mark(t.get('gen'))} §fIron and gold generator\n"
-            f"{mark(t.get('shop'))} §fItem Shop §7(optional)\n\n§7Stand on the spot and tap its button. For the bed, stand right next to it."))
+            f"{mark(t.get('shop'))} §fItem Shop §7(optional)\n{mark(t.get('upgrades'))} §fTeam Upgrades NPC §7(optional)\n\n"
+            "§7Stand on the spot and tap its button. For the bed, stand right next to it."))
         form.add_button("§lSet spawn point here", on_click=lambda p: self._team_set(p, key, "spawn", spot(p)))
         form.add_button("§lSet bed (stand next to it)", on_click=lambda p: self._team_bed(p, key))
         form.add_button("§lSet iron & gold generator here", on_click=lambda p: self._team_set(p, key, "gen", block_spot(p)))
         form.add_button("§lSet Item Shop here", on_click=lambda p: self._team_set(p, key, "shop", spot(p)))
+        form.add_button("§lSet Team Upgrades NPC here", on_click=lambda p: self._team_set(p, key, "upgrades", spot(p)))
         form.add_button("§c§lClear this team", on_click=lambda p: self._team_clear(p, key))
         form.add_button("§l< Back", on_click=self.setup_menu)
         player.send_form(form)
@@ -1368,6 +1836,25 @@ class Bedwars:
         self.save_cfg()
         player.send_message(f"§a{TEAM[key][1]} team cleared.")
         self.setup_menu(player)
+
+    def upgrades_npc_form(self, player):
+        from endstone.form import Dropdown
+        from endstone_galaxylink.npc import LOOKS
+        n = self.npc_cfg()
+        form = ModalForm(title="§lTeam Upgrades NPC", submit_button="Save")
+        form.add_control(TextInput("Name above its head (colour codes work)", UP_NAME, n["name"]))
+        form.add_control(TextInput("What it says when tapped", UP_DIALOG, n["dialog"]))
+        form.add_control(Dropdown("Look", [l[0] for l in LOOKS], n["look"] if 0 <= n["look"] < len(LOOKS) else 1))
+
+        def submit(p, data):
+            vals = json.loads(data) if isinstance(data, str) else data
+            self.cfg["upgrades_npc"] = {"name": str(vals[0]).strip()[:48] or UP_NAME, "dialog": str(vals[1]).strip()[:300],
+                                        "look": int(vals[2] or 0)}
+            self.save_cfg()
+            p.send_message("§aTeam Upgrades NPC saved. §7It shows like this from the next game.")
+            self.setup_menu(p)
+        form.on_submit = submit
+        player.send_form(form)
 
     def settings_form(self, player):
         r = self.cfg.get("rewards") or {}

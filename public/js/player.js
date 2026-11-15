@@ -193,7 +193,7 @@ async function load() {
       stat("trophy2", "Wins", short(bw.wins), `${bw.games} game${bw.games === 1 ? "" : "s"} played`),
       stat("sword", "Kills", short(bw.kills)),
       stat("skull", "Final kills", short(bw.finals)),
-      stat("pickaxe", "Beds broken", short(bw.beds)))) : null;
+      stat("pickaxe", "Beds broken", short(bw.beds))), bwHistory(p.name)) : null;
 
   // ---- activity over time (charts) ----
   const charts = section("Activity", h("p", { class: "text-3 small", style: "margin:0", text: "Loading…" }));
@@ -462,4 +462,39 @@ async function compareDialog(p) {
   form.addEventListener("submit", (e) => { e.preventDefault(); run(); });
   openDialog({ title: `Compare ${p.name}`, body: h("div", { class: "cmp" }, form, out), actions: [{ label: "Close", kind: "primary" }] });
   run();
+}
+
+
+// ---- Bedwars match history (recent games; tap one for the full recap) ----
+const TEAM_NAMES = { red: "Red", blue: "Blue", green: "Green", yellow: "Yellow" };
+const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+function bwHistory(name) {
+  const box = h("div", { class: "bwh" }, h("p", { class: "text-3 small", style: "margin:10px 0 0", text: "Loading recent games…" }));
+  getJson(`/api/bedwars/history?name=${encodeURIComponent(name)}`).then((d) => {
+    if (!d.matches?.length) { box.replaceChildren(); return; }
+    box.replaceChildren(h("h3", { class: "pp-sub", style: "margin:14px 0 6px;font-size:.95rem", text: "Recent games" }),
+      h("ul", { class: "bwh-list" }, ...d.matches.map((m) => h("li", {}, h("button", { type: "button", onclick: () => bwRecap(m.id) },
+        h("span", { class: `bwh-res ${m.won ? "win" : "loss"}`, text: m.won ? "Win" : "Loss" }),
+        h("span", { class: "bwh-stats" }, `${m.mode || "Bedwars"} · ${TEAM_NAMES[m.team] || m.team} team · ${m.kills} kills, ${m.finals} finals, ${m.beds} beds`),
+        h("span", { class: "text-3 small", text: new Date(m.startedAt).toLocaleDateString([], { month: "short", day: "numeric" }) }))))));
+  }).catch(() => box.replaceChildren());
+  return box;
+}
+
+async function bwRecap(id) {
+  let d;
+  try { d = await getJson(`/api/bedwars/match/${id}`); } catch (e) { toast(e.message); return; }
+  const m = d.match;
+  const teams = {};
+  for (const p of m.players) (teams[p.team] ||= []).push(p);
+  openDialog({
+    title: `${m.mode || "Bedwars"} game · ${new Date(m.startedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`,
+    body: h("div", { class: "stack", style: "gap:12px" },
+      h("p", { class: "text-2", style: "margin:0", text: `${m.winner ? `${TEAM_NAMES[m.winner]} team won` : "No winner"} after ${mmss(m.seconds)}.` }),
+      h("div", { class: "bw-live-teams" }, ...Object.entries(teams).map(([t, ps]) => h("div", { class: `bw-team ${t}` },
+        h("b", { text: `${TEAM_NAMES[t]}${t === m.winner ? " · winners" : ""}` }),
+        ...ps.map((p) => h("span", { text: `${p.name}: ${p.kills} kills, ${p.finals} finals, ${p.beds} beds` }))))),
+      m.feed?.length ? h("ul", { class: "bw-feed" }, ...m.feed.map((f) => h("li", { text: `${mmss(f.t)}  ${f.text}` }))) : null),
+    actions: [{ label: "Close", kind: "primary" }],
+  });
 }
