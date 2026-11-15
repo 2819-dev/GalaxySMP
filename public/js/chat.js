@@ -98,6 +98,7 @@ export const profileActionHooks = [];  // staff tools add buttons here
 let openCard = null;
 function closeProfile() {
   openCard?.remove();
+  openCard?._off?.abort();  // stop listening for clicks outside the old card
   openCard = null;
 }
 function openProfile(member, anchor) {
@@ -175,7 +176,12 @@ function openProfile(member, anchor) {
   }
   for (const hook of profileActionHooks) hook(member, actions, closeProfile);
   body.append(actions);
-  card.append(banner, pic, body);
+  const x = el("button", "pc-close");
+  x.type = "button";
+  x.setAttribute("aria-label", "Close");
+  x.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+  x.addEventListener("click", (e) => { e.stopPropagation(); closeProfile(); });
+  card.append(banner, x, pic, body);
   document.body.append(card);
   // place it next to what was clicked (on phones it's a sheet at the bottom)
   if (window.innerWidth > 700 && anchor) {
@@ -190,9 +196,13 @@ function openProfile(member, anchor) {
     card.classList.add("sheet");
   }
   openCard = card;
-  setTimeout(() => document.addEventListener("click", function off(e) {
-    if (!card.contains(e.target)) { closeProfile(); document.removeEventListener("click", off); }
-  }), 0);
+  // a click outside this card closes it (only this card: clicking another member opens theirs instead)
+  const off = new AbortController();
+  card._off = off;
+  setTimeout(() => {
+    if (off.signal.aborted) return;
+    document.addEventListener("click", (e) => { if (openCard === card && !card.contains(e.target)) closeProfile(); }, { signal: off.signal });
+  }, 0);
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeProfile(); });
 

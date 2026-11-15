@@ -176,6 +176,12 @@ The GalaxySMP team will now post some ideas in #Suggestions for you to vote on. 
 - The header is less crowded on computers: the server address now lives on the home page and in the menu.
 - The "Get the GalaxySMP app" banner is easy to read again in light mode.`,
   },
+  {
+    id: "2026-11-21c",
+    title: "Member profiles open every time",
+    body: `- Tapping one member after another in the Members list now opens each profile straight away. Before, the second tap could close the card instead.
+- Profile cards now have a close button, and on phones they leave the list visible above them so you can tap the next member.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
