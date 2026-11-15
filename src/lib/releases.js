@@ -182,6 +182,11 @@ The GalaxySMP team will now post some ideas in #Suggestions for you to vote on. 
     body: `- Tapping one member after another in the Members list now opens each profile straight away. Before, the second tap could close the card instead.
 - Profile cards now have a close button, and on phones they leave the list visible above them so you can tap the next member.`,
   },
+  {
+    id: "2026-11-21d",
+    title: "Plot Showcase is easier to find on phones",
+    body: `The map buttons now fit on every phone screen, and **Showcase** sits first in the top-left corner of the map with its own icon. On phones, pinch to zoom the map. You can also go straight to it at galaxymc.us/map#showcase.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

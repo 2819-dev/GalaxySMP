@@ -394,6 +394,8 @@ $("map-showcase").addEventListener("click", async () => {
     onClose: () => { closeShowcase = null; document.body.classList.remove("map-in-showcase"); },
   });
 });
+// galaxymc.us/map#showcase opens the Plot Showcase straight away
+if (location.hash === "#showcase") setTimeout(() => { if (!closeShowcase && $("map-showcase").offsetParent) $("map-showcase").click(); }, 800);
 $("map-zoom-in").addEventListener("click", () => zoom(1.5));
 $("map-zoom-out").addEventListener("click", () => zoom(1 / 1.5));
 $("map-home").addEventListener("click", () => {
