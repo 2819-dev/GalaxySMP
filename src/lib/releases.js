@@ -209,6 +209,11 @@ You get one vote each month, and you can change it while voting is open. Your vo
     title: "Uptime on the Status page",
     body: `The Status page now shows how much GalaxySMP has been online over the last 7 and 30 days, a bar for each of the last 30 days, and any recent outages or unexpected restarts. We're also making the server lighter on memory so it stays online more reliably.`,
   },
+  {
+    id: "2026-11-22e",
+    title: "Rank badges above heads",
+    body: `Rank badges above players' heads now stay in place. If anything else changes a player's name tag, the badge is put back straight away. As always, a player with more than one rank shows the highest one in the server's rank order.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

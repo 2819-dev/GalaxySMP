@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.47.4",
+                    "User-Agent": "GalaxyLink-Endstone/2.47.5",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -457,8 +457,18 @@ class VoiceLink:
             key = str(p.unique_id).lower()
             icon = self.wanted.get(key, "disconnected")
             tag = self.plugin.compose_tag(p, ICONS.get(icon))
-            if self.applied.get(key) == tag:
+            try:
+                current = p.name_tag
+            except Exception:
+                current = None
+            if current == tag:
+                self.applied[key] = tag
                 continue
+            if self.applied.get(key) == tag and current is not None and not getattr(self, "_overwrite_warned", False):
+                # we set it before and something else (another plugin) changed it: say so once, then put ours back
+                self._overwrite_warned = True
+                self.plugin.logger.warning(f"Another plugin changed {p.name}'s name above their head to {current!r}. "
+                                           "GalaxyLink puts the rank badge back; if this keeps happening, turn off name tags in the other plugin.")
             try:
                 p.name_tag = tag
                 self.applied[key] = tag
