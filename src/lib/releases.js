@@ -199,6 +199,11 @@ You get one vote each month, and you can change it while voting is open. Your vo
     title: "A more stable server",
     body: `We fixed a cause of unexpected server restarts. Shop NPCs and floating labels (leaderboards, crates, shop signs and Voting Computers) are now handled more safely when nobody is nearby. If the server ever does stop unexpectedly, staff now get the full details straight away so it can be fixed quickly.`,
   },
+  {
+    id: "2026-11-22c",
+    title: "Server stability fix",
+    body: `We found and fixed the cause of the recent unexpected restarts, which happened while floating labels (leaderboards, crates, shop signs) were being updated. Labels and shop NPCs now work in a way that can't crash the server.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

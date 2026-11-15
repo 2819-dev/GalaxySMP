@@ -1,16 +1,21 @@
-"""Floating text labels (leaderboards, shop signs, shop chests, crates), using the invisible
+"""Floating text labels (leaderboards, shop signs, shop chests, crates, Voting Computers), using the invisible
 galaxysmp:floating_text entity from the GalaxySMP blocks pack.
 
-Safe by design: this never looks through all the entities in the world (that crashed some servers).
-  - When we summon a label, the spawn event hands us that exact entity and we keep it.
-  - If we don't have a label's entity (after a restart, or it disappeared), we remove any old copy at that
-    exact spot with a targeted /kill and summon a fresh one, only when a player is nearby (area loaded).
+Crash-safe by design. Keeping hold of a label's entity and touching it later (to read or change its name) can
+crash the server, so we never do:
+  - A label is placed with a targeted /kill at its exact spot (no duplicates) and a /summon. The spawn event
+    hands us the new entity, which we name on the next tick and then forget.
+  - To change a label's text we simply place it again. Labels are only placed while a player is near
+    (the area is loaded), and placed again when someone comes back, and every few minutes as a refresh.
+  - We never look through all the entities in the world.
 """
 
 import math
+import time
 
 ENTITY = "galaxysmp:floating_text"
-NEAR = 32  # blocks: labels further than this from every player are never touched (their area may be unloaded)
+NEAR = 32          # blocks: labels are only placed while a player is this close (area loaded)
+REFRESH = 600      # seconds: place a label again this often while players are near (in case it went missing)
 
 
 def dim_cmd(name):
@@ -23,7 +28,7 @@ class FloatingTexts:
         self.plugin = plugin
         self.eco = plugin.economy
         self.labels = self.eco.get_config("floating_texts") or {}  # key -> {id, dim, x, y, z, text}
-        self.actors = {}        # label id -> Actor we summoned
+        self.placed = {}        # label id -> (text, when) for labels placed while a player was near
         self.expecting = None   # the label being summoned right now
         self.errors = 0
 
@@ -42,9 +47,9 @@ class FloatingTexts:
                 old["text"] = text
                 self.save()
                 if self.near(old):
-                    a = self.live(old)
-                    if a is not None:
-                        self._name(a, text)
+                    self.summon(old)  # place it again with the new text
+                else:
+                    self.placed.pop(old["id"], None)
             return
         lid = max([v["id"] for v in self.labels.values()] + [0]) + 1
         lab = {"id": lid, "dim": dim, "x": x, "y": y, "z": z, "text": text}
@@ -58,14 +63,7 @@ class FloatingTexts:
         if not lab:
             return
         self.save()
-        a = self.actors.pop(lab["id"], None)
-        if a is not None and self.near(lab):
-            try:
-                if a.is_valid:
-                    a.remove()
-                    return
-            except Exception:
-                pass
+        self.placed.pop(lab["id"], None)
         self.kill_at(lab)
 
     # ---------- entities ----------
@@ -76,16 +74,6 @@ class FloatingTexts:
             actor.is_name_tag_always_visible = True
         except Exception:
             pass
-
-    def live(self, lab):
-        a = self.actors.get(lab["id"])
-        try:
-            if a is not None and a.is_valid:
-                return a
-        except Exception:
-            pass
-        self.actors.pop(lab["id"], None)
-        return None
 
     def run(self, line):
         self.plugin.server.dispatch_command(self.plugin.server.command_sender, line)
@@ -102,6 +90,7 @@ class FloatingTexts:
     def summon(self, lab):
         if not self.crowded(lab):
             self.kill_at(lab)  # no duplicates: clear any old copy at this spot first
+        self.placed[lab["id"]] = (lab["text"], time.time())
         self.expecting = lab
         try:
             self.run(f"execute in {dim_cmd(lab['dim'])} run summon {ENTITY} {lab['x']} {lab['y']} {lab['z']}")
@@ -109,7 +98,7 @@ class FloatingTexts:
             self.expecting = None
 
     def on_spawn(self, event):
-        """ActorSpawnEvent: the label we're summoning right now."""
+        """ActorSpawnEvent: the label we're summoning right now. Named on the next tick, then forgotten."""
         lab = self.expecting
         if lab is None:
             return
@@ -119,10 +108,9 @@ class FloatingTexts:
                 return
         except Exception:
             return
-        self.actors[lab["id"]] = actor
         self.expecting = None
-        # name it on the next tick, once it's fully in the world
-        self.plugin.server.scheduler.run_task(self.plugin, lambda: self._name(actor, lab["text"]), delay=1)
+        text = lab["text"]
+        self.plugin.server.scheduler.run_task(self.plugin, lambda: self._name(actor, text), delay=1)
 
     def near(self, lab):
         for p in self.plugin.server.online_players:
@@ -135,19 +123,15 @@ class FloatingTexts:
         return False
 
     def update(self):
-        """Every minute: refresh texts and put back missing labels where players are."""
+        """Every minute: place labels where players are (new, changed, just came back, or due a refresh)."""
         try:
+            now = time.time()
             for lab in list(self.labels.values()):
                 if not self.near(lab):
-                    # nobody close: let go of the entity (its area can unload; touching an unloaded
-                    # entity can crash the server). It's replaced with a fresh one when a player comes back.
-                    self.actors.pop(lab["id"], None)
+                    self.placed.pop(lab["id"], None)  # placed again when someone comes back
                     continue
-                a = self.live(lab)
-                if a is not None:
-                    if a.name_tag != lab["text"]:
-                        self._name(a, lab["text"])
-                else:
+                done = self.placed.get(lab["id"])
+                if done is None or done[0] != lab["text"] or now - done[1] > REFRESH:
                     self.summon(lab)
         except Exception as e:  # never let a label problem take anything else down
             self.errors += 1

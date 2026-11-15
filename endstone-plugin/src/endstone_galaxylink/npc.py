@@ -1,8 +1,12 @@
 """Shop NPCs: /shopnpc summons one where you stand.
 
 Operators tap an NPC to edit it (name, dialog, which menus it opens, its look,
-move or remove it). Everyone else taps it to use it. NPCs don't move, can't be
-hurt and come back if they go missing.
+move or remove it). Everyone else taps it to use it. NPCs don't move and can't be hurt.
+If one ever goes missing, /shopnpc fix puts back the NPCs near you.
+
+Crash-safe: we never keep hold of an NPC's mob between ticks (touching a remembered mob later can crash
+the server). We only touch the mob inside events that hand it to us fresh (spawn, tap, hit), and use
+commands that find it by its tag.
 """
 
 import json
@@ -55,9 +59,9 @@ class NpcManager:
         self.plugin = plugin
         self.db = plugin.economy.db
         self.npcs = {}       # id -> record
-        self.actors = {}     # id -> Actor
         self.expecting = None  # (npc id, mob type) being summoned right now
         self.last_try = {}     # npc id -> when we last summoned it
+        self.held = set()      # NPCs made to stand still since a player came near
         self.passthrough = {}  # player uuid -> npc id: let Minecraft's own NPC editor open once
         for nid, data in self.db.execute("SELECT id, data FROM npcs").fetchall():
             self.npcs[nid] = json.loads(data)
@@ -123,6 +127,7 @@ class NpcManager:
         self.plugin.server.scheduler.run_task(self.plugin, lambda: self.setup(nid, actor), delay=1)
 
     def setup(self, nid, actor):
+        """Right after it spawned (the next tick): tag it, name it, and make it stand still."""
         rec = self.npcs.get(nid)
         if rec is None:
             return
@@ -133,7 +138,10 @@ class NpcManager:
             actor.is_name_tag_always_visible = True
         except Exception:
             return
-        self.actors[nid] = actor
+        self.cmd(f"execute in {self.dimension_cmd(rec['dim'])} run effect @e[tag={TAG}_{nid}] slowness infinite 255 true")
+
+    def cmd(self, line):
+        self.plugin.server.dispatch_command(self.plugin.server.command_sender, line)
 
     def npc_id(self, actor):
         try:
@@ -145,7 +153,6 @@ class NpcManager:
         return None
 
     def near(self, rec, dist=NEAR):
-        """Is a player close to this spot? Only then is the area surely loaded, so the NPC is safe to touch."""
         for p in self.plugin.server.online_players:
             try:
                 if p.dimension.name == rec["dim"] and math.dist((p.location.x, p.location.z), (rec["x"], rec["z"])) < dist:
@@ -154,47 +161,46 @@ class NpcManager:
                 continue
         return False
 
-    # ---------- keeping NPCs in place ----------
-    def tick(self):
-        """Holds NPCs still, but only those with a player nearby. When nobody is near, we let go of the mob
-        (its area can unload, and touching an unloaded mob can crash the server). When a player comes back,
-        the NPC is replaced with a fresh one."""
-        self._ticks += 1
-        for nid, actor in list(self.actors.items()):
-            rec = self.npcs.get(nid)
-            if rec is None or not self.near(rec):
-                self.actors.pop(nid, None)
-                continue
-            try:
-                if not actor.is_valid or actor.is_dead:
-                    self.actors.pop(nid, None)
-                    continue
-                l = actor.location
-                if math.dist((l.x, l.y, l.z), (rec["x"], rec["y"], rec["z"])) > 0.3 or abs(l.yaw - rec["yaw"]) > 5:
-                    from endstone.level import Location
-                    actor.teleport(Location(actor.dimension, rec["x"], rec["y"], rec["z"], 0.0, rec["yaw"]))
-                if actor.name_tag != rec["name"]:
-                    actor.name_tag = rec["name"]
-            except Exception:
-                self.actors.pop(nid, None)
-        if self._ticks % 10 == 0:
-            self.find_missing()
+    def tidy(self, nid, actor):
+        """Inside a tap/hit event (the mob is fresh): fix its name and put it back on its spot if it moved."""
+        rec = self.npcs.get(nid)
+        if rec is None:
+            return
+        try:
+            if actor.name_tag != rec["name"]:
+                actor.name_tag = rec["name"]
+            l = actor.location
+            if math.dist((l.x, l.y, l.z), (rec["x"], rec["y"], rec["z"])) > 0.5:
+                from endstone.level import Location
+                actor.teleport(Location(actor.dimension, rec["x"], rec["y"], rec["z"], 0.0, rec["yaw"]))
+        except Exception:
+            pass
 
-    def find_missing(self):
-        now = time.time()
-        for nid, rec in list(self.npcs.items()):
-            if nid in self.actors or now - self.last_try.get(nid, 0) < 10:
-                continue
+    def tick(self):
+        """When a player comes near an NPC, make sure it stands still (by command: the mob is found fresh)."""
+        self._ticks += 1
+        if self._ticks % 20:
+            return
+        for nid, rec in self.npcs.items():
             if self.near(rec):
-                self.spawn(nid)
+                if nid not in self.held:
+                    self.held.add(nid)
+                    self.cmd(f"execute in {self.dimension_cmd(rec['dim'])} run effect @e[tag={TAG}_{nid}] slowness infinite 255 true")
+            else:
+                self.held.discard(nid)
+
+    def fix(self, player):
+        """/shopnpc fix: puts back the NPCs within 40 blocks of you (a fresh copy, without duplicates)."""
+        if not player.is_op:
+            player.send_message("§cOnly operators can fix NPCs.")
+            return
+        here = [nid for nid, rec in self.npcs.items() if self.near(rec, 40) and
+                rec["dim"] == player.dimension.name and math.dist((player.location.x, player.location.z), (rec["x"], rec["z"])) < 40]
+        for nid in here:
+            self.spawn(nid)
+        player.send_message(f"§aPut back {len(here)} NPC{'s' if len(here) != 1 else ''} near you." if here else "§7No NPCs within 40 blocks of you.")
 
     def remove(self, nid):
-        actor = self.actors.pop(nid, None)
-        if actor is not None:
-            try:
-                actor.remove()
-            except Exception:
-                pass
         if nid in self.npcs:
             self.kill_tagged(nid)
         self.npcs.pop(nid, None)
@@ -206,6 +212,7 @@ class NpcManager:
         nid = self.npc_id(event.actor)
         if nid is None or nid not in self.npcs:
             return
+        self.tidy(nid, event.actor)
         player = event.player
         if self.passthrough.get(str(player.unique_id)) == nid:
             self.passthrough.pop(str(player.unique_id), None)
@@ -279,10 +286,7 @@ class NpcManager:
             rec["dialog"] = str(v[1]).strip()[:400]
             rec["actions"] = [key for (key, _, _), on in zip(ACTIONS, v[2:2 + len(ACTIONS)]) if on]
             self.save(nid)
-            actor = self.actors.get(nid)
-            if actor is not None:
-                actor.name_tag = name
-            p.send_message("§aNPC saved.")
+            p.send_message("§aNPC saved. §7(A new name shows the next time someone taps it.)")
             self.open_editor(p, nid)
 
         player.send_form(ModalForm(title="Edit NPC", controls=controls, submit_button="Save", on_submit=submit))
@@ -309,13 +313,7 @@ class NpcManager:
     def set_look(self, player, nid, index):
         self.npcs[nid]["look"] = index
         self.save(nid)
-        actor = self.actors.pop(nid, None)
-        if actor is not None:
-            try:
-                actor.remove()
-            except Exception:
-                pass
-        self.spawn(nid)
+        self.spawn(nid)  # replaces the old one
         player.send_message(f"§aNPC look changed to {LOOKS[index][0]}.")
 
     def move_here(self, player, nid):
@@ -325,11 +323,9 @@ class NpcManager:
         rec.update({"dim": player.dimension.name, "x": round(loc.x, 2), "y": round(loc.y, 2), "z": round(loc.z, 2),
                     "yaw": round(loc.yaw, 1)})
         self.save(nid)
-        actor = self.actors.get(nid)
-        if actor is not None and old_dim == rec["dim"]:
-            pass  # the hold-still loop moves it on the next tick
-        else:
-            self.set_look(player, nid, rec["look"])
+        if old_dim != rec["dim"]:
+            self.cmd(f"execute in {self.dimension_cmd(old_dim)} run kill @e[tag={TAG}_{nid}]")
+        self.set_look(player, nid, rec["look"])
         player.send_message("§aNPC moved to where you're standing. Step aside!")
 
     def confirm_remove(self, player, nid):

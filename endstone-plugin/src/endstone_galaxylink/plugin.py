@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.47.1"
+VERSION = "2.47.2"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -85,7 +85,7 @@ class GalaxyLink(Plugin):
         "addmoney": _cmd("Give a player money.", "/addmoney <player: player> <amount: message>", "galaxylink.command.addmoney"),
         "takemoney": _cmd("Take money from a player.", "/takemoney <player: player> <amount: message>",
                           "galaxylink.command.takemoney"),
-        "shopnpc": _cmd("Summon a shop NPC where you stand. Tap it to edit it.", "/shopnpc", "galaxylink.command.shopnpc"),
+        "shopnpc": _cmd("Summon a shop NPC where you stand (tap it to edit it). /shopnpc fix puts back missing NPCs near you.", "/shopnpc [action: message]", "galaxylink.command.shopnpc"),
         "guide": _cmd("Help: server info, rules and commands.", "/guide", "galaxylink.command.guide", ["menu"]),
         "tpa": _cmd("Ask to teleport to a player.", "/tpa <player: player>", "galaxylink.command.tpa"),
         "tpahere": _cmd("Ask a player to teleport to you.", "/tpahere <player: player>", "galaxylink.command.tpahere"),
@@ -727,7 +727,10 @@ class GalaxyLink(Plugin):
             simple[name]()
             return True
         if name == "shopnpc":
-            self.npcs.create(sender)
+            if args and str(args[0]).strip().lower() == "fix":
+                self.npcs.fix(sender)  # put back missing NPCs near you
+            else:
+                self.npcs.create(sender)
             return True
         if command.name == "ranks":
             if not isinstance(sender, Player):
