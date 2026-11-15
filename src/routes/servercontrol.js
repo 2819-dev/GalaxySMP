@@ -24,13 +24,14 @@ async function setKey(sql, key, value, by) {
 }
 
 export async function loadServerControl(sql) {
-  const [maintenance, restart, kit, lockdown] = await Promise.all([getKey(sql, "maintenance"), getKey(sql, "restart_plan"), getKey(sql, "welcome_kit"), getKey(sql, "lockdown")]);
+  const [maintenance, restart, kit, lockdown, holidays] = await Promise.all([getKey(sql, "maintenance"), getKey(sql, "restart_plan"), getKey(sql, "welcome_kit"), getKey(sql, "lockdown"), getKey(sql, "holiday_decor")]);
   const r = restart && restart.at && restart.at * 1000 > Date.now() - 120e3 ? restart : null;
   return {
     maintenance: { on: Boolean(maintenance?.on), message: maintenance?.message || DEFAULT_BANNER, since: maintenance?.since || null },
     restart: r,
     kit: kit || DEFAULT_KIT,
     lockdown: { on: Boolean(lockdown?.on), title: lockdown?.title || "", message: lockdown?.message || "", since: lockdown?.since || null },
+    holidays: { on: holidays?.on !== false },  // Jewish holiday decorations by the logo and on the home page (on unless turned off)
   };
 }
 
@@ -50,6 +51,7 @@ export async function siteNotice(request, env) {
     ok: true,
     maintenance: s.maintenance.on ? { message: s.maintenance.message } : null,
     restart: soon ? { at: new Date(soon.at * 1000).toISOString(), reason: soon.reason || "" } : null,
+    holidays: s.holidays.on,
   }, 200, { "Cache-Control": "public, max-age=20" });
 }
 
@@ -105,6 +107,9 @@ export async function saveServerControl(request, env) {
     }
     (await import("../lib/lockdown.js")).forgetLockdown();
     message = on ? "The website is locked and the server is closed to players. Only you can use the site." : "The website is open again and players can join the server.";
+  } else if (b.action === "holidays") {
+    await setKey(sql, "holiday_decor", { on: Boolean(b.on) }, user.username);
+    message = b.on ? "Holiday decorations are on." : "Holiday decorations are off.";
   } else if (b.action === "friendbot") {
     const msg = { type: "friendbot_settings", ...(b.enabled != null ? { enabled: Boolean(b.enabled) } : {}), ...(b.autoFriend != null ? { autoFriend: Boolean(b.autoFriend) } : {}), restart: Boolean(b.restart) };
     const sent = await toPlugin(env, msg);

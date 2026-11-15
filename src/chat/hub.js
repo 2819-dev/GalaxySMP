@@ -274,16 +274,31 @@ export class CommunityHub extends DurableObject {
 
     // A picture (uploaded first with POST /api/chat/images) can be sent on its own or with text.
     const imageId = Number.isInteger(Number(msg.imageId)) && Number(msg.imageId) > 0 ? Number(msg.imageId) : null;
+    // A voice message (uploaded first with POST /api/chat/voice; Galaxy+ and Pro+)
+    const audioId = Number.isInteger(Number(msg.audioId)) && Number(msg.audioId) > 0 ? Number(msg.audioId) : null;
+    // A reply in a thread (the message that started the thread)
+    const threadRoot = Number.isInteger(Number(msg.threadRoot)) && Number(msg.threadRoot) > 0 ? Number(msg.threadRoot) : null;
     // Admins (owners included) may post links; everyone else can't.
-    const check = imageId && !String(msg.content || "").trim()
+    const check = (imageId || audioId) && !String(msg.content || "").trim()
       ? { ok: true, text: "" }
       : checkMessage(msg.content, await this.wordList(), { allowLinks: hubCan(user, "post_links"), maxLength: maxLengthFor(user) });
     if (!check.ok) return reject(check.message);
-    const limited = this.rateCheck(user.id, check.text || `[picture ${imageId}]`);
+    const limited = this.rateCheck(user.id, check.text || `[media ${imageId || audioId}]`);
     if (limited) return reject(limited);
 
     const replyTo = msg.replyTo ? Number(msg.replyTo) : null;
     const sql = getDb(this.env);
+    // Slow mode (set by staff): one message every N seconds per member; staff who moderate aren't limited
+    const slowRow = await sql`SELECT slow_seconds FROM channels WHERE id = ${channelId}`;
+    const slow = Number(slowRow[0]?.slow_seconds || 0);
+    if (slow > 0 && !hubCan(user, "delete_messages")) {
+      const key = `${user.id}:${channelId}`;
+      this.slowSeen ||= new Map();
+      const last = this.slowSeen.get(key) || 0;
+      const wait = Math.ceil((last + slow * 1000 - Date.now()) / 1000);
+      if (wait > 0) return reject(`Slow mode is on: you can send another message in ${wait} second${wait === 1 ? "" : "s"}.`);
+      this.slowSeen.set(key, Date.now());
+    }
     // One statement that also re-checks, fresh from the database, that the sender
     // isn't banned or muted and is allowed to post in this channel.
     const rows = await sql`
@@ -294,15 +309,19 @@ export class CommunityHub extends DurableObject {
         SELECT id, min_post_power FROM channels WHERE id = ${channelId} AND kind = 'text' AND NOT hidden
            AND (NOT staff_only OR ${hubCan(user, "staff_chat")})
       ), ins AS (
-        INSERT INTO messages (channel_id, user_id, content, reply_to, image_id)
+        INSERT INTO messages (channel_id, user_id, content, reply_to, image_id, audio_id, thread_root)
         SELECT ch.id, who.id, ${check.text},
                (SELECT id FROM messages WHERE id = ${replyTo} AND channel_id = ${channelId} AND deleted_at IS NULL),
                (SELECT i.id FROM message_images i WHERE i.id = ${imageId} AND i.user_id = who.id
-                   AND NOT EXISTS (SELECT 1 FROM messages x WHERE x.image_id = i.id))
+                   AND NOT EXISTS (SELECT 1 FROM messages x WHERE x.image_id = i.id)),
+               (SELECT a.id FROM message_audio a WHERE a.id = ${audioId} AND a.user_id = who.id
+                   AND NOT EXISTS (SELECT 1 FROM messages x WHERE x.audio_id = a.id) AND NOT EXISTS (SELECT 1 FROM dm_messages y WHERE y.audio_id = a.id)),
+               (SELECT id FROM messages WHERE id = ${threadRoot} AND channel_id = ${channelId} AND thread_root IS NULL AND deleted_at IS NULL)
           FROM who, ch
          WHERE NOT who.banned
            AND (who.muted_until IS NULL OR who.muted_until <= now())
            AND (ch.min_post_power <= 10 OR ${hubCan(user, "post_staff_channels")})
+           AND (${threadRoot}::bigint IS NULL OR EXISTS (SELECT 1 FROM messages r WHERE r.id = ${threadRoot} AND r.channel_id = ch.id AND r.thread_root IS NULL AND r.deleted_at IS NULL))
         RETURNING id
       )
       SELECT (SELECT id FROM ins) AS id,
@@ -322,8 +341,19 @@ export class CommunityHub extends DurableObject {
     const message = await loadMessage(sql, r.id);
     this.send(ws, { type: "sent", nonce: msg.nonce, id: message.id });
     await this.broadcastChannel(channelId, { type: "message", message });
+    if (message.threadRoot) {
+      // the thread's reply count on the message that started it, and a notification for whoever started it
+      const root = await loadMessage(sql, message.threadRoot);
+      if (root) await this.broadcastChannel(channelId, { type: "thread_update", rootId: root.id, thread: root.thread });
+      const rootAuthor = root?.author?.id;
+      if (rootAuthor && rootAuthor !== user.id) {
+        this.ctx.waitUntil(notify(this.env, [rootAuthor], "mentions", { title: `${user.username} replied in your thread`, body: check.text || "🎤 Voice message",
+          url: `/community#thread-${root.id}`, tag: `thread-${root.id}` }).catch(() => {}));
+      }
+      return;  // thread replies stay on the website (not sent to game chat)
+    }
     if (check.text) this.ctx.waitUntil(import("../routes/gamechat.js").then((m) => m.toGame(this.env, sql, channelId, user.id, check.text)).catch(() => {}));
-    this.ctx.waitUntil(this.pushFor(sql, user, channelId, r.id, check.text || "📷 Sent a picture").catch((e) => console.error("push failed", e)));
+    this.ctx.waitUntil(this.pushFor(sql, user, channelId, r.id, check.text || (audioId ? "🎤 Voice message" : "📷 Sent a picture")).catch((e) => console.error("push failed", e)));
   }
 
   // Phone/computer notifications: #announcements posts (Updates), and @mentions / replies.

@@ -14,8 +14,22 @@ export function setupServerControl({ loaders, toast }) {
   loaders.serverctl = async () => {
     let d;
     try { d = await getJson("/api/panel/server-control"); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
-    box.replaceChildren(lockdownPanel(d), friendBotPanel(d), allowlistPanel(), goalPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d));
+    box.replaceChildren(lockdownPanel(d), friendBotPanel(d), allowlistPanel(), goalPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d), holidayPanel(d));
   };
+
+  // ---------- Jewish holiday decorations ----------
+  function holidayPanel(d) {
+    const on = d.holidays?.on !== false;
+    const preview = (id, night) => window.open(`/?holiday=${id}${night ? `&night=${night}` : ""}`, "_blank", "noopener");
+    const list = [["rosh", "Rosh Hashanah"], ["sukkot", "Sukkot"], ["chanukah", "Chanukah", 5], ["tubishvat", "Tu BiShvat"], ["purim", "Purim"], ["pesach", "Pesach"], ["lagbaomer", "Lag BaOmer"], ["shavuot", "Shavuot"]];
+    return h("section", { class: "panel sc-card" },
+      h("div", { class: "sc-head" }, h("h2", { text: "Holiday decorations" }), h("span", { class: `sg-status ${on ? "done" : "declined"}`, text: on ? "On" : "Off" })),
+      h("p", { class: "text-2", text: "On Jewish holidays, a small gold emblem appears next to the logo on every page and a greeting shows on the home page. On Chanukah the menorah lights one more candle each night. The dates follow the Hebrew calendar by themselves." }),
+      h("div", { class: "cx-row", style: "flex-wrap:wrap" }, h("span", { class: "text-3 small", text: "Preview:" }),
+        ...list.map(([id, name, night]) => h("button", { class: "btn btn-ghost btn-sm", type: "button", text: name, onclick: () => preview(id, night) }))),
+      h("div", { class: "cx-row" }, h("button", { class: `btn ${on ? "btn-secondary" : "btn-primary"}`, type: "button", text: on ? "Turn off" : "Turn on",
+        onclick: () => save({ action: "holidays", on: !on }).catch((e) => toast(e.message)) })));
+  }
 
   // ---------- friend bot (GalaxySMP under Play > Friends) ----------
   function friendBotPanel(d) {

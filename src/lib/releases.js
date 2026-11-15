@@ -151,12 +151,52 @@ The account that shows GalaxySMP under Play > Friends now runs alongside the ser
     title: "Light and dark mode moved to Account settings",
     body: `Choose Auto, Light or Dark in Account settings > Appearance. Auto follows your device's setting, and it's the default. The button at the top of every page has been removed to keep the header clean.`,
   },
+  {
+    id: "2026-11-21",
+    title: "Threads, voice messages, slow mode and holiday decorations",
+    body: `**Threads**
+Tap "Reply in thread" on any message to start a side conversation without filling up the channel. The original message shows how many replies it has; tap it to open the thread. You'll get a notification when someone replies to your thread.
+
+**Voice messages**
+Galaxy+ and Galaxy Pro+ members can now send voice messages of up to 1 minute in chat and in DMs. Tap the microphone next to the message box, listen back, then send. Everyone can play them.
+
+**Slow mode**
+Staff can turn on slow mode in a busy channel, so members can only send one message every few seconds. You'll see a note above the message box when it's on.
+
+**Holiday decorations**
+On Jewish holidays the website now wears a small gold emblem next to the logo and a greeting on the home page. On Chanukah, the menorah lights one more candle each night.
+
+**Vote on our ideas**
+The GalaxySMP team will now post some ideas in #Suggestions for you to vote on. The first one is Auction House price alerts: tell us if you'd use it!`,
+  },
 ];
+
+// Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
+export const OFFICIAL_SUGGESTIONS = [
+  {
+    id: "ah-price-alerts",
+    title: "Auction House price alerts",
+    body: "Pick an item and the most you'd pay, and get a notification (on the website and in game) as soon as someone lists it at or below that price. Vote below to tell us if you'd use this.",
+  },
+];
+
+async function postOfficialSuggestions(sql, author) {
+  if (!author) return;
+  for (const s of OFFICIAL_SUGGESTIONS) {
+    const claimed = await sql`INSERT INTO economy_config (key, value, updated_by) VALUES (${`suggestion:${s.id}`}, ${JSON.stringify(new Date().toISOString())}::jsonb, 'server')
+                              ON CONFLICT (key) DO NOTHING RETURNING key`;
+    if (claimed.length) await sql`INSERT INTO suggestions (user_id, title, body, anonymous, official) VALUES (${author.id}, ${s.title}, ${s.body}, false, true)`;
+  }
+}
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.
 export async function postReleases(env, sql) {
   const keys = RELEASES.map((r) => `release:${r.id}`);
-  const done = new Set((await sql`SELECT key FROM economy_config WHERE key = ANY(${keys})`).map((r) => r.key));
+  const done = new Set((await sql`SELECT key FROM economy_config WHERE key = ANY(${[...keys, ...OFFICIAL_SUGGESTIONS.map((x) => `suggestion:${x.id}`)]})`).map((r) => r.key));
+  if (OFFICIAL_SUGGESTIONS.some((x) => !done.has(`suggestion:${x.id}`))) {
+    const people = await sql`SELECT id, username, platform FROM users WHERE NOT banned ORDER BY id LIMIT 200`;
+    await postOfficialSuggestions(sql, people.find((u) => isOwner(env, u.username, u.platform === "bedrock")));
+  }
   for (const r of RELEASES) {
     const key = `release:${r.id}`;
     if (done.has(key)) continue;

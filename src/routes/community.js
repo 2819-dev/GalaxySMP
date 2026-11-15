@@ -81,7 +81,7 @@ export async function suggestionsList(request, env, ctx, url) {
   const sort = url.searchParams.get("sort") === "new" ? "new" : "top";
   const sql = getDb(env);
   const rows = await sql`
-    SELECT s.id, s.title, s.body, s.anonymous, s.status, s.created_at, s.user_id, s.staff_reply, s.staff_reply_at,
+    SELECT s.id, s.title, s.body, s.anonymous, s.official, s.status, s.created_at, s.user_id, s.staff_reply, s.staff_reply_at,
            u.username, ru.username AS reply_by,
            (SELECT count(*)::int FROM suggestion_comments c WHERE c.suggestion_id = s.id AND c.deleted_at IS NULL) AS comments,
            coalesce(sum(CASE WHEN v.value = 1 THEN 1 ELSE 0 END), 0)::int AS likes,
@@ -108,7 +108,8 @@ export async function suggestionsList(request, env, ctx, url) {
         createdAt: r.created_at,
         anonymous: r.anonymous,
         // Anonymous posts: only the owners (and the writer) see who wrote it.
-        author: !r.anonymous || owner || mine ? r.username : null,
+        author: r.official ? "GalaxySMP" : !r.anonymous || owner || mine ? r.username : null,
+        official: Boolean(r.official),  // posted by the server team for everyone to vote on
         mine,
         likes: r.likes,
         dislikes: r.dislikes,

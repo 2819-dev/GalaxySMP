@@ -85,6 +85,15 @@ const PENDING = [
     "UPDATE categories SET position = (SELECT position FROM categories WHERE name = 'Off-Topic') + 1 WHERE name = 'Staff' AND position <= (SELECT position FROM categories WHERE name = 'Off-Topic')",
     "INSERT INTO channels (category_id, slug, name, topic, position, min_post_power, kind) SELECT (SELECT id FROM categories WHERE name = 'Off-Topic'), v.slug, v.name, v.topic, v.pos, v.power, 'text' FROM (VALUES ('ot-announcements', 'OT | Announcements', 'Off-topic news from the staff team.', 0, 50), ('ot-general', 'OT | General', 'Chat about anything that isn''t GalaxySMP.', 1, 10), ('ot-media', 'OT | Media', 'Pictures, memes, videos and clips about anything.', 2, 10)) AS v(slug, name, topic, pos, power) ON CONFLICT (slug) DO NOTHING",
     "INSERT INTO schema_migrations (version) VALUES ('0055_off_topic') ON CONFLICT DO NOTHING",
+  ]],  ["0056_threads_voice_slowmode", [
+    "ALTER TABLE messages ADD COLUMN IF NOT EXISTS thread_root bigint REFERENCES messages(id) ON DELETE CASCADE",
+    "CREATE INDEX IF NOT EXISTS messages_thread_idx ON messages (thread_root, id) WHERE thread_root IS NOT NULL",
+    "CREATE TABLE IF NOT EXISTS message_audio (id bigserial PRIMARY KEY, user_id bigint NOT NULL, mime text NOT NULL, duration_ms integer NOT NULL, data bytea NOT NULL, created_at timestamptz NOT NULL DEFAULT now())",
+    "ALTER TABLE messages ADD COLUMN IF NOT EXISTS audio_id bigint REFERENCES message_audio(id) ON DELETE SET NULL",
+    "ALTER TABLE dm_messages ADD COLUMN IF NOT EXISTS audio_id bigint REFERENCES message_audio(id) ON DELETE SET NULL",
+    "ALTER TABLE channels ADD COLUMN IF NOT EXISTS slow_seconds integer NOT NULL DEFAULT 0",
+    "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS official boolean NOT NULL DEFAULT false",
+    "INSERT INTO schema_migrations (version) VALUES ('0056_threads_voice_slowmode') ON CONFLICT DO NOTHING",
   ]],
 ];
 

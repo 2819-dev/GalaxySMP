@@ -16,6 +16,7 @@ import { renderTeam, renderApplications } from "/js/community-team.js";
 import { renderStaffLogs, renderReports, renderShifts } from "/js/community-staff.js";
 import { renderJobs } from "/js/community-jobs.js";
 import { renderFriends } from "/js/community-friends.js";
+import { micButton, voicePlayer } from "/js/chat-voice.js";
 
 const panel = () => document.getElementById("channel-panel");
 const voiceBox = () => document.getElementById("voice-embed");
@@ -370,10 +371,12 @@ function renderDMs(p) {
     const meId = ctx.me?.id;
     const fill = (node, m) => {
       const text = node.querySelector(".dm-text");
-      text.replaceChildren(renderMarkdown(m.body, { channels: chatState.channels }));
+      text.replaceChildren(renderMarkdown(m.body || "", { channels: chatState.channels }));
+      text.hidden = !m.body && Boolean(m.audio);
+      if (m.audio && !node.querySelector(".vp")) text.before(voicePlayer({ src: `/api/chat/voice/${m.audio.id}`, ms: m.audio.ms, seed: m.audio.id }));
       node.querySelector(".dm-meta").textContent = `${dmTime(m.at)}${m.via === "game" ? " · from the game" : ""}${m.editedAt ? " · edited" : ""}${m.from === meId ? (m.read ? " · Read" : " · Sent") : ""}`;
       node.querySelector(".dm-edit-btn")?.remove();
-      if (m.from === meId && !m.read) { // your message they haven't read yet: you can still edit it
+      if (m.from === meId && !m.read && m.body) { // your message they haven't read yet: you can still edit it
         const b = h("button", { class: "dm-edit-btn", type: "button", "aria-label": "Edit message", title: "Edit (until they read it)" }, iconEl("pencil"), "Edit");
         b.addEventListener("click", () => editDm(node, m));
         node.querySelector(".dm-meta").append(b);
@@ -433,7 +436,14 @@ function renderDMs(p) {
         { icon: "gift", label: "Gift", onClick: () => giftDialog({ id: d.other.id, username: d.other.username, head: d.other.head }) },
       ], photo: null });
     });
-    const composer = h("div", { class: "dm-composer" }, plusBtn, input, send);
+    const composer = h("div", { class: "dm-composer" }, plusBtn, input);
+    composer.append(micButton(composer, async (audioId) => {
+      const r = await postJson(`/api/dm/with/${userId}`, { body: "", audioId });
+      if (!log.querySelector(`[data-id="${r.message.id}"]`)) add(r.message);
+      log.querySelector(".dm-start")?.remove();
+      log.scrollTop = log.scrollHeight;
+      loadList();
+    }), send);
     // "player1 is typing…"
     const typing = h("div", { class: "typing-line dm-typing", "aria-live": "polite" });
     let typingTimer = null;

@@ -439,7 +439,8 @@ export function suggestionCard(s, canModerate, reload, toast) {
   const up = h("button", { class: "sg-vote up", type: "button", "aria-pressed": String(s.myVote === 1), "aria-label": `Like (${s.likes})`, onclick: () => vote(1) }, iconEl("thumbsUp"), String(s.likes));
   const down = h("button", { class: "sg-vote down", type: "button", "aria-pressed": String(s.myVote === -1), "aria-label": `Dislike (${s.dislikes})`, onclick: () => vote(-1) }, iconEl("thumbsDown"), String(s.dislikes));
   let who;
-  if (!s.anonymous) who = s.author;
+  if (s.official) who = "GalaxySMP (official idea: vote to tell us if you want it)";
+  else if (!s.anonymous) who = s.author;
   else if (s.author) who = `Anonymous (${s.mine ? "you" : s.author}, only ${s.mine ? "you and the owners" : "owners"} can see this)`;
   else who = "Anonymous";
   const comments = h("div", { class: "sg-comments", hidden: true });
@@ -463,9 +464,9 @@ export function suggestionCard(s, canModerate, reload, toast) {
   const reply = s.staffReply ? h("div", { class: `sg-reply ${s.status}` },
     h("div", { class: "sg-reply-head" }, iconEl("shield"), `Staff response from ${s.staffReply.by}`),
     h("p", { text: s.staffReply.text })) : null;
-  return h("article", { class: "panel sg-card", id: `sg-${s.id}` },
+  return h("article", { class: `panel sg-card${s.official ? " sg-official" : ""}`, id: `sg-${s.id}` },
     h("div", { class: "sg-votes" }, up, down),
-    h("div", { class: "sg-body" }, h("h3", { class: "sg-title", text: s.title }), s.body ? h("p", { class: "sg-text", text: s.body }) : null, reply, foot, comments));
+    h("div", { class: "sg-body" }, h("h3", { class: "sg-title" }, s.official ? h("span", { class: "sg-official-tag" }, iconEl("shield"), "@GalaxySMP") : null, s.title), s.body ? h("p", { class: "sg-text", text: s.body }) : null, reply, foot, comments));
 }
 
 async function loadComments(s, box, toast, setCount) {

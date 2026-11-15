@@ -414,6 +414,7 @@ window.matchMedia?.("(prefers-color-scheme: light)").addEventListener?.("change"
 async function renderNotice() {
   let d;
   try { d = await fetch("/api/site-notice").then((r) => r.json()); } catch { return; }
+  if (d?.ok && (d.holidays !== false || /[?&]holiday=/.test(location.search))) import("/js/holidays.js").then((m) => m.decorate()).catch(() => {});
   if (!d?.ok || (!d.maintenance && !d.restart)) return;
   const bar = document.createElement("div");
   bar.className = `site-notice ${d.maintenance ? "maint" : "restart"}`;

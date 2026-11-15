@@ -35,17 +35,22 @@ async function loadUser(sql, id) {
 const userOut = (u) => ({ id: Number(u.id), username: u.username, head: headUrlFor(u), inGame: Boolean(u.in_game) });
 
 // The one place every DM goes through (website and game).
-async function sendDm(env, sql, from, to, text, via) {
+async function sendDm(env, sql, from, to, text, via, audioId = null) {
   if (!to || to.banned) throw new HttpError(404, "That member can't receive messages.");
   if (Number(from.id) === Number(to.id)) throw new HttpError(400, "You can't message yourself.");
   if (from.banned) throw new HttpError(403, "Your account has been banned.");
   if (from.muted_until && new Date(from.muted_until) > new Date()) throw new HttpError(403, "You're muted, so you can't send messages right now.");
   const body = clean(text);
-  if (!body) throw new HttpError(400, "Type a message first.");
+  if (!body && !audioId) throw new HttpError(400, "Type a message first.");
   const words = compileWordList(await sql`SELECT word, match FROM filter_words`);
   const fromPerms = { perms: await permsOfUser(env, sql, from.id) };
-  const check = checkMessage(body, words, { allowLinks: fromPerms.perms.includes("post_links"), maxLength: maxLengthFor(fromPerms) });
+  const check = body ? checkMessage(body, words, { allowLinks: fromPerms.perms.includes("post_links"), maxLength: maxLengthFor(fromPerms) }) : { ok: true, text: "" };
   if (!check.ok) throw new HttpError(400, check.message);
+  if (audioId) {  // a voice message the sender just recorded (not used anywhere yet)
+    const [a] = await sql`SELECT a.id FROM message_audio a WHERE a.id = ${audioId} AND a.user_id = ${from.id}
+                           AND NOT EXISTS (SELECT 1 FROM messages x WHERE x.audio_id = a.id) AND NOT EXISTS (SELECT 1 FROM dm_messages y WHERE y.audio_id = a.id)`;
+    if (!a) throw new HttpError(400, "That recording isn't available. Record it again.");
+  }
   const [blocked] = await sql`SELECT 1 FROM dm_blocks WHERE (user_id = ${to.id} AND blocked_id = ${from.id}) OR (user_id = ${from.id} AND blocked_id = ${to.id})`;
   if (blocked) throw new HttpError(403, "You can't message this member.");
   const [{ n }] = await sql`
@@ -60,15 +65,17 @@ async function sendDm(env, sql, from, to, text, via) {
     ON CONFLICT (user_a, user_b) DO UPDATE SET last_message_at = now(),
       a_unread = dm_threads.a_unread + ${fromIsA ? 0 : 1}, b_unread = dm_threads.b_unread + ${fromIsA ? 1 : 0}
     RETURNING id`;
-  const [msg] = await sql`INSERT INTO dm_messages (thread_id, sender_id, body, via) VALUES (${thread.id}, ${from.id}, ${check.text}, ${via}) RETURNING id, created_at`;
-  const out = { id: Number(msg.id), threadId: Number(thread.id), from: Number(from.id), fromName: from.username, to: Number(to.id), body: check.text, at: msg.created_at, via };
+  const [msg] = await sql`INSERT INTO dm_messages (thread_id, sender_id, body, via, audio_id) VALUES (${thread.id}, ${from.id}, ${check.text}, ${via}, ${audioId}) RETURNING id, created_at`;
+  const [au] = audioId ? await sql`SELECT duration_ms FROM message_audio WHERE id = ${audioId}` : [];
+  const out = { id: Number(msg.id), threadId: Number(thread.id), from: Number(from.id), fromName: from.username, to: Number(to.id), body: check.text, at: msg.created_at, via,
+    audio: au ? { id: Number(audioId), ms: Number(au.duration_ms) } : null };
   await notify(env, out);
   try { // phone/computer notification for the recipient, unless they have this conversation open right now
     const r = await hubStub(env).fetch(`https://hub/internal/viewing?user=${Number(to.id)}&view=dm:${Number(from.id)}`).then((x) => x.json()).catch(() => ({}));
-    if (!r.viewing) await pushNotify(env, [to.id], "dms", { title: `Message from ${from.username}`, body: check.text, url: "/community#messages", tag: `dm-${from.id}` });
+    if (!r.viewing) await pushNotify(env, [to.id], "dms", { title: `Message from ${from.username}`, body: check.text || "🎤 Voice message", url: "/community#messages", tag: `dm-${from.id}` });
   } catch { /* best effort */ }
   // in game: show it to the recipient if they're playing (the plugin delivers game-to-game DMs itself)
-  if (via === "web" && to.xuid) {
+  if (via === "web" && to.xuid && check.text) {
     try { await toPlugin(env, { type: "dm", toXuid: String(to.xuid), from: from.username, text: check.text }); } catch { /* server offline */ }
   }
   return out;
@@ -81,7 +88,7 @@ export async function listThreads(request, env) {
   const rows = await sql`
     SELECT t.id, t.last_message_at, CASE WHEN t.user_a = ${me.id} THEN t.a_unread ELSE t.b_unread END AS unread,
            o.id AS other_id, o.username, p.xuid, p.head_at, p.gamerpic_at, (p.online_at > now() - interval '150 seconds') AS in_game,
-           (SELECT body FROM dm_messages m WHERE m.thread_id = t.id ORDER BY m.id DESC LIMIT 1) AS preview,
+           (SELECT CASE WHEN m.body = '' AND m.audio_id IS NOT NULL THEN '🎤 Voice message' ELSE m.body END FROM dm_messages m WHERE m.thread_id = t.id ORDER BY m.id DESC LIMIT 1) AS preview,
            (SELECT sender_id FROM dm_messages m WHERE m.thread_id = t.id ORDER BY m.id DESC LIMIT 1) AS last_sender
       FROM dm_threads t
       JOIN users o ON o.id = CASE WHEN t.user_a = ${me.id} THEN t.user_b ELSE t.user_a END
@@ -111,11 +118,12 @@ export async function getConversation(request, env, ctx, url, params) {
   if (thread) {
     const before = Number(url.searchParams.get("before")) || null;
     const rows = await sql`
-      SELECT id, sender_id, body, via, created_at, read_at, edited_at FROM dm_messages
-       WHERE thread_id = ${thread.id} AND (${before}::bigint IS NULL OR id < ${before})
-       ORDER BY id DESC LIMIT 60`;
+      SELECT d.id, d.sender_id, d.body, d.via, d.created_at, d.read_at, d.edited_at, d.audio_id, a.duration_ms FROM dm_messages d
+        LEFT JOIN message_audio a ON a.id = d.audio_id
+       WHERE d.thread_id = ${thread.id} AND (${before}::bigint IS NULL OR d.id < ${before})
+       ORDER BY d.id DESC LIMIT 60`;
     messages = rows.reverse().map((m) => ({ id: Number(m.id), from: Number(m.sender_id), body: m.body, via: m.via, at: m.created_at,
-      read: Boolean(m.read_at), editedAt: m.edited_at || null }));
+      read: Boolean(m.read_at), editedAt: m.edited_at || null, audio: m.audio_id ? { id: Number(m.audio_id), ms: Number(m.duration_ms) } : null }));
     // opening the conversation reads their messages: the sender can't edit them any more
     // (looking as this member with "Act as Member" doesn't mark their messages as read)
     const read = me.acting_by ? [] : await sql`UPDATE dm_messages SET read_at = now() WHERE thread_id = ${thread.id} AND sender_id <> ${me.id} AND read_at IS NULL RETURNING id`;
@@ -133,7 +141,8 @@ export async function postMessage(request, env, ctx, url, params) {
   const sql = getDb(env);
   const from = await loadUser(sql, me.id);
   const to = await loadUser(sql, Number(params.userId));
-  const msg = await sendDm(env, sql, from, to, body.body, "web");
+  const audioId = Number.isInteger(Number(body.audioId)) && Number(body.audioId) > 0 ? Number(body.audioId) : null;
+  const msg = await sendDm(env, sql, from, to, body.body, "web", audioId);
   return json({ ok: true, message: msg });
 }
 
@@ -162,7 +171,7 @@ export async function ownerThreads(request, env, ctx, url) {
   const rows = await sql`
     SELECT t.id, t.last_message_at, a.id AS a_id, a.username AS a_name, b.id AS b_id, b.username AS b_name,
            (SELECT count(*)::int FROM dm_messages m WHERE m.thread_id = t.id) AS count,
-           (SELECT body FROM dm_messages m WHERE m.thread_id = t.id ORDER BY m.id DESC LIMIT 1) AS preview
+           (SELECT CASE WHEN m.body = '' AND m.audio_id IS NOT NULL THEN '🎤 Voice message' ELSE m.body END FROM dm_messages m WHERE m.thread_id = t.id ORDER BY m.id DESC LIMIT 1) AS preview
       FROM dm_threads t JOIN users a ON a.id = t.user_a JOIN users b ON b.id = t.user_b
      WHERE ${q} = '' OR lower(a.username) LIKE ${"%" + q + "%"} OR lower(b.username) LIKE ${"%" + q + "%"}
      ORDER BY t.last_message_at DESC LIMIT 100`;

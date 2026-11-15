@@ -458,8 +458,8 @@ function isGrouped(m, prev) {
   return prev && prev.author.id === m.author.id && !m.replyTo && new Date(m.createdAt) - new Date(prev.createdAt) < 5 * 60_000;
 }
 
-function renderMessage(m, prev) {
-  const grouped = isGrouped(m, prev);
+function renderMessage(m, prev, opts = {}) {
+  const grouped = !opts.thread && isGrouped(m, prev);
   const row = el("div", "msg" + (grouped ? " grouped" : ""));
   row.dataset.id = m.id;
   const author = state.members.get(m.author.id) || { id: m.author.id, username: m.author.username, role: m.author.role, rank: m.author.rank };
@@ -513,6 +513,7 @@ function renderMessage(m, prev) {
   }
   body.append(head, text);
   for (const hook of messageBodyHooks) hook(m, body, text);
+  if (opts.thread) { row.append(body); return row; }  // inside the thread panel: just the message
   body.append(renderReactions(m));
   row.append(body);
 
@@ -817,14 +818,15 @@ function submit() {
   const input = $("composer-input");
   const text = input.value.trim();
   const picture = state.pendingImage;  // a picture added with the picture button (already uploaded)
-  if (!text && !picture) return;
+  if (!text && !picture && !state.pendingAudio) return;
   if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
     note("You're offline. Your message will be ready to send when you reconnect.");
     return;
   }
   const nonce = Math.random().toString(36).slice(2);
   state.pending.set(nonce, text);
-  send({ type: "send", channelId: state.channelId, content: text, replyTo: state.replyTo?.id || null, nonce, imageId: picture?.id || null });
+  send({ type: "send", channelId: state.channelId, content: text, replyTo: state.replyTo?.id || null, nonce, imageId: picture?.id || null, audioId: state.pendingAudio?.id || null });
+  state.pendingAudio = null;
   input.value = "";
   if (picture) { state.pendingImage = null; for (const hook of composerHooks) hook(currentChannel(), true); }
   state.replyTo = null;
@@ -1000,6 +1002,7 @@ function handleEvent(data) {
       break;
     case "message":
       state.typing.get(data.message.channelId)?.delete(data.message.author.id);
+      if (data.message.threadRoot) { for (const hook of eventHooks) hook({ type: "thread_message", message: data.message }, state); renderTyping(); break; }
       addMessage(data.message);
       renderTyping();
       break;
@@ -1020,6 +1023,7 @@ function handleEvent(data) {
         note(`Not edited: ${data.message}`);
         break;
       }
+      if (String(data.nonce || "").startsWith("th-")) { for (const hook of eventHooks) hook({ type: "thread_rejected", nonce: data.nonce, message: data.message }, state); break; }
       const text = state.pending.get(data.nonce);
       state.pending.delete(data.nonce);
       const input = $("composer-input");
@@ -1223,4 +1227,4 @@ export function openDM(userId) {
 }
 
 export { openProfile };
-export { state as chatState, api as chatApi, note as chatNote, renderMembers, renderMessages, renderComposer, roleOf };
+export { send as chatSend, renderMessage, rerenderMessage, currentChannel, state as chatState, api as chatApi, note as chatNote, renderMembers, renderMessages, renderComposer, roleOf };

@@ -33,11 +33,17 @@ export function formatMessage(r) {
     pinned: Boolean(r.pinned_at),
     pollId: r.poll_id ? Number(r.poll_id) : null,
     image: r.image_id ? { id: Number(r.image_id), w: r.image_w, h: r.image_h } : null,
+    audio: r.audio_id ? { id: Number(r.audio_id), ms: Number(r.audio_ms) || 0 } : null,
+    threadRoot: r.thread_root ? Number(r.thread_root) : null,
+    thread: r.thread_count ? { count: Number(r.thread_count), lastAt: r.thread_last } : null,
   };
 }
 
 const SELECT = `
   SELECT m.id, m.channel_id, m.content, m.created_at, m.game_xuid, m.game_name, m.reply_to, m.seen_at, m.edited_at, m.pinned_at, m.poll_id, m.image_id, mi.width AS image_w, mi.height AS image_h,
+         m.audio_id, ma.duration_ms AS audio_ms, m.thread_root,
+         (SELECT count(*)::int FROM messages t WHERE t.thread_root = m.id AND t.deleted_at IS NULL) AS thread_count,
+         (SELECT max(t.created_at) FROM messages t WHERE t.thread_root = m.id AND t.deleted_at IS NULL) AS thread_last,
          u.id AS author_id, u.username, r.key AS role_key, r.color,
          rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient, rk.position AS rank_position,
          p.content AS reply_content, pu.username AS reply_username,
@@ -55,11 +61,12 @@ const SELECT = `
     LEFT JOIN ranks rk ON rk.id = prk.rank_id
     LEFT JOIN messages p ON p.id = m.reply_to
     LEFT JOIN users pu ON pu.id = p.user_id
-    LEFT JOIN message_images mi ON mi.id = m.image_id`;
+    LEFT JOIN message_images mi ON mi.id = m.image_id
+    LEFT JOIN message_audio ma ON ma.id = m.audio_id`;
 
 export async function loadHistory(sql, channelId, beforeId) {
   const rows = await sql.query(
-    `${SELECT} WHERE m.channel_id = $1 AND m.deleted_at IS NULL AND ($2::bigint IS NULL OR m.id < $2)
+    `${SELECT} WHERE m.channel_id = $1 AND m.deleted_at IS NULL AND m.thread_root IS NULL AND ($2::bigint IS NULL OR m.id < $2)
       ORDER BY m.id DESC LIMIT ${HISTORY_PAGE}`,
     [channelId, beforeId ?? null]
   );
@@ -68,8 +75,8 @@ export async function loadHistory(sql, channelId, beforeId) {
 
 // The messages around one message (for "jump to" from search and pins): 25 before, 25 after.
 export async function loadAround(sql, channelId, id) {
-  const before = await sql.query(`${SELECT} WHERE m.channel_id = $1 AND m.deleted_at IS NULL AND m.id <= $2 ORDER BY m.id DESC LIMIT 26`, [channelId, id]);
-  const after = await sql.query(`${SELECT} WHERE m.channel_id = $1 AND m.deleted_at IS NULL AND m.id > $2 ORDER BY m.id LIMIT 25`, [channelId, id]);
+  const before = await sql.query(`${SELECT} WHERE m.channel_id = $1 AND m.deleted_at IS NULL AND m.thread_root IS NULL AND m.id <= $2 ORDER BY m.id DESC LIMIT 26`, [channelId, id]);
+  const after = await sql.query(`${SELECT} WHERE m.channel_id = $1 AND m.deleted_at IS NULL AND m.thread_root IS NULL AND m.id > $2 ORDER BY m.id LIMIT 25`, [channelId, id]);
   return { messages: [...before.reverse(), ...after].map(formatMessage), hasMore: before.length >= 26, hasNewer: after.length >= 25 };
 }
 
@@ -106,4 +113,12 @@ export async function loadReactions(sql, messageId) {
       FROM reactions WHERE message_id = ${messageId}
      GROUP BY emoji ORDER BY min(created_at)`;
   return rows.map((r) => ({ emoji: r.emoji, users: r.users.map(Number) }));
+}
+
+// A thread: the message that started it, then every reply in order.
+export async function loadThread(sql, rootId) {
+  const [root] = await sql.query(`${SELECT} WHERE m.id = $1 AND m.deleted_at IS NULL AND m.thread_root IS NULL`, [rootId]);
+  if (!root) return null;
+  const replies = await sql.query(`${SELECT} WHERE m.thread_root = $1 AND m.deleted_at IS NULL ORDER BY m.id LIMIT 300`, [rootId]);
+  return { root: formatMessage(root), channelId: Number(root.channel_id), replies: replies.map(formatMessage) };
 }

@@ -8,7 +8,7 @@ import { INTEREST_NAME } from "./onboarding.js";
 import { getDb } from "../lib/db.js";
 import { json, HttpError } from "../lib/http.js";
 import { requireUser, publicUser } from "../lib/auth.js";
-import { REACTIONS, loadHistory, rankOf, loadAround, loadPins, searchMessages, loadMessage } from "../chat/messages.js";
+import { REACTIONS, loadHistory, rankOf, loadAround, loadPins, searchMessages, loadMessage, loadThread } from "../chat/messages.js";
 import { maxLengthFor } from "../lib/filter.js";
 import { headUrlFor } from "./heads.js";
 import { displayRank, loadPlanPriority } from "./ranks.js";
@@ -28,7 +28,7 @@ export async function bootstrap(request, env) {
   const sql = getDb(env);
   const [categories, channels, roles, members] = await Promise.all([
     sql`SELECT id, name FROM categories ORDER BY position, id`,
-    sql`SELECT id, category_id, slug, name, topic, min_post_power, kind FROM channels
+    sql`SELECT id, category_id, slug, name, topic, min_post_power, kind, slow_seconds FROM channels
          WHERE NOT hidden AND (NOT staff_only OR ${can(user, "staff_chat")}) ORDER BY position, id`,
     sql`SELECT key, name, color, power FROM roles ORDER BY power DESC`,
     sql`SELECT u.id, u.username, r.key AS role, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color, u.custom_presence, u.look_title, u.look_frame, u.platform AS plat,
@@ -68,6 +68,7 @@ export async function bootstrap(request, env) {
       topic: c.topic,
       kind: c.kind,
       canPost: c.kind === "text" && (c.min_post_power <= 10 || can(user, "post_staff_channels")),
+      slow: Number(c.slow_seconds || 0),
     })),
     roles: roles.map((r) => ({ key: r.key, name: r.name, color: r.color, power: r.power })),
     members: members.map((m) => ({
@@ -108,6 +109,29 @@ export async function history(request, env, ctx, url, params) {
   if (Number.isInteger(around) && around > 0) return json({ ok: true, ...(await loadAround(sql, channelId, around)) });
   const messages = await loadHistory(sql, channelId, before ? Number(before) : null);
   return json({ ok: true, messages, hasMore: messages.length >= 50 });
+}
+
+// GET /api/chat/threads/:id  (the message that started the thread + its replies)
+export async function thread(request, env, ctx, url, params) {
+  const user = await requireUser(request, env);
+  const sql = getDb(env);
+  const t = await loadThread(sql, Number(params.id) || 0);
+  if (!t) throw new HttpError(404, "That message no longer exists.");
+  await assertCanRead(sql, user, t.channelId);
+  return json({ ok: true, ...t });
+}
+
+// POST /api/chat/channels/:id/slowmode { seconds } (staff who can delete messages): 0 turns it off
+export async function slowmode(request, env, ctx, url, params) {
+  const user = await requireUser(request, env);
+  if (!can(user, "delete_messages")) throw new HttpError(403, "Your rank can't change slow mode.");
+  const seconds = Math.max(0, Math.min(3600, Math.round(Number((await request.json().catch(() => ({}))).seconds) || 0)));
+  const sql = getDb(env);
+  const [c] = await sql`UPDATE channels SET slow_seconds = ${seconds} WHERE id = ${Number(params.id) || 0} AND kind = 'text' RETURNING id, name`;
+  if (!c) throw new HttpError(404, "Unknown channel.");
+  await sql`INSERT INTO audit_log (actor_id, action, details) VALUES (${user.id}, 'channel.slowmode', ${JSON.stringify({ channel: c.name, seconds })}::jsonb)`;
+  await hubBroadcast(env, { type: "slowmode", channelId: Number(c.id), seconds });
+  return json({ ok: true, seconds, message: seconds ? `Slow mode is on: one message every ${seconds} seconds.` : "Slow mode is off." });
 }
 
 // GET /api/chat/search?q=words&channel=ID&from=username

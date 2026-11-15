@@ -43,6 +43,7 @@ export async function uploadRights(sql, user) {
     chat: !blocked && (can(user, "chat_pictures") || plan === "plus" || plan === "pro"),
     banner: !blocked && (can(user, "chat_pictures") || plan === "plus" || plan === "pro"),
     picture: !blocked && Boolean(r?.xuid) && (plan === "pro" || user.owner),
+    voice: !blocked && (plan === "plus" || plan === "pro" || Boolean(user.owner) || can(user, "chat_pictures")),
   };
 }
 
@@ -59,7 +60,7 @@ export async function rights(request, env) {
   const r = await uploadRights(sql, user);
   const [u] = await sql`SELECT u.id, u.banner_at, (u.banner IS NOT NULL) AS has_banner, p.pic_source, (p.custom_pic IS NOT NULL) AS has_pic
                           FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${user.id}`;
-  return json({ ok: true, chat: r.chat, banner: r.banner, picture: r.picture, plan: r.plan, blocked: r.blocked, linked: Boolean(r.xuid),
+  return json({ ok: true, chat: r.chat, voice: r.voice, banner: r.banner, picture: r.picture, plan: r.plan, blocked: r.blocked, linked: Boolean(r.xuid),
     bannerUrl: bannerUrl(u), picSource: u.pic_source || "auto", hasPicture: Boolean(u.has_pic) });
 }
 
@@ -89,6 +90,46 @@ export async function chatImage(request, env, ctx, url, params) {
        AND (EXISTS (SELECT 1 FROM messages m JOIN channels c ON c.id = m.channel_id
                      WHERE m.image_id = i.id AND m.deleted_at IS NULL AND (NOT c.staff_only OR ${staff}))
             OR (i.user_id = ${user.id} AND i.created_at > now() - interval '10 minutes'))`;
+  return serve(row);
+}
+
+// ---------- voice messages (Galaxy+ and Pro+, up to 1 minute) ----------
+const VOICE_TYPES = ["audio/webm", "audio/ogg", "audio/mp4", "audio/aac", "audio/mpeg"];
+// POST /api/chat/voice { mime, data (base64), ms }
+export async function uploadVoice(request, env) {
+  const user = await requireUser(request, env);
+  const sql = getDb(env);
+  const r = await uploadRights(sql, user);
+  if (r.blocked) throw new HttpError(403, "Staff turned off uploads for your account.");
+  if (!r.voice) throw new HttpError(403, "Voice messages are a Galaxy+ and Galaxy Pro+ perk.");
+  await rateLimit(env, "AUTH_LIMITER", `voice:${user.id}`);
+  const body = await readJson(request, 1_600_000);
+  const mime = String(body.mime || "").split(";")[0].trim().toLowerCase();
+  if (!VOICE_TYPES.includes(mime)) throw new HttpError(400, "That recording format isn't supported. Try another browser.");
+  const ms = Math.round(Number(body.ms) || 0);
+  if (ms < 500) throw new HttpError(400, "That recording is too short.");
+  if (ms > 61_000) throw new HttpError(400, "Voice messages can be up to 1 minute.");
+  const b64 = String(body.data || "").replace(/\s+/g, "");
+  if (!/^[A-Za-z0-9+/]+=*$/.test(b64) || b64.length < 200) throw new HttpError(400, "The recording didn't upload. Try again.");
+  if (b64.length > 1_400_000) throw new HttpError(413, "That recording is too large.");
+  const [{ n }] = await sql`SELECT count(*)::int AS n FROM message_audio WHERE user_id = ${user.id} AND created_at > now() - interval '1 hour'`;
+  if (n >= 40) throw new HttpError(429, "You've sent a lot of voice messages this hour. Try again later.");
+  const [row] = await sql`INSERT INTO message_audio (user_id, mime, duration_ms, data) VALUES (${user.id}, ${mime}, ${ms}, decode(${b64}, 'base64')) RETURNING id`;
+  return json({ ok: true, id: Number(row.id), ms });
+}
+
+// GET /api/chat/voice/:id  (members who can see the message or the DM)
+export async function voiceFile(request, env, ctx, url, params) {
+  const user = await requireUser(request, env);
+  const staff = can(user, "staff_chat");
+  const [row] = await getDb(env)`
+    SELECT a.mime, encode(a.data, 'base64') AS b64 FROM message_audio a
+     WHERE a.id = ${Number(params.id) || 0}
+       AND (EXISTS (SELECT 1 FROM messages m JOIN channels c ON c.id = m.channel_id
+                     WHERE m.audio_id = a.id AND m.deleted_at IS NULL AND (NOT c.staff_only OR ${staff}))
+            OR EXISTS (SELECT 1 FROM dm_messages d JOIN dm_threads t ON t.id = d.thread_id
+                        WHERE d.audio_id = a.id AND (t.user_a = ${user.id} OR t.user_b = ${user.id} OR ${Boolean(user.owner)}))
+            OR (a.user_id = ${user.id} AND a.created_at > now() - interval '10 minutes'))`;
   return serve(row);
 }
 
