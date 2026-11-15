@@ -3721,3 +3721,24 @@ html[data-theme="light"] .holiday-greeting { border-color: rgba(184, 134, 47, .3
 @media (max-width: 900px) { .holiday-greeting { margin: 0 0 20px; } .holiday-emblem { width: 28px; height: 24px; } }
 @media (prefers-reduced-motion: reduce) { .hg-flame, .hg-fire { animation: none; } }
 .thread-root .thread-chip { display: none; }
+
+/* ---------- Header fit: the bell and profile button never shrink ---------- */
+.acct-slot { flex: none; gap: 0; }
+.inbox-btn, .acct-btn, .nav-toggle, .brand, .holiday-emblem { flex: none; }
+.site-header .container { min-width: 0; }
+.nav { min-width: 0; }
+.nav-actions .ip-chip { display: none; }  /* the address is on the home page and in the menu; the header stays uncluttered */
+@media (max-width: 1260px) { .site-header .container { gap: 18px; } .nav-links a { padding: 7px 8px; font-size: .9rem; } }
+@media (max-width: 420px) {
+  .site-header .container { gap: 8px; }
+  .site-header .brand { gap: 6px; min-width: 0; }
+  .site-header .brand img { height: 22px; }
+  .site-header .holiday-emblem { width: 26px; height: 22px; }
+  .acct-signin { padding-left: 10px; padding-right: 10px; }
+}
+@media (max-width: 370px) { .site-header .holiday-emblem { display: none; } .acct-signin svg { display: none; } }
+/* the app banner is always dark, so its text stays light in light mode too */
+.install-banner, .install-sheet-card { color: #e9ebf8; }
+.install-banner .install-text span, .install-sheet-card ol { color: #b4b8d6; }
+.install-banner .install-close { color: #b4b8d6; }
+.install-banner .install-close:hover { background: rgba(255,255,255,.08); color: #fff; }

@@ -169,6 +169,13 @@ On Jewish holidays the website now wears a small gold emblem next to the logo an
 **Vote on our ideas**
 The GalaxySMP team will now post some ideas in #Suggestions for you to vote on. The first one is Auction House price alerts: tell us if you'd use it!`,
   },
+  {
+    id: "2026-11-21b",
+    title: "A cleaner header on every screen size",
+    body: `- The notifications bell and your profile picture now keep their full size on every screen, instead of getting squeezed on laptops and smaller computers.
+- The header is less crowded on computers: the server address now lives on the home page and in the menu.
+- The "Get the GalaxySMP app" banner is easy to read again in light mode.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
