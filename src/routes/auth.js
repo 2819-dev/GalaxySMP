@@ -124,6 +124,9 @@ export async function login(request, env) {
     throw new HttpError(403, "This account has been banned from the community." + (user.ban_reason ? ` Reason: ${user.ban_reason}` : "") + " You can appeal at galaxymc.us/appeal.");
   }
   await sql`UPDATE users SET failed_logins = 0, locked_until = NULL, last_seen_at = now() WHERE id = ${user.id}`;
+  // two-step sign-in on: the code from their authenticator app comes next (POST /api/auth/login/2fa)
+  const challenge = await (await import("./twostep.js")).challengeFor(sql, user.id);
+  if (challenge) return json({ ok: true, twoStep: true, challenge });
   const token = await createSession(sql, user.id);
   return json({ ok: true }, 200, { "Set-Cookie": sessionCookie(token) });
 }

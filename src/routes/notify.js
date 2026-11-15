@@ -84,16 +84,58 @@ export async function testPush(request, env) {
   return json({ ok: true, sent });
 }
 
+// ---------- the inbox (the bell at the top of every page) ----------
+// Personal notifications are also kept for 60 days so nothing is missed without a phone notification.
+// Reminders and summaries aren't kept. A newer notification with the same tag replaces the older one.
+const NOT_IN_INBOX = new Set(["summary", "reward", "server"]);
+async function toInbox(sql, ids, kind, m) {
+  const title = String(m.title || "GalaxySMP").slice(0, 80), body = String(m.body || "").slice(0, 200);
+  const url = String(m.url || "/").startsWith("/") ? String(m.url || "/").slice(0, 200) : "/";
+  const tag = m.tag ? String(m.tag).slice(0, 80) : null;
+  await sql`INSERT INTO notifications (user_id, kind, title, body, url, tag)
+            SELECT x, ${kind}, ${title}, ${body}, ${url}, ${tag} FROM unnest(${ids}::bigint[]) AS x
+            ON CONFLICT (user_id, tag) DO UPDATE SET kind = EXCLUDED.kind, title = EXCLUDED.title, body = EXCLUDED.body, url = EXCLUDED.url,
+                                                    created_at = now(), read_at = NULL`;
+}
+
+// GET /api/inbox
+export async function inbox(request, env, ctx, url) {
+  const user = await requireUser(request, env);
+  if (url?.searchParams.has("count")) return json({ ok: true, unread: await unreadCount(getDb(env), user.id) }, 200, { "Cache-Control": "no-store" });
+  const rows = await getDb(env)`SELECT id, kind, title, body, url, created_at, read_at FROM notifications
+                                 WHERE user_id = ${user.id} AND created_at > now() - interval '60 days' ORDER BY created_at DESC LIMIT 60`;
+  return json({ ok: true, unread: rows.filter((r) => !r.read_at).length,
+    items: rows.map((r) => ({ id: Number(r.id), kind: r.kind, title: r.title, body: r.body, url: r.url, at: r.created_at, read: Boolean(r.read_at) })) },
+    200, { "Cache-Control": "no-store" });
+}
+
+// POST /api/inbox { action: "read", id? } (no id = everything) | { action: "clear" }
+export async function inboxAction(request, env) {
+  const user = await requireUser(request, env);
+  const b = await readJson(request);
+  const sql = getDb(env);
+  if (b.action === "clear") await sql`DELETE FROM notifications WHERE user_id = ${user.id}`;
+  else if (b.id) await sql`UPDATE notifications SET read_at = now() WHERE user_id = ${user.id} AND id = ${Number(b.id)} AND read_at IS NULL`;
+  else await sql`UPDATE notifications SET read_at = now() WHERE user_id = ${user.id} AND read_at IS NULL`;
+  return json({ ok: true });
+}
+
+export async function unreadCount(sql, userId) {
+  const [r] = await sql`SELECT count(*)::int AS n FROM notifications WHERE user_id = ${userId} AND read_at IS NULL AND created_at > now() - interval '60 days'`;
+  return r.n;
+}
+
 // ---------- sending ----------
 // userIds: an array of user ids, or "all". kind: a KINDS key (null = always, e.g. a test).
 // Returns how many devices got it.
 // options.exclude: user ids that never get this one (e.g. whoever made the announcement)
 export async function notify(env, userIds, kind, message, options = {}) {
-  if (!env.VAPID_PRIVATE_KEY) return 0;
   const sql = getDb(env);
   const skip = new Set((options.exclude || []).map(Number));
   const ids = userIds === "all" ? null : [...new Set(userIds.map(Number).filter((id) => id && !skip.has(id)))];
   if (ids && !ids.length) return 0;
+  if (ids && kind && !NOT_IN_INBOX.has(kind)) await toInbox(sql, ids, kind, message).catch((e) => console.error("inbox failed", e));
+  if (!env.VAPID_PRIVATE_KEY) return 0;
   const exclude = [...skip];
   const def = kind ? KINDS[kind].default : true;
   const subs = await sql`

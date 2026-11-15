@@ -68,6 +68,20 @@
           <p class="form-error" id="si-error" role="alert"></p>
           <button class="btn btn-primary btn-lg btn-block" type="submit">Sign in</button>
         </form>
+
+        <form id="form-2fa" class="panel form" novalidate hidden>
+          <div>
+            <h2 style="margin:0 0 4px;font-size:1.2rem">Two-step sign-in</h2>
+            <p class="hint" style="margin:0">Enter the 6-digit code from your authenticator app. Lost your phone? Use one of your backup codes.</p>
+          </div>
+          <div>
+            <label class="field-label" for="tf-code">Code</label>
+            <input class="input" id="tf-code" name="code" inputmode="numeric" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="12" required>
+          </div>
+          <p class="form-error" id="tf-error" role="alert"></p>
+          <button class="btn btn-primary btn-lg btn-block" type="submit">Continue</button>
+          <button class="btn btn-ghost btn-block" type="button" id="tf-back">Back</button>
+        </form>
       </section>
 
       <!-- Waiting for /link -->

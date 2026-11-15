@@ -4,7 +4,7 @@ import { h, getJson, postJson } from "/js/dialog.js";
 import { iconEl } from "/js/site.js";
 import { faceSvg } from "/js/face.js";
 
-const KIND_LABEL = { first_join: "New player", achievement: "Achievement", potw: "Player of the Week", botw: "Build of the Week", rank: "Rank-up", plan: "Supporter", contest: "Build Contest" };
+const KIND_LABEL = { first_join: "New player", achievement: "Achievement", potw: "Player of the Week", botw: "Build of the Week", rank: "Rank-up", plan: "Supporter", contest: "Build Contest", anniversary: "Anniversary" };
 
 function ago(d) {
   const s = Math.max(0, (Date.now() - new Date(d)) / 1000);

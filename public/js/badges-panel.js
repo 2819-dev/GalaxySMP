@@ -1,10 +1,11 @@
 // Control Panel > Badges (Admins): make badges, give them to members, take them back.
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 import { iconEl } from "/js/site.js";
-import { hexBadge, BADGE_THEMES } from "/js/badges.js";
+import { hexBadge, BADGE_THEMES, FINISHES } from "/js/badges.js";
 import { faceSvg } from "/js/face.js";
 
-const STYLE_NAMES = { gold: "Gold", silver: "Silver", bronze: "Bronze", ruby: "Ruby", emerald: "Emerald", sapphire: "Sapphire", amethyst: "Amethyst", galaxy: "Galaxy", sunset: "Sunset", ice: "Ice" };
+const STYLE_NAMES = { gold: "Gold", silver: "Silver", bronze: "Bronze", ruby: "Ruby", emerald: "Emerald", sapphire: "Sapphire", amethyst: "Amethyst", galaxy: "Galaxy", sunset: "Sunset", ice: "Ice",
+  rosegold: "Rose gold", obsidian: "Obsidian", neon: "Neon", mint: "Mint", crimson: "Crimson", ocean: "Ocean", aurora: "Aurora", sakura: "Sakura", lava: "Lava", midnight: "Midnight" };
 
 function memberPicker(chosen, onChange) {
   const input = h("input", { class: "input", id: "bd-member", type: "search", placeholder: "Type the first letters of a name", autocomplete: "off" });
@@ -91,9 +92,15 @@ export function setupBadges({ loaders, toast }) {
   function newBadge() {
     const name = h("input", { class: "input", id: "bd-name", maxlength: 40, placeholder: "e.g. GalaxySMP 25th Anniversary" });
     const desc = h("input", { class: "input", id: "bd-desc", maxlength: 120, placeholder: "e.g. Played during the 25th anniversary event" });
-    let style = "gold", icon = "star";
+    let style = "gold", icon = "star", finish = "none";
     const preview = h("div", { class: "bd-hero" });
-    const drawPreview = () => preview.replaceChildren(hexBadge({ style, icon }, 96), h("b", { text: name.value.trim() || "Badge name" }));
+    const drawPreview = () => preview.replaceChildren(hexBadge({ style, icon, finish }, 96), h("b", { text: name.value.trim() || "Badge name" }));
+    const finishes = h("div", { class: "bd-finishes" });
+    const drawFinishes = () => finishes.replaceChildren(...Object.entries(FINISHES).map(([k, label]) => {
+      const b = h("button", { class: "btn btn-secondary btn-sm", type: "button", "aria-pressed": String(finish === k), text: label });
+      b.addEventListener("click", () => { finish = k; drawFinishes(); drawPreview(); });
+      return b;
+    }));
     const styles = h("div", { class: "bd-styles" });
     const drawStyles = () => styles.replaceChildren(...BADGE_THEMES.map((s) => {
       const b = h("button", { class: "bd-pick", type: "button", "aria-pressed": String(style === s), title: STYLE_NAMES[s] || s }, hexBadge({ style: s, icon }, 38));
@@ -107,14 +114,15 @@ export function setupBadges({ loaders, toast }) {
       return b;
     }));
     name.addEventListener("input", drawPreview);
-    drawStyles(); drawIcons(); drawPreview();
+    drawStyles(); drawIcons(); drawFinishes(); drawPreview();
     openDialog({
       title: "New badge",
       body: h("div", {}, preview, field("Name", name), field("What it's for (optional)", desc),
-        h("div", { class: "field" }, h("span", { class: "field-label", text: "Style" }), styles),
+        h("div", { class: "field" }, h("span", { class: "field-label", text: "Color" }), styles),
+        h("div", { class: "field" }, h("span", { class: "field-label", text: "Finish (animated)" }), finishes),
         h("div", { class: "field" }, h("span", { class: "field-label", text: "Icon" }), icons)),
       actions: [{ label: "Cancel" }, { label: "Create badge", kind: "primary", onClick: async () => {
-        await postJson("/api/panel/badges", { name: name.value, description: desc.value, style, icon });
+        await postJson("/api/panel/badges", { name: name.value, description: desc.value, style, icon, finish });
         toast("Badge created. Tap Give to hand it out.");
         load();
       } }],

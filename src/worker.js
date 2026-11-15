@@ -81,6 +81,9 @@ const routes = [
   ["POST", "/api/auth/link/start", (req, env) => linkStart(req, env)],
   ["POST", "/api/auth/link/poll", (req, env) => linkPoll(req, env)],
   ["POST", "/api/auth/login", (req, env) => login(req, env)],
+  ["POST", "/api/auth/login/2fa", (req, env) => import("./routes/twostep.js").then((m) => m.finishLogin(req, env))],
+  ["GET", "/api/account/2fa", (req, env) => import("./routes/twostep.js").then((m) => m.status(req, env))],
+  ["POST", "/api/account/2fa", (req, env) => import("./routes/twostep.js").then((m) => m.action(req, env))],
   ["POST", "/api/auth/logout", (req, env) => logout(req, env)],
   ["POST", "/api/act-as/stop", (req, env) => actas.stopActingRoute(req, env)],
   ["POST", "/api/mod/act-as/:id", actas.startActing],
@@ -167,6 +170,12 @@ const routes = [
   ["POST", "/api/giftcards", (req, env) => giftcards.buy(req, env)],
   ["GET", "/api/lockdown", async (req, env) => { const l = await lockdownState(env); return json({ ok: true, on: Boolean(l.on) }, 200, { "Cache-Control": "no-store" }); }],
   ["GET", "/api/friends", (req, env) => friends.list(req, env)],
+  ["GET", "/api/inbox", notifyRoutes.inbox],
+  ["GET", "/api/crates", async (req, env) => {
+    const [row] = await getDb(env)`SELECT value FROM economy_config WHERE key = 'crate_odds'`;
+    return json({ ok: true, ...(row?.value || { crates: [] }) }, 200, { "Cache-Control": "public, max-age=60" });
+  }],
+  ["POST", "/api/inbox", (req, env) => notifyRoutes.inboxAction(req, env)],
   ["POST", "/api/friends", (req, env) => friends.act(req, env)],
   ["GET", "/api/giftcards/mine", (req, env) => giftcards.mine(req, env)],
   ["GET", "/api/giftcards/open", giftcards.peek],

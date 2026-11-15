@@ -329,6 +329,7 @@ const SECTIONS = {
     } });
     return [
       card("Password", "Use it to sign in on galaxymc.us. Forgot it? Make a new account code in game with /link to set a new one.", form),
+      twoStepCard(),
       card("Signed-in devices", `You're signed in on ${data.sessions} device${data.sessions === 1 ? "" : "s"} (including this one).`, h("div", { class: "acc-card-foot" }, others)),
     ];
   },
@@ -424,3 +425,70 @@ window.addEventListener("hashchange", () => load(location.hash.slice(1)));
   document.querySelectorAll("[data-sec]").forEach((a) => a.prepend(iconEl(icons[a.dataset.sec])));
   load(location.hash.slice(1));
 })();
+
+// ---------- Two-step sign-in (Security) ----------
+function twoStepCard() {
+  const body = h("div", { class: "tf-body" }, h("p", { class: "text-3", style: "margin:0", text: "Loading…" }));
+  const box = card("Two-step sign-in", "Optional. When it's on, signing in with your password also asks for a 6-digit code from an authenticator app on your phone, so nobody can get in with just your password.", body);
+  const codeInput = (id) => h("input", { class: "input", id, inputmode: "numeric", autocomplete: "one-time-code", maxlength: 12, placeholder: "123456", style: "max-width:200px" });
+  const showBackups = (codes, title) => openDialog({
+    title,
+    body: h("div", {},
+      h("p", { class: "text-2", style: "margin:0 0 10px", text: "Save these somewhere safe (a screenshot or your notes). Each one works once if you lose your phone. You won't see them again." }),
+      h("div", { class: "tf-backups" }, ...codes.map((c) => h("code", { text: c })))),
+    actions: [{ label: "Copy all", onClick: async () => { await navigator.clipboard?.writeText(codes.join("\n")); toast("Backup codes copied."); return false; } },
+      { label: "I saved them", kind: "primary" }],
+  });
+  async function draw() {
+    let s;
+    try { s = await getJson("/api/account/2fa"); } catch (e) { body.replaceChildren(h("p", { class: "form-error", text: e.message })); return; }
+    if (!s.on) {
+      const start = h("button", { class: "btn btn-primary", type: "button", text: "Turn on two-step sign-in" });
+      start.addEventListener("click", setup);
+      body.replaceChildren(h("span", { class: "sg-status declined", text: "Off" }), h("div", { class: "acc-card-foot" }, start));
+      return;
+    }
+    const code = codeInput("tf-manage-code");
+    const act = async (action) => {
+      try {
+        const r = await postJson("/api/account/2fa", { action, code: code.value });
+        toast(r.message);
+        if (r.backupCodes) showBackups(r.backupCodes, "New backup codes");
+        draw();
+      } catch (e) { toast(e.message); }
+    };
+    body.replaceChildren(
+      h("span", { class: "sg-status done", text: `On since ${new Date(s.since).toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}` }),
+      h("p", { class: "text-3 small", style: "margin:8px 0", text: `${s.backupsLeft} backup code${s.backupsLeft === 1 ? "" : "s"} left. To make new ones or turn this off, enter a code from your app first.` }),
+      field("Code from your app", code),
+      h("div", { class: "cx-row" },
+        h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "New backup codes", onclick: () => act("backups") }),
+        h("button", { class: "btn btn-danger btn-sm", type: "button", text: "Turn off", onclick: () => act("disable") })));
+  }
+  async function setup() {
+    let r;
+    try { r = await postJson("/api/account/2fa", { action: "start" }); } catch (e) { toast(e.message); return; }
+    const code = codeInput("tf-setup-code");
+    const pretty = r.secret.match(/.{1,4}/g).join(" ");
+    openDialog({
+      title: "Turn on two-step sign-in",
+      body: h("div", { class: "tf-setup" },
+        h("p", { class: "text-2", style: "margin:0", text: "1. Install an authenticator app (any one works, for example Google Authenticator, Microsoft Authenticator or your phone's built-in passwords app)." }),
+        h("p", { class: "text-2", style: "margin:0", text: "2. On this phone, tap the button. On a computer, add an account in the app and type this setup key:" }),
+        h("a", { class: "btn btn-secondary btn-sm", href: r.url, text: "Add to my authenticator app" }),
+        h("code", { class: "tf-key", text: pretty }),
+        h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Copy setup key", onclick: async () => { await navigator.clipboard?.writeText(r.secret); toast("Setup key copied."); } }),
+        h("p", { class: "text-2", style: "margin:0", text: "3. Enter the 6-digit code the app shows:" }),
+        code),
+      actions: [{ label: "Cancel" }, { label: "Turn on", kind: "primary", onClick: async () => {
+        const res = await postJson("/api/account/2fa", { action: "enable", code: code.value });
+        toast(res.message);
+        draw();
+        showBackups(res.backupCodes, "Your backup codes");
+      } }],
+    });
+    setTimeout(() => code.focus(), 50);
+  }
+  draw();
+  return box;
+}

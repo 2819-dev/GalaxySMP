@@ -14,6 +14,16 @@ const THEMES = {
   galaxy: { frame: ["#E6E9FF", "#9AA6D6", "#3B4380"], inner: ["#8A5CFF", "#141A52"], ink: "#fff", stars: true },
   sunset: { frame: ["#FFF0E0", "#E7B53A", "#8A5A12"], inner: ["#FFB36B", "#E0457B"], ink: "#fff" },
   ice: { frame: ["#FFFFFF", "#BFEFFF", "#4A8BA8"], inner: ["#E0FBFF", "#4FC3E8"], ink: "#0b3a4d" },
+  rosegold: { frame: ["#FFF1EC", "#E8B4A0", "#8C5446"], inner: ["#F7C9B8", "#B9705E"], ink: "#4a1f15" },
+  obsidian: { frame: ["#9AA0B4", "#3A3F52", "#0E1018"], inner: ["#3B3550", "#07060D"], ink: "#C9B8FF" },
+  neon: { frame: ["#E9FFF9", "#4BE3C0", "#0E6E5C"], inner: ["#1B1F3A", "#05060F"], ink: "#4BFFD5" },
+  mint: { frame: ["#F2FFF8", "#BFE9D2", "#5E8C77"], inner: ["#C8F7DE", "#58C49A"], ink: "#0f3d2a" },
+  crimson: { frame: ["#FFE3E3", "#C9CED6", "#6B7280"], inner: ["#E5484D", "#5C0A14"], ink: "#fff" },
+  ocean: { frame: ["#E3FAFF", "#9CC9D6", "#3D6B7A"], inner: ["#3FC7E0", "#0B3A78"], ink: "#fff" },
+  aurora: { frame: ["#F0FFF6", "#A9E8D0", "#4E7C8C"], inner: ["#7CF5C0", "#5B3FD6"], ink: "#fff", stars: true },
+  sakura: { frame: ["#FFF3F7", "#F2C6D6", "#9C5C74"], inner: ["#FFD1E1", "#E77AA5"], ink: "#5a1531" },
+  lava: { frame: ["#FFE9D6", "#E07A3A", "#6B2A0E"], inner: ["#FFB547", "#B3200E"], ink: "#fff" },
+  midnight: { frame: ["#E6E9FF", "#7F8AC2", "#262C5C"], inner: ["#2C3A8C", "#060A24"], ink: "#FFE08A", stars: true },
   owner: { frame: ["#FFF6C2", "#F2C14E", "#7A4A06"], inner: ["#7B4DFF", "#0D0F3A"], ink: "#FFD866", stars: true, glow: true },
 };
 const HEX_OUT = "50,3 93,27.5 93,72.5 50,97 7,72.5 7,27.5";
@@ -38,13 +48,19 @@ function hexSvg(t) {
 }
 
 // One hexagon badge. size in px.
+// Finishes (animated): holo (rainbow sheen), glow (pulsing light in the badge's color), sparkle (twinkling stars).
+export const FINISHES = { none: "None", holo: "Holographic", glow: "Glow", sparkle: "Sparkle" };
+
 export function hexBadge(b, size = 44) {
   const t = THEMES[b.style] || THEMES.gold;
-  const el = h("span", { class: `hexb hexb-${b.style}${t.glow ? " hexb-glow" : ""}`, style: `--s:${size}px;--ink:${t.ink}` });
+  const finish = FINISHES[b.finish] && b.finish !== "none" ? b.finish : null;
+  const el = h("span", { class: `hexb hexb-${b.style}${t.glow ? " hexb-glow" : ""}${finish ? ` hexb-f-${finish}` : ""}`, style: `--s:${size}px;--ink:${t.ink};--glowc:${t.inner[0]}` });
   el.innerHTML = hexSvg(t); // fixed drawing only (no user text)
+  if (finish === "holo") el.append(h("span", { class: "hexb-holo" }));
   const ic = iconEl(b.icon || "star", "hexb-icon");
   el.append(ic);
-  if (b.style === "owner") el.append(h("span", { class: "hexb-shine" }));
+  if (b.style === "owner" || finish === "holo") el.append(h("span", { class: "hexb-shine" }));
+  if (finish === "sparkle") for (let i = 0; i < 4; i++) el.append(h("span", { class: `hexb-spark hexb-spark${i}` }));
   return el;
 }
 

@@ -7,13 +7,18 @@ import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
 import { isOwner } from "../lib/names.js";
 
-export const STYLES = ["gold", "silver", "bronze", "ruby", "emerald", "sapphire", "amethyst", "galaxy", "sunset", "ice"];
+export const STYLES = ["gold", "silver", "bronze", "ruby", "emerald", "sapphire", "amethyst", "galaxy", "sunset", "ice",
+  "rosegold", "obsidian", "neon", "mint", "crimson", "ocean", "aurora", "sakura", "lava", "midnight"];
+export const FINISHES = ["none", "holo", "glow", "sparkle"];
 export const ICONS = ["star", "crown", "trophy", "medal", "gem", "heart", "flame", "comet", "orbit", "sparkles", "castle", "sword",
-  "pickaxe", "shield", "gift", "calendar", "music", "megaphone", "tools", "handshake", "firework", "moon", "flag", "key"];
+  "pickaxe", "shield", "gift", "calendar", "music", "megaphone", "tools", "handshake", "firework", "moon", "flag", "key",
+  "rocket", "bolt", "leaf", "paw", "snowflake", "anchor", "compass", "feather", "cake", "hammer", "flask", "fish", "palette",
+  "camera", "headphones", "globe", "hourglass", "infinity", "puzzle", "eye", "sunrise", "dragon", "ghost", "clover", "skull",
+  "bricks", "flower", "sun", "mic", "book", "dice", "users", "bug", "portal", "cube", "coins", "trophy2"];
 export const OWNER_BADGE = { id: "owner", name: "Owner", description: "Founder and owner of GalaxySMP.", icon: "crown", style: "owner", builtIn: true };
 
 const clean = (v, max) => String(v ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
-const out = (b, awardedAt) => ({ id: String(b.id), name: b.name, description: b.description || "", icon: b.icon, style: b.style, ...(awardedAt ? { awardedAt } : {}) });
+const out = (b, awardedAt) => ({ id: String(b.id), name: b.name, description: b.description || "", icon: b.icon, style: b.style, finish: b.finish || "none", ...(awardedAt ? { awardedAt } : {}) });
 
 // Badges of many members at once: Map(userId -> [badge]) ; owners get the Owner badge first.
 export async function badgesFor(env, sql, users) {
@@ -44,7 +49,7 @@ export async function listBadges(request, env) {
     SELECT b.*, (SELECT json_agg(json_build_object('id', u.id, 'username', u.username) ORDER BY ub.awarded_at)
                    FROM user_badges ub JOIN users u ON u.id = ub.user_id WHERE ub.badge_id = b.id) AS holders
       FROM badges b ORDER BY b.id DESC`;
-  return json({ ok: true, styles: STYLES, icons: ICONS, owner: OWNER_BADGE,
+  return json({ ok: true, styles: STYLES, finishes: FINISHES, icons: ICONS, owner: OWNER_BADGE,
     badges: rows.map((b) => ({ ...out(b), holders: b.holders || [] })) });
 }
 
@@ -55,9 +60,9 @@ export async function createBadge(request, env) {
   if (!name) throw new HttpError(400, "Give the badge a name.");
   if (name.toLowerCase() === "owner") throw new HttpError(400, "The Owner badge is built in.");
   const sql = getDb(env);
-  const [b] = await sql`INSERT INTO badges (name, description, icon, style, created_by)
+  const [b] = await sql`INSERT INTO badges (name, description, icon, style, finish, created_by)
                         VALUES (${name}, ${clean(body.description, 120) || null}, ${ICONS.includes(body.icon) ? body.icon : "star"},
-                                ${STYLES.includes(body.style) ? body.style : "gold"}, ${user.id}) RETURNING id`;
+                                ${STYLES.includes(body.style) ? body.style : "gold"}, ${FINISHES.includes(body.finish) ? body.finish : "none"}, ${user.id}) RETURNING id`;
   await audit(sql, user.id, "badge.create", { badge: name });
   return json({ ok: true, id: String(b.id) });
 }

@@ -597,6 +597,8 @@ export async function tick(env) {
     ["wishlist", () => import("./wishlist.js").then((m) => m.wishlistSales(env, sql))],
     ["wrapped", () => import("./wrapped.js").then((m) => m.wrappedTick(env, sql))],
     ["release notes", () => import("../lib/releases.js").then((m) => m.postReleases(env, sql))],
+    ["anniversaries", () => import("./anniversary.js").then((m) => m.anniversaryTick(env, sql))],
+    ["inbox cleanup", () => sql`DELETE FROM notifications WHERE created_at < now() - interval '60 days'`],
     ["rewards", () => import("./rewards.js").then((m) => m.sendRewards(env, sql))],
   ];
   for (const [name, run] of jobs) await run().catch((e) => console.error(`${name} job failed`, e));

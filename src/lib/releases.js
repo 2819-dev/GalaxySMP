@@ -104,6 +104,24 @@ Add friends from their profile or from the new Friends page under Messages in Co
     title: "Clearer notices during big updates",
     body: `When GalaxySMP closes for a big update, the website now shows a simple notice explaining what's happening and when we expect to be back, and the server shows the same message if you try to join.`,
   },
+  {
+    id: "2026-11-18",
+    title: "Notifications inbox, anniversaries, crate odds and two-step sign-in",
+    body: `**Notifications inbox**
+A new bell at the top of every page keeps your recent notifications: messages, friend requests, jobs, trades and more, so you never miss anything even without phone notifications. Tap one to go straight to it.
+
+**Join anniversaries**
+Every year on the day you first joined GalaxySMP, you get an anniversary badge, a post on #Timeline and a gift in game ($500 for each year). The badge looks better every year you stay.
+
+**Crate odds**
+A new Crate Odds page (in the footer under Play) lists every prize in each crate and the exact chance of winning it.
+
+**Two-step sign-in**
+Protect your account with codes from an authenticator app. Turn it on in Account settings > Security. It's optional.
+
+**New badge looks**
+Badges now come in 20 colors, with holographic, glow and sparkle finishes and many more icons.`,
+  },
 ];
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.

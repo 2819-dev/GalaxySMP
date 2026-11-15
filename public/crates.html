@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crate Odds · GalaxySMP</title>
+  <meta name="description" content="Everything you can win from each GalaxySMP crate, and the exact chance of each prize.">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="GalaxySMP">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0c1b">
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/crates.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header" class="site-header-slot"></div>
+
+  <main id="main">
+    <div class="container">
+      <header class="page-head">
+        <h1>Crate Odds</h1>
+        <p>Everything you can win from each crate, and the exact chance of every prize. These are the real numbers the server uses, updated automatically whenever staff change a crate.</p>
+      </header>
+      <div class="co-grid" id="co-grid"><p class="text-3">Loading…</p></div>
+      <section class="panel co-keys">
+        <h2>How to get keys</h2>
+        <div class="co-key-list">
+          <div><b class="co-common">Common key</b><span>Finish all 3 daily quests (<code>/quests</code>), or buy one at the Common Crate at spawn<span id="co-price"></span>.</span></div>
+          <div><b class="co-rare">Rare key</b><span>Day 7 of your daily reward streak (<code>/daily</code>), the Season Pass, or inside a Common Crate.</span></div>
+          <div><b class="co-galaxy">Galaxy key</b><span>Events, server goals, the Season Pass, or a lucky Rare Crate.</span></div>
+        </div>
+        <p class="text-3 small" style="margin:12px 0 0">Open a crate by tapping it at spawn with a key in your inventory.</p>
+      </section>
+    </div>
+  </main>
+
+  <div id="site-footer"></div>
+</body>
+</html>

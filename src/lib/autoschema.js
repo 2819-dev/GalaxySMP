@@ -52,6 +52,21 @@ const PENDING = [
     "CREATE INDEX IF NOT EXISTS friends_b_idx ON friends (b)",
     "INSERT INTO schema_migrations (version) VALUES ('0052_contests_friends') ON CONFLICT DO NOTHING",
   ]],
+  ["0053_inbox_2fa_anniversaries", [
+    "CREATE TABLE IF NOT EXISTS notifications (id bigserial PRIMARY KEY, user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE, kind text, title text NOT NULL, body text NOT NULL DEFAULT '', url text NOT NULL DEFAULT '/', tag text, created_at timestamptz NOT NULL DEFAULT now(), read_at timestamptz)",
+    "CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications (user_id, created_at DESC)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS notifications_tag_idx ON notifications (user_id, tag)",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret text",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled_at timestamptz",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_backup text[] NOT NULL DEFAULT '{}'",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_last_step bigint",
+    "CREATE TABLE IF NOT EXISTS login_challenges (token text PRIMARY KEY, user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE, tries integer NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now())",
+    "CREATE TABLE IF NOT EXISTS anniversaries (xuid text NOT NULL, years integer NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (xuid, years))",
+    "ALTER TABLE badges ADD COLUMN IF NOT EXISTS auto_key text",
+    "CREATE UNIQUE INDEX IF NOT EXISTS badges_auto_key_idx ON badges (auto_key) WHERE auto_key IS NOT NULL",
+    "ALTER TABLE badges ADD COLUMN IF NOT EXISTS finish text",
+    "INSERT INTO schema_migrations (version) VALUES ('0053_inbox_2fa_anniversaries') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

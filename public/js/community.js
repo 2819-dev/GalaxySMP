@@ -56,6 +56,7 @@ document.querySelectorAll("[data-mode]").forEach((b) =>
     document.querySelectorAll("[data-mode]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     $("form-signup").hidden = mode !== "signup";
     $("form-signin").hidden = mode !== "signin";
+    $("form-2fa").hidden = true;
   })
 );
 
@@ -94,7 +95,14 @@ $("form-signin").addEventListener("submit", async (e) => {
   err.textContent = "";
   busy(form, true);
   try {
-    await api("/api/auth/login", { username: $("si-name").value.trim(), password: $("si-pass").value });
+    const r = await api("/api/auth/login", { username: $("si-name").value.trim(), password: $("si-pass").value });
+    if (r?.twoStep) {  // two-step sign-in: ask for the code next
+      twoStepChallenge = r.challenge;
+      form.hidden = true;
+      $("form-2fa").hidden = false;
+      $("tf-code").focus();
+      return;
+    }
     form.reset();
     await loadMe();
   } catch (ex) {
@@ -102,6 +110,36 @@ $("form-signin").addEventListener("submit", async (e) => {
   } finally {
     busy(form, false);
   }
+});
+
+// ---------- Two-step sign-in code ----------
+let twoStepChallenge = null;
+$("form-2fa").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const err = $("tf-error");
+  err.textContent = "";
+  busy(form, true);
+  try {
+    await api("/api/auth/login/2fa", { challenge: twoStepChallenge, code: $("tf-code").value.trim() });
+    form.reset();
+    form.hidden = true;
+    $("form-signin").reset();
+    await loadMe();
+  } catch (ex) {
+    err.textContent = ex.message;
+    if (/password again/.test(ex.message)) setTimeout(() => $("tf-back").click(), 1500);
+  } finally {
+    busy(form, false);
+  }
+});
+$("tf-back").addEventListener("click", () => {
+  twoStepChallenge = null;
+  $("form-2fa").reset();
+  $("form-2fa").hidden = true;
+  $("form-signin").hidden = false;
+  $("si-pass").value = "";
+  $("si-pass").focus();
 });
 
 // ---------- Waiting for /link ----------

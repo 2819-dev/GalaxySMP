@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.43.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.44.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -393,6 +393,10 @@ class VoiceLink:
             self.plugin.minigames.push()
         except Exception as e:
             self.plugin.logger.warning(f"Couldn't send minigames to the website: {e}")
+        try:
+            self.plugin.crates.push()  # the Crate Odds page
+        except Exception as e:
+            self.plugin.logger.warning(f"Couldn't send crate odds to the website: {e}")
         try:
             self.plugin.auction.push()
         except Exception as e:

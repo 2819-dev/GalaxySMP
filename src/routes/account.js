@@ -46,6 +46,7 @@ export async function headerMe(request, env) {
       onboarding: !u.onboarded_at && !user.acting_by, // still has to do the welcome steps
       acting: user.acting_by ? { by: user.acting_by_name } : null,  // the owner is looking as this member
       skin: u.look_theme || null,  // the website theme they picked (Season Pass unlock)
+      inbox: await (await import("./notify.js")).unreadCount(sql, user.id).catch(() => 0),  // the bell's number
     },
   }, 200, { "Cache-Control": "no-store" });
 }

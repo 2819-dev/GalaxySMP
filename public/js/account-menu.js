@@ -57,7 +57,7 @@ export async function renderAccountButton(slot) {
     dot.title = "Playing now";
     btn.append(dot);
   }
-  slot.replaceChildren(btn);
+  slot.replaceChildren(inboxBell(me.inbox || 0), btn);
 
   let card = null;
   const outside = (e) => { if (card && !card.contains(e.target) && !btn.contains(e.target)) close(); };
@@ -152,4 +152,107 @@ function actingBanner(me) {
   });
   bar.append(text, back);
   document.body.prepend(bar);
+}
+
+// ---------- the notification inbox (bell) ----------
+const KIND_ICON = { dms: "chat", mentions: "at", friends: "users", jobs: "briefcase", trades: "handshake", wishlist: "heart",
+  community: "sparkles", events: "calendar", news: "megaphone", updates: "megaphone", announcements: "megaphone" };
+const agoText = (d) => {
+  const m = Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 60000));
+  if (m < 1) return "now";
+  if (m < 60) return `${m}m`;
+  if (m < 1440) return `${Math.round(m / 60)}h`;
+  return `${Math.round(m / 1440)}d`;
+};
+
+function inboxBell(initial) {
+  const bell = make("button", "inbox-btn");
+  bell.type = "button";
+  bell.setAttribute("aria-haspopup", "dialog");
+  bell.setAttribute("aria-expanded", "false");
+  bell.innerHTML = icon("bell"); // fixed icon only
+  const count = make("span", "inbox-count");
+  bell.append(count);
+  let unread = initial;
+  const setCount = (n) => {
+    unread = n;
+    count.textContent = n > 99 ? "99+" : String(n);
+    count.hidden = !n;
+    bell.setAttribute("aria-label", n ? `Notifications, ${n} unread` : "Notifications");
+  };
+  setCount(initial);
+  const refresh = async () => {
+    try { setCount((await (await fetch("/api/inbox?count=1", { credentials: "same-origin" })).json()).unread || 0); } catch { /* offline */ }
+  };
+  setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 60_000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refresh(); });
+
+  let panel = null;
+  const outside = (e) => { if (panel && !panel.contains(e.target) && !bell.contains(e.target)) close(); };
+  const esc = (e) => { if (e.key === "Escape") { close(); bell.focus(); } };
+  const place = () => {
+    if (!panel) return;
+    const r = bell.getBoundingClientRect();
+    panel.style.top = `${r.bottom + 8}px`;
+    panel.style.right = `${Math.max(8, window.innerWidth - r.right - 46)}px`;
+  };
+  function close() {
+    panel?.remove();
+    panel = null;
+    bell.setAttribute("aria-expanded", "false");
+    document.removeEventListener("click", outside, true);
+    document.removeEventListener("keydown", esc);
+    window.removeEventListener("resize", place);
+  }
+  const post = (body) => fetch("/api/inbox", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {});
+
+  bell.addEventListener("click", async () => {
+    if (panel) return close();
+    panel = make("div", "inbox-card");
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-label", "Notifications");
+    const head = make("div", "inbox-head");
+    head.append(make("b", null, "Notifications"));
+    const readAll = make("button", "inbox-link", "Mark all as read");
+    readAll.type = "button";
+    head.append(readAll);
+    const list = make("div", "inbox-list");
+    list.append(make("p", "inbox-empty", "Loading…"));
+    const foot = make("a", "inbox-foot", "Notification settings");
+    foot.href = "/account#notifications";
+    panel.append(head, list, foot);
+    document.body.append(panel);
+    place();
+    bell.setAttribute("aria-expanded", "true");
+    window.addEventListener("resize", place);
+    setTimeout(() => { document.addEventListener("click", outside, true); document.addEventListener("keydown", esc); }, 0);
+    let d;
+    try { d = await (await fetch("/api/inbox", { credentials: "same-origin" })).json(); } catch { d = { items: [] }; }
+    if (!panel) return;
+    setCount(d.unread || 0);
+    readAll.hidden = !d.unread;
+    readAll.addEventListener("click", () => {
+      post({ action: "read" });
+      list.querySelectorAll(".inbox-item.unread").forEach((x) => x.classList.remove("unread"));
+      setCount(0);
+      readAll.hidden = true;
+    });
+    if (!d.items?.length) {
+      list.replaceChildren(make("p", "inbox-empty", "You're all caught up. Messages, friend requests, jobs and trades show up here."));
+      return;
+    }
+    list.replaceChildren(...d.items.map((n) => {
+      const a = make("a", `inbox-item${n.read ? "" : " unread"}`);
+      a.href = n.url || "/";
+      const ic = make("span", "inbox-ic");
+      ic.innerHTML = icon(KIND_ICON[n.kind] || "bell"); // fixed icon only
+      const text = make("span", "inbox-text");
+      text.append(make("b", null, n.title));
+      if (n.body) text.append(make("span", null, n.body));
+      a.append(ic, text, make("time", "inbox-time", agoText(n.at)));
+      a.addEventListener("click", () => { if (!n.read) post({ action: "read", id: n.id }); });
+      return a;
+    }));
+  });
+  return bell;
 }

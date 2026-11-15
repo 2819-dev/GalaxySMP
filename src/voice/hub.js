@@ -468,6 +468,19 @@ export class VoiceHub extends DurableObject {
       return import("../routes/friends.js").then((m) => m.friendsJoined(this.env, msg.players)).catch((e) => console.error("friend alerts failed", e))
         .then(() => recordPlayers(this.env, msg.players)).catch((e) => console.error("record players failed", e));
     }
+    if (msg.type === "crates") {  // what's inside each crate, for the Crate Odds page
+      const clip = (v, n) => String(v ?? "").slice(0, n);
+      const crates = (Array.isArray(msg.crates) ? msg.crates : []).slice(0, 6).map((c) => ({
+        key: clip(c.key, 20), name: clip(c.name, 40),
+        prizes: (Array.isArray(c.prizes) ? c.prizes : []).slice(0, 60).map((p) => ({
+          label: clip(p.label, 60), kind: clip(p.kind, 10), item: p.item ? clip(p.item, 60) : null, key: p.key ? clip(p.key, 20) : null,
+          count: Number(p.count) || 1, cents: p.cents == null ? null : Number(p.cents) || 0, chance: Math.max(0, Math.min(100, Number(p.chance) || 0)),
+        })),
+      }));
+      const value = { crates, keyPrice: Math.max(0, Number(msg.keyPrice) || 0), at: new Date().toISOString() };
+      return getDb(this.env)`INSERT INTO economy_config (key, value, updated_by) VALUES ('crate_odds', ${JSON.stringify(value)}::jsonb, 'server')
+                              ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = 'server'`.catch((e) => console.error("crate odds failed", e));
+    }
     if (msg.type === "build_contest") {  // a Build Contest finished: wins on profiles + #Timeline
       return import("../routes/friends.js").then((m) => m.recordContest(this.env, msg)).catch((e) => console.error("build contest failed", e));
     }

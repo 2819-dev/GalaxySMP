@@ -69,6 +69,23 @@ class Crates:
 
     def save(self):
         self.eco.set_config("crates", {"rewards": self.rewards, "blocks": self.blocks, "key_price": self.key_price})
+        self.push()
+
+    def push(self):
+        """What's inside each crate and the chances, for the Crate Odds page on the website."""
+        import re
+        voice = getattr(self.plugin, "_voice", None)
+        if voice is None or not getattr(voice, "ws", None):
+            return
+        out = []
+        for kind, name, _ in TYPES:
+            rewards = [r for r in self.rewards.get(kind) or [] if r.get("weight", 0) > 0]
+            total = sum(r["weight"] for r in rewards) or 1
+            out.append({"key": kind, "name": name, "prizes": [{
+                "label": re.sub(r"§.", "", reward_name(r)), "kind": r["kind"], "item": r.get("item"), "key": r.get("key"),
+                "count": r.get("count", 1), "cents": r.get("cents"), "chance": round(r["weight"] * 100 / total, 2),
+            } for r in sorted(rewards, key=lambda r: -r["weight"])]})
+        voice.send_json({"type": "crates", "crates": out, "keyPrice": self.key_price})
 
     def allowed(self, p):
         if getattr(p, "is_op", False):

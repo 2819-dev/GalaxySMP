@@ -108,6 +108,32 @@ const ICONS = {
   trophy: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
   tools: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',
   megaphone: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
+  at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
+  briefcase: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>',
+  rocket: '<path d="M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2"/><path d="M9 15l-3-3c1-4 4-8 9-9 2 0 4 0 6 1 1 2 1 4 1 6-1 5-5 8-9 9z"/><circle cx="15" cy="9" r="1.6"/>',
+  bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  leaf: '<path d="M5 21c0-9 6-15 16-16-1 10-7 16-16 16z"/><path d="M5 21l8-8"/>',
+  paw: '<circle cx="5.5" cy="10" r="2"/><circle cx="9.5" cy="5.5" r="2"/><circle cx="14.5" cy="5.5" r="2"/><circle cx="18.5" cy="10" r="2"/><path d="M8 17c0-3 2-5 4-5s4 2 4 5c0 2-2 3-4 3s-4-1-4-3z"/>',
+  snowflake: '<path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7M9 4l3 2 3-2M9 20l3-2 3 2"/>',
+  anchor: '<circle cx="12" cy="5" r="2.5"/><path d="M12 7.5V21M5 12H2a10 10 0 0 0 20 0h-3M8 11h8"/>',
+  compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
+  feather: '<path d="M20 4c-6 0-12 4-13 12l-3 4"/><path d="M20 4c0 7-4 12-11 12M14 10H8"/>',
+  cake: '<path d="M4 21h16v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z"/><path d="M4 16c2 1 4 1 5.3 0s4-1 5.4 0 4 1 5.3 0M12 7v4"/><path d="M12 3c1 1.2 1 2.4 0 3.2-1-.8-1-2 0-3.2z"/>',
+  hammer: '<path d="M14 7l-9 9 3 3 9-9"/><path d="M12 5l3-3 7 7-3 3z"/>',
+  flask: '<path d="M9 3h6M10 3v6L4 19a1.5 1.5 0 0 0 1.3 2h13.4a1.5 1.5 0 0 0 1.3-2L14 9V3"/><path d="M7 14h10"/>',
+  fish: '<path d="M2 12c3-5 9-7 14-3l5-3v12l-5-3c-5 4-11 2-14-3z"/><circle cx="8" cy="11" r=".8" fill="currentColor"/>',
+  palette: '<path d="M12 3a9 9 0 0 0 0 18c1.5 0 2-1 2-2s-1-1.5-1-2.5 1-1.5 2-1.5h2a4 4 0 0 0 4-4c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="14.5" cy="7" r="1"/>',
+  camera: '<path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/>',
+  headphones: '<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+  hourglass: '<path d="M6 2h12M6 22h12M7 2c0 6 10 6 10 10S7 16 7 22M17 2c0 6-10 6-10 10s10 4 10 10"/>',
+  infinity: '<path d="M7 8a4 4 0 1 0 0 8c4 0 6-8 10-8a4 4 0 1 1 0 8c-4 0-6-8-10-8z"/>',
+  puzzle: '<path d="M4 8h4a2 2 0 1 1 4 0h4v4a2 2 0 1 1 0 4v4h-4a2 2 0 1 0-4 0H4v-4a2 2 0 1 0 0-4z"/>',
+  eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  sunrise: '<path d="M3 18h18M6 18a6 6 0 0 1 12 0M12 3v4M4.2 9.2l1.4 1.4M19.8 9.2l-1.4 1.4M8 22h8"/>',
+  dragon: '<path d="M4 18c4 0 5-3 8-3s3 3 6 3l2-3-3-2c1-2 0-5-3-6l-2-4-2 4c-3 1-5 4-5 7l-3 2z"/><circle cx="14" cy="9" r=".8" fill="currentColor"/>',
+  ghost: '<path d="M5 21V10a7 7 0 0 1 14 0v11l-2.5-2-2.3 2-2.2-2-2.2 2-2.3-2z"/><circle cx="9.5" cy="10" r="1"/><circle cx="14.5" cy="10" r="1"/>',
+  clover: '<path d="M12 12c-4-1-6-4-4-6s5 0 4 6c1-6 4-8 6-6s0 5-6 6c6-1 8 2 6 4s-5 0-6-4c1 4-2 6-4 4s0-5 4-6z"/><path d="M12 12c1 4 2 7 4 9"/>',
 };
 
 // The same icon as an element: <span class="ic">svg</span>
@@ -217,7 +243,7 @@ function renderFooter() {
           <a class="brand" href="/" aria-label="${config.serverName} home"><img src="/img/wordmark.png" alt="${config.serverName}" width="150" height="26"></a>
           <p>A family-friendly Minecraft Bedrock server.</p>
         </div>
-        <div><h4>Play</h4><ul><li><a href="/join">How to Join</a></li><li><a href="/status">Server Status</a></li><li><a href="/leaderboard">Leaderboards</a></li><li><a href="/season">Season Pass</a></li><li><a href="/wrapped">Galaxy Wrapped</a></li><li><a href="/map">Server Map</a></li><li><a href="/shops">Player Shops</a></li><li><a href="/store">Store</a></li><li><a href="/store#donate">Donate</a></li></ul></div>
+        <div><h4>Play</h4><ul><li><a href="/join">How to Join</a></li><li><a href="/status">Server Status</a></li><li><a href="/leaderboard">Leaderboards</a></li><li><a href="/season">Season Pass</a></li><li><a href="/wrapped">Galaxy Wrapped</a></li><li><a href="/map">Server Map</a></li><li><a href="/shops">Player Shops</a></li><li><a href="/store">Store</a></li><li><a href="/crates">Crate Odds</a></li><li><a href="/store#donate">Donate</a></li></ul></div>
         <div><h4>Community</h4><ul><li><a href="/community">Community Chat</a></li><li><a href="/voice">Voice Chat</a></li><li><a href="/rules">Rules</a></li><li><a href="/appeal">Ban appeals</a></li></ul></div>
         <div><h4>Account</h4><ul><li><a href="/account">Account settings</a></li><li><a href="/account#notifications">Notifications</a></li><li><a href="/privacy">Privacy Policy</a></li></ul></div>
       </div>
