@@ -305,7 +305,13 @@ class RankManager:
         style = self.display_tag(player)
         tags = [tag_text(style)] if style else []
         name = name_text(player.name, style, bold=True) if style else f"§f§l{player.name}"
-        return ("§r ".join(tags) + "§r " if tags else "") + name + "§r"
+        return self.team_tag(player) + ("§r ".join(tags) + "§r " if tags else "") + name + "§r"
+
+    def team_tag(self, player):
+        """The team tag, always gray ('§7[TAG]§r '), before everything else (never mixed up with ranks)."""
+        teams = getattr(self.plugin, "teams", None)
+        xuid = getattr(player, "xuid", None)
+        return teams.chat_tag(xuid) if teams is not None and xuid else ""
 
     def chat_format(self, player):
         """[OWNER] **player1**: message  (rank color on the tag and name, never on the message)
@@ -319,7 +325,7 @@ class RankManager:
         style = solid(self.display_tag(player))
         prefix = paint(f"[{style['prefix']}]", style) + "§r " if style else ""
         name = paint("\x00", style, True) if style else "§f§l\x00"  # placeholder for {0}
-        fmt = (prefix + name).replace("{", "{{").replace("}", "}}").replace("\x00", "{0}")
+        fmt = (self.team_tag(player) + prefix + name).replace("{", "{{").replace("}", "}}").replace("\x00", "{0}")
         return fmt + "§r§7:§r {1}"
 
     # ---------- /ranks menu ----------

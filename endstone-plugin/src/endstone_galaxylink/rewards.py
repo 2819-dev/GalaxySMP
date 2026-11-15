@@ -7,7 +7,7 @@ Works for offline players too: money and keys are saved by Minecraft id (xuid).
 
 from endstone_galaxylink import money
 
-KEY_NAMES = {"common": "Common", "rare": "Rare", "galaxy": "Galaxy"}
+KEY_NAMES = {"common": "Common", "rare": "Rare", "galaxy": "Galaxy", "freeze": "Streak Freeze"}
 
 
 class Rewards:
@@ -36,7 +36,9 @@ class Rewards:
             if cents:
                 self.eco.add(xuid, name, cents)
             for kind, n in keys.items():
-                if n:
+                if n and kind == "freeze":
+                    self.plugin.progress.add_freezes(xuid, name, n)
+                elif n:
                     self.plugin.progress.add_keys(xuid, name, kind, n)
             seen.add(rid)
             self.given.append(rid)
@@ -55,6 +57,7 @@ class Rewards:
         if p is None:
             return
         parts = [f"§e{money.fmt(cents)}"] if cents else []
-        parts += [f"§d{n} {KEY_NAMES[k]} key{'s' if n != 1 else ''}" for k, n in keys.items() if n]
+        parts += [(f"§b{n} Streak Freeze{'s' if n != 1 else ''}" if k == "freeze" else f"§d{n} {KEY_NAMES[k]} key{'s' if n != 1 else ''}")
+                  for k, n in keys.items() if n]
         if parts:
             p.send_message(f"§aReward: {'§7, '.join(parts)}§7 ({reason}).")

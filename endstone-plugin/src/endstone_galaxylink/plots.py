@@ -166,7 +166,12 @@ class Plots:
         if plot.get("owner") == str(player.xuid):
             return "owner"
         m = (plot.get("members") or {}).get(player.name.lower())
-        return m["role"] if m else None
+        if m:
+            return m["role"]
+        teams = getattr(self.plugin, "teams", None)  # teammates can build on each other's plots
+        if teams is not None and plot.get("owner") and teams.same_team(player.xuid, plot["owner"]):
+            return "builder"
+        return None
 
     # ---------- protection ----------
     @staticmethod
@@ -960,8 +965,8 @@ class Plots:
             elif not self.has_tool(player, "manager"):
                 self.give_tool(player, "manager")
                 player.send_message("§aHere's your Plot Manager.")
-        elif what in ("public", "private"):
-            self.set_public_cmd(player, what == "public")
+        elif what in ("public", "private", "hidden", "nolocation", "hidelocation", "unlisted"):
+            self.set_public_cmd(player, "public" if what == "public" else "hidden" if what in ("private", "hidden") else "location")
         elif what == "list" and player.is_op:
             lines = [f"§f#{p['id']} {self.label(p)} §7{p['kind']} ({p['x1']},{p['z1']})-({p['x2']},{p['z2']}) "
                      f"{p.get('owner_name') or 'unclaimed'}" for p in self.plots.values()]
@@ -970,7 +975,7 @@ class Plots:
             self.open_manager(player)
 
     # ---------- public plots (shown on the website map, with photos and likes) ----------
-    def set_public_cmd(self, player, public):
+    def set_public_cmd(self, player, level):
         mine = [p for p in self.owned(player.xuid) if not p.get("shop")]
         here = None
         try:
@@ -982,15 +987,22 @@ class Plots:
         plot = here or (mine[0] if len(mine) == 1 else None)
         if plot is None:
             return player.send_message("§eStand in the plot you want to change." if mine else "§eYou don't have a plot yet.")
-        self.set_public(plot, public)
-        if public:
-            player.send_message(f"§a{self.label(plot)} is now public. §7Players can find it on the map at galaxymc.us/map. "
-                                "Add photos there. §e/plot private§7 hides it again.")
+        self.set_public(plot, level)
+        if level == "public":
+            player.send_message(f"§a{self.label(plot)} is now public. §7Players can find it on the map and in the Plot Showcase at "
+                                "galaxymc.us/map. Add photos there. §e/plot nolocation§7 hides where it is, §e/plot private§7 hides it all.")
+        elif level == "location":
+            player.send_message(f"§a{self.label(plot)} shows in the Plot Showcase without its location. §7It's not on the map.")
         else:
-            player.send_message(f"§a{self.label(plot)} is now private. §7It no longer shows on the website map.")
+            player.send_message(f"§a{self.label(plot)} is now private. §7It shows as \"Plot Hidden\" in the Plot Showcase."),
 
-    def set_public(self, plot, public):
-        plot["public"] = bool(public)
+    def set_public(self, plot, level):
+        """level: "public" (on the map and in the showcase), "location" (showcase without where it is), "hidden"."""
+        if level is True or level is False:
+            level = "public" if level else "hidden"
+        level = level if level in ("public", "location", "hidden") else "hidden"
+        plot["visibility"] = level
+        plot["public"] = level == "public"
         self.save(plot["id"])
         lm = getattr(self.plugin, "livemap", None)
         voice = getattr(self.plugin, "_voice", None)
@@ -1006,7 +1018,7 @@ class Plots:
         if plot is None or str(plot.get("owner") or "") != str(msg.get("xuid") or "") or plot.get("shop"):
             ans = {"ok": False, "message": "That isn't your plot."}
         else:
-            self.set_public(plot, bool(msg.get("public")))
+            self.set_public(plot, msg.get("visibility") or bool(msg.get("public")))
             ans = {"ok": True}
         voice = getattr(self.plugin, "_voice", None)
         if voice:

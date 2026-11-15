@@ -28,6 +28,13 @@ export const SHOP = [
     ],
   },
   {
+    id: "streak", name: "Streak", blurb: "Keep your daily streak safe. A freeze is used up by itself if you miss a day of /daily.",
+    items: [
+      { id: "streak_freeze_1", name: "Streak Freeze", price: 50, freezes: 1, icon: "snowflake", description: "Saves your daily streak once if you miss a day." },
+      { id: "streak_freeze_5", name: "5 Streak Freezes", price: 200, freezes: 5, icon: "snowflake", badge: "Best value", description: "Five freezes for your daily streak. You can hold up to 10." },
+    ],
+  },
+  {
     id: "effects", name: "Effects", blurb: "Handy effects that stay on while you play.",
     items: [
       {

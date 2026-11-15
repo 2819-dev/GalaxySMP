@@ -96,6 +96,7 @@ async function load() {
   if (social && !social.isMe) actions.append(h("a", { class: "btn btn-primary btn-sm", href: `/community#dm-${social.id}` }, iconEl("message"), "Message"));
   if (social && !social.isMe) actions.append(h("a", { class: "btn btn-secondary btn-sm", href: `/trades?to=${encodeURIComponent(p.name)}` }, iconEl("handshake"), "Trade"));
   if (p.userId && p.friend && p.friend !== "self") actions.append(friendButton(p));
+  actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => compareDialog(p) }, iconEl("scale"), "Compare"));
   if (social?.isMe) actions.append(h("a", { class: "btn btn-primary btn-sm", href: "/account" }, iconEl("pencil"), "Edit profile"));
   const share = h("button", { class: "btn btn-secondary btn-sm", type: "button" }, iconEl("share"), "Share");
   share.addEventListener("click", async () => {
@@ -179,6 +180,9 @@ async function load() {
       stat("scroll", "Quests done", short(s.quests)),
       stat("flame", "Daily streak", `${s.streak} day${s.streak === 1 ? "" : "s"}`, `Best: ${s.bestStreak}`)));
 
+  // ---- Daily streak (Duolingo style): this week, freezes ----
+  const streakBox = streakSection(p, Boolean(social?.isMe));
+
   // ---- Build Contest wins (stats) ----
   if (p.contestWins) stats.querySelector(".pp-stats")?.append(stat("trophy2", "Build Contest wins", short(p.contestWins)));
 
@@ -199,6 +203,7 @@ async function load() {
   const total = p.achievements.length;
   const pct = total ? Math.round((unlocked.length / total) * 100) : 0;
   const achievements = section("Achievements",
+    h("div", { class: "pp-ach-tools" }, h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => achievementsGuide(p) }, iconEl("book"), "Achievements guide")),
     total ? h("div", { class: "pp-progress" },
       h("div", { class: "pp-progress-bar" }, h("span", { style: `width:${pct}%` })),
       h("span", { class: "text-3 small", text: `${unlocked.length} of ${total} unlocked` })) : null,
@@ -247,7 +252,7 @@ async function load() {
       social.isMe ? h("p", { class: "text-3 small", style: "margin:10px 0 0", text: social.wishlistHidden ? "Only you can see your wishlist. Change this in Account settings." : "Everyone signed in can see this. You can hide it in Account settings." }) : null);
   }
 
-  box.replaceChildren(...[hero, showcase].filter(Boolean), h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, stats, bedwars, charts), h("div", { class: "pp-col" }, wishlist, achievements)));
+  box.replaceChildren(...[hero, showcase].filter(Boolean), h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, streakBox, stats, bedwars, charts), h("div", { class: "pp-col" }, wishlist, achievements)));
 }
 
 // Playtime per day (bars) and money over the last 30 days (line), from the daily history.
@@ -343,4 +348,118 @@ function friendButton(p) {
   });
   draw();
   return btn;
+}
+
+// The daily streak: a flame with the count, the last 7 days (played, saved by a freeze, missed) and Streak Freezes.
+function streakSection(p, isMe) {
+  const st = p.stats || {};
+  const info = p.streakInfo || {};
+  const etDay = (offset) => { const d = new Date(Date.now() - 5 * 3600e3 - offset * 864e5); return d.toISOString().slice(0, 10); };
+  const today = etDay(0);
+  const alive = info.lastDaily === today || info.lastDaily === etDay(1) || (info.lastDaily && info.freezes > 0);
+  const streak = alive ? Number(st.streak || 0) : 0;
+  if (!streak && !st.bestStreak && !isMe) return null;
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = etDay(i);
+    const kind = (info.log || {})[d] || (d === today ? "today" : "missed");
+    const label = new Date(`${d}T12:00:00Z`).toLocaleDateString([], { weekday: "narrow" });
+    days.push(h("div", { class: `sk-day sk-${kind}`, title: `${d}: ${kind === "played" ? "played" : kind === "frozen" ? "saved by a Streak Freeze" : kind === "today" ? "today" : "missed"}` },
+      h("span", { class: "sk-dot" }, kind === "played" ? iconEl("flame") : kind === "frozen" ? iconEl("snowflake") : kind === "today" ? h("span", { class: "sk-ring" }) : null),
+      h("span", { class: "sk-label", text: label })));
+  }
+  const claimedToday = info.lastDaily === today;
+  const hint = isMe
+    ? (claimedToday ? "You're done for today. See you tomorrow!" : streak ? "Type /daily in game today to keep your streak going." : "Type /daily in game to start a streak.")
+    : null;
+  return h("section", { class: "panel pp-sec sk-card" },
+    h("div", { class: "sk-top" },
+      h("div", { class: `sk-flame${streak ? " on" : ""}` }, iconEl("flame"), h("b", { text: String(streak) })),
+      h("div", { class: "sk-text" },
+        h("h2", { class: "pp-h2", style: "margin:0", text: streak === 1 ? "1-day streak" : `${streak}-day streak` }),
+        h("span", { class: "text-3 small", text: `Best: ${st.bestStreak || 0} day${st.bestStreak === 1 ? "" : "s"}` })),
+      h("div", { class: "sk-freezes", title: "Streak Freezes save the streak by themselves if a day is missed" }, iconEl("snowflake"), h("b", { text: String(info.freezes || 0) }))),
+    h("div", { class: "sk-week" }, ...days),
+    hint ? h("p", { class: "text-3 small", style: "margin:10px 0 0", text: hint }) : null,
+    isMe ? h("div", { class: "sk-actions" },
+      h("span", { class: "text-3 small", text: "You earn a freeze every 7 days of streak (up to 2). Galaxy Pro+ gets one each month." }),
+      h("a", { class: "btn btn-secondary btn-sm", href: "/store#streak" }, iconEl("snowflake"), "Get Streak Freezes")) : null);
+}
+
+// ---------- Achievements guide (a dialog on the profile, not a page) ----------
+function achievementsGuide(p) {
+  const mine = new Set(p.viewer?.achievements || []);
+  const all = [...p.achievements].sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0));
+  let filter = "all";
+  const list = h("div", { class: "ag-list" });
+  const tabs = h("div", { class: "fr-tabs" });
+  const draw = () => {
+    tabs.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.f === filter)));
+    const shown = all.filter((a) => filter === "all" || (filter === "todo" ? !mine.has(a.id) : mine.has(a.id)));
+    list.replaceChildren(...(shown.length ? shown.map((a) => {
+      const have = mine.has(a.id);
+      const tier = a.pct == null ? null : a.pct <= 5 ? "Legendary" : a.pct <= 15 ? "Epic" : a.pct <= 35 ? "Rare" : null;
+      return h("div", { class: `ag-row${have ? " have" : ""}` },
+        h("span", { class: "ag-ic" }, iconEl(have ? "check" : achIcon(a.id))),
+        h("div", { class: "ag-text" }, h("b", { text: a.name }), h("span", { class: "text-2 small", text: a.desc })),
+        h("div", { class: "ag-pct" }, h("b", { text: a.pct == null ? "–" : `${a.pct}%` }), h("span", { class: "text-3 small", text: tier || "of players" })));
+    }) : [h("p", { class: "text-3", style: "margin:0", text: filter === "todo" ? "You have every achievement. Amazing!" : "None yet." })]));
+  };
+  for (const [f, label] of [["all", "All"], ["todo", "Still to get"], ["have", "Unlocked"]]) {
+    if (f !== "all" && !p.viewer) continue;
+    const b = h("button", { class: "fr-tab", type: "button", "data-f": f, text: label });
+    b.addEventListener("click", () => { filter = f; draw(); });
+    tabs.append(b);
+  }
+  draw();
+  openDialog({
+    title: "Achievements guide",
+    body: h("div", { class: "ag" },
+      h("p", { class: "text-3 small", style: "margin:0", text: `Every achievement on GalaxySMP, how to get it, and how many players have it.${p.viewer ? " Your own are ticked." : ""}` }),
+      tabs, list),
+    actions: [{ label: "Close", kind: "primary" }],
+  });
+}
+
+// ---------- Compare players (a dialog on the profile) ----------
+async function compareDialog(p) {
+  const other = p.viewer && p.viewer.name.toLowerCase() !== p.name.toLowerCase() ? p.viewer.name : "";
+  const input = h("input", { class: "input", id: "cmp-name", maxlength: 32, placeholder: "Another player's name", value: other });
+  input.value = other;
+  const out = h("div", { class: "cmp-out" });
+  const run = async () => {
+    const name = input.value.trim().replace(/^\./, "");
+    if (!name) { out.replaceChildren(h("p", { class: "text-3", style: "margin:0", text: "Type a player's name to compare." })); return; }
+    out.replaceChildren(h("p", { class: "text-3", style: "margin:0", text: "Loading…" }));
+    let q;
+    try { q = (await getJson(`/api/players/${encodeURIComponent(name)}`)).player; } catch (e) { out.replaceChildren(h("p", { class: "form-error", text: e.message })); return; }
+    const A = p, B = q;
+    const unlocked = (x) => x.achievements.filter((a) => a.unlocked).length;
+    const rows = [
+      ["Playtime", (x) => Number(x.stats.playtime || 0), (v) => hours(v)],
+      ["Money", (x) => Number(x.money || 0), (v) => money(v)],
+      ["Blocks mined", (x) => Number(x.stats.mined || 0), short],
+      ["Blocks placed", (x) => Number(x.stats.placed || 0), short],
+      ["Mobs defeated", (x) => Number(x.stats.kills || 0), short],
+      ["Quests done", (x) => Number(x.stats.quests || 0), short],
+      ["Best daily streak", (x) => Number(x.stats.bestStreak || 0), (v) => `${v} day${v === 1 ? "" : "s"}`],
+      ["Achievements", unlocked, (v) => String(v)],
+      ["Bedwars wins", (x) => Number(x.bedwars?.wins || 0), short],
+      ["Build Contest wins", (x) => Number(x.contestWins || 0), short],
+    ];
+    let wa = 0, wb = 0;
+    const body = rows.map(([label, get, fmt]) => {
+      const a = get(A), b = get(B);
+      if (a > b) wa++; else if (b > a) wb++;
+      return h("div", { class: "cmp-row" },
+        h("span", { class: `cmp-v${a > b ? " win" : ""}`, text: fmt(a) }), h("span", { class: "cmp-l text-3 small", text: label }), h("span", { class: `cmp-v r${b > a ? " win" : ""}`, text: fmt(b) }));
+    });
+    out.replaceChildren(
+      h("div", { class: "cmp-head" }, h("b", { text: A.name }), h("span", { class: "text-3 small", text: `${wa} – ${wb}` }), h("b", { class: "r", text: B.name })),
+      ...body);
+  };
+  const form = h("form", { class: "fr-add" }, input, h("button", { class: "btn btn-primary", type: "submit", text: "Compare" }));
+  form.addEventListener("submit", (e) => { e.preventDefault(); run(); });
+  openDialog({ title: `Compare ${p.name}`, body: h("div", { class: "cmp" }, form, out), actions: [{ label: "Close", kind: "primary" }] });
+  run();
 }

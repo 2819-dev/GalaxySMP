@@ -14,7 +14,7 @@ import { sendPlans } from "./plans.js";
 import { SHOP_ITEMS, GAME_SHOP as SHOP } from "../store/shop.js";
 
 const MOD = 50;
-export const LATEST_PLUGIN = "2.44.0"; // the GalaxyLink version made for this website
+export const LATEST_PLUGIN = "2.45.0"; // the GalaxyLink version made for this website
 export const LATEST_ICONS = "1.9.0"; // the GalaxySMP Icons resource pack version that goes with it
 const older = (a, b) => { const x = String(a).split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
 const ADMIN = 100;
@@ -372,6 +372,9 @@ export async function giveShopItem(env, sql, p, body, user, source = "staff") {
     await sql`UPDATE players SET extra_shop_plots = extra_shop_plots + 1 WHERE xuid = ${p.xuid}`;
   } else if (item.id === "night_vision") {
     await sql`UPDATE players SET night_vision_until = greatest(coalesce(night_vision_until, now()), now()) + make_interval(days => ${option.days}) WHERE xuid = ${p.xuid}`;
+  } else if (item.freezes) {  // streak freezes: given in game through the rewards queue (works while offline)
+    const { queueReward } = await import("./rewards.js");
+    await queueReward(sql, { xuid: p.xuid, name: p.gamertag, keys: { freeze: item.freezes }, reason: item.name });
   } else if (item.category === "cosmetics") {
     await sql`UPDATE players SET cosmetics = array_append(cosmetics, ${item.id}) WHERE xuid = ${p.xuid} AND NOT (${item.id} = ANY(cosmetics))`;
   }

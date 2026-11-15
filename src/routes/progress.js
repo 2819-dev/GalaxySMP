@@ -25,6 +25,7 @@ const BOARDS = {
   contest_wins: { col: "contest_wins", title: "Build Contest Wins" },
 };
 const ONLINE_SECONDS = 150;
+const STREAK_MILESTONES = [30, 50, 100, 200, 365];
 const n = (v) => Math.max(0, Math.round(Number(v) || 0));
 
 // ---------- from the server (through the live connection) ----------
@@ -50,8 +51,19 @@ export async function recordStats(env, list, online) {
           kills = EXCLUDED.kills, deaths = EXCLUDED.deaths, quests_done = EXCLUDED.quests_done, streak = EXCLUDED.streak,
           best_streak = EXCLUDED.best_streak, achievements = EXCLUDED.achievements, stats_at = now(),
           gamertag = CASE WHEN ${Boolean(p.name)} THEN EXCLUDED.gamertag ELSE players.gamertag END,
-          last_daily = coalesce(${/^\d{4}-\d{2}-\d{2}$/.test(String(p.lastDaily || "")) ? p.lastDaily : null}::date, players.last_daily)`;
+          last_daily = coalesce(${/^\d{4}-\d{2}-\d{2}$/.test(String(p.lastDaily || "")) ? p.lastDaily : null}::date, players.last_daily),
+          freezes = coalesce(${p.freezes == null ? null : n(p.freezes)}::int, players.freezes),
+          streak_log = coalesce(${p.streakLog && typeof p.streakLog === "object" ? JSON.stringify(Object.fromEntries(Object.entries(p.streakLog)
+            .filter(([d, v]) => /^\d{4}-\d{2}-\d{2}$/.test(d) && ["played", "frozen"].includes(v)).slice(-21))) : null}::jsonb, players.streak_log)`;
     }));
+  }
+  // streak milestones go on #Timeline (once per streak: the dedupe key has the day it was reached)
+  for (const p of players) {
+    const st = n(p.streak);
+    if (STREAK_MILESTONES.includes(st) && /^\d{4}-\d{2}-\d{2}$/.test(String(p.lastDaily || ""))) {
+      await postTimeline(sql, { kind: "streak", xuid: String(p.xuid), name: String(p.name || "A player"), title: `reached a ${st}-day streak`,
+        detail: "Claimed the daily reward every day.", icon: "flame", dedupe: `streak:${p.xuid}:${st}:${p.lastDaily}` });
+    }
   }
   if (onlineIds.length) {
     // session_start: when they joined this time (for "Playing for 1h 20m" on their profile)
@@ -196,6 +208,7 @@ export async function profile(request, env, ctx, url, params) {
   const rows = await sql`
     SELECT p.xuid, p.gamertag, p.first_seen, p.last_seen, p.balance_cents, p.is_op, p.playtime_s, p.mined, p.placed, p.kills, p.deaths,
            p.quests_done, p.streak, p.best_streak, p.achievements, p.online_at, p.extra_plots, p.head_at, p.gamerpic_at,
+           p.freezes, p.streak_log, p.last_daily,
            p.pic_source, (p.head IS NOT NULL) AS has_head, (p.custom_pic IS NOT NULL) AS has_custom,
            (p.online_at > now() - interval '150 seconds') AS online,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient,
@@ -231,6 +244,7 @@ export async function profile(request, env, ctx, url, params) {
       bedwars: { games: Number(p.bw_games || 0), wins: Number(p.bw_wins || 0), kills: Number(p.bw_kills || 0), finals: Number(p.bw_finals || 0), beds: Number(p.bw_beds || 0) },
       stats: { playtime: Number(p.playtime_s), mined: Number(p.mined), placed: Number(p.placed), kills: Number(p.kills), deaths: Number(p.deaths),
                quests: p.quests_done, streak: p.streak, bestStreak: p.best_streak },
+      streakInfo: { freezes: Number(p.freezes || 0), log: p.streak_log || {}, lastDaily: p.last_daily ? new Date(p.last_daily).toISOString().slice(0, 10) : null },
       positions: {
         money: await rankAt("balance_cents", Number(p.balance_cents)), playtime: await rankAt("playtime_s", Number(p.playtime_s)),
         mined: await rankAt("mined", Number(p.mined)),
@@ -240,6 +254,11 @@ export async function profile(request, env, ctx, url, params) {
         const counts = new Map((await sql`SELECT a AS id, count(*)::int AS n FROM players, unnest(achievements) a GROUP BY a`).map((r) => [r.id, r.n]));
         const [{ total }] = await sql`SELECT count(*)::int AS total FROM players WHERE cardinality(achievements) > 0`;
         return defs.map((a) => ({ ...a, unlocked: have.has(a.id), pct: total ? Math.max(1, Math.round(((counts.get(a.id) || 0) / total) * 100)) : null }));
+      })(),
+      // the viewer's own Minecraft name and achievements (for the achievements guide and Compare)
+      viewer: await (async () => {
+        const [v] = await sql`SELECT p.gamertag, p.achievements FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${me.id}`;
+        return v ? { name: v.gamertag, achievements: v.achievements || [] } : null;
       })(),
       // the owner can pick this player's picture: Xbox picture or player head (their own Pro+ picture comes first)
       ...(me.owner ? { picture: { xuid: p.xuid, source: p.pic_source || "auto", hasHead: Boolean(p.has_head), custom: p.pic_source === "custom" && Boolean(p.has_custom) } } : {}),

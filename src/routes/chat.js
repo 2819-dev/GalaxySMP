@@ -47,6 +47,7 @@ export async function bootstrap(request, env) {
   await sql`UPDATE users SET last_seen_at = now() WHERE id = ${user.id}`;
   const planPriority = await loadPlanPriority(sql);
   const badgeMap = await badgesFor(env, sql, members.map((m) => ({ id: m.id, username: m.username, plat: m.plat })));
+  const tagMap = await (await import("./teams.js")).teamTags(sql, members.map((m) => m.xuid).filter(Boolean)).catch(() => new Map());
   // staff replies to your support tickets you haven't read yet (shows a dot on the Support channel)
   const [{ ticket_unread: ticketUnread }] = await sql`SELECT coalesce(sum(user_unread), 0)::int AS ticket_unread FROM tickets WHERE user_id = ${user.id}`;
   const [{ dm_unread: dmUnread }] = await sql`
@@ -77,6 +78,7 @@ export async function bootstrap(request, env) {
       status: (m.plan === "pro" || isOwner(env, m.username, m.plat === "bedrock")) && m.custom_presence?.title && (!m.custom_presence.until || new Date(m.custom_presence.until) > new Date())
         ? `${m.custom_presence.label && m.custom_presence.label !== "Status" ? `${m.custom_presence.label} ` : ""}${m.custom_presence.title}` : null,
       badges: badgeMap.get(Number(m.id)) || [],
+      team: (m.xuid && tagMap.get(m.xuid)) || null,  // team tag, shown gray before the name
       bio: m.bio || null, interests: (m.interests || []).map((i) => INTEREST_NAME[i]).filter(Boolean), color: m.profile_color || null, ...looksOut(m),
       // real name (set by staff): everyone sees it unless the member hid it; they and staff always do
       ...(m.real_name && (!m.real_name_hidden || Number(m.id) === Number(user.id) || can(user, "see_real_names"))

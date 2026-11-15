@@ -171,6 +171,11 @@ const routes = [
   ["GET", "/api/lockdown", async (req, env) => { const l = await lockdownState(env); return json({ ok: true, on: Boolean(l.on) }, 200, { "Cache-Control": "no-store" }); }],
   ["GET", "/api/friends", (req, env) => friends.list(req, env)],
   ["GET", "/api/inbox", notifyRoutes.inbox],
+  ["GET", "/api/teams/mine", (req, env) => import("./routes/teams.js").then((m) => m.mine(req, env))],
+  ["GET", "/api/teams/leaderboard", (req, env) => import("./routes/teams.js").then((m) => m.leaderboard(req, env))],
+  ["GET", "/api/teams/chat", (req, env, ctx, url) => import("./routes/teams.js").then((m) => m.chat(req, env, ctx, url))],
+  ["POST", "/api/teams/chat", (req, env) => import("./routes/teams.js").then((m) => m.send(req, env))],
+  ["POST", "/api/teams", (req, env) => import("./routes/teams.js").then((m) => m.act(req, env))],
   ["GET", "/api/crates", async (req, env) => {
     const [row] = await getDb(env)`SELECT value FROM economy_config WHERE key = 'crate_odds'`;
     return json({ ok: true, ...(row?.value || { crates: [] }) }, 200, { "Cache-Control": "public, max-age=60" });
@@ -182,6 +187,7 @@ const routes = [
   ["POST", "/api/giftcards/redeem", (req, env) => giftcards.redeem(req, env)],
   ["GET", "/api/checklist", (req, env) => checklist.get(req, env)],
   ["POST", "/api/checklist/claim", (req, env) => checklist.claim(req, env)],
+  ["GET", "/api/map/showcase", (req, env) => plotshow.showcase(req, env)],
   ["GET", "/api/map/plots/:id", plotshow.plotCard],
   ["POST", "/api/map/plots/:id", plotshow.plotAction],
   ["GET", "/api/map/plot-photo/:id", plotshow.plotPhoto],

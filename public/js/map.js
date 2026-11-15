@@ -384,6 +384,16 @@ function hover(sx, sy, wx, wz) {
 }
 
 $("map-3d").addEventListener("click", toggle3d);
+let closeShowcase = null;
+$("map-showcase").addEventListener("click", async () => {
+  if (closeShowcase) { closeShowcase(); return; }
+  const m = await import("/js/map-showcase.js");
+  document.body.classList.add("map-in-showcase");
+  closeShowcase = m.openShowcase(canvas.parentElement, {
+    goTo: (x, z, s) => { if (in3d) toggle3d(); goTo(x, z, s); },
+    onClose: () => { closeShowcase = null; document.body.classList.remove("map-in-showcase"); },
+  });
+});
 $("map-zoom-in").addEventListener("click", () => zoom(1.5));
 $("map-zoom-out").addEventListener("click", () => zoom(1 / 1.5));
 $("map-home").addEventListener("click", () => {

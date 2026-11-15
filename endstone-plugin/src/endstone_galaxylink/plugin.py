@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.44.0"
+VERSION = "2.45.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -112,6 +112,7 @@ class GalaxyLink(Plugin):
         "elevator": _cmd("Get the Elevator Tool back, or open it (Galaxy+, Pro+ and staff).", "/elevator", "galaxylink.command.elevator", ["elevators"]),
         "ranktags": _cmd("Smooth gradient rank tags (pictures) on or off.", "/ranktags [state: message]", "galaxylink.command.ranktags"),
         "dm": _cmd("Send a direct message to a community member (website and game).", "/dm <player: message>", "galaxylink.command.dm", ["msgweb"]),
+        "tc": _cmd("Talk to your team (teams are made on galaxymc.us).", "/tc [message: message]", "galaxylink.command.dm", ["teamchat"]),
         "r": _cmd("Reply to your last direct message.", "/r <message: message>", "galaxylink.command.dm", ["reply"]),
         "report": _cmd("Report a player who is breaking the rules.", "/report [player: message]", "galaxylink.command.report"),
         "shift": _cmd("Staff shifts: /shift on, break, back, off or status.", "/shift [action: message]", "galaxylink.command.shift"),
@@ -210,6 +211,8 @@ class GalaxyLink(Plugin):
         self.teleports = Teleports(self)
         self.plots = Plots(self)
         self.minigames = Minigames(self)
+        from endstone_galaxylink.teams import Teams
+        self.teams = Teams(self)  # teams from the website: gray [TAG] in chat, /tc, shared plots
         from endstone_galaxylink.buildcontest import BuildContest
         self.buildcontest = BuildContest(self)  # the Build Contest minigame (hosted through the Minigame Center)
         self.buildcontest.recover()
@@ -687,6 +690,7 @@ class GalaxyLink(Plugin):
             "delwarp": lambda: self.warps.del_warp(sender, args),
             "goal": lambda: self.goals.show(sender),
             "dm": lambda: self.dms.command(sender, args),
+            "tc": lambda: self.teams.command(sender, args),
             "r": lambda: self.dms.reply(sender, args),
             "daily": lambda: self.progress.daily_menu(sender),
             "quests": lambda: self.progress.quests_menu(sender),

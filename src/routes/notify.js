@@ -12,7 +12,7 @@ export const KINDS = {
   updates: { name: "Announcements", hint: "New posts in #Announcements", default: true },
   announcements: { name: "Server announcements", hint: "Announcements staff send in game", default: true },
   server: { name: "Server online / offline", hint: "When GalaxySMP goes down or comes back online", default: true },
-  reward: { name: "Daily reward reminder", hint: "Around noon (US Eastern) if you haven't claimed /daily yet", default: true },
+  reward: { name: "Streak reminder", hint: "At most one in the evening, only if your daily streak would end tonight and you have no Streak Freeze", default: true },
   events: { name: "Events", hint: "New events, and a reminder 15 minutes before events you asked to be reminded about", default: true },
   news: { name: "Updates & polls", hint: "New posts in #Updates (when staff choose to notify) and new polls", default: true },
   jobs: { name: "Jobs", hint: "When someone offers to do your job, takes it or finishes it, and when you're hired or paid", default: true },
@@ -178,14 +178,16 @@ export async function daily(env, cron) {
   if (!cron.startsWith("5 16") && !cron.startsWith("35 0")) return 0;
   const sql = getDb(env);
   const etToday = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10); // US Eastern date (close enough)
-  if (cron.startsWith("5 16")) {
-    // reward reminder: linked players who haven't claimed today
-    const rows = await sql`
-      SELECT u.id FROM users u JOIN players p ON p.uuid = u.mc_uuid
-       WHERE p.last_daily IS NULL OR p.last_daily < ${etToday}::date`;
-    return notify(env, rows.map((r) => r.id), "reward", {
-      title: "Your daily reward is ready", body: "Join GalaxySMP and type /daily to claim it (and keep your streak going).", url: "/", tag: "reward", ttl: 6 * 3600,
-    });
+  if (cron.startsWith("5 16")) return 0;  // (the old midday reminder; streak reminders are now in the evening, only when needed)
+  // One gentle streak reminder in the evening (US Eastern), only when a streak of 3+ days would end tonight:
+  // not claimed today, claimed yesterday, and no Streak Freeze to save it.
+  const atRisk = await sql`
+    SELECT u.id, p.streak FROM users u JOIN players p ON p.uuid = u.mc_uuid
+     WHERE NOT u.banned AND p.streak >= 3 AND coalesce(p.freezes, 0) = 0 AND p.last_daily = ${etToday}::date - 1`;
+  for (const r of atRisk) {
+    await notify(env, [r.id], "reward", {
+      title: `Keep your ${r.streak}-day streak`, body: "Hop on GalaxySMP and type /daily before midnight to keep it going.", url: "/", tag: "streak", ttl: 4 * 3600,
+    }).catch(() => {});
   }
   const [{ played }] = await sql`SELECT count(*)::int AS played FROM players WHERE last_seen > now() - interval '24 hours'`;
   const rows = await sql`

@@ -300,6 +300,7 @@ export class VoiceHub extends DurableObject {
       this.ctx.waitUntil(this.sendShop());
       this.ctx.waitUntil(import("../routes/rewards.js").then((m) => m.sendRewards(this.env, undefined, (msg) => { this.send(server, msg); return true; })).catch(() => {}));
       this.ctx.waitUntil(this.sendMapSetting());
+      this.ctx.waitUntil(import("../routes/teams.js").then(async (m) => this.send(server, await m.teamsState(getDb(this.env)))).catch(() => {}));
       return new Response(null, { status: 101, webSocket: client });
     }
 
@@ -446,6 +447,7 @@ export class VoiceHub extends DurableObject {
       const plots = (Array.isArray(msg.plots) ? msg.plots : []).slice(0, 2000).map((p) => ({
         kind: String(p.kind || "plot").slice(0, 8), label: String(p.label || "").slice(0, 40), owner: String(p.owner || "").slice(0, 32),
         id: p.id != null ? String(p.id).slice(0, 20) : null, ownerXuid: p.owner_xuid ? String(p.owner_xuid).slice(0, 20) : null, public: Boolean(p.public),
+        visibility: ["public", "location", "hidden"].includes(p.visibility) ? p.visibility : (p.public ? "public" : "hidden"),
         x1: Number(p.x1) || 0, z1: Number(p.z1) || 0, x2: Number(p.x2) || 0, z2: Number(p.z2) || 0 }));
       const st = msg.status && typeof msg.status === "object" ? msg.status : {};
       const status = { sent: Number(st.sent) || 0, error: st.error ? String(st.error).slice(0, 200) : null, method: st.method ? String(st.method).slice(0, 10) : null };
@@ -467,6 +469,9 @@ export class VoiceHub extends DurableObject {
       // friends first (it needs to know who was already online), then the usual player update
       return import("../routes/friends.js").then((m) => m.friendsJoined(this.env, msg.players)).catch((e) => console.error("friend alerts failed", e))
         .then(() => recordPlayers(this.env, msg.players)).catch((e) => console.error("record players failed", e));
+    }
+    if (msg.type === "teamchat") {  // /tc in game: into the team chat on the website
+      return import("../routes/teams.js").then((m) => m.fromGame(this.env, msg)).catch((e) => console.error("team chat failed", e));
     }
     if (msg.type === "crates") {  // what's inside each crate, for the Crate Odds page
       const clip = (v, n) => String(v ?? "").slice(0, n);

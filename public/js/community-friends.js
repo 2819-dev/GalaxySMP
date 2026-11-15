@@ -12,14 +12,41 @@ const ago = (d) => {
   return `Played ${days} day${days === 1 ? "" : "s"} ago`;
 };
 
-export function renderFriends(root, { toast, setTimer, openDM }) {
+// Two tabs: Friends and Team (the team lives here instead of its own page).
+export function renderFriends(root, helpers) {
+  const wrap = h("div", { class: "cp-wrap" });
+  const body = h("div");
+  const tabs = h("div", { class: "fr-tabs", role: "tablist" });
+  let current = null;
+  let timers = [];
+  const sub = { ...helpers, setTimer: (t) => { timers.push(t); helpers.setTimer(t); } };
+  const show = (which) => {
+    if (current === which) return;
+    current = which;
+    timers.forEach(clearInterval);
+    timers = [];
+    tabs.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === which)));
+    body.replaceChildren();
+    if (which === "team") import("/js/community-myteam.js").then((m) => m.renderMyTeam(body, sub));
+    else renderFriendsList(body, sub);
+  };
+  for (const [key, label, ic] of [["friends", "Friends", "users"], ["team", "Team", "shield"]]) {
+    const b = h("button", { class: "fr-tab", type: "button", role: "tab", "data-tab": key }, iconEl(ic), label);
+    b.addEventListener("click", () => show(key));
+    tabs.append(b);
+  }
+  wrap.append(h("div", { class: "tl-intro" }, h("h2", { text: "Friends & Team" })), tabs, body);
+  root.append(wrap);
+  show(location.hash === "#team" ? "team" : "friends");
+}
+
+function renderFriendsList(root, { toast, setTimer, openDM }) {
   const input = h("input", { class: "input", id: "fr-add", maxlength: 32, placeholder: "Website or Minecraft name", autocomplete: "off" });
   const addBtn = h("button", { class: "btn btn-primary", type: "submit" }, iconEl("userPlus"), "Send request");
   const form = h("form", { class: "fr-add" }, input, addBtn);
   const lists = h("div", { class: "fr-lists" });
-  root.append(h("div", { class: "cp-wrap" },
-    h("div", { class: "tl-intro" }, h("h2", { text: "Friends" }),
-      h("p", { class: "text-3", text: "See when your friends are on the server. You'll get a notification when a friend joins (turn it off in Account settings > Notifications)." })),
+  root.append(h("div", { class: "fr-lists" },
+    h("p", { class: "text-3", style: "margin:0", text: "See when your friends are on the server. You'll get a notification when a friend joins (turn it off in Account settings > Notifications)." }),
     h("section", { class: "panel fr-box" }, h("h3", { class: "fr-h", text: "Add a friend" }), form),
     lists));
 

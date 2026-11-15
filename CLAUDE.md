@@ -5,3 +5,5 @@
 - Small database changes can go in `src/lib/autoschema.js` (they run automatically, must be safe to run twice).
   Also keep a copy in `migrations/`.
 - Never use the word "Webshop" on the site; it's the "Store".
+- Never clutter the navigation, sidebar, drawer, footer or Community channel list with new pages. Put new features
+  inside existing pages (a tab, a section, a dialog or a button on a related page) unless the owner asks for a page.

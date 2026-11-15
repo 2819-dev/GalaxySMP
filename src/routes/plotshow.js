@@ -1,5 +1,8 @@
-// Plots on the map. Free plots show as green boxes. A player's plot only shows when its owner makes it public
-// (/plot public in game, or the switch on the map). Tapping a public plot shows its name, owner, photos and likes.
+// Plots on the map and the Plot Showcase. Free plots show as green boxes. Owners pick who sees their plot:
+//   public    on the map and in the showcase, with its location
+//   location  in the showcase (name, photos, likes) but "Location Hidden" and not on the map
+//   hidden    a locked "Plot Hidden" card in the showcase
+// (/plot public | nolocation | private in game, or the plot card on the website.)
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -40,14 +43,16 @@ export async function plotCard(request, env, ctx, url, params) {
   const sql = getDb(env);
   const p = await plotById(env, params.id);
   const me = await viewerXuid(sql, user);
-  if (!p || p.kind !== "plot" || !p.ownerXuid || (!p.public && p.ownerXuid !== me)) throw new HttpError(404, "This plot isn't public.");
+  const vis = p?.visibility || (p?.public ? "public" : "hidden");
+  if (!p || p.kind !== "plot" || !p.ownerXuid || (vis === "hidden" && p.ownerXuid !== me)) throw new HttpError(404, "This plot is hidden.");
+  const showWhere = vis === "public" || p.ownerXuid === me;
   const [show] = await sql`SELECT caption FROM plot_showcase WHERE plot_id = ${String(p.id)}`;
   const photos = await sql`SELECT id, width, height FROM plot_photos WHERE plot_id = ${String(p.id)} ORDER BY position`;
   const [lk] = await sql`SELECT count(*)::int AS n, bool_or(user_id = ${user.id}) AS mine FROM plot_likes WHERE plot_id = ${String(p.id)}`;
   return json({ ok: true, plot: {
-    id: p.id, name: p.label || `${p.owner}'s plot`, owner: p.owner, public: Boolean(p.public), mine: p.ownerXuid === me,
+    id: p.id, name: p.label || `${p.owner}'s plot`, owner: p.owner, public: vis === "public", visibility: vis, mine: p.ownerXuid === me,
     caption: show?.caption || "", photos: photos.map((x) => ({ id: Number(x.id), w: x.width, h: x.height })),
-    likes: lk?.n || 0, liked: Boolean(lk?.mine), x: Math.round((p.x1 + p.x2) / 2), z: Math.round((p.z1 + p.z2) / 2),
+    likes: lk?.n || 0, liked: Boolean(lk?.mine), x: showWhere ? Math.round((p.x1 + p.x2) / 2) : null, z: showWhere ? Math.round((p.z1 + p.z2) / 2) : null,
   } });
 }
 
@@ -63,18 +68,21 @@ export async function plotAction(request, env, ctx, url, params) {
   const mine = p.ownerXuid === me;
   const id = String(p.id);
   if (body.action === "like") {
-    if (!p.public) throw new HttpError(404, "This plot isn't public.");
+    if ((p.visibility || (p.public ? "public" : "hidden")) === "hidden") throw new HttpError(404, "This plot is hidden.");
     if (mine) throw new HttpError(400, "You can't like your own plot.");
     const del = await sql`DELETE FROM plot_likes WHERE plot_id = ${id} AND user_id = ${user.id} RETURNING 1`;
     if (!del.length) await sql`INSERT INTO plot_likes (plot_id, user_id) VALUES (${id}, ${user.id}) ON CONFLICT DO NOTHING`;
     return json({ ok: true, liked: !del.length });
   }
   if (!mine) throw new HttpError(403, "Only the plot's owner can change this.");
-  if (body.action === "public" || body.action === "private") {
-    const a = await voiceStub(env).fetch("https://voice/internal/ask", { method: "POST", body: JSON.stringify({ type: "plot_public", id: p.id, xuid: me, public: body.action === "public" }) })
+  if (body.action === "public" || body.action === "private" || body.action === "visibility") {
+    const level = body.action === "public" ? "public" : body.action === "private" ? "hidden" : ["public", "location", "hidden"].includes(body.level) ? body.level : null;
+    if (!level) throw new HttpError(400, "Choose who can see your plot.");
+    const a = await voiceStub(env).fetch("https://voice/internal/ask", { method: "POST", body: JSON.stringify({ type: "plot_public", id: p.id, xuid: me, public: level === "public", visibility: level }) })
       .then((r) => r.json()).catch(() => ({ ok: false }));
-    if (!a.ok) throw new HttpError(409, a.message || "The server needs to be online to change this. You can also type /plot public in game.");
-    return json({ ok: true, public: body.action === "public", message: body.action === "public" ? "Your plot is public. Everyone can find it on the map." : "Your plot is private again." });
+    if (!a.ok) throw new HttpError(409, a.message || "The server needs to be online to change this. You can also type /plot public, /plot nolocation or /plot private in game.");
+    const msg = { public: "Your plot is public: on the map and in the Plot Showcase.", location: "Your plot is in the Plot Showcase, with its location hidden.", hidden: "Your plot is hidden. It shows as \"Plot Hidden\" in the showcase." };
+    return json({ ok: true, visibility: level, public: level === "public", message: msg[level] });
   }
   if (body.action === "photos") {
     const imgs = Array.isArray(body.images) ? body.images.slice(0, MAX_PHOTOS + 1) : [];
@@ -102,4 +110,34 @@ export async function plotPhoto(request, env, ctx, url, params) {
   const [img] = await getDb(env)`SELECT mime, encode(data, 'base64') AS b64 FROM plot_photos WHERE id = ${Number(params.id) || 0}`;
   if (!img) return new Response("Not found", { status: 404 });
   return new Response(Buffer.from(img.b64.replace(/\s+/g, ""), "base64"), { headers: { "Content-Type": img.mime, "Cache-Control": "private, max-age=86400" } });
+}
+
+// GET /api/map/showcase: every claimed player plot, most liked first (hidden ones as locked cards at the end)
+export async function showcase(request, env) {
+  const user = await requireUser(request, env);
+  const sql = getDb(env);
+  const me = await viewerXuid(sql, user);
+  const live = await voiceStub(env).fetch("https://voice/internal/map").then((r) => r.json()).catch(() => ({}));
+  const plots = (live.plots || []).filter((p) => p.kind === "plot" && p.ownerXuid);
+  const ids = plots.map((p) => String(p.id));
+  const [likes, firsts, shows] = ids.length ? await Promise.all([
+    sql`SELECT plot_id, count(*)::int AS n FROM plot_likes WHERE plot_id = ANY(${ids}) GROUP BY plot_id`,
+    sql`SELECT DISTINCT ON (plot_id) plot_id, id, width, height, (SELECT count(*)::int FROM plot_photos q WHERE q.plot_id = x.plot_id) AS n
+          FROM plot_photos x WHERE plot_id = ANY(${ids}) ORDER BY plot_id, position`,
+    sql`SELECT plot_id, caption FROM plot_showcase WHERE plot_id = ANY(${ids})`,
+  ]) : [[], [], []];
+  const L = new Map(likes.map((r) => [r.plot_id, r.n])), F = new Map(firsts.map((r) => [r.plot_id, r])), C = new Map(shows.map((r) => [r.plot_id, r.caption]));
+  const out = plots.map((p) => {
+    const id = String(p.id), vis = p.visibility || (p.public ? "public" : "hidden"), mine = p.ownerXuid === me;
+    if (vis === "hidden" && !mine) return { id, visibility: "hidden" };
+    const f = F.get(id);
+    return {
+      id, visibility: vis, mine, name: p.label || `${p.owner}'s plot`, owner: p.owner, likes: L.get(id) || 0, caption: C.get(id) || "",
+      photo: f ? { id: Number(f.id), w: f.width, h: f.height } : null, photos: f ? f.n : 0,
+      x: vis === "public" || mine ? Math.round((p.x1 + p.x2) / 2) : null, z: vis === "public" || mine ? Math.round((p.z1 + p.z2) / 2) : null,
+    };
+  });
+  const rank = (p) => (p.visibility === "hidden" && !p.mine ? 2 : 0) + (p.photo ? 0 : 1);
+  out.sort((a, b) => rank(a) - rank(b) || (b.likes || 0) - (a.likes || 0));
+  return json({ ok: true, plots: out }, 200, { "Cache-Control": "no-store" });
 }

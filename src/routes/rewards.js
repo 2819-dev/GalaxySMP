@@ -4,7 +4,7 @@
 import { getDb } from "../lib/db.js";
 import { toPlugin } from "./economy.js";
 
-export const KEY_KINDS = ["common", "rare", "galaxy"];
+export const KEY_KINDS = ["common", "rare", "galaxy", "freeze"];  // "freeze" = daily streak freezes
 
 export function cleanKeys(keys) {
   const out = {};

@@ -332,6 +332,7 @@ class LiveMap:
             # (the website only shows a player's plot to others once it's public; it shows free plots to everyone)
             plots.append({"kind": kind, "label": self.plugin.plots.label(p) if kind != "plot" or p.get("name") else "",
                           "owner": p.get("owner_name") or "", "owner_xuid": p.get("owner") or None, "public": bool(p.get("public")),
+                          "visibility": p.get("visibility") or ("public" if p.get("public") else "hidden"),
                           "id": p.get("id"), "x1": p["x1"], "z1": p["z1"], "x2": p["x2"], "z2": p["z2"]})
         voice.send_json({"type": "map_markers", "markers": markers, "plots": plots[:2000],
                          "status": {"sent": self.sent, "error": self.last_error, "method": self.method}})

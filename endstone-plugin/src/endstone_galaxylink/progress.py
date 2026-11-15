@@ -2,7 +2,10 @@
 
 Stats      playtime, blocks mined and placed, mobs killed, deaths, money earned by selling.
 /daily     log in every day for a reward: day 1 $100, day 2 $200 ... day 7 $700 + a Rare crate key,
-           then it starts over at day 1. Missing a day restarts the streak.
+           then it starts over at day 1. Missing a day restarts the streak, unless you have a Streak Freeze:
+           one is used up by itself for each missed day. You earn a freeze every 7 days of streak (holding up
+           to 2 earned ones), and can get more from the Store or Galaxy Pro+ (holding up to 10).
+           Streak milestones (7, 30, 50, 100, 200, 365 days) are celebrated.
            Galaxy+ gets 25% more, Galaxy Pro+ 50% more. Days start at midnight (US Eastern).
 /quests    3 new quests every day: one easy, one medium, one hard. Finishing all 3 gives a Common crate key.
 /achievements  milestones (shown on galaxymc.us profiles) and small money rewards.
@@ -139,6 +142,7 @@ ACH_BY_ID = {a[0]: a for a in ACHIEVEMENTS}
 
 NEW_STATS = {"playtime": 0, "mined": 0, "placed": 0, "kills": 0, "deaths": 0, "sold": 0, "diamonds": 0, "quests": 0,
              "streak": 0, "best_streak": 0, "last_daily": None, "keys": 0, "achievements": {}, "daily": None,
+             "freezes": 0, "streak_log": {},  # streak_log: recent days -> "played" or "frozen" (for the website)
              "crate_keys": {"common": 0, "rare": 0, "galaxy": 0}}
 KEY_NAMES = {"common": "Common", "rare": "Rare", "galaxy": "Galaxy"}
 
@@ -151,6 +155,11 @@ def dollars(cents):
 def bar(n, total, width=10):
     filled = min(width, int(width * n / total)) if total else width
     return "§a" + "|" * filled + "§8" + "|" * (width - filled)
+
+
+MAX_FREEZES = 10            # most Streak Freezes anyone can hold
+EARNED_FREEZE_CAP = 2       # free ones (every 7 days of streak) only while holding fewer than this
+STREAK_MILESTONES = {7, 30, 50, 100, 200, 365}
 
 
 class Progress:
@@ -305,6 +314,13 @@ class Progress:
         self.push()
 
     # ---------- daily reward ----------
+    def missed_days(self, s):
+        """How many days were missed since the last claim (0 if claimed yesterday or today)."""
+        if not s.get("last_daily"):
+            return None
+        last = datetime.date.fromisoformat(s["last_daily"])
+        return max(0, (self.today() - last).days - 1)
+
     def daily_state(self, player):
         """(can claim now?, the day number they'd get, current streak)"""
         s = self.stats(player)
@@ -312,8 +328,27 @@ class Progress:
         last = datetime.date.fromisoformat(s["last_daily"]) if s.get("last_daily") else None
         if last == today:
             return False, (s["streak"] - 1) % 7 + 1, s["streak"]
-        streak = s["streak"] if last == today - datetime.timedelta(days=1) else 0
+        missed = self.missed_days(s)
+        # missed days are covered by Streak Freezes (one each), so the streak goes on
+        streak = s["streak"] if missed is not None and missed <= s.get("freezes", 0) else 0
         return True, streak % 7 + 1, streak
+
+    def add_freezes(self, xuid, name, n):
+        """Streak Freezes from the Store, Pro+ or staff (any player, online or not). Holds up to 10."""
+        x = str(xuid)
+        s = self.cache.get(x) or self.load(x) or json.loads(json.dumps(NEW_STATS))
+        for k, v in NEW_STATS.items():
+            s.setdefault(k, json.loads(json.dumps(v)))
+        s.setdefault("name", name)
+        s["freezes"] = max(0, min(MAX_FREEZES, s.get("freezes", 0) + int(n)))
+        if x in self.cache:
+            self.dirty.add(x)
+            self.unsent.add(x)
+        else:
+            self.db.execute("INSERT OR REPLACE INTO player_stats (xuid, name, data) VALUES (?,?,?)", (x, s.get("name") or name, json.dumps(s)))
+            self.db.commit()
+            self.unsent.add(x)
+        return s["freezes"]
 
     def daily_amount(self, player, day):
         plans = getattr(self.plugin, "plans", None)
@@ -326,6 +361,16 @@ class Progress:
             return player.send_message("§7You already claimed today's reward. Come back tomorrow!")
         s = self.stats(player)
         cents = self.daily_amount(player, day)
+        missed = self.missed_days(s) or 0
+        used = missed if streak and missed else 0
+        log = s.setdefault("streak_log", {})
+        if used:  # Streak Freezes kept the streak going
+            s["freezes"] = max(0, s.get("freezes", 0) - used)
+            for i in range(1, used + 1):
+                log[str(self.today() - datetime.timedelta(days=i))] = "frozen"
+        log[str(self.today())] = "played"
+        for d in sorted(log)[:-21]:  # keep three weeks
+            log.pop(d, None)
         s["streak"] = streak + 1
         s["best_streak"] = max(s["best_streak"], s["streak"])
         s["last_daily"] = str(self.today())
@@ -337,6 +382,13 @@ class Progress:
             extra = " §d+ 1 Rare crate key!"
         self.touch(player)
         player.send_message(f"§6§lDaily reward: §r§aDay {day}: {dollars(cents)}{extra} §7(streak: {s['streak']} day{'s' if s['streak'] != 1 else ''})")
+        if used:
+            player.send_message(f"§b❄ {used} Streak Freeze{'s' if used != 1 else ''} saved your streak. §7You have {s['freezes']} left.")
+        if s["streak"] % 7 == 0 and s.get("freezes", 0) < EARNED_FREEZE_CAP:
+            s["freezes"] = s.get("freezes", 0) + 1
+            player.send_message("§b❄ You earned a Streak Freeze! §7If you miss a day, it saves your streak by itself.")
+        if s["streak"] in STREAK_MILESTONES:
+            player.send_message(f"§6§l🔥 {s['streak']}-day streak!§r §7Amazing. Keep it going!")
         try:
             show_title(self.plugin, player, "§6Daily reward", f"§aDay {day}: {dollars(cents)}", 5, 50, 15)
             player.play_sound(player.location, "random.levelup", 0.8, 1.2)
@@ -358,7 +410,9 @@ class Progress:
         now = datetime.datetime.now(TZ)
         midnight = datetime.datetime.combine(now.date() + datetime.timedelta(days=1), datetime.time(), tzinfo=TZ)
         left = int((midnight - now).total_seconds())
-        info = (f"Streak: §l{streak} day{'s' if streak != 1 else ''}§r. Log in every day to keep it going. Missing a day starts again at day 1."
+        fz = self.stats(player).get("freezes", 0)
+        info = (f"Streak: §l{streak} day{'s' if streak != 1 else ''}§r · Streak Freezes: §b{fz}§r\n"
+                "§7A freeze saves your streak by itself if you miss a day. You earn one every 7 days (more in the Store).§r"
                 f"\n\n" + "\n".join(lines) + f"\n\n§7Next reward in {left // 3600}h {left % 3600 // 60}m.")
         form = ActionForm(title="§l§6Daily Reward", content=info)
         if can:
@@ -521,6 +575,7 @@ class Progress:
         return {"xuid": xuid, "name": s.get("name"), "playtime": s["playtime"], "mined": s["mined"], "placed": s["placed"],
                 "kills": s["kills"], "deaths": s["deaths"], "quests": s["quests"], "streak": s["streak"], "best": s["best_streak"],
                 "achievements": sorted(s["achievements"].keys()), "lastDaily": s.get("last_daily"),
+                "freezes": int(s.get("freezes", 0)), "streakLog": dict(sorted((s.get("streak_log") or {}).items())[-21:]),
                 "bedwars": {k: int(s.get(f"bw_{k}", 0)) for k in ("games", "wins", "kills", "finals", "beds")}}
 
     def push(self, everything=False):

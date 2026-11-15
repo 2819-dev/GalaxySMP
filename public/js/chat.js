@@ -486,6 +486,8 @@ function renderMessage(m, prev) {
   const head = el("div", "msg-head");
   // Like Discord: the name in the rank's color/gradient, then the rank's icon.
   const rank = rankFor(m.author.id, m.author.rank);
+  const teamTag = state.members.get(m.author.id)?.team;
+  if (teamTag) head.append(el("span", "team-tag", `[${teamTag}]`));  // always gray, so it never looks like a rank
   const name = el("span", "name clickable");
   name.append(paint(m.author.username, rank));
   name.addEventListener("click", (e) => { e.stopPropagation(); openProfile({ ...author, rank }, name); });
@@ -1168,7 +1170,7 @@ export async function startChat({ onSignedOut }) {
   }
   // Direct messages show as a channel at the top of the list (its own view, like Support).
   data.channels.unshift({ id: DM_CHANNEL, categoryId: DM_CHANNEL, slug: "messages", name: "Direct Messages", topic: "Private chats with other members (also in game with /dm)", kind: "dms", canPost: false },
-    { id: FRIENDS_CHANNEL, categoryId: DM_CHANNEL, slug: "friends", name: "Friends", topic: "Your friends, friend requests and who's in game", kind: "friends", canPost: false });
+    { id: FRIENDS_CHANNEL, categoryId: DM_CHANNEL, slug: "friends", name: "Friends", topic: "Your friends, your team and who's in game", kind: "friends", canPost: false });
   state.categories = [{ id: DM_CHANNEL, name: "Messages" }, ...data.categories];
   if (data.dmUnread) state.unread.add(DM_CHANNEL);
   state.reactions = data.reactions;

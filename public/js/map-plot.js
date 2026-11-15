@@ -30,16 +30,36 @@ export async function openPlot(id, onChange) {
     } catch (e) { toast(e.message); }
   });
   const body = h("div", { class: "mp-card" }, photos,
-    h("div", { class: "mp-meta" }, h("span", { class: "text-3 small", text: `By ${d.owner} · X ${d.x}, Z ${d.z}` }), d.mine ? h("span", { class: `mp-state ${d.public ? "on" : ""}`, text: d.public ? "Public" : "Private" }) : like),
+    h("div", { class: "mp-meta" }, h("span", { class: "text-3 small", text: `By ${d.owner} · ${d.x != null ? `X ${d.x}, Z ${d.z}` : "Location Hidden"}` }),
+      d.mine ? h("span", { class: `mp-state ${d.visibility === "public" ? "on" : ""}`, text: VIS[d.visibility] || "Hidden" }) : like),
     d.caption ? h("p", { class: "text-2", style: "margin:0", text: d.caption } ) : null);
   const actions = [{ label: "Close" }];
   if (d.mine) {
-    actions.unshift({ label: d.public ? "Make private" : "Make public", onClick: async () => {
-      const r = await postJson(`/api/map/plots/${encodeURIComponent(id)}`, { action: d.public ? "private" : "public" });
-      toast(r.message); onChange?.();
-    } }, { label: "Edit photos", onClick: () => { editPhotos(id, d, onChange); } });
+    actions.unshift({ label: "Who can see it", onClick: () => { pickVisibility(id, d, onChange); } }, { label: "Edit photos", onClick: () => { editPhotos(id, d, onChange); } });
   }
   openDialog({ title: d.name, body, actions });
+}
+
+const VIS = { public: "Public", location: "Location Hidden", hidden: "Plot Hidden" };
+
+function pickVisibility(id, d, onChange) {
+  const opts = [
+    ["public", "Public", "On the map and in the Plot Showcase, with where it is."],
+    ["location", "Location Hidden", "In the Plot Showcase with photos and likes, but nobody can see where it is."],
+    ["hidden", "Plot Hidden", "Only a locked \"Plot Hidden\" card in the showcase."],
+  ];
+  let level = d.visibility || "hidden";
+  const list = h("div", { class: "mp-vis" });
+  const draw = () => list.replaceChildren(...opts.map(([k, name, text]) => {
+    const b = h("button", { class: "mp-vis-opt", type: "button", role: "radio", "aria-checked": String(level === k) }, h("b", { text: name }), h("span", { class: "text-3 small", text }));
+    b.addEventListener("click", () => { level = k; draw(); });
+    return b;
+  }));
+  draw();
+  openDialog({ title: "Who can see your plot?", body: list, actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: async () => {
+    const r = await postJson(`/api/map/plots/${encodeURIComponent(id)}`, { action: "visibility", level });
+    toast(r.message); onChange?.();
+  } }] });
 }
 
 function editPhotos(id, d, onChange) {

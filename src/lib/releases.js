@@ -122,6 +122,21 @@ Protect your account with codes from an authenticator app. Turn it on in Account
 **New badge looks**
 Badges now come in 20 colors, with holographic, glow and sparkle finishes and many more icons.`,
   },
+  {
+    id: "2026-11-19",
+    title: "Teams, Streak Freezes, the Plot Showcase and more",
+    body: `**Teams**
+Make a team of up to 8 players in Community > Friends > Team. Pick a name and a tag of up to 5 letters and numbers, which shows in gray before your name in chat. Teams get a private team chat on the website (also /tc in game), teammates can build on each other's plots, and there's a Top Teams leaderboard.
+
+**Daily streaks, upgraded**
+Your profile now shows your streak with this week's days. Streak Freezes save your streak by themselves if you miss a day: you earn one every 7 days, Galaxy Pro+ gets one each month, and you can get more in the Store. Big milestones are celebrated on #Timeline. Streak reminders are now at most one gentle note in the evening, and only when your streak would end that night.
+
+**Plot Showcase**
+Tap Showcase on the map to see everyone's builds, most liked first. Plot owners choose what's shown: Public, Location Hidden (photos and likes, but not where it is) or Plot Hidden. In game: /plot public, /plot nolocation or /plot private.
+
+**Achievements guide and Compare**
+Every profile has an Achievements guide showing how to get each achievement and how many players have it, with yours ticked. Tap Compare on any profile to see two players' stats side by side.`,
+  },
 ];
 
 // Posts any release note that hasn't been posted yet (oldest first). Safe to call often.

@@ -598,6 +598,7 @@ export async function tick(env) {
     ["wrapped", () => import("./wrapped.js").then((m) => m.wrappedTick(env, sql))],
     ["release notes", () => import("../lib/releases.js").then((m) => m.postReleases(env, sql))],
     ["anniversaries", () => import("./anniversary.js").then((m) => m.anniversaryTick(env, sql))],
+    ["pro+ streak freezes", () => proFreezes(sql)],
     ["inbox cleanup", () => sql`DELETE FROM notifications WHERE created_at < now() - interval '60 days'`],
     ["rewards", () => import("./rewards.js").then((m) => m.sendRewards(env, sql))],
   ];
@@ -627,4 +628,19 @@ async function buildOfTheWeek(env, sql) {
   if (!badge) [badge] = await sql`INSERT INTO badges (name, description, icon, style) VALUES ('Build of the Week', 'Posted the most liked build of the week in #Builds.', 'castle', 'gold') RETURNING id`;
   await sql`INSERT INTO user_badges (user_id, badge_id) VALUES (${winner.user_id}, ${badge.id}) ON CONFLICT DO NOTHING`;
   await notify(env, [winner.user_id], "community", { title: "Your build is Build of the Week!", body: `"${winner.title}" got the most likes last week. You earned the Build of the Week badge.`, url: "/community#builds", tag: "botw" });
+}
+
+// Galaxy Pro+ members get one free Streak Freeze each calendar month (given in game through the rewards queue).
+async function proFreezes(sql) {
+  const month = new Date().toISOString().slice(0, 7);
+  const due = await sql`
+    SELECT s.xuid, p.gamertag FROM subscriptions s JOIN players p ON p.xuid = s.xuid
+     WHERE s.plan = 'pro' AND (s.expires_at IS NULL OR s.expires_at > now())
+       AND NOT EXISTS (SELECT 1 FROM streak_grants g WHERE g.xuid = s.xuid AND g.month = ${month}) LIMIT 200`;
+  if (!due.length) return;
+  const { queueReward } = await import("./rewards.js");
+  for (const r of due) {
+    const [ok] = await sql`INSERT INTO streak_grants (xuid, month) VALUES (${r.xuid}, ${month}) ON CONFLICT DO NOTHING RETURNING xuid`;
+    if (ok) await queueReward(sql, { xuid: r.xuid, name: r.gamertag, keys: { freeze: 1 }, reason: "Galaxy Pro+ monthly Streak Freeze" });
+  }
 }

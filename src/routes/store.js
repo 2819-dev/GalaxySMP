@@ -18,7 +18,7 @@ import { headUrlFor } from "./heads.js";
 import { notify as pushNotify } from "./notify.js";
 
 // What can be bought now ("plans" = subscriptions). The rest show "Coming soon".
-export const ON_SALE = new Set(["plans", "money", "plots", "effects"]);
+export const ON_SALE = new Set(["plans", "money", "plots", "effects", "streak"]);
 export const PLAN_DAYS = 30; // a subscription bought here lasts 30 days (buying again adds 30 more)
 
 // The owner has unlimited credits (they aren't real money).
