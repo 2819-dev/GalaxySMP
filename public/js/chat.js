@@ -292,6 +292,8 @@ async function selectChannel(id) {
   renderChannels();
   // Special channels (Information, Auction House, Suggestions, Voice Chat, Events) have their own views.
   const special = ch.kind && ch.kind !== "text";
+  // pins, search and slow mode only make sense in normal chat channels
+  for (const id of ["open-pins", "open-search", "open-slowmode"]) { const b = document.getElementById(id); if (b) b.hidden = Boolean(special) || (id === "open-slowmode" && b.hidden); }
   $("messages").hidden = special;
   document.querySelector(".composer-wrap").hidden = special;
   $("jump-latest").hidden = true;

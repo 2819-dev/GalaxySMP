@@ -499,6 +499,8 @@ export function installBanner(force) {
   const snoozed = Number(store.get("gsmp-install-later") || 0);
   if (!force && Date.now() - snoozed < 7 * 86400_000) return;
   if (!installEvent && !isIos()) return;  // nothing to offer on this browser
+  // Only where the app matters (home, voice), never over the Store, profiles or the panels
+  if (!force && !["/", "/voice"].includes(location.pathname)) return;
   const bar = document.createElement("div");
   bar.className = "install-banner";
   bar.innerHTML = `
@@ -507,10 +509,10 @@ export function installBanner(force) {
     <button class="btn btn-primary btn-sm" type="button" data-install>${isIos() && !installEvent ? "How to add" : "Install"}</button>
     <button class="install-close" type="button" aria-label="Not now">×</button>`;
   bar.querySelector("[data-install]").addEventListener("click", () => installApp());
-  bar.querySelector(".install-close").addEventListener("click", () => { store.set("gsmp-install-later", String(Date.now())); bar.remove(); });
+  bar.querySelector(".install-close").addEventListener("click", () => { store.set("gsmp-install-later", String(Date.now())); bar.remove(); document.body.classList.remove("has-install-banner"); });
   // In Community, sit above the message box instead of floating over the newest messages.
   const host = document.querySelector(".composer-wrap");
-  if (host) { bar.classList.add("inline"); host.prepend(bar); } else document.body.append(bar);
+  if (host) { bar.classList.add("inline"); host.prepend(bar); } else { document.body.append(bar); document.body.classList.add("has-install-banner"); }  // leave room so it never covers the page
 }
 
 window.addEventListener("beforeinstallprompt", (e) => {

@@ -304,6 +304,17 @@ Compare on any profile now also lists the achievements you both have, and the on
     title: "Meet GalaxySMP, the server's own account",
     body: `GalaxySMP is now a member of the Community, with a verified BOT tag. It posts the Question of the Day, welcomes new players, announces chat level-ups and answers !commands in #Bot Commands. Official posts, like these update notes, come from it too. Tap its name to see its profile. To join GalaxySMP from the Friends tab on Xbox, add GalaxyPRO#9842 as a friend.`,
   },
+  {
+    id: "2026-11-27-mobile",
+    title: "A better fit on phones and in the app",
+    body: `We went through every page on phone-sized screens and tidied up what didn't feel right.
+
+**In the app:** pages no longer slide under the iPhone status bar or the home bar, and the message box sits clear of the bottom edge.
+
+**Community:** tap a message to show its buttons, which are now bigger and easier to hit. The app banner no longer covers the newest messages, and channels like #Timeline no longer show chat-only buttons.
+
+**Elsewhere:** the app banner only appears on the home and voice pages and never covers anything, profile names no longer overlap the banner picture, and the Store's cart button no longer sits on top of the category tabs.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

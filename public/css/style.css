@@ -26,6 +26,10 @@
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   --max: 1140px;
   --header-h: 60px;
+  /* the phone's notch / status bar and home bar (only non-zero in the app, with viewport-fit=cover) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --top-h: calc(var(--header-h) + var(--safe-top));
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -91,9 +95,10 @@ code, .mono { font-family: var(--mono); font-size: .94em; }
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* ---------- Header ---------- */
-.site-header-slot { min-height: var(--header-h); }
+.site-header-slot { min-height: var(--top-h); }
 .site-header {
   position: sticky; top: 0; z-index: 50;
+  padding-top: var(--safe-top); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
   background: rgba(10, 12, 27, .88);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -365,7 +370,7 @@ body.app-mode #main > .container { max-width: none; padding: 0; }
 .chat {
   --side-w: 248px; --members-w: 236px;
   display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr) var(--members-w);
-  height: calc(100vh - var(--header-h)); height: calc(100dvh - var(--header-h));
+  height: calc(100vh - var(--top-h)); height: calc(100dvh - var(--top-h));
   width: 100%; background: var(--bg);
 }
 .chat-side, .chat-members { background: var(--bg-raised); display: flex; flex-direction: column; min-height: 0; }
@@ -455,7 +460,9 @@ body.app-mode #main > .container { max-width: none; padding: 0; }
   position: absolute; right: 16px; top: -14px; display: none; gap: 2px; padding: 3px;
   background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,.3);
 }
-.msg:hover .msg-actions, .msg.active .msg-actions { display: flex; }
+.msg.active .msg-actions { display: flex; }
+@media (hover: hover) { .msg:hover .msg-actions { display: flex; } }
+@media (pointer: coarse) { .msg-actions .icon-btn { width: 38px; height: 38px; } .msg-actions { top: -22px; } }
 .msg-actions .icon-btn { width: 30px; height: 30px; }
 .msg-actions .icon-btn.danger:hover { color: var(--bad); }
 .picker {
@@ -499,14 +506,14 @@ body.app-mode #main > .container { max-width: none; padding: 0; }
 @media (max-width: 1100px) {
   .chat { grid-template-columns: var(--side-w) minmax(0, 1fr); }
   .chat-members { display: none; }
-  .chat-members.open { display: flex; position: fixed; top: var(--header-h); right: 0; bottom: 0; width: min(84vw, 280px); z-index: 60; box-shadow: -10px 0 30px rgba(0,0,0,.4); }
+  .chat-members.open { display: flex; position: fixed; top: var(--top-h); right: 0; bottom: 0; width: min(84vw, 280px); z-index: 60; box-shadow: -10px 0 30px rgba(0,0,0,.4); }
   .chat-top .members-toggle { display: inline-grid; }
 }
 @media (min-width: 1101px) { .chat-top .members-toggle { display: none; } }
 @media (max-width: 760px) {
   .chat { grid-template-columns: minmax(0, 1fr); }
   .chat-side { display: none; }
-  .chat-side.open { display: flex; position: fixed; top: var(--header-h); left: 0; bottom: 0; width: min(84vw, 290px); z-index: 60; box-shadow: 10px 0 30px rgba(0,0,0,.4); }
+  .chat-side.open { display: flex; position: fixed; top: var(--top-h); left: 0; bottom: 0; width: min(84vw, 290px); z-index: 60; box-shadow: 10px 0 30px rgba(0,0,0,.4); }
   .chat-top { padding-left: 6px; }
   .chat-top .only-mobile { display: inline-grid; }
   .chat-top .topic { display: none; }
@@ -515,7 +522,7 @@ body.app-mode #main > .container { max-width: none; padding: 0; }
   .composer-wrap { padding: 0 10px 10px; }
   .messages-start { padding: 16px 12px; }
 }
-.drawer-scrim.open { display: block; position: fixed; inset: var(--header-h) 0 0 0; background: rgba(0,0,0,.5); z-index: 55; }
+.drawer-scrim.open { display: block; position: fixed; inset: var(--top-h) 0 0 0; background: rgba(0,0,0,.5); z-index: 55; }
 
 /* ============================================================
    Dialogs and staff tools
@@ -645,7 +652,7 @@ textarea.input { height: auto; padding: 10px 14px; resize: vertical; min-height:
 .rank-preview-box { padding: 12px 14px; border-radius: 9px; background: #2b2b2b; border: 1px solid var(--border-strong); color: #fff; }
 .perm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; margin-top: 6px; font-size: .9rem; color: var(--text-2); }
 @media (max-width: 520px) { .perm-grid { grid-template-columns: 1fr; } }
-.dialog { max-height: calc(100vh - 32px); overflow-y: auto; }
+.dialog { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px - var(--safe-top) - var(--safe-bottom)); overflow-y: auto; }
 
 /* ---------- Money leaderboard ---------- */
 .leaderboard { list-style: none; margin: 0; padding: 0; }
@@ -1188,11 +1195,11 @@ button.pc-li { cursor: pointer; }
 img[src*="g=1"] { image-rendering: auto !important; }
 
 /* ---------- Store: Subscriptions + Shop ---------- */
-.store-tabs { position: sticky; top: calc(var(--header-h) + 8px); z-index: 5; display: flex; gap: 6px; padding: 5px; margin: 0 0 24px;
+.store-tabs { position: sticky; top: calc(var(--top-h) + 8px); z-index: 5; display: flex; gap: 6px; padding: 5px; margin: 0 0 24px;
   background: rgba(16,19,46,.85); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 999px; width: fit-content; }
 .store-tab { padding: 8px 18px; border-radius: 999px; color: var(--text-2); font-weight: 700; }
 .store-tab.active { background: var(--accent); color: #fff; }
-.store-section { scroll-margin-top: calc(var(--header-h) + 70px); margin-bottom: 40px; }
+.store-section { scroll-margin-top: calc(var(--top-h) + 70px); margin-bottom: 40px; }
 .store-h2 { font-size: 1.5rem; margin: 0 0 4px; }
 .store-sub { margin: 0 0 18px; }
 .plan-tag { background: none; padding: 0; }
@@ -1396,7 +1403,7 @@ body.app-mode .notify-banner { bottom: calc(86px + env(safe-area-inset-bottom));
 
 /* ---------- Account (settings) ---------- */
 .acc-layout { display: grid; grid-template-columns: 230px 1fr; gap: 24px; align-items: start; }
-.acc-nav { position: sticky; top: calc(var(--header-h) + 16px); display: flex; flex-direction: column; gap: 2px; padding: 8px; background: var(--surface);
+.acc-nav { position: sticky; top: calc(var(--top-h) + 16px); display: flex; flex-direction: column; gap: 2px; padding: 8px; background: var(--surface);
   border: 1px solid var(--border); border-radius: var(--radius-lg); }
 .acc-nav a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: var(--text-2); font-weight: 600; font-size: .95rem; }
 .acc-nav a:hover { background: var(--surface-2); color: var(--text); }
@@ -1595,7 +1602,7 @@ textarea.input.dm-input { resize: none; min-height: 44px; max-height: 140px; ove
 
 /* Store: donate */
 .donate-card { display: flex; align-items: center; gap: 16px; margin: 0 0 20px; padding: 18px 20px; border-color: rgba(255,127,196,.35);
-  background: linear-gradient(120deg, rgba(255,127,196,.10), rgba(124,92,255,.10)); scroll-margin-top: calc(var(--header-h) + 20px); }
+  background: linear-gradient(120deg, rgba(255,127,196,.10), rgba(124,92,255,.10)); scroll-margin-top: calc(var(--top-h) + 20px); }
 .donate-icon { width: 48px; height: 48px; flex: none; display: grid; place-items: center; border-radius: 14px; background: rgba(255,127,196,.2); color: #ff9fd3; }
 .donate-icon svg { width: 26px; height: 26px; }
 .donate-text { flex: 1; min-width: 0; }
@@ -3129,7 +3136,7 @@ html[data-skin][data-theme="light"] body { background: radial-gradient(1200px 70
 .dialog { border-radius: 22px; }
 
 /* ---------- Store v5: pixel-art graphics, sticky category bar, See all ---------- */
-.ap-nav { position: sticky; top: calc(var(--header-h) + 6px); z-index: 20; display: flex; gap: 6px; overflow-x: auto; margin: 22px -16px 0; padding: 8px 16px;
+.ap-nav { position: sticky; top: calc(var(--top-h) + 6px); z-index: 20; display: flex; gap: 6px; overflow-x: auto; margin: 22px -16px 0; padding: 8px 16px;
   scrollbar-width: none; background: color-mix(in srgb, var(--bg) 78%, transparent); backdrop-filter: saturate(180%) blur(18px); -webkit-backdrop-filter: saturate(180%) blur(18px);
   border-bottom: 1px solid var(--border); }
 .ap-nav::-webkit-scrollbar { display: none; }
@@ -3138,7 +3145,7 @@ html[data-skin][data-theme="light"] body { background: radial-gradient(1200px 70
 .ap-nav .ap-cat.active { background: var(--text); color: var(--bg); }
 .ap-cat-pix { width: 22px; height: 22px; image-rendering: pixelated; flex: none; }
 html[data-theme="light"] .ap-nav { background: rgba(245, 245, 247, .82); }
-.ap-sec, .ap-sub { scroll-margin-top: calc(var(--header-h) + 70px); }
+.ap-sec, .ap-sub { scroll-margin-top: calc(var(--top-h) + 70px); }
 
 .ap-h2-row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
 .ap-seeall { flex: none; background: none; border: 0; padding: 4px 0; color: var(--accent-text); font: 600 .95rem var(--font); cursor: pointer; }
@@ -4048,3 +4055,29 @@ html[data-theme="light"] .holiday-greeting { border-color: rgba(184, 134, 47, .3
 .acting-bar.full { background: linear-gradient(90deg, #5865f2, #8a5cff); color: #fff; }
 .pl-row.pl-bot { border: 1px solid rgba(88,101,242,.4); background: linear-gradient(90deg, rgba(88,101,242,.08), transparent); }
 .pl-row.pl-bot .pl-head-wrap img { background: #0d1530; object-fit: contain; }
+
+/* ---------- phones and the app: keep things clear of the notch and the home bar ---------- */
+.composer-wrap { padding-bottom: calc(16px + var(--safe-bottom)); }
+.chat-side.open, .chat-members.open { padding-bottom: var(--safe-bottom); }
+.site-footer { padding-bottom: calc(24px + var(--safe-bottom)); }
+@media (max-width: 760px) { .composer-wrap { padding: 0 10px calc(10px + var(--safe-bottom)); } }
+
+body.has-install-banner { padding-bottom: calc(96px + var(--safe-bottom)); }
+.install-banner { bottom: calc(12px + var(--safe-bottom)); }
+/* Profiles: the name and tags always start below the banner (they used to slide up over it when there was a lot to show) */
+.pp-hero-body { align-items: flex-start; }
+.pp-who { margin-top: 56px; }
+.pp-actions { align-self: flex-end; }
+@media (max-width: 600px) {
+  .pp-who { flex-basis: 100%; margin-top: 0; min-width: 0; }
+  .pp-actions { align-self: auto; flex-wrap: wrap; }
+  .pp-name { font-size: 1.6rem; }
+}
+/* The iPhone "voice needs the app" screen is always dark, so its text is always light (also in light mode) */
+.install-wall, .install-wall h1 { color: #fff; }
+.install-wall .text-2, .install-wall-steps ol { color: rgba(225,232,255,.86); }
+.install-wall .text-3 { color: rgba(205,214,245,.7); }
+.install-wall-steps b { color: #fff; }
+.install-wall { padding-top: calc(24px + var(--safe-top)); padding-bottom: calc(24px + var(--safe-bottom)); overflow-y: auto; }
+/* Sticky cart button sits flush with the screen edge so chips never peek out on its right side */
+@media (max-width: 760px) { .ap-nav .ap-cartbtn { right: -16px; margin-right: -16px; border-radius: 99px 0 0 99px; border-right: 0; padding-right: 20px; } }
