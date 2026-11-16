@@ -13,7 +13,7 @@
   try { seen = sessionStorage.getItem("gsmp-intro") === "1"; sessionStorage.setItem("gsmp-intro", "1"); } catch (e) { /* private mode */ }
   var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   var SLOW_MS = 400;          // later pages: only show if loading takes longer than this
-  var DURATION = 1600;        // the full animation
+  var DURATION = 2400;        // the full animation
   var loaded = document.readyState === "complete";
   window.addEventListener("load", function () { loaded = true; });
 
