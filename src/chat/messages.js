@@ -20,7 +20,13 @@ export function formatMessage(r) {
     createdAt: r.created_at,
     seen: Boolean(r.seen_at),          // another member has seen it (it can't be edited after that)
     editedAt: r.edited_at || null,
-    author: { id: r.author_id ? Number(r.author_id) : 0, username: r.username || r.game_name || "Player", role: r.role_key || "member", color: r.color || null, rank: rankOf(r) },
+    author: { id: r.author_id ? Number(r.author_id) : 0, username: r.username || r.game_name || "Player", role: r.role_key || "member", color: r.color || null, rank: rankOf(r),
+      level: r.chat_level != null ? Number(r.chat_level) : null },
+    bot: Boolean(r.kind && !r.author_id && !r.game_xuid),  // posted by @GalaxySMP (Question of the Day, welcomes, level-ups)
+    kind: r.kind || null,
+    meta: r.meta || null,
+    thanks: (r.thanks || []).map(Number),
+    waves: (r.waves || []).map(Number),
     fromGame: Boolean(r.game_xuid),
     replyTo: r.reply_to
       ? {
@@ -41,7 +47,9 @@ export function formatMessage(r) {
 
 const SELECT = `
   SELECT m.id, m.channel_id, m.content, m.created_at, m.game_xuid, m.game_name, m.reply_to, m.seen_at, m.edited_at, m.pinned_at, m.poll_id, m.image_id, mi.width AS image_w, mi.height AS image_h,
-         m.audio_id, ma.duration_ms AS audio_ms, m.thread_root,
+         m.audio_id, ma.duration_ms AS audio_ms, m.thread_root, m.kind, m.meta, cx.level AS chat_level,
+         (SELECT coalesce(array_agg(t.user_id), '{}') FROM message_thanks t WHERE t.message_id = m.id) AS thanks,
+         CASE WHEN m.kind = 'welcome' THEN (SELECT coalesce(array_agg(w.user_id ORDER BY w.created_at), '{}') FROM message_waves w WHERE w.message_id = m.id) END AS waves,
          (SELECT count(*)::int FROM messages t WHERE t.thread_root = m.id AND t.deleted_at IS NULL) AS thread_count,
          (SELECT max(t.created_at) FROM messages t WHERE t.thread_root = m.id AND t.deleted_at IS NULL) AS thread_last,
          u.id AS author_id, u.username, r.key AS role_key, r.color,
@@ -62,7 +70,8 @@ const SELECT = `
     LEFT JOIN messages p ON p.id = m.reply_to
     LEFT JOIN users pu ON pu.id = p.user_id
     LEFT JOIN message_images mi ON mi.id = m.image_id
-    LEFT JOIN message_audio ma ON ma.id = m.audio_id`;
+    LEFT JOIN message_audio ma ON ma.id = m.audio_id
+    LEFT JOIN chat_xp cx ON cx.user_id = u.id`;
 
 export async function loadHistory(sql, channelId, beforeId) {
   const rows = await sql.query(

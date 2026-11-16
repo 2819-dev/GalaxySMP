@@ -465,7 +465,7 @@ function linkify(box, text) {
 }
 
 function isGrouped(m, prev) {
-  return prev && prev.author.id === m.author.id && !m.replyTo && new Date(m.createdAt) - new Date(prev.createdAt) < 5 * 60_000;
+  return prev && prev.author.id === m.author.id && prev.author.username === m.author.username && !m.bot && !prev.bot && !m.replyTo && new Date(m.createdAt) - new Date(prev.createdAt) < 5 * 60_000;
 }
 
 function renderMessage(m, prev, opts = {}) {
@@ -473,9 +473,17 @@ function renderMessage(m, prev, opts = {}) {
   const row = el("div", "msg" + (grouped ? " grouped" : ""));
   row.dataset.id = m.id;
   const author = state.members.get(m.author.id) || { id: m.author.id, username: m.author.username, role: m.author.role, rank: m.author.rank };
-  const pic = avatar(m.author.username, false, author);
-  pic.classList.add("clickable");
-  pic.addEventListener("click", (e) => { e.stopPropagation(); openProfile(author, pic); });
+  let pic;
+  if (m.bot) {  // @GalaxySMP (Question of the Day, welcome cards, level-ups)
+    pic = el("img", "avatar head bot-avatar");
+    pic.src = "/favicon.png";
+    pic.alt = "";
+    row.classList.add("bot-msg", `kind-${m.kind}`);
+  } else {
+    pic = avatar(m.author.username, false, author);
+    pic.classList.add("clickable");
+    pic.addEventListener("click", (e) => { e.stopPropagation(); openProfile(author, pic); });
+  }
   row.append(pic);
   if (grouped) {  // the time shows in the left gutter on hover, like Discord
     const gt = el("time", "gutter-time", timeFmt.format(new Date(m.createdAt)));
@@ -504,6 +512,7 @@ function renderMessage(m, prev, opts = {}) {
   head.append(name);
   const ri = roleIcon(rank);
   if (ri) head.append(ri);
+  for (const hook of messageHeadHooks) hook(m, head);
   const t = el("time", "", timeFmt.format(new Date(m.createdAt)));
   t.dateTime = m.createdAt;
   t.title = new Date(m.createdAt).toLocaleString();
@@ -552,6 +561,7 @@ export function channelChoices() {
 
 // Stage D adds staff actions (report, delete) through this hook.
 export const messageActionHooks = [];
+export const messageHeadHooks = [];  // e.g. the chat level next to a name, the BOT tag
 export const messageBodyHooks = [];  // e.g. polls draw themselves inside their message
 export const composerHooks = [];     // e.g. the Poll button, when the channel changes
 

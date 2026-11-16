@@ -3986,3 +3986,34 @@ html[data-theme="light"] .holiday-greeting { border-color: rgba(184, 134, 47, .3
   .ct-price { grid-column: 2 / 3; text-align: left; }
   .ap-cart-label { display: none; }
 }
+
+/* Community extras: chat levels, BOT tag, Question of the Day, welcome waves, thanks, While you were away */
+.lvl-pill { font-size: .66rem; font-weight: 800; letter-spacing: .02em; padding: 1px 6px; border-radius: 6px; background: linear-gradient(135deg, rgba(61,170,244,.18), rgba(138,92,255,.18)); color: var(--accent-text, #5b7cfa); align-self: center; }
+.bot-tag { font-size: .62rem; font-weight: 800; padding: 1px 5px; border-radius: 4px; background: #5865f2; color: #fff; align-self: center; letter-spacing: .04em; }
+.bot-avatar { background: var(--surface-2); object-fit: contain; padding: 3px; }
+.msg.bot-msg .msg-text { color: var(--text); }
+.qotd-card, .welcome-card { border-radius: 14px; padding: 10px 12px; margin-top: 2px; }
+.qotd-card { background: linear-gradient(135deg, rgba(255,184,0,.13), rgba(255,120,60,.07)); border: 1px solid rgba(240,170,40,.35); }
+.welcome-card { background: linear-gradient(135deg, rgba(61,200,140,.13), rgba(61,170,244,.08)); border: 1px solid rgba(61,190,140,.35); }
+.qotd-card .msg-head, .welcome-card .msg-head { margin-bottom: 2px; }
+.qotd-foot, .welcome-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.qotd-foot .btn svg { width: 15px; height: 15px; }
+.wave-btn .wave-hand { display: inline-block; margin-right: 4px; transform-origin: 70% 70%; }
+.wave-btn:not(:disabled):hover .wave-hand { animation: wave-hand 1s ease-in-out infinite; }
+@keyframes wave-hand { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(16deg); } 40% { transform: rotate(-8deg); } 60% { transform: rotate(14deg); } 80% { transform: rotate(-4deg); } }
+@media (prefers-reduced-motion: reduce) { .wave-btn .wave-hand { animation: none !important; } }
+.thanks-chip { display: inline-flex; align-items: center; gap: 2px; margin-top: 6px; padding: 2px 9px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); font: inherit; font-size: .78rem; cursor: pointer; }
+.thanks-chip.mine { border-color: rgba(47,168,90,.5); background: rgba(47,168,90,.12); color: #2fa85a; }
+.msg-actions .icon-btn.on { color: #2fa85a; }
+.away { display: flex; flex-direction: column; gap: 12px; max-width: 520px; }
+.away-sec h3 { margin: 0 0 6px; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+.away-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.away-chip { padding: 4px 10px; border-radius: 99px; background: var(--surface-2); font-size: .86rem; }
+.away-msg { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; padding: 8px 10px; margin-bottom: 6px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: inherit; font: inherit; cursor: pointer; }
+.away-msg:hover { background: var(--surface-2); }
+.away-quote { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.away-mention { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 600; color: var(--accent-text, #5b7cfa); }
+.away-mention svg, .away-ev svg { width: 16px; height: 16px; }
+.away-ev { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; }
+.qotd-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; max-height: 420px; overflow: auto; }
+.qotd-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }

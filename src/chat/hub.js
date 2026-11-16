@@ -68,6 +68,17 @@ export class CommunityHub extends DurableObject {
     ws.serializeAttachment({ ...user, viewing: view, viewingAt: Date.now() });
   }
 
+  // The page says "I'm open on screen" about once a minute: counts minutes on Community (for Friend Streaks).
+  async onActive(user) {
+    if (!user?.id || user.readOnly) return;
+    this.activeAt ||= new Map();
+    const last = this.activeAt.get(user.id) || 0;
+    if (Date.now() - last < 55_000) return;  // several tabs open still count once a minute
+    this.activeAt.set(user.id, Date.now());
+    const { countActivity } = await import("./engage.js");
+    await countActivity(this.env, getDb(this.env), user.id, { minute: true });
+  }
+
   // "player1 is typing…": in a channel to everyone else, in a DM only to the other person.
   // Not stored anywhere; browsers send it at most every few seconds and hide it after 6 seconds.
   async onTyping(ws, user, msg) {
@@ -234,6 +245,7 @@ export class CommunityHub extends DurableObject {
       else if (msg.type === "edit") await this.onEdit(ws, user, msg);
       else if (msg.type === "viewing") this.onViewing(ws, user, msg);
       else if (msg.type === "typing") await this.onTyping(ws, user, msg);
+      else if (msg.type === "active") await this.onActive(user);
     } catch (e) {
       console.error("hub error", e);
       this.send(ws, { type: "error", nonce: msg.nonce, message: "Something went wrong. Please try again." });
@@ -347,6 +359,9 @@ export class CommunityHub extends DurableObject {
     const message = await loadMessage(sql, r.id);
     this.send(ws, { type: "sent", nonce: msg.nonce, id: message.id });
     await this.broadcastChannel(channelId, { type: "message", message });
+    // chat XP, level-ups, !commands in #Bot Commands, and website activity for Friend Streaks
+    this.ctx.waitUntil(import("./engage.js").then((e) => e.afterMessage(this.env, sql, user, channelId, message,
+      (m) => this.broadcastChannel(m.channelId, { type: "message", message: m }))).catch((err) => console.error("engage failed", err)));
     if (message.threadRoot) {
       // the thread's reply count on the message that started it, and a notification for whoever started it
       const root = await loadMessage(sql, message.threadRoot);

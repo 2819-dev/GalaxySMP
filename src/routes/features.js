@@ -621,6 +621,10 @@ export async function tick(env) {
     ["pro+ streak freezes", () => proFreezes(sql)],
     ["inbox cleanup", () => sql`DELETE FROM notifications WHERE created_at < now() - interval '60 days'`],
     ["rewards", () => import("./rewards.js").then((m) => m.sendRewards(env, sql))],
+    ["question of the day", () => import("../chat/engage.js").then(async (m) => {
+      const { hubBroadcast } = await import("./chat.js");
+      return m.qotdTick(env, sql, (message) => hubBroadcast(env, { type: "message", message }));
+    })],
   ];
   for (const [name, run] of jobs) await run().catch((e) => console.error(`${name} job failed`, e));
 }

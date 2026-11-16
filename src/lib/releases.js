@@ -284,6 +284,21 @@ Compare on any profile now also lists the achievements you both have, and the on
 
 **Also new:** rate the help you got when a support ticket closes, the Merch Supporter badge for buying 2 or more merch items, and #OT | Advertising now allows links, with one post every 20 minutes.`,
   },
+  {
+    id: "2026-11-26a",
+    title: "A livelier Community",
+    body: `**Question of the Day:** every morning @GalaxySMP asks a fun question in #Chat. Tap Answer to reply in its thread.
+
+**Welcome waves:** when a new player joins for the first time, a welcome card appears in #Chat. Tap Wave to say hi, and they'll see how many people waved.
+
+**Thanks:** tap the handshake on a helpful message to thank its author. At 25 thanks you earn the Helpful badge.
+
+**Chat levels:** chatting earns XP (once a minute), and your level shows next to your name. Level-ups are announced in the new #Bot Commands channel, where you can type !level, !top and !help.
+
+**While you were away:** come back after a day or more and Community shows you what you missed.
+
+**Friend Streaks:** a day now also counts if you spend 15 minutes on Community and send at least one message.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

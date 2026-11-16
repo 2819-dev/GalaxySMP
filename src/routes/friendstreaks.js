@@ -1,7 +1,8 @@
 // Friend Streaks (like Duolingo): invite a friend, they accept, and every day you BOTH play on the server the
 // streak grows by one. Miss a day and it starts again from 0. Up to 5 Friend Streaks each (invites count too).
 // Milestones (7, 30, 100, 365 days) give both friends game money; 100 days also gives a badge.
-// Days are counted in New York time, like the rest of the site. "Played" = was on the server at any time that day.
+// Days are counted in New York time, like the rest of the site. "Played" = on the server at any time that day, or on
+// Community for 15 minutes with at least 1 message (see chat/engage.js).
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -39,9 +40,13 @@ export function current(row, d = days()) {
 // Which of these users have been on the server today (New York time).
 async function playedToday(sql, userIds) {
   if (!userIds.length) return new Set();
+  // in game for any time today, or on Community for 15 minutes today with at least 1 message
   const rows = await sql`
     SELECT DISTINCT u.id FROM users u JOIN players p ON p.uuid = u.mc_uuid JOIN player_sessions s ON s.xuid = p.xuid
-     WHERE u.id = ANY(${userIds}) AND (s.ended_at AT TIME ZONE ${TZ})::date = (now() AT TIME ZONE ${TZ})::date`;
+     WHERE u.id = ANY(${userIds}) AND (s.ended_at AT TIME ZONE ${TZ})::date = (now() AT TIME ZONE ${TZ})::date
+    UNION
+    SELECT w.user_id AS id FROM web_activity w
+     WHERE w.user_id = ANY(${userIds}) AND w.day = (now() AT TIME ZONE ${TZ})::date AND w.minutes >= 15 AND w.messages >= 1`;
   return new Set(rows.map((r) => Number(r.id)));
 }
 

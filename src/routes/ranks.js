@@ -364,7 +364,13 @@ export async function recordPlayers(env, list) {
     RETURNING xuid, gamertag, (xmax = 0) AS inserted`));
   // brand-new players go on #Timeline
   for (const [row] of results) {
-    if (row?.inserted) await postTimeline(sql, { kind: "first_join", xuid: row.xuid, name: row.gamertag, title: "joined GalaxySMP for the first time", detail: "Say hi and welcome them!", icon: "sparkles", dedupe: `join:${row.xuid}` });
+    if (row?.inserted) {
+      await postTimeline(sql, { kind: "first_join", xuid: row.xuid, name: row.gamertag, title: "joined GalaxySMP for the first time", detail: "Say hi and welcome them!", icon: "sparkles", dedupe: `join:${row.xuid}` });
+      // a welcome card in #Chat with a Wave button
+      const { welcomeCard } = await import("../chat/engage.js");
+      const { hubBroadcast } = await import("./chat.js");
+      await welcomeCard(sql, { xuid: row.xuid, name: row.gamertag }, (message) => hubBroadcast(env, { type: "message", message })).catch((e) => console.error("welcome card failed", e));
+    }
   }
 }
 

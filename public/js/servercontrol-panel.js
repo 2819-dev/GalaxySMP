@@ -1,6 +1,7 @@
 // Control Panel > Server > Server control (owner only): maintenance mode, a one-time scheduled restart,
 // and the welcome kit for brand-new players.
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
+import { iconEl } from "/js/site.js";
 
 const pad = (n) => String(n).padStart(2, "0");
 const localInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -14,7 +15,7 @@ export function setupServerControl({ loaders, toast }) {
   loaders.serverctl = async () => {
     let d;
     try { d = await getJson("/api/panel/server-control"); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
-    box.replaceChildren(lockdownPanel(d), h("div", { class: "sc-potm-slot" }), friendBotPanel(d), allowlistPanel(), goalPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d), holidayPanel(d));
+    box.replaceChildren(lockdownPanel(d), h("div", { class: "sc-potm-slot" }), friendBotPanel(d), allowlistPanel(), goalPanel(), qotdPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d), holidayPanel(d));
     box.querySelector(".sc-potm-slot")?.replaceWith(potmPanel());
   };
 
@@ -55,6 +56,37 @@ export function setupServerControl({ loaders, toast }) {
     }
     draw();
     return wrap;
+  }
+
+  // ---------- Question of the Day ----------
+  function qotdPanel() {
+    const list = h("div", { class: "qotd-list" }, h("p", { class: "text-3", text: "Loading…" }));
+    const input = h("input", { class: "input", maxlength: 200, placeholder: "e.g. What's your favorite biome to build in?", "aria-label": "New question" });
+    const add = h("button", { class: "btn btn-primary", type: "button", text: "Add" });
+    async function draw() {
+      let d;
+      try { d = await getJson("/api/panel/qotd"); } catch (e) { list.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
+      const next = d.questions.filter((q) => !q.usedAt);
+      list.replaceChildren(
+        h("p", { class: "text-3 small", style: "margin:0", text: `${d.questions.length} questions · ${next.length} not asked yet. When every question has been asked, they start again from the oldest.` }),
+        ...d.questions.slice(0, 60).map((q) => h("div", { class: "qotd-row" },
+          h("span", { text: q.text }),
+          h("span", { class: "text-3 small", text: q.usedAt ? `asked ${new Date(q.usedAt).toLocaleDateString()}` : "not asked yet" }),
+          h("button", { class: "icon-btn", type: "button", "aria-label": "Delete question", title: "Delete", onclick: async () => {
+            try { await postJson("/api/panel/qotd", { action: "delete", id: q.id }); draw(); } catch (e) { toast(e.message); }
+          } }, iconEl("trash")))));
+    }
+    add.addEventListener("click", async () => {
+      add.disabled = true;
+      try { const r = await postJson("/api/panel/qotd", { action: "add", text: input.value }); toast(r.message); input.value = ""; draw(); } catch (e) { toast(e.message); }
+      add.disabled = false;
+    });
+    draw();
+    return h("section", { class: "panel sc-card" },
+      h("div", { class: "sc-head" }, h("h2", { text: "Question of the Day" })),
+      h("p", { class: "text-2", text: "Every morning at 6:30 (New York time), @GalaxySMP asks one of these in #Chat, and players answer in a thread. Your own questions are asked first." }),
+      h("div", { class: "cx-row" }, input, add),
+      h("details", { class: "qotd-all" }, h("summary", { text: "All questions" }), list));
   }
 
   // ---------- Jewish holiday decorations ----------

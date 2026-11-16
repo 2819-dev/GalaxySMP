@@ -5,6 +5,7 @@ import "/js/chat-polls.js";
 import "/js/chat-pictures.js";
 import "/js/chat-threads.js";
 import "/js/chat-voice.js";
+import "/js/chat-engage.js";
 import { maybeAskForNotifications, refreshSubscription, openPreferences } from "/js/notify.js";
 
 const $ = (id) => document.getElementById(id);

@@ -33,7 +33,7 @@ messageBodyHooks.push((m, body) => {
 });
 
 // ---------- the side panel ----------
-async function openThread(rootId) {
+export async function openThread(rootId) {
   let d;
   try { d = await getJson(`/api/chat/threads/${rootId}`); } catch (e) { toast(e.message); return; }
   closeThread();

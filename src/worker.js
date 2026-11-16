@@ -58,6 +58,7 @@ import * as friends from "./routes/friends.js";
 import * as friendStreaks from "./routes/friendstreaks.js";
 import * as merch from "./routes/merch.js";
 import * as cart from "./routes/cart.js";
+import * as engage from "./routes/engage.js";
 import { isActingRequest } from "./lib/auth.js";
 import { ensureSchema } from "./lib/autoschema.js";
 import { lockdownGate, lockdownState } from "./lib/lockdown.js";
@@ -195,6 +196,12 @@ const routes = [
   ["POST", "/api/friends/streak", (req, env) => friendStreaks.act(req, env)],
   ["GET", "/api/store/merch", (req, env) => merch.list(req, env)],
   ["POST", "/api/store/cart/quote", (req, env) => cart.quote(req, env)],
+  ["POST", "/api/chat/messages/:id/thank", engage.thank],
+  ["POST", "/api/chat/messages/:id/wave", engage.wave],
+  ["GET", "/api/community/away", (req, env) => engage.away(req, env)],
+  ["GET", "/api/community/level", engage.level],
+  ["GET", "/api/panel/qotd", (req, env) => engage.qotdList(req, env)],
+  ["POST", "/api/panel/qotd", (req, env) => engage.qotdSave(req, env)],
   ["POST", "/api/store/cart/checkout", (req, env) => cart.checkout(req, env)],
   ["POST", "/api/store/merch/quote", (req, env) => merch.quote(req, env)],
   ["POST", "/api/store/merch/checkout", (req, env) => merch.checkout(req, env)],
