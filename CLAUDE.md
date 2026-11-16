@@ -7,3 +7,8 @@
 - Never use the word "Webshop" on the site; it's the "Store".
 - Never clutter the navigation, sidebar, drawer, footer or Community channel list with new pages. Put new features
   inside existing pages (a tab, a section, a dialog or a button on a related page) unless the owner asks for a page.
+- Never re-suggest ideas the owner said no to or skipped. So far: scheduled staff posts, per-channel notification
+  settings, weekend boosts, treasure hunts, Bedwars Quick Buy, Bedwars tournaments, map heatmap, player-made guides,
+  gifting reminders, birthdays, profile/plot guestbooks, Hall of Fame, item price guide, bug report board, advent
+  calendar, "recently bought"/live tickers, vote page, Build of the Month, install-as-app, saved messages,
+  "Remind me" on messages, share to DM, bounties. Add to this list whenever the owner says no.
