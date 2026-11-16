@@ -160,7 +160,7 @@ function drawSlow(ch) {
 function slowDialog() {
   const ch = currentChannel();
   if (!ch) return;
-  const choices = [0, 5, 10, 30, 60, 300, 900, 3600];
+  const choices = [0, 5, 10, 30, 60, 300, 900, 1200, 3600];
   const sel = h("select", { class: "input", id: "slow-seconds" }, ...choices.map((s) => h("option", { value: s, text: s ? slowLabel(s) : "Off", selected: Number(ch.slow || 0) === s })));
   openDialog({
     title: `Slow mode in #${ch.name}`,

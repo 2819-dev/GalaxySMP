@@ -121,7 +121,8 @@ export function checkMessage(raw, compiledWords, opts = {}) {
   let scan = text.toLowerCase();
   for (const own of OWN_ADDRESSES) scan = scan.split(own).join(" ");
   if (EMAIL_RES.some((re) => re.test(scan))) return blocked("personal", "Email addresses can't be shared in chat.");
-  if (opts.allowLinks) scan = scan.replace(URL_TOKEN_RE, " ");
+  // opts.allowUrls: everyone may post web links in this channel (e.g. #OT | Advertising); IPs and numbers are still checked
+  if (opts.allowLinks || opts.allowUrls) scan = scan.replace(URL_TOKEN_RE, " ");
   if (LINK_RES.some((re) => re.test(scan))) return blocked("link", "Links aren't allowed in chat.");
   // Admins (allowLinks) may also share server IPs, ports and other numbers (e.g. setup guides).
   if (!opts.allowLinks && IP_RE.test(scan)) return blocked("link", "IP addresses aren't allowed in chat.");

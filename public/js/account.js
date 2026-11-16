@@ -129,7 +129,7 @@ function inviteCard() {
     });
     const parts = [
       h("p", { class: "text-2", style: "margin:0" }, `Your link opens the "Request to join" page: friends still ask to join and wait for the owner to approve them. When an approved friend makes an account and plays for ${d.rewards.hours} hour, you get `,
-        h("b", { text: moneyDollars(d.rewards.inviter / 100) }), " and they get ", h("b", { text: moneyDollars(d.rewards.friend / 100) }), ` in game. Invite ${d.rewards.badgeAt} friends who play to earn the Recruiter badge.`),
+        h("b", { text: `${moneyDollars(d.rewards.inviter / 100)} and a Rare Pack` }), " and they get ", h("b", { text: `${moneyDollars(d.rewards.friend / 100)}, a Tool Pack and a Food Pack` }), ` in game. Invite ${d.rewards.badgeAt} friends who play to earn the Recruiter badge.`),
       h("div", { class: "acc-invite" }, link, copy),
       h("div", { class: "acc-invite-stats" },
         h("div", {}, h("b", { text: String(d.friends.length) }), h("span", { class: "text-3 small", text: "joined with your link" })),

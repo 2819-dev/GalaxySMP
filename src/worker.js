@@ -57,6 +57,7 @@ import * as actas from "./routes/actas.js";
 import * as friends from "./routes/friends.js";
 import * as friendStreaks from "./routes/friendstreaks.js";
 import * as merch from "./routes/merch.js";
+import * as cart from "./routes/cart.js";
 import { isActingRequest } from "./lib/auth.js";
 import { ensureSchema } from "./lib/autoschema.js";
 import { lockdownGate, lockdownState } from "./lib/lockdown.js";
@@ -193,6 +194,8 @@ const routes = [
   ["POST", "/api/friends", (req, env) => friends.act(req, env)],
   ["POST", "/api/friends/streak", (req, env) => friendStreaks.act(req, env)],
   ["GET", "/api/store/merch", (req, env) => merch.list(req, env)],
+  ["POST", "/api/store/cart/quote", (req, env) => cart.quote(req, env)],
+  ["POST", "/api/store/cart/checkout", (req, env) => cart.checkout(req, env)],
   ["POST", "/api/store/merch/quote", (req, env) => merch.quote(req, env)],
   ["POST", "/api/store/merch/checkout", (req, env) => merch.checkout(req, env)],
   ["POST", "/api/store/merch/connect", (req, env) => merch.connect(req, env)],
@@ -311,6 +314,8 @@ const routes = [
   ["GET", "/api/support/tickets/:id", support.getTicket],
   ["POST", "/api/support/tickets/:id/messages", support.postMessage],
   ["POST", "/api/support/tickets/:id/close", support.closeTicket],
+  ["POST", "/api/support/tickets/:id/rate", support.rateTicket],
+  ["GET", "/api/mod/ticket-ratings", support.ratings],
   ["GET", "/api/mod/tickets", support.staffTickets],
   ["GET", "/api/me/header", (req, env) => account.headerMe(req, env)],
   ["GET", "/api/account", (req, env) => account.getAccount(req, env)],

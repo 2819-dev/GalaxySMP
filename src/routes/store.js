@@ -18,11 +18,11 @@ import { headUrlFor } from "./heads.js";
 import { notify as pushNotify } from "./notify.js";
 
 // What can be bought now ("plans" = subscriptions). The rest show "Coming soon".
-export const ON_SALE = new Set(["plans", "money", "plots", "effects", "streak"]);
+export const ON_SALE = new Set(["plans", "money", "packs", "bundles", "plots", "effects", "streak"]);
 export const PLAN_DAYS = 30; // a subscription bought here lasts 30 days (buying again adds 30 more)
 
 // The owner has unlimited credits (they aren't real money).
-const ownerOf = (env, user) => isOwner(env, user.username, user.platform === "bedrock");
+export const ownerOf = (env, user) => isOwner(env, user.username, user.platform === "bedrock");
 
 export const stripeReady = (env) => Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET);
 
@@ -32,7 +32,7 @@ export function onSale(prod) {
 
 const usd = (c) => `$${(c / 100).toFixed(2)}`;
 
-async function linkedPlayer(sql, userId) {
+export async function linkedPlayer(sql, userId) {
   const [p] = await sql`SELECT p.xuid, p.gamertag, p.cosmetics FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${userId}`;
   return p || null;
 }
@@ -96,7 +96,7 @@ async function prepare(sql, user, body) {
   return { prod, item, player: p, promo, final, giftTo };
 }
 
-async function deliver(env, sql, player, prod, by, source) {
+export async function deliver(env, sql, player, prod, by, source) {
   await (await import("./wishlist.js")).gotItem(sql, player.xuid, prod.key).catch(() => {});
   if (prod.isPlan) return grantPlan(env, sql, player, prod, by, source);
   return giveShopItem(env, sql, { xuid: player.xuid, gamertag: player.gamertag }, { item: prod.key, option: prod.option }, by, source);
@@ -115,6 +115,13 @@ async function grantPlan(env, sql, player, prod, by, source) {
   if (!keep) await postTimeline(sql, { kind: "plan", xuid: player.xuid, name: player.gamertag, title: `got ${prod.name || (prod.key === "pro" ? "Galaxy Pro+" : "Galaxy+")}`,
     detail: "Thanks for supporting GalaxySMP!", icon: "star", dedupe: `plan:${player.xuid}:${prod.key}:${new Date().toISOString().slice(0, 10)}` });
   return { ok: true, sent, expires };
+}
+
+// The plan in a bundle: 30 days, the same as buying the plan (adds to the time left, or switches plan).
+export async function grantBundlePlan(env, sql, p, planKey, by) {
+  const plan = PLANS[planKey];
+  if (!plan) return;
+  await grantPlan(env, sql, { xuid: p.xuid, gamertag: p.gamertag }, { key: planKey, name: plan.name, price: 0, isPlan: true }, { username: by?.username || "bundle" }, "bundle");
 }
 
 const doneMessage = (prod, sent) => `${prod.name} is yours${prod.isPlan ? ` for ${PLAN_DAYS} days` : ""}! ${sent ? "It's ready in game." : "You'll get it next time the server is online."}`;
@@ -264,6 +271,10 @@ async function fulfil(env, sql, payId) {
   }
   if (pay.kind === "merch") {
     await (await import("./merch.js")).paid(env, sql, pay);
+    return;
+  }
+  if (pay.kind === "cart") {
+    await (await import("./cart.js")).paid(env, sql, pay);
     return;
   }
   if (pay.kind === "topup") {

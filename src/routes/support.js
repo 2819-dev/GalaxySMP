@@ -10,6 +10,7 @@ import { checkMessage, compileWordList } from "../lib/filter.js";
 import { hubStub } from "./chat.js";
 import { headUrlFor } from "./heads.js";
 import { toPlugin } from "./economy.js";
+import { isOwner } from "../lib/names.js";
 
 const STAFF = 50;
 const STATUSES = ["open", "waiting", "resolved", "closed"];
@@ -42,6 +43,7 @@ function ticketOut(t) {
     userUnread: t.user_unread, staffUnread: t.staff_unread,
     user: t.username ? { id: Number(t.user_id), username: t.username, head: headUrlFor(t) } : undefined,
     assignedTo: t.assigned_name || null, preview: t.preview || null,
+    rating: t.rating_stars ? { stars: Number(t.rating_stars) } : null,
   };
 }
 
@@ -54,7 +56,8 @@ const TICKET_SELECT = (sql) => sql`
 
 async function loadTicket(sql, id, user) {
   const rows = await sql`
-    SELECT t.*, u.username, p.xuid, p.head_at, p.gamerpic_at, a.username AS assigned_name
+    SELECT t.*, u.username, p.xuid, p.head_at, p.gamerpic_at, a.username AS assigned_name,
+           (SELECT stars FROM ticket_ratings r WHERE r.ticket_id = t.id) AS rating_stars
       FROM tickets t JOIN users u ON u.id = t.user_id
       LEFT JOIN players p ON p.uuid = u.mc_uuid
       LEFT JOIN users a ON a.id = t.assigned_to
@@ -72,9 +75,10 @@ async function detail(sql, t, viewer) {
   // reading clears the unread counter for whoever is looking
   if (Number(t.user_id) === Number(viewer.id) && t.user_unread && !viewer.acting_by) await sql`UPDATE tickets SET user_unread = 0 WHERE id = ${t.id}`;
   else if (isStaff(viewer) && Number(t.user_id) !== Number(viewer.id) && t.staff_unread) await sql`UPDATE tickets SET staff_unread = 0 WHERE id = ${t.id}`;
+  const staffReplied = msgs.some((m) => m.from_staff);
   return {
     ok: true,
-    ticket: ticketOut(t),
+    ticket: { ...ticketOut(t), canRate: Number(t.user_id) === Number(viewer.id) && !viewer.acting_by && ["resolved", "closed"].includes(t.status) && staffReplied && !t.rating_stars },
     messages: msgs.map((m) => ({
       id: Number(m.id), body: m.body, fromStaff: m.from_staff, at: m.created_at, author: m.username || "Staff",
       head: headUrlFor(m),
@@ -201,4 +205,59 @@ export async function updateTicket(request, env, ctx, url, params) {
 export async function openTicketCount(sql) {
   const [{ n }] = await sql`SELECT count(*)::int AS n FROM tickets WHERE status = 'open'`;
   return n;
+}
+
+// ---------- ratings ----------
+// POST /api/support/tickets/:id/rate { stars: 1-5, comment }: the player rates the help once the ticket is resolved or closed.
+export async function rateTicket(request, env, ctx, url, params) {
+  const user = await requireUser(request, env);
+  if (user.acting_by) throw new HttpError(403, "You can't rate a ticket while looking at the site as another member.");
+  const body = await readJson(request);
+  const stars = Math.round(Number(body.stars));
+  if (!(stars >= 1 && stars <= 5)) throw new HttpError(400, "Choose 1 to 5 stars.");
+  const sql = getDb(env);
+  const t = await loadTicket(sql, Number(params.id), user);
+  if (Number(t.user_id) !== Number(user.id)) throw new HttpError(403, "Only the person who opened the ticket can rate it.");
+  if (!["resolved", "closed"].includes(t.status)) throw new HttpError(409, "You can rate the help once the ticket is resolved or closed.");
+  let comment = String(body.comment || "").trim().slice(0, 300);
+  if (comment) {
+    const check = checkMessage(comment, compileWordList(await sql`SELECT word, match FROM filter_words`), { allowLinks: false, maxLength: 300 });
+    if (!check.ok) throw new HttpError(400, check.message);
+    comment = check.text;
+  }
+  // who helped: the assigned staff member, or else whoever sent the most staff replies
+  let staffId = t.assigned_to ? Number(t.assigned_to) : null;
+  if (!staffId) {
+    const [top] = await sql`SELECT user_id FROM ticket_messages WHERE ticket_id = ${t.id} AND from_staff AND user_id IS NOT NULL
+                             GROUP BY user_id ORDER BY count(*) DESC LIMIT 1`;
+    staffId = top ? Number(top.user_id) : null;
+  }
+  if (!staffId) throw new HttpError(409, "Staff haven't replied to this ticket yet.");
+  const [row] = await sql`INSERT INTO ticket_ratings (ticket_id, user_id, staff_id, stars, comment) VALUES (${t.id}, ${user.id}, ${staffId}, ${stars}, ${comment || null})
+                          ON CONFLICT (ticket_id) DO NOTHING RETURNING ticket_id`;
+  if (!row) throw new HttpError(409, "You already rated this ticket.");
+  return json({ ok: true, message: "Thanks for your feedback!" });
+}
+
+// GET /api/mod/ticket-ratings: the owner sees every staff member's average and recent comments; other staff see their own.
+export async function ratings(request, env) {
+  const user = await requireStaff(request, env);
+  const sql = getDb(env);
+  const owner = isOwner(env, user.username, user.platform === "bedrock");
+  const staff = await sql`
+    SELECT r.staff_id, u.username, count(*)::int AS n, round(avg(r.stars)::numeric, 2)::float AS avg,
+           count(*) FILTER (WHERE r.created_at > now() - interval '30 days')::int AS recent
+      FROM ticket_ratings r JOIN users u ON u.id = r.staff_id
+     WHERE ${owner} OR r.staff_id = ${user.id}
+     GROUP BY r.staff_id, u.username ORDER BY avg DESC, n DESC`;
+  const latest = await sql`
+    SELECT r.ticket_id, r.stars, r.comment, r.created_at, s.username AS staff, p.username AS player
+      FROM ticket_ratings r JOIN users s ON s.id = r.staff_id JOIN users p ON p.id = r.user_id
+     WHERE ${owner} OR r.staff_id = ${user.id}
+     ORDER BY r.created_at DESC LIMIT 20`;
+  return json({
+    ok: true, owner,
+    staff: staff.map((s) => ({ id: Number(s.staff_id), username: s.username, count: s.n, average: s.avg, last30: s.recent })),
+    latest: latest.map((r) => ({ ticket: Number(r.ticket_id), stars: r.stars, comment: r.comment, at: r.created_at, staff: r.staff, player: owner ? r.player : null })),
+  });
 }

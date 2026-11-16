@@ -29,7 +29,9 @@ try:
 except Exception:  # no time zone data on this machine: use UTC
     TZ = datetime.timezone.utc
 
-DAILY_CENTS = [10000, 20000, 30000, 40000, 50000, 60000, 70000]  # $100 ... $700
+DAILY_CENTS = [2500, 5000, 2500, 7500, 5000, 10000, 10000]  # $25 ... $100 (packs and keys do the heavy lifting now)
+DAILY_PACKS = {3: {"food": 1}, 5: {"tools": 1}, 7: {"rare": 1}}   # day -> item packs
+DAILY_KEYS = {5: {"common": 1}, 7: {"rare": 1}}                    # day -> crate keys
 PLAN_BONUS = {"free": 1.0, "plus": 1.25, "pro": 1.5}
 
 STONE = {"stone", "cobblestone", "deepslate", "cobbled_deepslate", "andesite", "diorite", "granite", "tuff", "netherrack", "blackstone", "basalt"}
@@ -89,10 +91,18 @@ QUESTS = {
         ("bw_bed_2", "Break 2 beds in Bedwars", "bw_bed", None, 2),
     ],
 }
-QUEST_REWARD = {"easy": 2500, "medium": 7500, "hard": 20000}  # $25, $75, $200
+QUEST_REWARD = {"easy": 1000, "medium": 2500, "hard": 5000}  # $10, $25, $50
+QUEST_PACKS = {"hard": {"food": 1}}  # hard quests also give a Food Pack
 QUEST_BY_ID = {q[0]: (tier, q) for tier, qs in QUESTS.items() for q in qs}
 
-# (id, name, description, emoji for the website, reward cents, test(stats, extra))
+def achievement_cents(cents):
+    """Achievements pay a quarter of their listed amount (rounded to $5), so rewards don't flood the economy."""
+    if not cents:
+        return 0
+    return max(500, int(round(cents / 4 / 500)) * 500)
+
+
+# (id, name, description, emoji for the website, reward cents (paid at a quarter), test(stats, extra))
 ACHIEVEMENTS = [
     ("welcome", "Welcome to the Galaxy", "Join GalaxySMP for the first time", "🌌", 0, lambda s, x: True),
     ("play_1h", "Settling In", "Play for 1 hour", "⏱️", 1000, lambda s, x: s["playtime"] >= 3600),
@@ -312,7 +322,10 @@ class Progress:
 
     def tick(self):
         """Every minute: playtime, 'play' quests, achievements, saving, and sending stats to the website."""
+        afk = getattr(self.plugin, "afk", None)
         for p in self.plugin.server.online_players:
+            if afk is not None and afk.is_afk(p):
+                continue  # AFK time doesn't count as playtime
             self.add(p, "playtime", 60)
             self.progress(p, "play", None, 1)
             self.check_achievements(p)
@@ -361,6 +374,13 @@ class Progress:
         key = plans.plan_key(player) if plans else "free"
         return int(DAILY_CENTS[day - 1] * PLAN_BONUS.get(key, 1.0))
 
+    def daily_text(self, player, day):
+        from endstone_galaxylink.packs import name as pack_name
+        parts = [dollars(self.daily_amount(player, day))]
+        parts += [pack_name(k, n) for k, n in DAILY_PACKS.get(day, {}).items()]
+        parts += [f"{n} {k.capitalize()} key{'s' if n != 1 else ''}" for k, n in DAILY_KEYS.get(day, {}).items()]
+        return " + ".join(parts)
+
     def claim_daily(self, player):
         can, day, streak = self.daily_state(player)
         if not can:
@@ -383,9 +403,13 @@ class Progress:
         s["dailies"] = s.get("dailies", 0) + 1
         self.eco.credit(player, cents)
         extra = ""
-        if day == 7:
-            s["crate_keys"]["rare"] = s["crate_keys"].get("rare", 0) + 1
-            extra = " §d+ 1 Rare crate key!"
+        for kind, n in DAILY_KEYS.get(day, {}).items():
+            s["crate_keys"][kind] = s["crate_keys"].get(kind, 0) + n
+            extra += f" §d+ {n} {kind.capitalize()} crate key{'s' if n != 1 else ''}"
+        if DAILY_PACKS.get(day):
+            from endstone_galaxylink.packs import name as pack_name
+            extra += "§6 + " + ", ".join(pack_name(k, n) for k, n in DAILY_PACKS[day].items())
+            self.plugin.packs.give(player.xuid, DAILY_PACKS[day])
         self.touch(player)
         player.send_message(f"§6§lDaily reward: §r§aDay {day}: {dollars(cents)}{extra} §7(streak: {s['streak']} day{'s' if s['streak'] != 1 else ''})")
         if used:
@@ -406,7 +430,7 @@ class Progress:
         can, day, streak = self.daily_state(player)
         lines = []
         for d in range(1, 8):
-            amount = dollars(self.daily_amount(player, d)) + (" + Rare crate key" if d == 7 else "")
+            amount = self.daily_text(player, d)
             if d < day or (d == day and not can):
                 lines.append(f"§a✔ Day {d}: {amount}")
             elif d == day:
@@ -422,7 +446,7 @@ class Progress:
                 f"\n\n" + "\n".join(lines) + f"\n\n§7Next reward in {left // 3600}h {left % 3600 // 60}m.")
         form = ActionForm(title="§l§6Daily Reward", content=info)
         if can:
-            form.add_button(f"§a§lClaim Day {day}§r\n§8{dollars(self.daily_amount(player, day))}", icon="textures/ui/gift_square",
+            form.add_button(f"§a§lClaim Day {day}§r\n§8{self.daily_text(player, day)}", icon="textures/ui/gift_square",
                             on_click=lambda p: (self.claim_daily(p), None)[1])
         form.add_button("§lQuests", icon="textures/ui/book_edit_default", on_click=self.quests_menu)
         form.add_button("Close")
@@ -454,7 +478,12 @@ class Progress:
                 self.eco.credit(player, cents)
                 s = self.stats(player)
                 s["quests"] += 1
-                player.send_message(f"§a§lQuest complete! §r§f{label} §a+{dollars(cents)}")
+                bonus = ""
+                if QUEST_PACKS.get(tier):
+                    from endstone_galaxylink.packs import name as pack_name
+                    bonus = " §6+ " + ", ".join(pack_name(k, n) for k, n in QUEST_PACKS[tier].items())
+                    self.plugin.packs.give(player.xuid, QUEST_PACKS[tier])
+                player.send_message(f"§a§lQuest complete! §r§f{label} §a+{dollars(cents)}{bonus}")
                 try:
                     player.send_toast("§aQuest complete!", f"{label}: +{dollars(cents)}")
                     player.play_sound(player.location, "random.levelup", 0.6, 1.5)
@@ -504,6 +533,7 @@ class Progress:
                 continue
             s["achievements"][aid] = int(time.time())
             self.touch(player)
+            cents = achievement_cents(cents)
             if cents:
                 self.eco.credit(player, cents)
             reward = f" §a+{dollars(cents)}" if cents else ""
@@ -523,7 +553,7 @@ class Progress:
         lines = []
         for aid, name, desc, emoji, cents, test in ACHIEVEMENTS:
             mark = "§a✔" if aid in got else "§8✖"
-            lines.append(f"{mark} §{'f' if aid in got else '7'}§l{name}§r§7: {desc}{f' ({dollars(cents)})' if cents else ''}")
+            lines.append(f"{mark} §{'f' if aid in got else '7'}§l{name}§r§7: {desc}{f' ({dollars(achievement_cents(cents))})' if cents else ''}")
         form = ActionForm(title="§l§dAchievements", content=f"{len(got)}/{len(ACHIEVEMENTS)} unlocked. Your achievements show on your galaxymc.us profile.\n\n" + "\n".join(lines))
         form.add_button("§lMy stats", icon="textures/ui/icon_book_writable", on_click=lambda p: self.stats_menu(p, p))
         form.add_button("Close")

@@ -83,6 +83,7 @@ export function ticketChat(box, id, opts) {
     const closed = t.status === "closed";
     composer.hidden = closed && !staff;
     if (closed && !staff && !box.querySelector(".tk-closed")) log.after(h("p", { class: "text-3 small tk-closed", text: "This ticket is closed. Open a new one if you still need help." }));
+    if (!staff) drawRating(t);
     if (data.messages.length === lastCount) return;
     const first = lastCount < 0;
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
@@ -94,6 +95,30 @@ export function ticketChat(box, id, opts) {
         h("div", { class: "tk-text", text: m.body })))));
     if (first || atBottom) log.scrollTop = log.scrollHeight;
     opts.onChange?.();
+  }
+
+  // Rate the help (1 to 5 stars) once the ticket is resolved or closed.
+  let rateBox = null;
+  function drawRating(t) {
+    if (!t.canRate && !t.rating) { rateBox?.remove(); rateBox = null; return; }
+    if (rateBox && rateBox.dataset.state === (t.rating ? "done" : "ask")) return;
+    rateBox?.remove();
+    if (t.rating) {
+      rateBox = h("div", { class: "tk-rate done", "data-state": "done" }, h("span", { class: "tk-stars", "aria-label": `You rated ${t.rating.stars} out of 5` }, ...[1, 2, 3, 4, 5].map((n) => h("span", { class: n <= t.rating.stars ? "on" : "", text: "★" }))), h("span", { class: "text-3 small", text: "Thanks for rating the help you got." }));
+    } else {
+      let stars = 0;
+      const btns = [1, 2, 3, 4, 5].map((n) => h("button", { type: "button", class: "tk-star", "aria-label": `${n} star${n === 1 ? "" : "s"}`, text: "★",
+        onclick: () => { stars = n; btns.forEach((b, i) => b.classList.toggle("on", i < n)); submit.disabled = false; } }));
+      const comment = h("input", { class: "input", maxlength: 300, placeholder: "Anything to add? (optional)", "aria-label": "Comment" });
+      const submit = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Send rating", disabled: true });
+      submit.addEventListener("click", async () => {
+        submit.disabled = true;
+        try { const r = await postJson(`/api/support/tickets/${id}/rate`, { stars, comment: comment.value }); toast(r.message); t.rating = { stars }; t.canRate = false; drawRating(t); }
+        catch (e) { toast(e.message); submit.disabled = false; }
+      });
+      rateBox = h("div", { class: "tk-rate", "data-state": "ask" }, h("b", { text: "How was the help you got?" }), h("div", { class: "tk-stars-pick", role: "group", "aria-label": "Rating" }, ...btns), h("div", { class: "tk-rate-row" }, comment, submit));
+    }
+    log.after(rateBox);
   }
 
   function renderControls(t) {

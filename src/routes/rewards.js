@@ -1,10 +1,22 @@
-// In-game rewards (money and crate keys) from the website: referrals, the season pass and server goals.
+// In-game rewards (money, crate keys and item packs) from the website: referrals, the season pass and server goals.
 // They wait in game_rewards until the plugin confirms it gave them, so players get them even if the server
 // was offline or they weren't playing. The plugin remembers which ones it gave, so nothing is given twice.
 import { getDb } from "../lib/db.js";
 import { toPlugin } from "./economy.js";
 
 export const KEY_KINDS = ["common", "rare", "galaxy", "freeze"];  // "freeze" = daily streak freezes
+// Item packs (the list lives in the plugin's packs.json, so the game and the website always agree)
+import PACKS from "../../endstone-plugin/src/endstone_galaxylink/packs.json";
+export { PACKS };
+export function cleanPacks(packs) {
+  const out = {};
+  for (const k of Object.keys(PACKS)) {
+    const n = Math.max(0, Math.min(20, Math.floor(Number(packs?.[k]) || 0)));
+    if (n) out[k] = n;
+  }
+  return out;
+}
+export const packText = (packs) => Object.entries(packs || {}).map(([k, n]) => `${n > 1 ? `${n} × ` : ""}${PACKS[k]?.name || k}`).join(", ");
 
 export function cleanKeys(keys) {
   const out = {};
@@ -16,21 +28,22 @@ export function cleanKeys(keys) {
 }
 
 // Adds a reward to the queue (it's sent with the next batch). Returns its id.
-export async function queueReward(sql, { xuid, name, cents = 0, keys = {}, stats = null, reason }) {
+export async function queueReward(sql, { xuid, name, cents = 0, keys = {}, packs = {}, stats = null, reason }) {
   const k = cleanKeys(keys);
+  const pk = cleanPacks(packs);
   const c = Math.max(0, Math.round(Number(cents) || 0));
   const st = stats && Object.keys(stats).length ? stats : null;  // leaderboard stats set by the owner
-  if (!xuid || (!c && !Object.keys(k).length && !st)) return null;
-  const [r] = await sql`INSERT INTO game_rewards (xuid, name, cents, keys, stats, reason)
-                         VALUES (${String(xuid)}, ${String(name || "").slice(0, 32)}, ${c}, ${JSON.stringify(k)}::jsonb, ${st ? JSON.stringify(st) : null}::jsonb, ${String(reason).slice(0, 120)}) RETURNING id`;
+  if (!xuid || (!c && !Object.keys(k).length && !Object.keys(pk).length && !st)) return null;
+  const [r] = await sql`INSERT INTO game_rewards (xuid, name, cents, keys, packs, stats, reason)
+                         VALUES (${String(xuid)}, ${String(name || "").slice(0, 32)}, ${c}, ${JSON.stringify(k)}::jsonb, ${JSON.stringify(pk)}::jsonb, ${st ? JSON.stringify(st) : null}::jsonb, ${String(reason).slice(0, 120)}) RETURNING id`;
   return Number(r.id);
 }
 
 // Sends everything that's waiting to the plugin (it answers with "rewards_done"). Safe to call often.
 export async function sendRewards(env, sql = getDb(env), send = null) {
-  const rows = await sql`SELECT id, xuid, name, cents, keys, stats, reason FROM game_rewards WHERE sent_at IS NULL ORDER BY id LIMIT 100`;
+  const rows = await sql`SELECT id, xuid, name, cents, keys, packs, stats, reason FROM game_rewards WHERE sent_at IS NULL ORDER BY id LIMIT 100`;
   if (!rows.length) return 0;
-  const msg = { type: "rewards", list: rows.map((r) => ({ id: Number(r.id), xuid: r.xuid, name: r.name, cents: Number(r.cents), keys: r.keys || {}, ...(r.stats ? { stats: r.stats } : {}), reason: r.reason })) };
+  const msg = { type: "rewards", list: rows.map((r) => ({ id: Number(r.id), xuid: r.xuid, name: r.name, cents: Number(r.cents), keys: r.keys || {}, ...(r.packs && Object.keys(r.packs).length ? { packs: r.packs } : {}), ...(r.stats ? { stats: r.stats } : {}), reason: r.reason })) };
   const sent = send ? send(msg) : await toPlugin(env, msg).catch(() => false);
   return sent ? rows.length : 0;
 }

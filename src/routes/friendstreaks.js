@@ -7,12 +7,18 @@ import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
 import { limit as rateLimit } from "../lib/ratelimit.js";
 import { notify } from "./notify.js";
-import { queueReward } from "./rewards.js";
+import { queueReward, packText } from "./rewards.js";
 import { postTimeline } from "./feed.js";
 
 export const MAX_STREAKS = 5;
 const TZ = "America/New_York";
-export const MILESTONES = { 7: 50000, 30: 250000, 100: 1000000, 365: 5000000 };  // cents for EACH friend
+// What EACH friend gets at a milestone (money is small on purpose: packs and keys are the real prize)
+export const MILESTONES = {
+  7: { cents: 10000, packs: { food: 1 }, keys: { common: 1 } },
+  30: { cents: 50000, packs: { rare: 1 }, keys: { rare: 1 } },
+  100: { cents: 250000, packs: { legendary: 1 }, keys: { rare: 2 } },
+  365: { cents: 1000000, packs: { legendary: 2 }, keys: { galaxy: 1 } },
+};
 const BADGE = "Friend Streak: 100 days";
 const pair = (x, y) => (x < y ? [x, y] : [y, x]);
 const usd = (c) => `$${(c / 100).toLocaleString("en-US")}`;
@@ -172,7 +178,8 @@ async function milestone(env, sql, r, n) {
   const [claimed] = await sql`INSERT INTO economy_config (key, value, updated_by) VALUES (${key}, ${JSON.stringify(new Date().toISOString())}::jsonb, 'server')
                               ON CONFLICT (key) DO NOTHING RETURNING key`;
   if (!claimed) return;
-  const cents = MILESTONES[n];
+  const prize = MILESTONES[n];
+  const cents = prize.cents;
   let badge = null;
   if (n >= 100) {
     [badge] = await sql`SELECT id FROM badges WHERE name = ${BADGE} ORDER BY id LIMIT 1`;
@@ -180,11 +187,11 @@ async function milestone(env, sql, r, n) {
   }
   for (const p of people) {
     const friend = people.find((x) => Number(x.id) !== Number(p.id));
-    if (p.xuid) await queueReward(sql, { xuid: p.xuid, name: p.name, cents, reason: `${n}-day Friend Streak with ${friend.name}` });
+    if (p.xuid) await queueReward(sql, { xuid: p.xuid, name: p.name, cents, packs: prize.packs, keys: prize.keys, reason: `${n}-day Friend Streak with ${friend.name}` });
     if (badge) await sql`INSERT INTO user_badges (user_id, badge_id) VALUES (${p.id}, ${badge.id}) ON CONFLICT DO NOTHING`;
     await notify(env, [Number(p.id)], "friends", {
       title: `${n}-day Friend Streak!`,
-      body: `You and ${friend.name} played on ${n} days in a row. You both earned ${usd(cents)} in game${badge ? " and the Friend Streak badge" : ""}.`,
+      body: `You and ${friend.name} played on ${n} days in a row. You both earned ${usd(cents)}, ${packText(prize.packs)} and crate keys in game${badge ? ", plus the Friend Streak badge" : ""}.`,
       url: "/community#friends", tag: `fstreak-ms-${r.a}-${r.b}`,
     }).catch(() => {});
   }

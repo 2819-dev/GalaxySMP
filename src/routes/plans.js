@@ -23,7 +23,7 @@ export async function loadSubscriptions(sql) {
 // Public: the Store page.
 export function storePlans(env) {
   const cardsReady = Boolean(env?.STRIPE_SECRET_KEY && env?.STRIPE_WEBHOOK_SECRET);
-  const ON_SALE = ["plans", "money", "plots", "effects", "streak"]; // the same list as ON_SALE in routes/store.js
+  const ON_SALE = ["plans", "money", "packs", "bundles", "plots", "effects", "streak"]; // the same list as ON_SALE in routes/store.js
   return json({
     ok: true,
     checkoutEnabled: cardsReady,
@@ -31,7 +31,7 @@ export function storePlans(env) {
     plans: ["free", "plus", "pro"].map((id) => ({ id, ...PLANS[id] })),
     shop: SHOP.map((c) => ({
       id: c.id, name: c.name, blurb: c.blurb,
-      items: c.items.map(({ cents, days, ...i }) => ({ ...i, price: i.price != null ? i.price / 100 : undefined,
+      items: c.items.map(({ cents, days, ...i }) => ({ ...i, price: i.price != null ? i.price / 100 : undefined, worth: i.worth ? i.worth / 100 : undefined,
         options: i.options?.map((o) => ({ id: o.id, name: o.name, price: o.price / 100 })) })),
     })),
   }, 200, { "Cache-Control": "public, max-age=300" });

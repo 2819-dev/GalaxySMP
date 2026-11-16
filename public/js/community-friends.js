@@ -113,7 +113,7 @@ function renderFriendsList(root, { toast, setTimer, openDM }) {
     root.querySelectorAll(".fr-more").forEach((b) => b.setAttribute("aria-label", "Remove friend"));
   }
   // ---------- Friend Streaks (like Duolingo) ----------
-  const NEXT = [[7, "$500"], [30, "$2,500"], [100, "$10,000 + a badge"], [365, "$50,000"]];
+  const NEXT = [[7, "$100, a Food Pack and a key"], [30, "$500, a Rare Pack and a key"], [100, "a Legendary Pack, keys and a badge"], [365, "2 Legendary Packs and a Galaxy key"]];
   const sAct = async (action, f, label) => {
     try {
       const r = await postJson("/api/friends/streak", { action, userId: f.id });

@@ -271,6 +271,18 @@ Compare on any profile now also lists the achievements you both have, and the on
     id: "2026-11-24b",
     title: "GalaxySMP merch is coming to the Store",
     body: `The Store is getting a Merch section with real GalaxySMP gear, made to order and shipped to your door. You'll see the exact shipping cost before you pay, can pay with a card or Galaxy Credits, and get a notification with tracking when your order ships. The first items will appear in the Store soon.`,
+  },  {
+    id: "2026-11-25a",
+    title: "Store cart, packs, bundles and a fairer economy",
+    body: `**Shopping cart:** every Store item now has Add to cart next to Buy now. Check out everything at once with one payment, by card or Galaxy Credits, and one promo code for the whole cart. To send a gift, use Buy now on the item.
+
+**Packs and bundles:** new item packs (Food, Tool, Builder, Miner, Rare and Legendary) and money-saving bundles are in the Store. In-game money in the Store is also cheaper.
+
+**Rewards rebalanced:** daily rewards, quests, achievements, the Season Pass, Friend Streaks, invites and the weekly Bedwars champion now give item packs and crate keys, with smaller amounts of money. This keeps money valuable for everyone. Jobs still pay the same.
+
+**AFK:** if you don't move for 3 minutes, you're marked AFK, and /afk switches it yourself. AFK time doesn't count as playtime.
+
+**Also new:** rate the help you got when a support ticket closes, the Merch Supporter badge for buying 2 or more merch items, and #OT | Advertising now allows links, with one post every 20 minutes.`,
   },
 ];
 

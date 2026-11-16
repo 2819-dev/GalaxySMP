@@ -14,7 +14,7 @@ import { sendPlans } from "./plans.js";
 import { SHOP_ITEMS, GAME_SHOP as SHOP } from "../store/shop.js";
 
 const MOD = 50;
-export const LATEST_PLUGIN = "2.48.2"; // the GalaxyLink version made for this website
+export const LATEST_PLUGIN = "2.49.0"; // the GalaxyLink version made for this website
 export const LATEST_ICONS = "1.9.0"; // the GalaxySMP Icons resource pack version that goes with it
 const older = (a, b) => { const x = String(a).split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
 const ADMIN = 100;
@@ -372,6 +372,19 @@ export async function giveShopItem(env, sql, p, body, user, source = "staff") {
     await sql`UPDATE players SET extra_shop_plots = extra_shop_plots + 1 WHERE xuid = ${p.xuid}`;
   } else if (item.id === "night_vision") {
     await sql`UPDATE players SET night_vision_until = greatest(coalesce(night_vision_until, now()), now()) + make_interval(days => ${option.days}) WHERE xuid = ${p.xuid}`;
+  } else if (item.packs) {  // item packs: given in game through the rewards queue (saved until they join)
+    const { queueReward, sendRewards } = await import("./rewards.js");
+    await queueReward(sql, { xuid: p.xuid, name: p.gamertag, packs: item.packs, reason: item.name });
+    await sendRewards(env, sql).catch(() => 0);
+  } else if (item.bundle) {  // a bundle: a plan (30 days), packs and keys
+    const b = item.bundle;
+    if (b.plan) {
+      const { grantBundlePlan } = await import("./store.js");
+      await grantBundlePlan(env, sql, p, b.plan, user);
+    }
+    const { queueReward, sendRewards } = await import("./rewards.js");
+    await queueReward(sql, { xuid: p.xuid, name: p.gamertag, packs: b.packs || {}, keys: b.keys || {}, cents: b.cents || 0, reason: item.name });
+    await sendRewards(env, sql).catch(() => 0);
   } else if (item.freezes) {  // streak freezes: given in game through the rewards queue (works while offline)
     const { queueReward } = await import("./rewards.js");
     await queueReward(sql, { xuid: p.xuid, name: p.gamertag, keys: { freeze: item.freezes }, reason: item.name });

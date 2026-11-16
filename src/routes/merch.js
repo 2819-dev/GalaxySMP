@@ -156,7 +156,7 @@ function orderOut(o) {
 
 // ---------- the order ----------
 const clip = (v, n) => String(v ?? "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, n);
-function cleanAddress(a = {}) {
+export function cleanAddress(a = {}) {
   const ad = {
     first_name: clip(a.first_name, 40), last_name: clip(a.last_name, 40), email: clip(a.email, 120), phone: clip(a.phone, 30),
     country: clip(a.country, 2).toUpperCase(), region: clip(a.region, 40), address1: clip(a.address1, 100), address2: clip(a.address2, 100),
@@ -171,7 +171,7 @@ function cleanAddress(a = {}) {
 }
 
 // Checks the items against the live catalog and works out the price (never trusts prices from the browser).
-async function priced(env, rawItems) {
+export async function priced(env, rawItems) {
   const items = (Array.isArray(rawItems) ? rawItems : []).slice(0, 10);
   if (!items.length) throw new HttpError(400, "Choose something to buy.");
   const all = await catalog(env);
@@ -189,7 +189,7 @@ async function priced(env, rawItems) {
   return { lines, subtotal };
 }
 
-async function shippingCost(env, lines, address) {
+export async function shippingCost(env, lines, address) {
   const shop = await shopId(env);
   const r = await printify(env, "POST", `/shops/${shop}/orders/shipping.json`, {
     line_items: lines.map((l) => ({ product_id: l.productId, variant_id: l.variantId, quantity: l.qty })),
@@ -273,7 +273,7 @@ export async function paid(env, sql, pay) {
 }
 
 // Sends a paid order to Printify. If that fails, the player gets their money back.
-async function place(env, sql, id, pay = null) {
+export async function place(env, sql, id, pay = null, refundCents = null) {
   const [o] = await sql`SELECT * FROM merch_orders WHERE id = ${id}`;
   try {
     const shop = await shopId(env);
@@ -291,6 +291,7 @@ async function place(env, sql, id, pay = null) {
       await sql`UPDATE merch_orders SET error = ${`Not sent to production: ${e.message}`.slice(0, 300)} WHERE id = ${o.id}`;
     }
     await notify(env, [Number(o.user_id)], "reward", { title: "Merch order placed", body: `Order #${o.id} is being made. We'll tell you when it ships.`, url: "/store#merch", tag: `merch-${o.id}` }).catch(() => {});
+    await supporterBadge(env, sql, Number(o.user_id)).catch((e) => console.error("merch badge failed", e));
     await ownerAlert(env, sql, `New merch order #${o.id}: ${usd(o.total_cents)}${o.method === "credits" ? " (paid with credits)" : ""}.`).catch(() => {});
     return { ok: true };
   } catch (e) {
@@ -302,7 +303,7 @@ async function place(env, sql, id, pay = null) {
       message = "We couldn't place your order, so your credits were given back.";
     } else if (pay?.payment_intent) {
       try {
-        await stripe(env, "POST", "/refunds", { payment_intent: pay.payment_intent }, `gsmp-merch-refund-${o.id}`);
+        await stripe(env, "POST", "/refunds", { payment_intent: pay.payment_intent, ...(refundCents ? { amount: refundCents } : {}) }, `gsmp-merch-refund-${o.id}`);
         await sql`UPDATE merch_orders SET status = 'refunded' WHERE id = ${o.id}`;
         message = "We couldn't place your order, so your card was refunded.";
       } catch (err) {
@@ -314,6 +315,18 @@ async function place(env, sql, id, pay = null) {
     await ownerAlert(env, sql, `Merch order #${o.id} failed: ${e.message}`).catch(() => {});
     return { ok: false, message };
   }
+}
+
+// The Merch Supporter badge: for members who bought 2 or more merch items (across all their orders).
+export const BADGE_AT = 2;
+async function supporterBadge(env, sql, userId) {
+  const [{ n }] = await sql`SELECT coalesce(sum((l->>'qty')::int), 0)::int AS n FROM merch_orders m, jsonb_array_elements(m.items) l
+                             WHERE m.user_id = ${userId} AND m.status NOT IN ('awaiting_payment', 'failed', 'refunded', 'canceled')`;
+  if (n < BADGE_AT) return;
+  let [badge] = await sql`SELECT id FROM badges WHERE name = 'Merch Supporter' ORDER BY id LIMIT 1`;
+  if (!badge) [badge] = await sql`INSERT INTO badges (name, description, icon, style) VALUES ('Merch Supporter', 'Bought GalaxySMP merch. Thank you!', 'gift', 'gold') RETURNING id`;
+  const [given] = await sql`INSERT INTO user_badges (user_id, badge_id) VALUES (${userId}, ${badge.id}) ON CONFLICT DO NOTHING RETURNING user_id`;
+  if (given) await notify(env, [userId], "reward", { title: "You earned the Merch Supporter badge!", body: "Thanks for buying GalaxySMP merch. The badge now shows on your profile.", url: "/account", tag: "merch-badge" }).catch(() => {});
 }
 
 async function ownerAlert(env, sql, text) {

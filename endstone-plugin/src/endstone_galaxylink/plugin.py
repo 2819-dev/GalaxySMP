@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.48.2"
+VERSION = "2.49.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -132,6 +132,7 @@ class GalaxyLink(Plugin):
         "bedwars": _cmd("Play Bedwars.", "/bedwars [action: message]", "galaxylink.command.bedwars", ["bw"]),
         "leave": _cmd("Leave Bedwars or a Build Contest and get your own items back.", "/leave", "galaxylink.command.bedwars"),
         "trade": _cmd("See trade offers to you (offer items at galaxymc.us/trades).", "/trade", "galaxylink.command.trade"),
+        "afk": _cmd("Mark yourself as away (AFK), or back.", "/afk", "galaxylink.command.afk"),
         "tpd": _cmd("Teleport where you've been sent (e.g. to the staff member who accepted your minigame).", "/tpd", "galaxylink.command.tpd"),
         "plotaxe": _cmd("Get the Plot Axe to make plots and protected areas.", "/plotaxe", "galaxylink.command.plotaxe"),
     }
@@ -193,6 +194,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.announce": _perm("Allows /announce (server operators, or give it with a rank).", "op"),
         "galaxylink.command.chatfilter": _perm("Allows /chatfilter (server operators, or give it with a rank).", "op"),
         "galaxylink.command.tpd": _perm("Allows /tpd.", True),
+        "galaxylink.command.afk": _perm("Allows /afk.", True),
         STAFF_PERMISSION: _perm("Minigame Staff: accept or decline minigame host requests. Give it with a rank.", "op"),
     }
 
@@ -241,6 +243,10 @@ class GalaxyLink(Plugin):
         self.cosmetics = Cosmetics(self)
         self.ranktags = RankTags(self)
         from endstone_galaxylink.rewards import Rewards
+        from endstone_galaxylink.afk import Afk
+        self.afk = Afk(self)  # away after 3 minutes without moving, or /afk
+        from endstone_galaxylink.packs import Packs
+        self.packs = Packs(self)  # item packs (rewards and Store)
         self.rewards = Rewards(self)  # money and keys from the website (referrals, season pass, server goals)
         from endstone_galaxylink.gamechat import GameChat
         self.gamechat = GameChat(self)  # #Chat on the website <-> game chat
@@ -269,6 +275,7 @@ class GalaxyLink(Plugin):
             self.logger.warning(f"Couldn't check the world's packs: {e}")
         self.server.scheduler.run_task(self, self.ranks.refresh_pictures, delay=40)  # plan tags, even before ranks arrive
         self.server.scheduler.run_task(self, self.elevators.tick, delay=2, period=2)
+        self.server.scheduler.run_task(self, self._watched("checking AFK players", self.afk.tick), delay=100, period=100)
         self.server.scheduler.run_task(self, self.elevators.check_tools, delay=1200, period=1200)
         self.server.scheduler.run_task(self, self.jobs.tick, delay=100, period=100)
         self.server.scheduler.run_task(self, self.servercontrol.tick, delay=20, period=20)
@@ -398,6 +405,10 @@ class GalaxyLink(Plugin):
         self.announcements.on_join(player)
         self.moderation.on_join(player)
         self.progress.on_join(player)
+        try:
+            self.packs.on_join(player)
+        except Exception as e:
+            self.logger.warning(f"Packs on join failed: {e}")
         if brand_new:  # very first join: welcome kit
             self.server.scheduler.run_task(self, lambda: player.is_valid and self.servercontrol.welcome(player), delay=40)
         self.shopchests.on_join(player)
@@ -535,6 +546,7 @@ class GalaxyLink(Plugin):
     def on_player_chat(self, event: PlayerChatEvent):
         if self.moderation.on_chat(event):  # muted players can't chat
             return
+        self.afk.activity(event.player)
         raw = event.message  # before the filter scrambles anything (the website filters it again)
         self.chatfilter.on_chat(event)  # scrambles bad words with §k (when it's on)
         pics = getattr(self, "ranktags", None)
@@ -573,6 +585,8 @@ class GalaxyLink(Plugin):
 
     @event_handler
     def on_player_command(self, event: PlayerCommandEvent):
+        if not event.command.lstrip("/").lower().startswith("afk"):
+            self.afk.activity(event.player)
         if self.bedwars.on_command(event):  # only a few commands work during Bedwars
             return
         if self.buildcontest.on_command(event):  # no teleporting out of the Build Contest
@@ -722,6 +736,7 @@ class GalaxyLink(Plugin):
             "inspect": lambda: self.blocklog.toggle(sender),
             "rollback": lambda: self.blocklog.rollback_command(sender, args),
             "tpd": lambda: self.minigames.tpd_command(sender),
+            "afk": lambda: self.afk.command(sender),
         }
         if name in simple:
             simple[name]()

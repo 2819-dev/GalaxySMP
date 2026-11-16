@@ -278,10 +278,12 @@ export class CommunityHub extends DurableObject {
     const audioId = Number.isInteger(Number(msg.audioId)) && Number(msg.audioId) > 0 ? Number(msg.audioId) : null;
     // A reply in a thread (the message that started the thread)
     const threadRoot = Number.isInteger(Number(msg.threadRoot)) && Number(msg.threadRoot) > 0 ? Number(msg.threadRoot) : null;
-    // Admins (owners included) may post links; everyone else can't.
+    // Admins (owners included) may post links anywhere; everyone may post web links in channels that allow them.
+    const sql0 = getDb(this.env);
+    const [chOpts] = await sql0`SELECT allow_links, slow_seconds FROM channels WHERE id = ${channelId}`;
     const check = (imageId || audioId) && !String(msg.content || "").trim()
       ? { ok: true, text: "" }
-      : checkMessage(msg.content, await this.wordList(), { allowLinks: hubCan(user, "post_links"), maxLength: maxLengthFor(user) });
+      : checkMessage(msg.content, await this.wordList(), { allowLinks: hubCan(user, "post_links"), allowUrls: Boolean(chOpts?.allow_links), maxLength: maxLengthFor(user) });
     if (!check.ok) return reject(check.message);
     const limited = this.rateCheck(user.id, check.text || `[media ${imageId || audioId}]`);
     if (limited) return reject(limited);
@@ -289,14 +291,18 @@ export class CommunityHub extends DurableObject {
     const replyTo = msg.replyTo ? Number(msg.replyTo) : null;
     const sql = getDb(this.env);
     // Slow mode (set by staff): one message every N seconds per member; staff who moderate aren't limited
-    const slowRow = await sql`SELECT slow_seconds FROM channels WHERE id = ${channelId}`;
-    const slow = Number(slowRow[0]?.slow_seconds || 0);
+    const slow = Number(chOpts?.slow_seconds || 0);
     if (slow > 0 && !hubCan(user, "delete_messages")) {
       const key = `${user.id}:${channelId}`;
       this.slowSeen ||= new Map();
-      const last = this.slowSeen.get(key) || 0;
+      let last = this.slowSeen.get(key) || 0;
+      if (slow >= 300 && !threadRoot) {  // long slow modes survive restarts: check their last message too
+        const [lm] = await sql`SELECT max(created_at) AS at FROM messages WHERE channel_id = ${channelId} AND user_id = ${user.id} AND thread_root IS NULL`;
+        if (lm?.at) last = Math.max(last, new Date(lm.at).getTime());
+      }
       const wait = Math.ceil((last + slow * 1000 - Date.now()) / 1000);
-      if (wait > 0) return reject(`Slow mode is on: you can send another message in ${wait} second${wait === 1 ? "" : "s"}.`);
+      const when = wait >= 120 ? `${Math.ceil(wait / 60)} minutes` : `${wait} second${wait === 1 ? "" : "s"}`;
+      if (wait > 0) return reject(`Slow mode is on: you can send another message in ${when}.`);
       this.slowSeen.set(key, Date.now());
     }
     // One statement that also re-checks, fresh from the database, that the sender
@@ -430,11 +436,11 @@ export class CommunityHub extends DurableObject {
     const id = Number(msg.messageId);
     if (!Number.isInteger(id)) return reject("Unknown message.");
     const sql = getDb(this.env);
-    const [m] = await sql`SELECT user_id, seen_at, deleted_at FROM messages WHERE id = ${id}`;
+    const [m] = await sql`SELECT m.user_id, m.seen_at, m.deleted_at, c.allow_links FROM messages m LEFT JOIN channels c ON c.id = m.channel_id WHERE m.id = ${id}`;
     if (!m || m.deleted_at) return reject("That message no longer exists.");
     if (Number(m.user_id) !== Number(user.id)) return reject("You can only edit your own messages.");
     if (m.seen_at) return reject("Someone has already read this message, so it can't be edited. You can delete it instead.");
-    const check = checkMessage(msg.content, await this.wordList(), { allowLinks: hubCan(user, "post_links"), maxLength: maxLengthFor(user) });
+    const check = checkMessage(msg.content, await this.wordList(), { allowLinks: hubCan(user, "post_links"), allowUrls: Boolean(m.allow_links), maxLength: maxLengthFor(user) });
     if (!check.ok) return reject(check.message);
     const [u] = await sql`SELECT banned, muted_until FROM users WHERE id = ${user.id}`;
     if (u?.banned || (u?.muted_until && new Date(u.muted_until) > new Date())) return reject("You can't edit messages right now.");

@@ -1,5 +1,5 @@
 // Bedwars on the website: match history (profiles), the live game view, weekly/monthly leaderboards with a
-// weekly champion ($5,000 + badge), and "players are waiting" alerts for members who turn them on.
+// weekly champion ($1,000 + Rare Pack + Rare key + badge), and "players are waiting" alerts for members who turn them on.
 import { getDb } from "../lib/db.js";
 import { json, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -111,13 +111,13 @@ export async function weeklyChampion(env, sql) {
      WHERE m.started_at >= ${last.toISOString()}::timestamptz AND m.started_at < ${monday.toISOString()}::timestamptz
      GROUP BY mp.xuid HAVING count(*) FILTER (WHERE mp.won) > 0 ORDER BY wins DESC, finals DESC LIMIT 1`;
   if (!best) return;
-  await queueReward(sql, { xuid: best.xuid, name: best.name, cents: 500000, keys: {}, reason: "Weekly Bedwars Champion" });
+  await queueReward(sql, { xuid: best.xuid, name: best.name, cents: 100000, keys: { rare: 1 }, packs: { rare: 1 }, reason: "Weekly Bedwars Champion" });
   let [badge] = await sql`SELECT id FROM badges WHERE name = 'Weekly Bedwars Champion' ORDER BY id LIMIT 1`;
   if (!badge) [badge] = await sql`INSERT INTO badges (name, description, icon, style) VALUES ('Weekly Bedwars Champion', 'Won the most Bedwars games in a week.', 'trophy', 'gold') RETURNING id`;
   const [u] = await sql`SELECT u.id FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE p.xuid = ${best.xuid} AND NOT u.banned`;
   if (u) {
     await sql`INSERT INTO user_badges (user_id, badge_id) VALUES (${u.id}, ${badge.id}) ON CONFLICT DO NOTHING`;
-    await notify(env, [Number(u.id)], "community", { title: "You're the Weekly Bedwars Champion!", body: `${best.wins} wins last week. You earned $5,000 (in game) and the Weekly Bedwars Champion badge.`, url: "/leaderboard#bedwars", tag: "bw-champion" }).catch(() => {});
+    await notify(env, [Number(u.id)], "community", { title: "You're the Weekly Bedwars Champion!", body: `${best.wins} wins last week. You earned $1,000, a Rare Pack and a Rare key (in game), and the Weekly Bedwars Champion badge.`, url: "/leaderboard#bedwars", tag: "bw-champion" }).catch(() => {});
   }
   const { postTimeline } = await import("./feed.js");
   await postTimeline(sql, { kind: "bw_champion", xuid: best.xuid, name: best.name, title: "is the Weekly Bedwars Champion",

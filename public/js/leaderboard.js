@@ -120,7 +120,7 @@ async function load() {
       const top = await (await fetch(`/api/bedwars/top?range=${bwRange}`)).json();
       const field = { bw_wins: "wins", bw_finals: "finals", bw_beds: "beds" }[board];
       data.players = (top.players || []).map((p) => ({ name: p.name, value: p[field] || 0 })).filter((p) => p.value > 0).sort((a, b) => b.value - a.value);
-      data.title = `${SHORT[board]} ${bwRange === "week" ? "this week" : "this month"}${bwRange === "week" ? " (the weekly #1 in wins gets $5,000 and a badge)" : ""}`;
+      data.title = `${SHORT[board]} ${bwRange === "week" ? "this week" : "this month"}${bwRange === "week" ? " (the weekly #1 in wins gets $1,000, a Rare Pack, a Rare key and a badge)" : ""}`;
     }
     tabs();
     $("lb-players").textContent = data.totals.players.toLocaleString();

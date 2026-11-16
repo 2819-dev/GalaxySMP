@@ -3,6 +3,7 @@
 // The owner also sees setup help, items hidden because their price is too low, and every order.
 import { toast, iconEl } from "/js/site.js";
 import { h, openDialog, postJson } from "/js/dialog.js";
+import { addToCart } from "/js/store-cart.js";
 
 const usd = (c) => `$${(Number(c) / 100).toFixed(2)}`;
 const STATUS = {
@@ -99,7 +100,11 @@ function productDialog(p) {
         p.description ? h("p", { class: "text-2 mx-desc", text: p.description }) : null,
         ...pickers.map((x) => x.el),
         h("label", { class: "field" }, h("span", { text: "How many" }), qty))),
-    actions: [{ label: "Cancel" }, { label: "Next: shipping", kind: "primary", onClick: () => {
+    actions: [{ label: "Add to cart", onClick: () => {
+      const v = variant();
+      if (!v || !v.available) throw new Error("That option isn't available. Choose another one.");
+      addToCart({ type: "merch", productId: p.id, variantId: v.id, qty: Number(qty.value), name: `${p.title} (${v.title})`, price: v.price / 100, image: mainImage(p, v.id), max: 5 });
+    } }, { label: "Buy now", kind: "primary", onClick: () => {
       const v = variant();
       if (!v || !v.available) throw new Error("That option isn't available. Choose another one.");
       addressDialog(p, v, Number(qty.value));
@@ -108,7 +113,8 @@ function productDialog(p) {
   dlg.dialog.classList.add("mx-dialog");
 }
 
-function addressDialog(p, v, qty) {
+// The shipping address fields (also used by the Store cart). Returns { el, value }.
+export function addressForm(countries = state?.countries) {
   const f = (name, label, attrs = {}) => {
     const input = h("input", { class: "input", name, autocomplete: attrs.ac || "off", maxlength: attrs.max || 100, ...(attrs.type ? { type: attrs.type } : {}) });
     return { input, el: h("label", { class: `field${attrs.half ? " half" : ""}` }, h("span", { text: label }), input) };
@@ -116,7 +122,7 @@ function addressDialog(p, v, qty) {
   const first = f("first_name", "First name", { ac: "given-name", max: 40, half: true });
   const last = f("last_name", "Last name", { ac: "family-name", max: 40, half: true });
   const email = f("email", "Email (for shipping updates)", { ac: "email", type: "email", max: 120 });
-  const country = h("select", { class: "input", name: "country", autocomplete: "country" }, ...(state.countries || [["US", "United States"]]).map(([c, n]) => h("option", { value: c, text: n })));
+  const country = h("select", { class: "input", name: "country", autocomplete: "country" }, ...(countries || [["US", "United States"]]).map(([c, n]) => h("option", { value: c, text: n })));
   const a1 = f("address1", "Street address", { ac: "address-line1" });
   const a2 = f("address2", "Apartment, suite (optional)", { ac: "address-line2" });
   const city = f("city", "City", { ac: "address-level2", max: 60, half: true });
@@ -137,11 +143,17 @@ function addressDialog(p, v, qty) {
     first_name: first.input.value, last_name: last.input.value, email: email.input.value, phone: phone.input.value, country: country.value,
     region: country.value === "US" ? regionSelect.value : regionInput.value, address1: a1.input.value, address2: a2.input.value, city: city.input.value, zip: zip.input.value,
   });
+  const el = h("div", { class: "mx-grid" }, first.el, last.el, email.el, h("label", { class: "field" }, h("span", { text: "Country" }), country), a1.el, a2.el, city.el, region, zip.el, phone.el);
+  return { el, value: address };
+}
+
+function addressDialog(p, v, qty) {
+  const { el: grid, value: address } = addressForm();
   openDialog({
     title: "Where should we send it?",
     body: h("div", { class: "form mx-form" },
       h("p", { class: "text-3 small", style: "margin:0", text: `${qty > 1 ? `${qty} × ` : ""}${p.title} (${v.title}). Under 18? Ask a parent before ordering.` }),
-      h("div", { class: "mx-grid" }, first.el, last.el, email.el, h("label", { class: "field" }, h("span", { text: "Country" }), country), a1.el, a2.el, city.el, region, zip.el, phone.el),
+      grid,
       h("p", { class: "text-3 small", style: "margin:0", text: "Your address is only used to ship this order. It's shared with Printify, who makes and ships it." })),
     actions: [{ label: "Back", onClick: () => productDialog(p) }, { label: "See total", kind: "primary", onClick: async () => {
       const items = [{ productId: p.id, variantId: v.id, qty }];

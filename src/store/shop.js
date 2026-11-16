@@ -15,9 +15,36 @@ export const SHOP = [
     id: "money", name: "Money", blurb: "In-game money, added to your balance straight away.",
     items: [
       { id: "money_1k", name: "$1K", price: 50, cents: 100000, icon: "wallet", description: "A little extra spending money." },
-      { id: "money_10k", name: "$10K", price: 200, cents: 1000000, icon: "coins", description: "Enough for a stack of crate keys." },
-      { id: "money_100k", name: "$100K", price: 800, cents: 10000000, icon: "bank", description: "Big builds, big shops." },
-      { id: "money_1m", name: "$1M", price: 2500, cents: 100000000, icon: "crown", badge: "Best value", description: "Become a Millionaire (that's an achievement too)." },
+      { id: "money_10k", name: "$10K", price: 150, cents: 1000000, icon: "coins", description: "Enough for a stack of crate keys." },
+      { id: "money_100k", name: "$100K", price: 600, cents: 10000000, icon: "bank", description: "Big builds, big shops." },
+      { id: "money_1m", name: "$1M", price: 2000, cents: 100000000, icon: "crown", badge: "Best value", description: "Become a Millionaire (that's an achievement too)." },
+    ],
+  },
+  {
+    // Item packs: given in game (or saved until you next join). Contents are in the plugin's packs.json.
+    id: "packs", name: "Packs", blurb: "Useful items, delivered straight to your inventory.",
+    items: [
+      { id: "pack_food", name: "Food Pack", price: 50, packs: { food: 1 }, icon: "leaf", description: "32 steak, 16 golden carrots and 16 bread." },
+      { id: "pack_tools", name: "Tool Pack", price: 75, packs: { tools: 1 }, icon: "pickaxe", description: "Iron pickaxe, axe, shovel and sword, plus a shield." },
+      { id: "pack_builder", name: "Builder Pack", price: 100, packs: { builder: 1 }, icon: "bricks", description: "64 oak logs, 64 stone bricks, 32 glass and 32 torches." },
+      { id: "pack_miner", name: "Miner Pack", price: 100, packs: { miner: 1 }, icon: "pickaxe", description: "An iron pickaxe, 64 torches, 32 ladders and 16 steak." },
+      { id: "pack_rare", name: "Rare Pack", price: 200, packs: { rare: 1 }, icon: "gem", description: "4 diamonds, 2 golden apples, 4 ender pearls and 16 bottles o' enchanting." },
+      { id: "pack_legendary", name: "Legendary Pack", price: 400, packs: { legendary: 1 }, icon: "crown", badge: "Rarest", description: "16 diamonds, 2 netherite scrap, an enchanted golden apple, a totem of undying and 64 bottles o' enchanting." },
+    ],
+  },
+  {
+    // Bundles: several things for less than buying each one.
+    id: "bundles", name: "Bundles", blurb: "More for less: several things together, cheaper than buying each one.",
+    items: [
+      { id: "bundle_starter", name: "Starter Bundle", price: 399, limit: 1, icon: "rocket", badge: "Best for new players",
+        bundle: { plan: "plus", packs: { tools: 1, food: 1, builder: 1 }, keys: { rare: 1 } }, worth: 625,
+        description: "Galaxy+ for 30 days, a Tool Pack, a Food Pack, a Builder Pack and a Rare crate key. One per player." },
+      { id: "bundle_adventurer", name: "Adventurer Bundle", price: 299, icon: "compass",
+        bundle: { packs: { miner: 1, rare: 1, food: 1 }, keys: { common: 2 } }, worth: 450,
+        description: "A Miner Pack, a Rare Pack, a Food Pack and 2 Common crate keys." },
+      { id: "bundle_legend", name: "Legend Bundle", price: 899, icon: "crown", badge: "Best value",
+        bundle: { plan: "pro", packs: { legendary: 1, rare: 1 }, keys: { galaxy: 1 } }, worth: 1350,
+        description: "Galaxy Pro+ for 30 days, a Legendary Pack, a Rare Pack and a Galaxy crate key." },
     ],
   },
   {

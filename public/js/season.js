@@ -5,7 +5,9 @@ import { money } from "/js/money.js";
 
 const root = document.getElementById("ss-root");
 const KEY = { common: "Common key", rare: "Rare key", galaxy: "Galaxy key" };
-const rewardText = (r) => [r.cents ? `${money(r.cents)}` : null, ...Object.entries(r.keys || {}).map(([k, n]) => `${n > 1 ? `${n} ` : ""}${KEY[k]}${n > 1 ? "s" : ""}`)].filter(Boolean).join(" + ");
+const PACK = { food: "Food Pack", tools: "Tool Pack", builder: "Builder Pack", miner: "Miner Pack", rare: "Rare Pack", legendary: "Legendary Pack" };
+const rewardText = (r) => [r.cents ? `${money(r.cents)}` : null, ...Object.entries(r.packs || {}).map(([k, n]) => `${n > 1 ? `${n} × ` : ""}${PACK[k] || k}`),
+  ...Object.entries(r.keys || {}).map(([k, n]) => `${n > 1 ? `${n} ` : ""}${KEY[k]}${n > 1 ? "s" : ""}`)].filter(Boolean).join(" + ");
 // Website looks unlocked by a tier (themes, titles, frames)
 const unlockText = (u) => (u.kind === "theme" ? `${u.name} theme` : u.kind === "title" ? `"${u.name}" title` : u.name);  // also Bedwars effects (kind "cosmetic")
 const daysLeft = (d) => Math.max(0, Math.ceil((new Date(d) - Date.now()) / 864e5));
@@ -54,7 +56,7 @@ async function load() {
     const r = t[track];
     const keyKind = Object.keys(r.keys || {})[0];
     const u = r.unlock || (r.cosmetic ? { kind: "cosmetic", name: r.cosmetic } : null);
-    const ic = u ? h("span", { class: `ss-ic look ${u.kind}` }, iconEl(u.kind === "theme" ? "contrast" : u.kind === "title" ? "tag" : u.kind === "cosmetic" ? "sparkles" : "user")) : h("span", { class: "ss-ic" }, iconEl(keyKind ? "key" : "coins"));
+    const ic = u ? h("span", { class: `ss-ic look ${u.kind}` }, iconEl(u.kind === "theme" ? "contrast" : u.kind === "title" ? "tag" : u.kind === "cosmetic" ? "sparkles" : "user")) : h("span", { class: "ss-ic" }, iconEl(Object.keys(r.packs || {}).length ? "gift" : keyKind ? "key" : "coins"));
     if (u?.colors) ic.style.background = `linear-gradient(135deg, ${u.colors[1]}, ${u.colors[2]})`;
     let foot;
     if (claimed) foot = h("span", { class: "ss-done", text: "Claimed ✓" });

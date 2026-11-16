@@ -22,14 +22,20 @@ export const SEASON_COSMETICS = {
   "pro:24": ["bw_win_dragon", "Bedwars victory: Dragon Roar"],
 };
 const TIERS = 30;
+const FREE_PACKS = ["food", "tools", "builder", "miner"];
+const PRO_PACKS = ["food", "builder", "miner", "tools", "rare"];
 const XP_PER_TIER = 120;
 const WEEKS = 8;
 
 export function defaultTiers() {
   const out = [];
   for (let i = 1; i <= TIERS; i++) {
-    const free = { cents: (200 + 50 * i) * 100, keys: {} };
-    const pro = { cents: (500 + 100 * i) * 100, keys: {} };
+    // Less money, more item packs and keys (so money stays worth something)
+    const free = { cents: (50 + 10 * i) * 100, keys: {}, packs: {} };
+    const pro = { cents: (100 + 20 * i) * 100, keys: {}, packs: {} };
+    if (i % 3 === 0) free.packs[FREE_PACKS[(i / 3 - 1) % FREE_PACKS.length]] = 1;
+    if (i % 2 === 0) pro.packs[PRO_PACKS[(i / 2 - 1) % PRO_PACKS.length]] = 1;
+    if (i % 10 === 0) { free.packs.rare = (free.packs.rare || 0) + 1; pro.packs.legendary = 1; }
     if (i % 5 === 0) { free.keys.common = 1; pro.keys.rare = 1; }
     if (i === 15) free.keys.rare = 1;
     if (i === 30) free.keys.galaxy = 1;
@@ -110,7 +116,7 @@ export async function claim(request, env) {
     : await sql`UPDATE season_progress SET claimed_free = array_append(claimed_free, ${tier}) WHERE season_id = ${s.id} AND xuid = ${me.xuid} AND NOT (${tier} = ANY(claimed_free)) RETURNING 1`;
   if (!done.length) throw new HttpError(409, "You already claimed that reward.");
   const reward = t[track];
-  await queueReward(sql, { xuid: me.xuid, name: me.gamertag, cents: reward.cents, keys: reward.keys, reason: `${s.name} tier ${tier}${track === "pro" ? " (Pro+)" : ""}` });
+  await queueReward(sql, { xuid: me.xuid, name: me.gamertag, cents: reward.cents, keys: reward.keys, packs: reward.packs || {}, reason: `${s.name} tier ${tier}${track === "pro" ? " (Pro+)" : ""}` });
   const { sendRewards } = await import("./rewards.js");
   await sendRewards(env, sql).catch(() => {});
   const unlock = tierUnlock(track, tier, s.id);

@@ -7,8 +7,10 @@ import { requireUser } from "../lib/auth.js";
 import { queueReward } from "./rewards.js";
 import { notify } from "./notify.js";
 
-export const INVITER_CENTS = 5000_00;
-export const FRIEND_CENTS = 2500_00;
+export const INVITER_CENTS = 1000_00;
+export const INVITER_PACKS = { rare: 1 };
+export const FRIEND_PACKS = { tools: 1, food: 1 };
+export const FRIEND_CENTS = 500_00;
 export const NEEDED_SECS = 3600;
 export const BADGE_AT = 15;
 
@@ -86,9 +88,9 @@ export async function checkReferrals(env, sql) {
   for (const r of due) {
     const [claimed] = await sql`UPDATE users SET referral_rewarded_at = now() WHERE id = ${r.id} AND referral_rewarded_at IS NULL RETURNING id`;
     if (!claimed) continue;
-    await queueReward(sql, { xuid: r.xuid, name: r.gamertag, cents: FRIEND_CENTS, reason: `Welcome gift: ${r.inv_name} invited you` });
-    if (r.inv_xuid) await queueReward(sql, { xuid: r.inv_xuid, name: r.inv_tag, cents: INVITER_CENTS, reason: `${r.username} played their first hour` });
-    await notify(env, [Number(r.inv_id)], "community", { title: `${r.username} played their first hour!`, body: `You earned $5,000 in game for inviting them.`, url: "/account#invite", tag: "referral" }).catch(() => {});
+    await queueReward(sql, { xuid: r.xuid, name: r.gamertag, cents: FRIEND_CENTS, packs: FRIEND_PACKS, reason: `Welcome gift: ${r.inv_name} invited you` });
+    if (r.inv_xuid) await queueReward(sql, { xuid: r.inv_xuid, name: r.inv_tag, cents: INVITER_CENTS, packs: INVITER_PACKS, reason: `${r.username} played their first hour` });
+    await notify(env, [Number(r.inv_id)], "community", { title: `${r.username} played their first hour!`, body: `You earned $1,000 and a Rare Pack in game for inviting them.`, url: "/account#invite", tag: "referral" }).catch(() => {});
     await syncRecruiter(env, sql, r.inv_id);
   }
 }

@@ -176,6 +176,24 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
           t.staffUnread ? h("span", { class: "tk-unread", text: `${t.staffUnread} new` }) : null)));
     }
   };
+  // Ticket ratings: the owner sees everyone's average; other staff see their own.
+  $("tk-ratings")?.addEventListener("click", async () => {
+    let d;
+    try { d = await getJson("/api/mod/ticket-ratings"); } catch (e) { toast(e.message); return; }
+    const stars = (n) => h("span", { class: "tk-stars" }, ...[1, 2, 3, 4, 5].map((i) => h("span", { class: i <= Math.round(n) ? "on" : "", text: "★" })));
+    openDialog({
+      title: d.owner ? "Ticket ratings" : "Your ticket ratings",
+      body: h("div", { class: "stack", style: "gap:12px" },
+        d.staff.length ? h("div", { class: "tk-rt-list" }, ...d.staff.map((s) => h("div", { class: "tk-rt-row" },
+          h("b", { text: s.username }), stars(s.average), h("span", { text: s.average.toFixed(1) }),
+          h("span", { class: "text-3 small", text: `${s.count} rating${s.count === 1 ? "" : "s"} · ${s.last30} in the last 30 days` }))))
+          : h("p", { class: "text-3", text: d.owner ? "No ratings yet. Players can rate the help once a ticket is resolved or closed." : "You don't have any ratings yet." }),
+        d.latest.length ? h("div", { class: "stack", style: "gap:6px" }, h("b", { text: "Latest" }), ...d.latest.map((r) => h("div", { class: "tk-rt-item" },
+          stars(r.stars), h("span", { class: "small", text: `Ticket #${r.ticket}${d.owner ? ` · ${r.staff}` : ""}${r.player ? ` · from ${r.player}` : ""}` }),
+          r.comment ? h("p", { class: "text-2 small", style: "margin:2px 0 0", text: `"${r.comment}"` }) : null))) : null),
+      actions: [{ label: "Close" }],
+    });
+  });
   function openTicket(id) {
     $("tickets-main").hidden = true;
     const view = $("ticket-view");

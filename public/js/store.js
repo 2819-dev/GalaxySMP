@@ -7,7 +7,8 @@ import { h, openDialog, postJson } from "/js/dialog.js";
 import { faceSvg } from "/js/face.js";
 import { cardEl, giftCardDialog, myCardsEl, sentDialog } from "/js/giftcards.js";
 import { DESIGNS } from "/js/giftcard-designs.js";
-import { renderMerch } from "/js/store-merch.js";
+import { renderMerch, addressForm } from "/js/store-merch.js";
+import { addToCart, cartButton, setupCart, clearCart } from "/js/store-cart.js";
 
 const usd = (n) => `$${Number(n).toFixed(2)}`;
 let data = null;   // /api/store/plans
@@ -286,8 +287,11 @@ function renderPlans() {
     if (!plan.price) buy = h("a", { class: "ap-buy ghost", href: "/join", text: "Get started" });
     else if (!sellable) buy = h("span", { class: "ap-buy soon", text: "Coming soon" });
     else {
-      buy = h("button", { class: "ap-buy", type: "button", text: current ? "Renew" : "Buy" });
-      buy.addEventListener("click", () => buyPlan(plan));
+      const now = h("button", { class: "ap-buy", type: "button", text: current ? "Renew" : "Buy now" });
+      now.addEventListener("click", () => buyPlan(plan));
+      const add = h("button", { class: "ap-addcart", type: "button", "aria-label": `Add ${plan.name} to cart`, title: "Add to cart" }, iconEl("cart"), h("span", { text: "+" }));
+      add.addEventListener("click", () => addToCart({ type: "item", item: plan.id, name: `${plan.name} (30 days)`, price: plan.price, icon: PLAN_ICON[plan.id], plan: true, max: 1 }));
+      buy = h("div", { class: "ap-buys" }, add, now);
     }
     card.append(...[
       h("span", { class: `ap-kicker${current ? " current" : ""}`, text: kicker }),
@@ -341,15 +345,17 @@ function renderCompare() {
 
 // ---------- Shop: one shelf per category ----------
 let filter = "all";
-const CAT_NAMES = { devices: "Galaxy Cube", money: "Money", plots: "Land", effects: "Effects", cosmetics: "Cosmetics" };
+const CAT_NAMES = { devices: "Galaxy Cube", money: "Money", packs: "Packs", bundles: "Bundles", plots: "Land", effects: "Effects", cosmetics: "Cosmetics" };
 const CAT_LINES = {
   devices: "Our first device. Coming soon.",
   money: "Added to your balance instantly.",
+  packs: "Useful items, straight to your inventory.",
+  bundles: "Several things together, for less.",
   plots: "More room to build. Yours to keep.",
   effects: "Handy boosts that last while you play.",
   cosmetics: "Stand out wherever you go.",
 };
-const CAT_ICON = { devices: "cube", money: "coins", plots: "homes", effects: "moon", cosmetics: "sparkles" };
+const CAT_ICON = { devices: "cube", money: "coins", packs: "gift", bundles: "bag", plots: "homes", effects: "moon", cosmetics: "sparkles" };
 // Pixel-art graphics (the same set as the rank badges) for every plan, category and item.
 const PIX = {
   free: "tree", plus: "star", pro: "wingeddiamond",
@@ -382,6 +388,7 @@ function renderCats() {
   nav.replaceChildren(...items.map(([id, name]) => h("a", { class: "ap-cat", href: `#${target(id)}`, "data-target": target(id),
     onclick: (e) => { e.preventDefault(); document.getElementById(target(id))?.scrollIntoView({ behavior: "smooth", block: "start" }); } },
     h("span", { class: `ap-cat-ic2 c-${id}` }, iconEl(id === "ranks" ? "star" : id === "credits" ? "wallet" : id === "giftcards" ? "gift" : id === "merch" ? "bag" : CAT_ICON[id] || "cart")), h("span", { text: name }))));
+  nav.append(cartButton());
   const links = [...nav.querySelectorAll(".ap-cat")];
   const io = new IntersectionObserver((entries) => {
     for (const en of entries) {
@@ -411,7 +418,7 @@ function itemCard(item, cat, sale) {
   let option = item.options ? item.options[0].id : null;
   const price = h("div", { class: "ap-price" });
   const setPrice = () => {
-    const small = item.priceText ? item.priceNote : item.limit === 1 ? "One per player" : item.limit ? `Up to ${item.limit} per player` : "";
+    const small = item.priceText ? item.priceNote : item.worth ? `Worth ${usd(item.worth)}${item.limit === 1 ? " · one per player" : ""}` : item.limit === 1 ? "One per player" : item.limit ? `Up to ${item.limit} per player` : "";
     price.replaceChildren(h("b", { text: item.priceText || usd(item.options ? item.options.find((o) => o.id === option).price : item.price) }), ...(small ? [h("small", { text: small })] : []));
   };
   setPrice();
@@ -419,12 +426,19 @@ function itemCard(item, cat, sale) {
   if (maxed) buy = h("span", { class: "ap-buy owned" }, iconEl("check"), "Owned");
   else if (!sale) buy = h("span", { class: "ap-buy soon", text: "Coming soon" });
   else {
-    buy = h("button", { class: "ap-buy", type: "button", text: "Buy" });
-    buy.addEventListener("click", () => {
+    const now = h("button", { class: "ap-buy", type: "button", text: "Buy now" });
+    now.addEventListener("click", () => {
       const o = item.options?.find((x) => x.id === option);
       checkout({ id: item.id, option: () => option, name: o ? `${item.name} (${o.name})` : item.name, price: o ? o.price : item.price,
         icon: item.icon || "cart", cat: cat.id, tags: ["shop", `cat:${cat.id}`, `item:${item.id}`], isPlan: false });
     });
+    const add = h("button", { class: "ap-addcart", type: "button", "aria-label": `Add ${item.name} to cart`, title: "Add to cart" }, iconEl("cart"), h("span", { text: "+" }));
+    add.addEventListener("click", () => {
+      const o = item.options?.find((x) => x.id === option);
+      addToCart({ type: "item", item: item.id, option: o?.id || null, name: o ? `${item.name} (${o.name})` : item.name, price: o ? o.price : item.price,
+        icon: item.icon || "cart", max: item.limit ? Math.max(1, item.limit - owned) : 10 });
+    });
+    buy = h("div", { class: "ap-buys" }, add, now);
   }
   let sel = null;
   if (item.options) {
@@ -614,6 +628,7 @@ function openItem(key) {
 
 let merchShown = false;
 function renderAll() {
+  setupCart({ signedIn: me.signedIn, addressForm, onDone: async () => { await refreshMine(); renderAll(); } });
   renderStrip();
   renderCredits();
   renderPlans();
@@ -667,13 +682,14 @@ function watchTabs() {
     };
     tryShow(0);
   } else if (paid) {
+    if (paid === "cart") clearCart();
     history.replaceState(null, "", paid === "merch" ? "/store#merch" : "/store");
     // Stripe tells us about the payment a moment later: check the balance again shortly
     setTimeout(async () => { await refreshMine(); renderAll(); }, 3000);
     openDialog({
       title: "Thank you!",
       body: h("div", { class: "co-done" }, h("div", { class: "co-done-icon" }, iconEl("check")),
-        h("p", { class: "text-2", text: paid === "credits" ? "Your credits are on their way. They show up in a few seconds." : paid === "merch" ? "Your payment went through and your merch order is being placed. You'll get a notification with tracking when it ships." : "Your payment went through. Your item is on its way to you in game." })),
+        h("p", { class: "text-2", text: paid === "cart" ? "Your payment went through. Game items arrive in game right away (or next time you join), and any merch is being made. We'll notify you when it ships." : paid === "credits" ? "Your credits are on their way. They show up in a few seconds." : paid === "merch" ? "Your payment went through and your merch order is being placed. You'll get a notification with tracking when it ships." : "Your payment went through. Your item is on its way to you in game." })),
       actions: [{ label: "Done", kind: "primary" }],
     });
   }

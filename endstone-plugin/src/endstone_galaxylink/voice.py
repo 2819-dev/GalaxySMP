@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.48.2",
+                    "User-Agent": "GalaxyLink-Endstone/2.49.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -400,6 +400,9 @@ class VoiceLink:
         """What a player is up to, in a few words (for "who's online" on the home page)."""
         pl = self.plugin
         try:
+            afk = getattr(pl, "afk", None)
+            if afk is not None and afk.is_afk(p):
+                return "AFK"
             bw = getattr(pl, "bedwars", None)
             if bw is not None:
                 uid = str(p.unique_id)
