@@ -112,6 +112,10 @@ const PENDING = [
     "CREATE INDEX IF NOT EXISTS builds_kind_idx ON builds (kind, id DESC) WHERE deleted_at IS NULL",
     "INSERT INTO schema_migrations (version) VALUES ('0059_screenshots') ON CONFLICT DO NOTHING",
   ]],
+  ["0060_private_polls", [
+    "ALTER TABLE polls ADD COLUMN IF NOT EXISTS private boolean NOT NULL DEFAULT false",
+    "INSERT INTO schema_migrations (version) VALUES ('0060_private_polls') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

@@ -250,6 +250,11 @@ The home page shows who's playing right now and what they're doing, like playing
 **Compare achievements**
 Compare on any profile now also lists the achievements you both have, and the ones only one of you has.`,
   },
+  {
+    id: "2026-11-23c",
+    title: "Private polls",
+    body: `Some polls are now private, marked with a lock. On a private poll, you only see your own vote: the results and who voted for what stay with the server owner. Vote as usual, and change your vote any time until it closes.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

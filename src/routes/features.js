@@ -209,8 +209,21 @@ export async function newsDelete(request, env, ctx, url, params) {
 }
 
 // =====================================================================
-// Polls (staff create, everyone votes)
+// Polls (staff create, everyone votes). Private polls (only the owner can make them): nobody sees the
+// results except the owner, who also sees who voted what. Voters only see their own choice.
 // =====================================================================
+async function privacy(sql, user, polls, options) {
+  const priv = polls.filter((p) => p.private).map((p) => Number(p.id));
+  if (!priv.length) return;
+  if (user.owner) {
+    const rows = await sql`SELECT v.option_id, u.username FROM poll_votes v JOIN users u ON u.id = v.user_id WHERE v.poll_id = ANY(${priv}::bigint[]) ORDER BY u.username`;
+    for (const o of options) if (priv.includes(Number(o.poll_id))) o.who = rows.filter((r) => String(r.option_id) === String(o.id)).map((r) => r.username);
+  } else {
+    for (const o of options) if (priv.includes(Number(o.poll_id))) o.votes = null;
+    for (const p of polls) if (p.private) p.voters = null;
+  }
+}
+const optOut = (o) => ({ id: Number(o.id), label: o.label, votes: o.votes == null ? null : Number(o.votes), mine: o.mine, ...(o.who ? { who: o.who } : {}) });
 export async function pollsList(request, env) {
   const user = await requireUser(request, env);
   const sql = getDb(env);
@@ -225,12 +238,13 @@ export async function pollsList(request, env) {
     SELECT o.id, o.poll_id, o.label, o.position, (SELECT count(*) FROM poll_votes v WHERE v.option_id = o.id) AS votes,
            EXISTS (SELECT 1 FROM poll_votes v WHERE v.option_id = o.id AND v.user_id = ${user.id}) AS mine
       FROM poll_options o WHERE o.poll_id = ANY(${ids}::bigint[]) ORDER BY o.poll_id, o.position` : [];
+  await privacy(sql, user, polls, options);
   return json({
-    ok: true, canManage: isStaff(user),
+    ok: true, canManage: isStaff(user), canPrivate: Boolean(user.owner),
     polls: polls.map((p) => ({
       id: Number(p.id), question: p.question, multi: p.multi, author: p.author || "Staff", createdAt: p.created_at,
-      closesAt: p.closes_at, closed: Boolean(p.is_closed), voters: Number(p.voters),
-      options: options.filter((o) => String(o.poll_id) === String(p.id)).map((o) => ({ id: Number(o.id), label: o.label, votes: Number(o.votes), mine: o.mine })),
+      closesAt: p.closes_at, closed: Boolean(p.is_closed), voters: p.voters == null ? null : Number(p.voters), private: Boolean(p.private),
+      options: options.filter((o) => String(o.poll_id) === String(p.id)).map(optOut),
     })),
   });
 }
@@ -238,20 +252,21 @@ export async function pollsList(request, env) {
 // One poll with its answers and votes (for polls shown inside chat messages).
 async function loadPoll(sql, pid, user) {
   const [p] = await sql`
-    SELECT p.id, p.question, p.multi, p.author_id, p.closes_at, p.channel_id, u.username AS author,
+    SELECT p.id, p.question, p.multi, p.author_id, p.closes_at, p.channel_id, p.private, u.username AS author,
            (p.closed OR (p.closes_at IS NOT NULL AND p.closes_at < now())) AS is_closed,
            (SELECT count(DISTINCT v.user_id) FROM poll_votes v WHERE v.poll_id = p.id) AS voters
       FROM polls p LEFT JOIN users u ON u.id = p.author_id WHERE p.id = ${pid} AND p.deleted_at IS NULL`;
   if (!p) return null;
   const options = await sql`
-    SELECT o.id, o.label, (SELECT count(*) FROM poll_votes v WHERE v.option_id = o.id) AS votes,
+    SELECT o.id, o.poll_id, o.label, (SELECT count(*) FROM poll_votes v WHERE v.option_id = o.id) AS votes,
            EXISTS (SELECT 1 FROM poll_votes v WHERE v.option_id = o.id AND v.user_id = ${user.id}) AS mine
       FROM poll_options o WHERE o.poll_id = ${pid} ORDER BY o.position`;
+  await privacy(sql, user, [p], options);
   return {
     id: Number(p.id), question: p.question, multi: p.multi, author: p.author || "Staff", closesAt: p.closes_at,
-    closed: Boolean(p.is_closed), voters: Number(p.voters),
+    closed: Boolean(p.is_closed), voters: p.voters == null ? null : Number(p.voters), private: Boolean(p.private),
     canClose: !p.is_closed && (isMod(user) || Number(p.author_id) === Number(user.id)),
-    options: options.map((o) => ({ id: Number(o.id), label: o.label, votes: Number(o.votes), mine: o.mine })),
+    options: options.map(optOut),
   };
 }
 
@@ -287,8 +302,9 @@ export async function chatPollCreate(request, env) {
   const [ch] = await sql`SELECT c.id FROM channels c, users u JOIN roles r ON r.id = u.role_id
                           WHERE c.id = ${Number(body.channelId) || 0} AND c.kind = 'text' AND NOT c.hidden AND u.id = ${user.id} AND r.power >= c.min_post_power`;
   if (!ch) throw new HttpError(403, "You can't post in this channel.");
-  const [p] = await sql`INSERT INTO polls (question, multi, author_id, closes_at, channel_id)
-                        VALUES (${question}, ${Boolean(body.multi)}, ${user.id}, ${closesAt}, ${ch.id}) RETURNING id`;
+  if (body.private && !user.owner) throw new HttpError(403, "Only the owner can make private polls.");
+  const [p] = await sql`INSERT INTO polls (question, multi, author_id, closes_at, channel_id, private)
+                        VALUES (${question}, ${Boolean(body.multi)}, ${user.id}, ${closesAt}, ${ch.id}, ${Boolean(body.private)}) RETURNING id`;
   await sql.transaction(opts.map((label, i) => sql`INSERT INTO poll_options (poll_id, label, position) VALUES (${p.id}, ${label}, ${i})`));
   const [m] = await sql`INSERT INTO messages (channel_id, user_id, content, poll_id) VALUES (${ch.id}, ${user.id}, ${`📊 Poll: ${question}`}, ${p.id}) RETURNING id`;
   const message = await loadMessage(sql, Number(m.id));
@@ -316,8 +332,9 @@ export async function pollCreate(request, env) {
   const hours = Number(body.hours) || 0;
   if (hours < 0 || hours > 24 * 30) throw new HttpError(400, "Polls can run for up to 30 days.");
   const sql = getDb(env);
-  const [p] = await sql`INSERT INTO polls (question, multi, author_id, closes_at)
-                        VALUES (${question}, ${Boolean(body.multi)}, ${user.id}, ${hours ? new Date(Date.now() + hours * 3600e3).toISOString() : null}) RETURNING id`;
+  if (body.private && !user.owner) throw new HttpError(403, "Only the owner can make private polls.");
+  const [p] = await sql`INSERT INTO polls (question, multi, author_id, closes_at, private)
+                        VALUES (${question}, ${Boolean(body.multi)}, ${user.id}, ${hours ? new Date(Date.now() + hours * 3600e3).toISOString() : null}, ${Boolean(body.private)}) RETURNING id`;
   await sql.transaction(opts.map((label, i) => sql`INSERT INTO poll_options (poll_id, label, position) VALUES (${p.id}, ${label}, ${i})`));
   await audit(sql, user.id, "poll.create", { question });
   if (body.notify !== false) await notify(env, "all", "news", { title: "New poll", body: question, url: "/community#polls", tag: `poll-${p.id}` });

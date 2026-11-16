@@ -66,5 +66,5 @@ document.getElementById("composer-poll")?.addEventListener("click", () => {
     });
     return;
   }
-  pollDialog(() => {}, toast, { channelId: channel.id, channelName: channel.name });
+  pollDialog(() => {}, toast, { channelId: channel.id, channelName: channel.name, canPrivate: Boolean(state.me?.owner) });
 });

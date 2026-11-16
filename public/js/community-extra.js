@@ -206,7 +206,7 @@ export function renderPolls(p, { toast, setTimer }) {
     let d;
     try { d = await getJson("/api/community/polls"); } catch (e) { list.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
     add.hidden = !d.canManage;
-    add.onclick = () => pollDialog(load, toast);
+    add.onclick = () => pollDialog(load, toast, { canPrivate: d.canPrivate });
     list.replaceChildren(...(d.polls.length ? d.polls.map((pl) => pollCard(pl, d.canManage, load, toast)) : [h("div", { class: "panel empty", text: "No polls yet." })]));
   }
   load();
@@ -215,9 +215,10 @@ export function renderPolls(p, { toast, setTimer }) {
 
 export function pollCard(pl, canManage, reload, toast, { chat = false } = {}) {
   const voted = pl.options.some((o) => o.mine);
-  const showResults = voted || pl.closed;
-  const total = pl.options.reduce((n, o) => n + o.votes, 0);
-  const top = Math.max(0, ...pl.options.map((o) => o.votes));
+  const hidden = pl.private && pl.options.some((o) => o.votes == null);  // a private poll: results are only for the owner
+  const showResults = (voted || pl.closed || pl.private) && !hidden;  // the owner always sees a private poll's results
+  const total = pl.options.reduce((n, o) => n + (o.votes || 0), 0);
+  const top = Math.max(0, ...pl.options.map((o) => o.votes || 0));
   const chosen = new Set(pl.options.filter((o) => o.mine).map((o) => o.id));
   const opts = h("div", { class: "pl-opts", role: pl.multi ? "group" : "radiogroup", "aria-label": pl.question });
   const vote = async () => {
@@ -230,17 +231,19 @@ export function pollCard(pl, canManage, reload, toast, { chat = false } = {}) {
     const bar = h("span", { class: "pl-bar" });
     if (showResults) bar.style.width = `${pct}%`;
     b.append(bar, h("span", { class: "pl-mark", "aria-hidden": "true", text: o.mine ? "✓" : "" }), h("span", { class: "pl-label", text: o.label }),
-      ...(showResults ? [h("span", { class: "pl-pct", text: `${pct}%` })] : []));
+      ...(showResults ? [h("span", { class: "pl-pct", text: pl.private ? `${o.votes} · ${pct}%` : `${pct}%` })] : []));
     b.addEventListener("click", () => {
       if (pl.multi) chosen.has(o.id) ? chosen.delete(o.id) : chosen.add(o.id);
       else { if (chosen.has(o.id)) chosen.clear(); else { chosen.clear(); chosen.add(o.id); } }
       vote();
     });
     opts.append(b);
+    if (o.who && showResults) opts.append(h("p", { class: "pl-who text-3 small", text: o.who.length ? o.who.join(", ") : "Nobody yet" }));
   }
   const status = pl.closed ? "Closed" : pl.closesAt ? `Closes ${day(pl.closesAt)}, ${time(pl.closesAt)}` : "Open";
   const foot = h("div", { class: "sg-foot" }, h("span", { class: `sg-status ${pl.closed ? "done" : "planned"}`, text: pl.closed ? "Closed" : "Open" }),
-    h("span", { text: `${pl.voters} vote${pl.voters === 1 ? "" : "s"} · ${pl.multi ? "Choose any" : "Choose one"} · ${pl.closed ? `by ${pl.author}` : status}` }));
+    h("span", { text: `${pl.voters == null ? "" : `${pl.voters} vote${pl.voters === 1 ? "" : "s"} · `}${pl.multi ? "Choose any" : "Choose one"} · ${pl.closed ? `by ${pl.author}` : status}` }));
+  if (pl.private) foot.prepend(h("span", { class: "pl-private" }, iconEl("lock"), hidden ? "Private: only the owner sees the results" : "Private poll: only you see results and votes"));
   if (chat && pl.canClose) {
     foot.append(h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Close poll", onclick: async () => { try { await postJson(`/api/community/polls/${pl.id}/close`, {}); reload(); } catch (e) { toast(e.message); } } }));
   } else if (canManage && !chat) {
@@ -251,10 +254,10 @@ export function pollCard(pl, canManage, reload, toast, { chat = false } = {}) {
     }) }));
   }
   return h("article", { class: `panel pl-card${chat ? " in-chat" : ""}` }, h("h3", { class: "sg-title", text: pl.question }),
-    !showResults ? h("p", { class: "text-3 small", style: "margin:0 0 8px", text: "Vote to see the results." }) : null, opts, foot);
+    !showResults ? h("p", { class: "text-3 small", style: "margin:0 0 8px", text: hidden ? (voted ? "Your vote is saved. Results are private." : "Your vote is private. Nobody else can see what you picked.") : "Vote to see the results." }) : null, opts, foot);
 }
 
-export function pollDialog(done, toast, { channelId = null, channelName = "" } = {}) {
+export function pollDialog(done, toast, { channelId = null, channelName = "", canPrivate = false } = {}) {
   const q = h("input", { class: "input", id: "pl-q", maxlength: 140, placeholder: "e.g. What should the next event be?" });
   const box = h("div", { class: "stack", style: "gap:6px" });
   const addRow = (v = "") => {
@@ -267,14 +270,16 @@ export function pollDialog(done, toast, { channelId = null, channelName = "" } =
   const multi = h("input", { type: "checkbox", id: "pl-multi" });
   const length = select("pl-len", [["24", "1 day"], ["72", "3 days"], ["168", "1 week"], ["0", "Until I close it"]], "72");
   const tell = h("input", { type: "checkbox", id: "pl-notify", checked: true });
+  const priv = h("input", { type: "checkbox", id: "pl-private" });
   openDialog({
     title: "New poll",
     body: h("div", { class: "form" }, field("Question", q),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Answers (2 to 8)" }), box, more),
       h("label", { class: "check" }, multi, "Let people choose more than one"),
+      canPrivate ? h("label", { class: "check" }, priv, "Private results: only you see the results and who voted what") : null,
       field("Runs for", length), channelId ? h("p", { class: "text-3 small", style: "margin:0", text: `It's posted as a message in #${channelName}.` }) : h("label", { class: "check" }, tell, "Notify everyone")),
     actions: [{ label: "Cancel" }, { label: "Post poll", kind: "primary", onClick: async () => {
-      const data = { question: q.value, options: [...box.children].map((i) => i.value), multi: multi.checked, hours: Number(length.value), notify: tell.checked };
+      const data = { question: q.value, options: [...box.children].map((i) => i.value), multi: multi.checked, hours: Number(length.value), notify: tell.checked, private: canPrivate && priv.checked };
       await postJson(channelId ? "/api/chat/polls" : "/api/community/polls", channelId ? { ...data, channelId } : data);
       toast("Poll posted.");
       done();

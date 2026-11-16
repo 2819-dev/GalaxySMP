@@ -3831,3 +3831,7 @@ html[data-theme="light"] .holiday-greeting { border-color: rgba(184, 134, 47, .3
 .cmp-ach li { display: flex; gap: 6px; align-items: baseline; }
 .cmp-ach li svg { width: 15px; height: 15px; flex: none; color: var(--accent-text); align-self: center; }
 .bd-kinds { margin-bottom: 12px; }
+/* Private polls */
+.pl-private { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--accent-text); }
+.pl-private svg { width: 13px; height: 13px; }
+.pl-who { margin: -2px 0 4px 34px; }
