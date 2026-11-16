@@ -8,6 +8,7 @@ import { limit as rateLimit } from "../lib/ratelimit.js";
 import { headUrlFor } from "./heads.js";
 import { notify } from "./notify.js";
 import { postTimeline } from "./feed.js";
+import { streaksFor, MAX_STREAKS } from "./friendstreaks.js";
 
 const MAX_FRIENDS = 200;
 const pair = (x, y) => (x < y ? [x, y] : [y, x]);
@@ -36,12 +37,13 @@ export async function list(request, env) {
       LEFT JOIN players p ON p.uuid = u.mc_uuid
      WHERE (f.a = ${me.id} OR f.b = ${me.id}) AND NOT u.banned
      ORDER BY (p.online_at > now() - interval '150 seconds') DESC NULLS LAST, lower(u.username)`;
+  const streaks = await streaksFor(sql, me.id).catch((e) => { console.error("friend streaks failed", e); return {}; });
   const person = (r) => ({
     id: Number(r.id), username: r.username, gamertag: r.gamertag || null, head: headUrlFor(r),
-    inGame: Boolean(r.in_game), lastSeen: r.last_seen || null,
+    inGame: Boolean(r.in_game), lastSeen: r.last_seen || null, streak: streaks[Number(r.id)] || null,
   });
   return json({
-    ok: true,
+    ok: true, maxStreaks: MAX_STREAKS, streakCount: Object.keys(streaks).length,
     friends: rows.filter((r) => r.status === "accepted").map(person),
     incoming: rows.filter((r) => r.status === "pending" && Number(r.requested_by) !== Number(me.id)).map(person),
     outgoing: rows.filter((r) => r.status === "pending" && Number(r.requested_by) === Number(me.id)).map(person),
@@ -86,6 +88,7 @@ export async function act(request, env) {
   }
   if (action === "decline" || action === "cancel" || action === "remove") {
     await sql`DELETE FROM friends WHERE a = ${a} AND b = ${b}`;
+    await sql`DELETE FROM friend_streaks WHERE a = ${a} AND b = ${b}`;
     return json({ ok: true, state: "none" });
   }
   throw new HttpError(400, "Unknown action.");

@@ -93,10 +93,11 @@ function renderFriendsList(root, { toast, setTimer, openDM }) {
           btn("Accept", "btn-primary", () => act("accept", f.id, `You and ${f.gamertag || f.username} are now friends.`)),
           btn("Decline", "btn-ghost", () => act("decline", f.id))))));
     }
+    parts.push(streakSection(d));
     const online = d.friends.filter((f) => f.inGame).length;
     parts.push(h("section", { class: "panel fr-box" },
       h("h3", { class: "fr-h", text: d.friends.length ? `Your friends · ${online} in game` : "Your friends" }),
-      ...(d.friends.length ? d.friends.map((f) => person(f, f.inGame ? "In game now" : ago(f.lastSeen),
+      ...(d.friends.length ? d.friends.map((f) => person(f, (f.inGame ? "In game now" : ago(f.lastSeen)) + (f.streak?.status === "active" && f.streak.length ? ` · 🔥 ${f.streak.length}` : ""),
         btn("Message", "btn-secondary", () => (openDM ? openDM(f.id) : (location.href = `/community#dm-${f.id}`)), "message"),
         btn("", "btn-ghost fr-more", () => openDialog({
           title: `Remove ${f.gamertag || f.username}?`,
@@ -111,6 +112,76 @@ function renderFriendsList(root, { toast, setTimer, openDM }) {
     lists.replaceChildren(...parts);
     root.querySelectorAll(".fr-more").forEach((b) => b.setAttribute("aria-label", "Remove friend"));
   }
+  // ---------- Friend Streaks (like Duolingo) ----------
+  const NEXT = [[7, "$500"], [30, "$2,500"], [100, "$10,000 + a badge"], [365, "$50,000"]];
+  const sAct = async (action, f, label) => {
+    try {
+      const r = await postJson("/api/friends/streak", { action, userId: f.id });
+      toast(r.message || label || "Done.");
+      load();
+    } catch (e) { toast(e.message); }
+  };
+  function streakCard(f) {
+    const st = f.streak;
+    const name = f.gamertag || f.username;
+    const lit = st.doneToday;
+    let status, action = null;
+    if (st.doneToday) status = "You both played today";
+    else if (!st.meToday && !st.themToday) status = st.length ? "Play today to keep it going" : "Play on the same day to start it";
+    else if (!st.meToday) status = `${name} played today. Your turn!`;
+    else status = `Waiting for ${name} to play today`;
+    if (st.canNudge) action = btn("Remind", "btn-secondary", () => sAct("nudge", f), "bell");
+    const next = NEXT.find(([n]) => n > st.length);
+    const menu = btn("", "btn-ghost fs-more", () => openDialog({
+      title: `End your Friend Streak with ${name}?`,
+      body: h("p", { text: `Your ${st.length}-day streak will be gone, and you can start a new one later. Your best was ${st.best} days.` }),
+      actions: [{ label: "Keep it" }, { label: "End streak", kind: "danger", onClick: () => sAct("end", f) }],
+    }), "trash");
+    menu.setAttribute("aria-label", "End Friend Streak");
+    return h("div", { class: `fs-card${lit ? " lit" : ""}${st.length && !lit && (!st.meToday || !st.themToday) ? " risk" : ""}` },
+      h("div", { class: "fs-top" }, face(f), h("b", { class: "fs-name", text: name }), menu),
+      h("div", { class: "fs-flame" }, iconEl("flame"), h("span", { class: "fs-num", text: String(st.length) })),
+      h("div", { class: "fs-days", text: st.length === 1 ? "day" : "days" }),
+      h("div", { class: "fs-today" },
+        h("span", { class: `fs-tick${st.meToday ? " on" : ""}`, title: st.meToday ? "You played today" : "You haven't played today" }, "You"),
+        h("span", { class: `fs-tick${st.themToday ? " on" : ""}`, title: st.themToday ? `${name} played today` : `${name} hasn't played today` }, name)),
+      h("p", { class: "fs-status", text: status }),
+      next ? h("p", { class: "fs-next text-3", text: `${next[0] - st.length} more day${next[0] - st.length === 1 ? "" : "s"} to ${next[0]}: ${next[1]} each` }) : null,
+      action);
+  }
+  function inviteDialog(d) {
+    const free = d.friends.filter((f) => !f.streak && f.gamertag);
+    openDialog({
+      title: "Start a Friend Streak",
+      body: h("div", { class: "form" },
+        h("p", { class: "text-2", style: "margin:0", text: "Pick a friend. Every day you both play on GalaxySMP, your streak grows. Miss a day and it starts again." }),
+        free.length ? h("div", { class: "fs-pick" }, ...free.map((f) => h("button", { class: "fs-pick-row", type: "button", onclick: (e) => { e.target.closest("dialog")?.close(); sAct("invite", f); } },
+          face(f), h("b", { text: f.gamertag || f.username }), h("span", { class: "text-3 small", text: "Invite" }))))
+          : h("p", { class: "text-3", text: "All your friends who play already have a streak or an invite with you. Add more friends first." })),
+      actions: [{ label: "Close" }],
+    });
+  }
+  function streakSection(d) {
+    const all = d.friends.filter((f) => f.streak);
+    const active = all.filter((f) => f.streak.status === "active").sort((x, y) => y.streak.length - x.streak.length);
+    const incoming = all.filter((f) => f.streak.status === "pending" && !f.streak.byMe);
+    const outgoing = all.filter((f) => f.streak.status === "pending" && f.streak.byMe);
+    const room = d.streakCount < d.maxStreaks;
+    const box = h("section", { class: "panel fr-box" },
+      h("div", { class: "fs-head" },
+        h("h3", { class: "fr-h", style: "margin:0" }, iconEl("flame"), ` Friend Streaks · ${d.streakCount}/${d.maxStreaks}`),
+        room && d.friends.length ? btn("Start one", "btn-primary", () => inviteDialog(d), "plus") : null),
+      h("p", { class: "text-3 small", style: "margin:0", text: "Play on GalaxySMP on the same days as a friend to grow your streak. Rewards at 7, 30, 100 and 365 days." }));
+    for (const f of incoming) {
+      box.append(person(f, "Wants to start a Friend Streak with you",
+        btn("Accept", "btn-primary", () => sAct("accept", f)), btn("Decline", "btn-ghost", () => sAct("decline", f))));
+    }
+    if (active.length) box.append(h("div", { class: "fs-grid" }, ...active.map(streakCard)));
+    else if (!incoming.length && !outgoing.length) box.append(h("p", { class: "text-3", text: d.friends.length ? "No Friend Streaks yet. Tap Start one to invite a friend." : "Add a friend first, then start a Friend Streak together." }));
+    for (const f of outgoing) box.append(person(f, "Friend Streak invite sent", btn("Cancel", "btn-ghost", () => sAct("cancel", f))));
+    return box;
+  }
+
   load();
   setTimer(setInterval(load, 30_000));
 }

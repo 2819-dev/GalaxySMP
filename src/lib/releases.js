@@ -260,6 +260,13 @@ Compare on any profile now also lists the achievements you both have, and the on
     title: "Rank badges fixed in game",
     body: `Rank badges in game chat and above heads now always show your highest rank, including right after a server restart. The server also remembers everyone's ranks, so they show correctly even before it reconnects to the website.`,
   },
+  {
+    id: "2026-11-24a",
+    title: "Friend Streaks and Happening now",
+    body: `**Friend Streaks:** invite a friend from Community > Friends to start a Friend Streak. Every day you both play on GalaxySMP, your streak grows by one; miss a day and it starts again. You can have up to 5. If your friend hasn't played yet today, tap Remind to send them a nudge. Reach 7, 30, 100 and 365 days to earn game money for both of you, plus a badge at 100 days.
+
+**Happening now:** the top of #Timeline now shows what's on right now (events, minigames, Build Contests and Bedwars games), with a Join button.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
@@ -268,6 +275,11 @@ export const OFFICIAL_SUGGESTIONS = [
     id: "ah-price-alerts",
     title: "Auction House price alerts",
     body: "Pick an item and the most you'd pay, and get a notification (on the website and in game) as soon as someone lists it at or below that price. Vote below to tell us if you'd use this.",
+  },
+  {
+    id: "play-sessions",
+    title: "Play Sessions",
+    body: "Post a plan like \"Bedwars at 7 pm, who's in?\" in #Events. Other players tap I'm in, and everyone who joined gets a reminder 10 minutes before it starts. Vote below to tell us if you'd use this.",
   },
 ];
 

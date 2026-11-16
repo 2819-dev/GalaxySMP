@@ -55,6 +55,7 @@ import * as helpcenter from "./routes/helpcenter.js";
 import * as uploads from "./routes/uploads.js";
 import * as actas from "./routes/actas.js";
 import * as friends from "./routes/friends.js";
+import * as friendStreaks from "./routes/friendstreaks.js";
 import { isActingRequest } from "./lib/auth.js";
 import { ensureSchema } from "./lib/autoschema.js";
 import { lockdownGate, lockdownState } from "./lib/lockdown.js";
@@ -105,6 +106,7 @@ const routes = [
   ["POST", "/api/join-requests", (req, env) => joinreq.createJoinRequest(req, env)],
   ["GET", "/api/site-notice", (req, env) => serverctl.siteNotice(req, env)],
   ["GET", "/api/feed", feed.listFeed],
+  ["GET", "/api/feed/now", feed.happeningNow],
   ["GET", "/api/team", (req, env) => team.listTeam(req, env)],
   ["GET", "/api/help-center", (req, env) => helpcenter.helpCenter(req, env)],
   ["GET", "/api/uploads/rights", (req, env) => uploads.rights(req, env)],
@@ -188,6 +190,7 @@ const routes = [
   }],
   ["POST", "/api/inbox", (req, env) => notifyRoutes.inboxAction(req, env)],
   ["POST", "/api/friends", (req, env) => friends.act(req, env)],
+  ["POST", "/api/friends/streak", (req, env) => friendStreaks.act(req, env)],
   ["GET", "/api/giftcards/mine", (req, env) => giftcards.mine(req, env)],
   ["GET", "/api/giftcards/open", giftcards.peek],
   ["POST", "/api/giftcards/redeem", (req, env) => giftcards.redeem(req, env)],

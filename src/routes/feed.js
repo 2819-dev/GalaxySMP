@@ -7,6 +7,7 @@ import { requireUser } from "../lib/auth.js";
 import { checkMessage, compileWordList } from "../lib/filter.js";
 import { limit as rateLimit } from "../lib/ratelimit.js";
 import { headUrlFor } from "./heads.js";
+import { voiceStub } from "./voice.js";
 
 const STAFF = 50;
 
@@ -108,4 +109,44 @@ export async function deletePost(request, env, ctx, url, params) {
   const sql = getDb(env);
   await sql`UPDATE timeline_posts SET deleted_at = now() WHERE id = ${Number(params.id) || 0}`;
   return json({ ok: true });
+}
+
+// GET /api/feed/now: what's happening right now, for the "Happening now" card at the top of #Timeline.
+// Calendar events that are on (or start within 15 minutes), minigames people can join (Build Contests too),
+// and a Bedwars game being played. Nothing is stored: it's worked out each time.
+export async function happeningNow(request, env) {
+  await requireUser(request, env);
+  const sql = getDb(env);
+  const stub = voiceStub(env);
+  const [events, games, bw] = await Promise.all([
+    sql`SELECT id, title, kind, location, starts_at, ends_at FROM events
+         WHERE deleted_at IS NULL AND starts_at <= now() + interval '15 minutes'
+           AND coalesce(ends_at, starts_at + interval '2 hours') > now()
+         ORDER BY starts_at LIMIT 3`.catch(() => []),
+    stub.fetch("https://voice/internal/events").then((r) => r.json()).catch(() => ({})),
+    stub.fetch("https://voice/internal/bwlive").then((r) => r.json()).catch(() => ({})),
+  ]);
+  const now = Date.now();
+  const items = [];
+  for (const e of events) {
+    const started = new Date(e.starts_at).getTime() <= now;
+    items.push({ kind: "event", id: `event-${e.id}`, title: e.title, live: started, startsAt: e.starts_at, endsAt: e.ends_at,
+      detail: e.location || (started ? "Happening now on GalaxySMP" : "Starting soon"), url: "/community#events" });
+  }
+  if (games.at && now - games.at < 5 * 60e3) {
+    for (const g of (games.events || []).slice(0, 3)) {
+      const signup = Number(g.signupEnds) * 1000 > now;
+      const contest = /^Build Contest/.test(String(g.game || ""));
+      items.push({ kind: contest ? "contest" : "minigame", id: `game-${g.id}`, title: String(g.game || "Minigame").slice(0, 80), live: !signup,
+        detail: signup ? `Sign-ups open · ${Number(g.players) || 0} joined · hosted by ${String(g.host || "staff").slice(0, 32)}` : `Playing now · ${Number(g.players) || 0} players`,
+        endsAt: signup ? new Date(Number(g.signupEnds) * 1000).toISOString() : null, howTo: "In game: /minigames", url: null });
+    }
+  }
+  if (bw.at && now - bw.at < 30e3 && bw.running) {
+    const teams = Array.isArray(bw.teams) ? bw.teams : [];
+    const beds = teams.filter((t) => t && t.bed).length;
+    items.push({ kind: "bedwars", id: "bedwars", title: "Bedwars game in progress", live: true,
+      detail: teams.length ? `${teams.length} teams · ${beds} bed${beds === 1 ? "" : "s"} still standing` : "Watch from the Leaderboards page", howTo: "In game: /bedwars", url: "/leaderboard#bedwars" });
+  }
+  return json({ ok: true, items }, 200, { "Cache-Control": "no-store" });
 }

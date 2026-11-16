@@ -1,10 +1,11 @@
 // #Timeline: what's happening on GalaxySMP, as feed cards (like the Muse app's feed): picture, who, what
 // happened, a picture when there is one, then Like and Comments.
 import { h, getJson, postJson } from "/js/dialog.js";
-import { iconEl } from "/js/site.js";
+import { iconEl, serverAddress } from "/js/site.js";
+import config from "/config.js";
 import { faceSvg } from "/js/face.js";
 
-const KIND_LABEL = { first_join: "New player", achievement: "Achievement", potw: "Player of the Week", botw: "Build of the Week", rank: "Rank-up", plan: "Supporter", contest: "Build Contest", anniversary: "Anniversary" };
+const KIND_LABEL = { first_join: "New player", achievement: "Achievement", potw: "Player of the Week", botw: "Build of the Week", rank: "Rank-up", plan: "Supporter", contest: "Build Contest", anniversary: "Anniversary", friend_streak: "Friend Streak" };
 
 function ago(d) {
   const s = Math.max(0, (Date.now() - new Date(d)) / 1000);
@@ -16,11 +17,12 @@ function ago(d) {
 }
 
 export function renderTimeline(root, { toast, setTimer }) {
+  const nowBox = h("div", { class: "tl-now-wrap", "aria-live": "polite" });
   const list = h("div", { class: "tl-feed" });
   const more = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Load more", hidden: true });
   root.append(h("div", { class: "cp-wrap tl-wrap" },
     h("div", { class: "tl-intro" }, h("h2", { text: "Timeline" }), h("p", { class: "text-3", text: "What's happening on GalaxySMP: new players, achievements, weekly winners and more." })),
-    list, h("div", { class: "tl-more" }, more)));
+    nowBox, list, h("div", { class: "tl-more" }, more)));
   let oldest = null;
   let newest = null;
 
@@ -101,7 +103,42 @@ export function renderTimeline(root, { toast, setTimer }) {
     }
     more.hidden = !d.more;
   }
+  // ---------- "Happening now": a live card at the top while something is on ----------
+  const NOW_ICON = { event: "calendar", minigame: "minigames", contest: "trophy2", bedwars: "sword" };
+  const join = async (it) => {
+    const addr = config.bedrockPort ? `${serverAddress}:${config.bedrockPort}` : serverAddress;
+    try { await navigator.clipboard.writeText(serverAddress); } catch { /* not allowed: the toast still shows the address */ }
+    toast(`Server address copied (${addr}). Open Minecraft and join GalaxySMP${it.howTo ? `, then ${it.howTo.replace(/^In game: /, "type ")}` : ""}.`);
+  };
+  const until = (iso) => {
+    if (!iso) return null;
+    const m = Math.round((new Date(iso) - Date.now()) / 60000);
+    return m > 0 ? (m < 60 ? `${m} min left` : `${Math.round(m / 60)} h left`) : null;
+  };
+  async function loadNow() {
+    let d;
+    try { d = await getJson("/api/feed/now"); } catch { return; }
+    const items = d.items || [];
+    if (!items.length) { nowBox.replaceChildren(); return; }
+    nowBox.replaceChildren(h("section", { class: "tl-now" },
+      h("div", { class: "tl-now-head" }, h("span", { class: "tl-now-dot", "aria-hidden": "true" }), h("b", { text: "Happening now" })),
+      ...items.map((it) => {
+        const starts = !it.live && it.startsAt ? Math.max(0, Math.round((new Date(it.startsAt) - Date.now()) / 60000)) : null;
+        const when = it.live ? until(it.endsAt) : starts != null ? (starts ? `Starts in ${starts} min` : "Starting now") : until(it.endsAt);
+        return h("div", { class: "tl-now-row" },
+          h("span", { class: "tl-now-ic" }, iconEl(NOW_ICON[it.kind] || "sparkles")),
+          h("div", { class: "tl-now-text" },
+            h("b", { text: it.title }),
+            h("small", { class: "text-3", text: [it.detail, when].filter(Boolean).join(" · ") })),
+          h("div", { class: "tl-now-btns" },
+            it.url ? h("a", { class: "btn btn-sm btn-ghost", href: it.url, text: "Details" }) : null,
+            h("button", { class: "btn btn-sm btn-primary", type: "button", onclick: () => join(it) }, "Join")));
+      })));
+  }
+
   more.addEventListener("click", () => load(true));
+  loadNow();
+  setTimer(setInterval(() => { if (!document.hidden) loadNow(); }, 30000));
   load(false);
   setTimer(setInterval(() => { if (!document.hidden && !list.querySelector(".tl-comments:not([hidden])")) load(false); }, 30000));
 }

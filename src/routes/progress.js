@@ -72,6 +72,9 @@ export async function recordStats(env, list, online) {
                                  online_at = now() WHERE xuid = ANY(${onlineIds})`;
   }
   await recordHistory(sql, players.map((p) => String(p.xuid)), onlineIds).catch((e) => console.error("history failed", e));
+  if (onlineIds.length) {
+    await import("./friendstreaks.js").then((m) => m.updateOnline(env, sql, onlineIds)).catch((e) => console.error("friend streaks failed", e));
+  }
   const defs = new Map((await achievementDefs(sql)).map((a) => [a.id, a]));
   for (const p of players) {
     const had = before.get(String(p.xuid));
