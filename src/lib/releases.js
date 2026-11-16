@@ -255,6 +255,11 @@ Compare on any profile now also lists the achievements you both have, and the on
     title: "Private polls",
     body: `Some polls are now private, marked with a lock. On a private poll, you only see your own vote: the results and who voted for what stay with the server owner. Vote as usual, and change your vote any time until it closes.`,
   },
+  {
+    id: "2026-11-23d",
+    title: "Rank badges fixed in game",
+    body: `Rank badges in game chat and above heads now always show your highest rank, including right after a server restart. The server also remembers everyone's ranks, so they show correctly even before it reconnects to the website.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

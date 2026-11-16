@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.48.1",
+                    "User-Agent": "GalaxyLink-Endstone/2.48.2",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -350,6 +350,8 @@ class VoiceLink:
         self._ticks = getattr(self, "_ticks", 0) + 1
         if self._ticks % 4 == 0:
             self._apply_icons()  # catches players who just joined the server
+        if self.ws and self._ticks % 40 == 0 and not getattr(self.plugin.ranks, "received_at", 0):
+            self.send_json({"type": "need_ranks"})  # connected but the ranks didn't arrive: ask again
         if self.ws and (self._ticks % STATUS_EVERY == 1 or getattr(self, "_status_ws", None) is not self.ws):
             self._status_ws = self.ws
             self._send_status(self.ws)

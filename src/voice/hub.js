@@ -52,7 +52,10 @@ export class VoiceHub extends DurableObject {
   }
 
   pluginSocket() {
-    return this.ctx.getWebSockets("plugin")[0] || null;
+    // The newest live connection. After a crash or reconnect the old one can still be listed for a while:
+    // never send to it (ranks, shop and settings sent there were lost, so ranks fell back to plan tags).
+    const live = this.ctx.getWebSockets("plugin").filter((ws) => !ws.deserializeAttachment()?.gone);
+    return live[live.length - 1] || null;
   }
 
   members() {
@@ -293,7 +296,10 @@ export class VoiceHub extends DurableObject {
     const [client, server] = Object.values(pair);
 
     if (request.headers.get("X-GSMP-Plugin") === "1") {
-      for (const old of this.ctx.getWebSockets("plugin")) { try { old.close(1000, "replaced"); } catch { /* gone */ } }
+      for (const old of this.ctx.getWebSockets("plugin")) {
+        try { old.serializeAttachment({ ...(old.deserializeAttachment() || {}), kind: "plugin", gone: true }); } catch { /* gone */ }
+        try { old.close(1000, "replaced"); } catch { /* gone */ }
+      }
       this.ctx.acceptWebSocket(server, ["plugin"]);
       server.serializeAttachment({ kind: "plugin" });
       this.ctx.waitUntil(this.serverUp());
@@ -485,6 +491,9 @@ export class VoiceHub extends DurableObject {
       };
       return getDb(this.env)`INSERT INTO economy_config (key, value, updated_by) VALUES ('friendbot_status', ${JSON.stringify(value)}::jsonb, 'server')
                               ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = 'server'`.catch(() => {});
+    }
+    if (msg.type === "need_ranks") {  // the plugin didn't get the ranks: send them again
+      return this.sendRanks();
     }
     if (msg.type === "bw_live") {  // the Bedwars game running now, for the live view on the website
       return this.ctx.storage.put("bwlive", { ...msg, at: Date.now() });

@@ -204,20 +204,43 @@ class RankManager:
         self.assign = {}       # xuid -> [rank ids], top of the Rank order first
         self.attachments = {}  # player uuid -> PermissionAttachment
         self.plan_priority = {"pro": 50, "plus": 60}  # Galaxy+ / Pro+ tags on the same 1-255 scale as ranks
+        self.received_at = 0
+        # The last ranks the website sent, so they're right from the moment the server starts (before the
+        # website connects) instead of everyone showing only their plan tag for a while.
+        cached = plugin.economy.get_config("ranks_cache")
+        if isinstance(cached, dict) and cached.get("ranks"):
+            try:
+                self._load(cached)
+            except Exception:
+                pass
 
     # ---------- state from the website ----------
     def update(self, msg):
+        import time
         self.received = True  # gradient pictures are only built once the real ranks are here
-        self.ranks = {r["id"]: r for r in msg.get("ranks", [])}
+        self.received_at = time.time()
+        self._load(msg)
+        try:
+            self.plugin.economy.set_config("ranks_cache", {k: msg.get(k) for k in ("ranks", "planPriority", "rankSets", "assignments")})
+        except Exception:
+            pass
+        self.plugin.server.scheduler.run_task(self.plugin, self.apply_all)
+        self.plugin.server.scheduler.run_task(self.plugin, self.refresh_pictures)
+
+    def _load(self, msg):
+        def key(i):  # rank ids can come as numbers or strings: always the same type
+            try:
+                return int(i)
+            except (TypeError, ValueError):
+                return i
+        self.ranks = {key(r["id"]): {**r, "id": key(r["id"])} for r in msg.get("ranks", []) or []}
         if isinstance(msg.get("planPriority"), dict):
             self.plan_priority = {k: int(v) for k, v in msg["planPriority"].items()}
         sets = msg.get("rankSets")
         if isinstance(sets, dict):  # several ranks per player (website 2.25+)
-            self.assign = {str(k): [i for i in v if i is not None] for k, v in sets.items() if isinstance(v, list)}
+            self.assign = {str(k): [key(i) for i in v if i is not None] for k, v in sets.items() if isinstance(v, list)}
         else:
-            self.assign = {str(k): [v] for k, v in (msg.get("assignments") or {}).items() if v is not None}
-        self.plugin.server.scheduler.run_task(self.plugin, self.apply_all)
-        self.plugin.server.scheduler.run_task(self.plugin, self.refresh_pictures)
+            self.assign = {str(k): [key(v)] for k, v in (msg.get("assignments") or {}).items() if v is not None}
 
     def all_tags(self):
         """Every rank badge on the server: ranks and the Galaxy+ / Pro+ plan tags."""
@@ -271,7 +294,10 @@ class RankManager:
     # ---------- effects in game ----------
     def apply_all(self):
         for p in self.plugin.server.online_players:
-            self.apply_permissions(p)
+            try:
+                self.apply_permissions(p)
+            except Exception as e:  # one player's problem never stops everyone's badges from updating
+                self.plugin.logger.warning(f"Couldn't apply {p.name}'s rank permissions: {e}")
         self.plugin.refresh_tags()
 
     def apply_permissions(self, player):
