@@ -31,7 +31,7 @@ export async function bootstrap(request, env) {
     sql`SELECT id, category_id, slug, name, topic, min_post_power, kind, slow_seconds FROM channels
          WHERE NOT hidden AND (NOT staff_only OR ${can(user, "staff_chat")}) ORDER BY position, id`,
     sql`SELECT key, name, color, power FROM roles ORDER BY power DESC`,
-    sql`SELECT u.id, u.username, r.key AS role, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color, u.custom_presence, u.look_title, u.look_frame, u.platform AS plat,
+    sql`SELECT u.id, u.username, u.is_bot, r.key AS role, u.real_name, u.real_name_hidden, u.bio, u.interests, u.profile_color, u.custom_presence, u.look_title, u.look_frame, u.platform AS plat,
                rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon,
                rk.gradient AS rank_gradient, rk.position AS rank_position, rk.priority AS rank_priority,
                pl.xuid, pl.head_at, pl.gamerpic_at, (pl.online_at > now() - interval '150 seconds') AS in_game, u.created_at, u.banner_at, (u.banner IS NOT NULL) AS has_banner,
@@ -41,7 +41,7 @@ export async function bootstrap(request, env) {
           LEFT JOIN player_top_rank prk ON prk.xuid = pl.xuid
           LEFT JOIN ranks rk ON rk.id = prk.rank_id
          WHERE NOT u.banned
-         ORDER BY (rk.id IS NULL), rk.position, lower(u.username)
+         ORDER BY u.is_bot DESC, (rk.id IS NULL), rk.position, lower(u.username)
          LIMIT 500`,
   ]);
   await sql`UPDATE users SET last_seen_at = now() WHERE id = ${user.id}`;
@@ -74,7 +74,7 @@ export async function bootstrap(request, env) {
     members: members.map((m) => ({
       id: Number(m.id), username: m.username, role: m.role, rank: displayRank(rankOf(m), m.plan, planPriority, PLANS),
       // Minecraft head picture (if the server has sent it), plan, and when they joined the community
-      head: headUrlFor(m),
+      head: m.is_bot ? "/favicon.png" : headUrlFor(m), bot: Boolean(m.is_bot),
       plan: m.plan || null, inGame: Boolean(m.in_game), since: m.created_at, banner: bannerUrl(m),
       status: (m.plan === "pro" || isOwner(env, m.username, m.plat === "bedrock")) && m.custom_presence?.title && (!m.custom_presence.until || new Date(m.custom_presence.until) > new Date())
         ? `${m.custom_presence.label && m.custom_presence.label !== "Status" ? `${m.custom_presence.label} ` : ""}${m.custom_presence.title}` : null,

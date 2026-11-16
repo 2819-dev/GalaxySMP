@@ -106,7 +106,7 @@ export async function login(request, env) {
     SELECT id, username_lower, banned, ban_reason,
            coalesce(locked_until > now(), false) AS locked,
            password_hash = crypt(${password}, password_hash) AS ok
-      FROM users WHERE username_lower = ANY(${candidates})`;
+      FROM users WHERE username_lower = ANY(${candidates}) AND NOT is_bot`;  // nobody can sign in as GalaxySMP
   const user = rows.find((r) => r.ok) || rows.find((r) => r.username_lower === name) || rows[0];
 
   const wrong = "Incorrect username or password. New to GalaxySMP? Create an account first.";

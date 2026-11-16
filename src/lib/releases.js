@@ -299,6 +299,11 @@ Compare on any profile now also lists the achievements you both have, and the on
 
 **Friend Streaks:** a day now also counts if you spend 15 minutes on Community and send at least one message.`,
   },
+  {
+    id: "2026-11-26b",
+    title: "Meet GalaxySMP, the server's own account",
+    body: `GalaxySMP is now a member of the Community, with a verified BOT tag. It posts the Question of the Day, welcomes new players, announces chat level-ups and answers !commands in #Bot Commands. Official posts, like these update notes, come from it too. Tap its name to see its profile. To join GalaxySMP from the Friends tab on Xbox, add GalaxyPRO#9842 as a friend.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
@@ -315,6 +320,14 @@ export const OFFICIAL_SUGGESTIONS = [
   },
 ];
 
+// Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).
+async function officialAuthor(env, sql) {
+  const [bot] = await sql`SELECT id, username FROM users WHERE is_bot ORDER BY id LIMIT 1`.catch(() => []);
+  if (bot) return bot;
+  const people = await sql`SELECT id, username, platform FROM users WHERE NOT banned ORDER BY id LIMIT 200`;
+  return people.find((u) => isOwner(env, u.username, u.platform === "bedrock"));
+}
+
 async function postOfficialSuggestions(sql, author) {
   if (!author) return;
   for (const s of OFFICIAL_SUGGESTIONS) {
@@ -329,8 +342,7 @@ export async function postReleases(env, sql) {
   const keys = RELEASES.map((r) => `release:${r.id}`);
   const done = new Set((await sql`SELECT key FROM economy_config WHERE key = ANY(${[...keys, ...OFFICIAL_SUGGESTIONS.map((x) => `suggestion:${x.id}`)]})`).map((r) => r.key));
   if (OFFICIAL_SUGGESTIONS.some((x) => !done.has(`suggestion:${x.id}`))) {
-    const people = await sql`SELECT id, username, platform FROM users WHERE NOT banned ORDER BY id LIMIT 200`;
-    await postOfficialSuggestions(sql, people.find((u) => isOwner(env, u.username, u.platform === "bedrock")));
+    await postOfficialSuggestions(sql, await officialAuthor(env, sql));
   }
   for (const r of RELEASES) {
     const key = `release:${r.id}`;
@@ -338,8 +350,7 @@ export async function postReleases(env, sql) {
     const claimed = await sql`INSERT INTO economy_config (key, value, updated_by) VALUES (${key}, ${JSON.stringify(new Date().toISOString())}::jsonb, 'server')
                               ON CONFLICT (key) DO NOTHING RETURNING key`;
     if (!claimed.length) continue; // another run got it first
-    const owners = await sql`SELECT id, username, platform FROM users WHERE NOT banned ORDER BY id LIMIT 200`;
-    const author = owners.find((u) => isOwner(env, u.username, u.platform === "bedrock"));
+    const author = await officialAuthor(env, sql);
     await sql`INSERT INTO news_posts (title, body, tag, author_id) VALUES (${r.title}, ${r.body}, 'release', ${author?.id || null})`;
     await notify(env, "all", "news", { title: "New update", body: r.title, url: "/community#updates", tag: `release-${r.id}` }).catch(() => {});
   }

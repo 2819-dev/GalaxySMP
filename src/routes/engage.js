@@ -18,7 +18,7 @@ import { levelInfo } from "../chat/engage.js";
 export const HELPFUL_AT = 25;
 
 async function visibleMessage(sql, user, id) {
-  const [m] = await sql`SELECT m.id, m.user_id, m.kind, m.meta, m.channel_id, c.staff_only FROM messages m JOIN channels c ON c.id = m.channel_id
+  const [m] = await sql`SELECT m.id, m.user_id, m.kind, m.meta, m.channel_id, c.staff_only, (SELECT is_bot FROM users WHERE id = m.user_id) AS is_bot FROM messages m JOIN channels c ON c.id = m.channel_id
                          WHERE m.id = ${id} AND m.deleted_at IS NULL`;
   if (!m || (m.staff_only && !can(user, "staff_chat"))) throw new HttpError(404, "That message no longer exists.");
   return m;
@@ -36,7 +36,7 @@ export async function thank(request, env, ctx, url, params) {
   await rateLimit(env, "AUTH_LIMITER", `thank:${user.id}`);
   const sql = getDb(env);
   const m = await visibleMessage(sql, user, Number(params.id));
-  if (!m.user_id) throw new HttpError(400, "You can only thank members.");
+  if (!m.user_id || m.is_bot) throw new HttpError(400, "You can only thank members.");
   if (Number(m.user_id) === Number(user.id)) throw new HttpError(400, "You can't thank yourself.");
   const [had] = await sql`DELETE FROM message_thanks WHERE message_id = ${m.id} AND user_id = ${user.id} RETURNING 1`;
   if (!had) {
@@ -152,4 +152,28 @@ export async function qotdSave(request, env) {
   if (!check.ok) throw new HttpError(400, check.message);
   await sql`INSERT INTO qotd_questions (text, created_by) VALUES (${check.text}, ${user.id})`;
   return json({ ok: true, message: "Added. New questions are asked before older ones." });
+}
+
+// ---------- post as GalaxySMP (owner) ----------
+// GET: the channels it can post in. POST { channelId, text }: posts the message as GalaxySMP.
+export async function botChannels(request, env) {
+  await ownerOnly(request, env);
+  const rows = await getDb(env)`SELECT id, name FROM channels WHERE kind = 'text' AND NOT hidden ORDER BY position, id`;
+  return json({ ok: true, channels: rows.map((c) => ({ id: Number(c.id), name: c.name })) });
+}
+
+export async function botSay(request, env) {
+  const user = await ownerOnly(request, env);
+  const body = await readJson(request);
+  const sql = getDb(env);
+  const text = String(body.text || "").replace(/\r\n?/g, "\n").trim().slice(0, 2000);
+  if (!text) throw new HttpError(400, "Write a message first.");
+  const [ch] = await sql`SELECT id, name FROM channels WHERE id = ${Number(body.channelId) || 0} AND kind = 'text' AND NOT hidden`;
+  if (!ch) throw new HttpError(404, "Choose a channel.");
+  const { botPost } = await import("../chat/engage.js");
+  const message = await botPost(sql, { channelId: ch.id, content: text, kind: "post", meta: { by: user.username } });
+  if (!message) throw new HttpError(409, "That couldn't be posted.");
+  await hubBroadcast(env, { type: "message", message });
+  await sql`INSERT INTO audit_log (actor_id, action, details) VALUES (${user.id}, 'bot.post', ${JSON.stringify({ channel: ch.name, text: text.slice(0, 200) })}::jsonb)`;
+  return json({ ok: true, message: `Posted in #${ch.name} as GalaxySMP.` });
 }

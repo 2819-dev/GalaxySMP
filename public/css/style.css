@@ -4017,3 +4017,6 @@ html[data-theme="light"] .holiday-greeting { border-color: rgba(184, 134, 47, .3
 .away-ev { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; }
 .qotd-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; max-height: 420px; overflow: auto; }
 .qotd-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
+
+.bot-tag { display: inline-flex; align-items: center; gap: 2px; margin-left: 4px; vertical-align: middle; }
+.bot-tag svg { width: 10px; height: 10px; stroke-width: 3.5; }

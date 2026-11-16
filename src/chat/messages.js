@@ -22,7 +22,7 @@ export function formatMessage(r) {
     editedAt: r.edited_at || null,
     author: { id: r.author_id ? Number(r.author_id) : 0, username: r.username || r.game_name || "Player", role: r.role_key || "member", color: r.color || null, rank: rankOf(r),
       level: r.chat_level != null ? Number(r.chat_level) : null },
-    bot: Boolean(r.kind && !r.author_id && !r.game_xuid),  // posted by @GalaxySMP (Question of the Day, welcomes, level-ups)
+    bot: Boolean(r.is_bot || (r.kind && !r.author_id && !r.game_xuid)),  // posted by GalaxySMP (Question of the Day, welcomes, level-ups...)
     kind: r.kind || null,
     meta: r.meta || null,
     thanks: (r.thanks || []).map(Number),
@@ -52,7 +52,7 @@ const SELECT = `
          CASE WHEN m.kind = 'welcome' THEN (SELECT coalesce(array_agg(w.user_id ORDER BY w.created_at), '{}') FROM message_waves w WHERE w.message_id = m.id) END AS waves,
          (SELECT count(*)::int FROM messages t WHERE t.thread_root = m.id AND t.deleted_at IS NULL) AS thread_count,
          (SELECT max(t.created_at) FROM messages t WHERE t.thread_root = m.id AND t.deleted_at IS NULL) AS thread_last,
-         u.id AS author_id, u.username, r.key AS role_key, r.color,
+         u.id AS author_id, u.username, u.is_bot, r.key AS role_key, r.color,
          rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient, rk.position AS rank_position,
          p.content AS reply_content, pu.username AS reply_username,
          (p.id IS NOT NULL AND p.deleted_at IS NOT NULL) AS reply_deleted,

@@ -37,6 +37,7 @@ const userOut = (u) => ({ id: Number(u.id), username: u.username, head: headUrlF
 // The one place every DM goes through (website and game).
 async function sendDm(env, sql, from, to, text, via, audioId = null) {
   if (!to || to.banned) throw new HttpError(404, "That member can't receive messages.");
+  if (to.is_bot === true || (await sql`SELECT is_bot FROM users WHERE id = ${to.id}`)[0]?.is_bot) throw new HttpError(400, "GalaxySMP is the server's own account, so it can't read DMs. Open a ticket in #Support if you need help.");
   if (Number(from.id) === Number(to.id)) throw new HttpError(400, "You can't message yourself.");
   if (from.banned) throw new HttpError(403, "Your account has been banned.");
   if (from.muted_until && new Date(from.muted_until) > new Date()) throw new HttpError(403, "You're muted, so you can't send messages right now.");

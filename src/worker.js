@@ -201,6 +201,8 @@ const routes = [
   ["GET", "/api/community/away", (req, env) => engage.away(req, env)],
   ["GET", "/api/community/level", engage.level],
   ["GET", "/api/panel/qotd", (req, env) => engage.qotdList(req, env)],
+  ["GET", "/api/panel/bot-post", (req, env) => engage.botChannels(req, env)],
+  ["POST", "/api/panel/bot-post", (req, env) => engage.botSay(req, env)],
   ["POST", "/api/panel/qotd", (req, env) => engage.qotdSave(req, env)],
   ["POST", "/api/store/cart/checkout", (req, env) => cart.checkout(req, env)],
   ["POST", "/api/store/merch/quote", (req, env) => merch.quote(req, env)],

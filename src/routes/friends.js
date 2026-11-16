@@ -66,8 +66,9 @@ export async function act(request, env) {
   }
   if (!other) throw new HttpError(404, "We couldn't find that member.");
   if (other === Number(me.id)) throw new HttpError(400, "You can't add yourself.");
-  const [them] = await sql`SELECT id, username, banned FROM users WHERE id = ${other}`;
+  const [them] = await sql`SELECT id, username, banned, is_bot FROM users WHERE id = ${other}`;
   if (!them || them.banned) throw new HttpError(404, "We couldn't find that member.");
+  if (them.is_bot) throw new HttpError(400, "GalaxySMP is the server's own account. To play from the Friends tab on Xbox, add GalaxyPRO#9842 there instead.");
   const [a, b] = pair(Number(me.id), other);
   const state = await friendState(sql, me.id, other);
   const action = String(body.action || "");

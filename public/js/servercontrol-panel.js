@@ -15,7 +15,7 @@ export function setupServerControl({ loaders, toast }) {
   loaders.serverctl = async () => {
     let d;
     try { d = await getJson("/api/panel/server-control"); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
-    box.replaceChildren(lockdownPanel(d), h("div", { class: "sc-potm-slot" }), friendBotPanel(d), allowlistPanel(), goalPanel(), qotdPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d), holidayPanel(d));
+    box.replaceChildren(lockdownPanel(d), h("div", { class: "sc-potm-slot" }), friendBotPanel(d), allowlistPanel(), goalPanel(), botPanel(), qotdPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d), holidayPanel(d));
     box.querySelector(".sc-potm-slot")?.replaceWith(potmPanel());
   };
 
@@ -56,6 +56,26 @@ export function setupServerControl({ loaders, toast }) {
     }
     draw();
     return wrap;
+  }
+
+  // ---------- Post as GalaxySMP ----------
+  function botPanel() {
+    const sel = h("select", { class: "input", "aria-label": "Channel" }, h("option", { value: "", text: "Loading channels…" }));
+    const text = h("textarea", { class: "input", rows: 3, maxlength: 2000, placeholder: "Write a message. **bold** and links work.", "aria-label": "Message" });
+    const send = h("button", { class: "btn btn-primary", type: "button", text: "Post as GalaxySMP" });
+    getJson("/api/panel/bot-post").then((d) => {
+      sel.replaceChildren(...d.channels.map((c) => h("option", { value: c.id, text: `#${c.name}`, selected: c.name === "Chat" })));
+    }).catch((e) => toast(e.message));
+    send.addEventListener("click", async () => {
+      send.disabled = true;
+      try { const r = await postJson("/api/panel/bot-post", { channelId: Number(sel.value), text: text.value }); toast(r.message); text.value = ""; } catch (e) { toast(e.message); }
+      send.disabled = false;
+    });
+    return h("section", { class: "panel sc-card" },
+      h("div", { class: "sc-head" }, h("h2", { text: "Post as GalaxySMP" })),
+      h("p", { class: "text-2", text: "GalaxySMP is the server's own member account (with the BOT tag). It posts the Question of the Day, welcomes and level-ups by itself. You can also post as it here; nobody can sign in to it." }),
+      h("label", { class: "field" }, h("span", { text: "Channel" }), sel), text,
+      h("div", { class: "cx-row" }, send));
   }
 
   // ---------- Question of the Day ----------

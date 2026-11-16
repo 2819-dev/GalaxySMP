@@ -117,6 +117,7 @@ function openProfile(member, anchor) {
   pic.append(big);
   const name = el("div", "pc-name");
   name.append(paint(member.username, rank));
+  if (member.bot) name.append(botTag());
   const ri = roleIcon(rank);
   if (ri) name.append(ri);
   const title = member.title ? el("div", "look-title", member.title) : null;
@@ -474,11 +475,15 @@ function renderMessage(m, prev, opts = {}) {
   row.dataset.id = m.id;
   const author = state.members.get(m.author.id) || { id: m.author.id, username: m.author.username, role: m.author.role, rank: m.author.rank };
   let pic;
-  if (m.bot) {  // @GalaxySMP (Question of the Day, welcome cards, level-ups)
+  if (m.bot) {  // GalaxySMP (Question of the Day, welcome cards, level-ups, posts from the owner)
     pic = el("img", "avatar head bot-avatar");
     pic.src = "/favicon.png";
     pic.alt = "";
-    row.classList.add("bot-msg", `kind-${m.kind}`);
+    row.classList.add("bot-msg", `kind-${m.kind || "post"}`);
+    if (m.author.id) {
+      pic.classList.add("clickable");
+      pic.addEventListener("click", (e) => { e.stopPropagation(); openProfile(author, pic); });
+    }
   } else {
     pic = avatar(m.author.username, false, author);
     pic.classList.add("clickable");
@@ -900,6 +905,7 @@ function memberRow(m, isOnline) {
   name.append(paint(m.username, m.rank));
   const ri = roleIcon(m.rank);
   if (ri) name.append(ri);
+  if (m.bot) name.append(botTag());
   info.append(name);
   if (m.status) info.append(el("span", "member-activity status", m.status));
   else if (m.inGame) info.append(el("span", "member-activity", "Playing GalaxySMP"));
@@ -915,6 +921,15 @@ function memberRow(m, isOnline) {
 
 // Stage D adds staff tools to member rows through this hook.
 export const memberHooks = [];
+
+// The BOT tag with a verified check, for the GalaxySMP account.
+export function botTag() {
+  const t = el("span", "bot-tag");
+  t.title = "The official GalaxySMP account";
+  t.innerHTML = icon("check");
+  t.append("BOT");
+  return t;
+}
 
 // ---------- "player1 is typing…" ----------
 const typingSent = new Map();
@@ -1013,6 +1028,7 @@ function handleEvent(data) {
   switch (data.type) {
     case "hello":
       state.online = new Set(data.online);
+      for (const mem of state.members?.values?.() || []) if (mem.bot) state.online.add(mem.id);  // GalaxySMP is always online
       renderMembers();
       break;
     case "presence":

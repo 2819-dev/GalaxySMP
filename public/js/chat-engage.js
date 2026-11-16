@@ -3,14 +3,14 @@
 // once-a-minute "Community is open" ping (15 minutes + 1 message a day keeps Friend Streaks going).
 import { toast, iconEl } from "/js/site.js";
 import { h, getJson, postJson, openDialog } from "/js/dialog.js";
-import { chatState as state, chatSend, messageHeadHooks, messageBodyHooks, messageActionHooks, rerenderMessage, openAt } from "/js/chat.js";
+import { chatState as state, chatSend, messageHeadHooks, messageBodyHooks, messageActionHooks, rerenderMessage, openAt, botTag } from "/js/chat.js";
 import { openThread } from "/js/chat-threads.js";
 
 const me = () => state.me?.id;
 
 // ---------- names: BOT tag and chat level ----------
 messageHeadHooks.push((m, head) => {
-  if (m.bot) { head.append(h("span", { class: "bot-tag", text: "BOT" })); return; }
+  if (m.bot) { head.append(botTag()); return; }
   if (m.author.level) head.append(h("span", { class: "lvl-pill", title: `Chat level ${m.author.level}`, text: `Lv ${m.author.level}` }));
 });
 

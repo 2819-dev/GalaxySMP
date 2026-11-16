@@ -23,12 +23,22 @@ export function levelFor(xp) {
 }
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: TZ });
 
-// Posts a message as @GalaxySMP. Returns the message (the caller sends it to everyone).
+// The GalaxySMP member account (a real member nobody can sign in to).
+let botId = null;
+export async function botUserId(sql) {
+  if (botId) return botId;
+  const [u] = await sql`SELECT id FROM users WHERE is_bot ORDER BY id LIMIT 1`;
+  botId = u ? Number(u.id) : null;
+  return botId;
+}
+
+// Posts a message as GalaxySMP. Returns the message (the caller sends it to everyone).
 export async function botPost(sql, { slug, channelId, content, kind, meta = null, replyTo = null, threadRoot = null }) {
   const [ch] = channelId ? [{ id: channelId }] : await sql`SELECT id FROM channels WHERE slug = ${slug}`;
   if (!ch) return null;
+  const uid = await botUserId(sql);
   const [row] = await sql`INSERT INTO messages (channel_id, user_id, content, kind, meta, game_name, reply_to, thread_root)
-                          VALUES (${ch.id}, NULL, ${String(content).slice(0, 2000)}, ${kind}, ${meta ? JSON.stringify(meta) : null}::jsonb, ${BOT_NAME}, ${replyTo}, ${threadRoot})
+                          VALUES (${ch.id}, ${uid}, ${String(content).slice(0, 2000)}, ${kind}, ${meta ? JSON.stringify(meta) : null}::jsonb, ${uid ? null : BOT_NAME}, ${replyTo}, ${threadRoot})
                           RETURNING id`;
   return loadMessage(sql, row.id);
 }
