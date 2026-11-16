@@ -29,12 +29,33 @@ export async function startActing(request, env, ctx, url, params) {
   return new Response(JSON.stringify({ ok: true, message: `You're now seeing GalaxySMP as ${target.username}.` }), { headers });
 }
 
+// POST /api/mod/use-galaxysmp: the owner uses the site AS GalaxySMP (the official account), with full access:
+// chat, react, edit its profile... Everything is done by GalaxySMP. "Back to my account" ends it.
+const BOT_HOURS = 12;
+export async function useGalaxySMP(request, env) {
+  const me = await requireUser(request, env);
+  if (me.acting_by || me.owner_as) throw new HttpError(400, "Go back to your own account first.");
+  if (!isOwner(env, me.username, me.platform === "bedrock")) throw new HttpError(403, "Only the owner can use the GalaxySMP account.");
+  const sql = getDb(env);
+  const [bot] = await sql`SELECT id, username FROM users WHERE is_bot ORDER BY id LIMIT 1`;
+  if (!bot) throw new HttpError(404, "The GalaxySMP account doesn't exist yet.");
+  const token = randomToken(32);
+  await sql`INSERT INTO sessions (token_hash, user_id, expires_at, owner_as)
+            VALUES (${await sha256(token)}, ${bot.id}, now() + make_interval(hours => ${BOT_HOURS}), ${me.id})`;
+  await sql`INSERT INTO audit_log (actor_id, action, details) VALUES (${me.id}, 'use_galaxysmp.start', '{}'::jsonb)`;
+  const headers = new Headers({ "Content-Type": "application/json" });
+  headers.append("Set-Cookie", returnCookie(readCookie(request), BOT_HOURS * 3600));
+  headers.append("Set-Cookie", sessionCookie(token).replace(/Max-Age=\d+/, `Max-Age=${BOT_HOURS * 3600}`));
+  return new Response(JSON.stringify({ ok: true, message: "You're now using the site as GalaxySMP." }), { headers });
+}
+
 // Ends an acting session: back into the owner's own account. Returns the response, or null if not acting.
 export async function stopActing(request, env) {
   const token = readCookie(request);
   if (!token) return null;
   const sql = getDb(env);
-  const [s] = await sql`SELECT acting_by FROM sessions WHERE token_hash = ${await sha256(token)}`;
+  const [row] = await sql`SELECT coalesce(acting_by, owner_as) AS acting_by, owner_as FROM sessions WHERE token_hash = ${await sha256(token)}`;
+  const s = row;
   if (!s?.acting_by) return null;
   await sql`DELETE FROM sessions WHERE token_hash = ${await sha256(token)}`;
   const headers = new Headers({ "Content-Type": "application/json" });
@@ -44,7 +65,7 @@ export async function stopActing(request, env) {
   if (mine && Number(mine.user_id) === Number(s.acting_by)) {
     headers.append("Set-Cookie", sessionCookie(own));
     await sql`INSERT INTO audit_log (actor_id, action, details) VALUES (${s.acting_by}, 'act_as.stop', '{}'::jsonb)`;
-    return new Response(JSON.stringify({ ok: true, backToOwner: true, url: "/staff#players" }), { headers });
+    return new Response(JSON.stringify({ ok: true, backToOwner: true, url: s.owner_as ? "/community" : "/staff#players" }), { headers });
   }
   headers.append("Set-Cookie", clearCookie());  // their own session ended meanwhile: just signed out
   return new Response(JSON.stringify({ ok: true, backToOwner: false }), { headers });

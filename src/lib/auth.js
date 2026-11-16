@@ -59,8 +59,8 @@ export async function getUser(request, env) {
   if (!token || token.length > 100) return null;
   const sql = getDb(env);
   const rows = await sql`
-    SELECT u.id, u.username, u.platform, u.banned, u.ban_reason, u.muted_until, u.mute_reason, s.acting_by,
-           (SELECT username FROM users a WHERE a.id = s.acting_by) AS acting_by_name,
+    SELECT u.id, u.username, u.platform, u.banned, u.ban_reason, u.muted_until, u.mute_reason, s.acting_by, s.owner_as, u.is_bot,
+           (SELECT username FROM users a WHERE a.id = coalesce(s.acting_by, s.owner_as)) AS acting_by_name,
            r.key AS role_key, r.name AS role_name, r.color AS role_color, r.power AS role_power,
            (SELECT coalesce(array_agg(DISTINCT pm), '{}') FROM players pl JOIN player_ranks x ON x.xuid = pl.xuid JOIN ranks rk ON rk.id = x.rank_id,
                    unnest(rk.web_perms) pm WHERE pl.uuid = u.mc_uuid) AS web_perms
@@ -73,7 +73,8 @@ export async function getUser(request, env) {
   // Website permissions come from the member's ranks (the owner has all). role_power is worked out from them
   // (Admin Panel = 100, Mod Panel = 50) so every page agrees with the ranks.
   u.owner = isOwner(env, u.username, u.platform === "bedrock");
-  u.perms = u.owner ? ALL_PERMS : (u.web_perms || []).filter((p) => PERM_KEYS.has(p));
+  // GalaxySMP (the official account) can only be used by the owner, so it can post anywhere and use staff tools
+  u.perms = u.owner || u.is_bot ? ALL_PERMS : (u.web_perms || []).filter((p) => PERM_KEYS.has(p));
   u.role_power = u.owner ? 100 : Math.max(tierFor(u.perms), Number(u.role_power) < 50 ? Number(u.role_power) : 10);
   return u;
 }
@@ -91,7 +92,8 @@ export function publicUser(u) {
     platform: u.platform,
     role: { key: u.role_key, name: u.role_name, color: u.role_color, power: Number(u.role_power) },
     perms: u.perms || [], owner: Boolean(u.owner),
-    acting: u.acting_by ? { by: u.acting_by_name } : null,  // the owner is looking at the site as this member
+    acting: u.acting_by ? { by: u.acting_by_name } : u.owner_as ? { by: u.acting_by_name, full: true } : null,  // the owner is looking at (or using) the site as this member
+    bot: Boolean(u.is_bot),
     mutedUntil: u.muted_until && new Date(u.muted_until) > new Date() ? u.muted_until : null,
   };
 }

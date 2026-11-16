@@ -225,6 +225,16 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
     let d;
     try { d = await getJson(`/api/mod/players?q=${encodeURIComponent($("pl-search").value)}&filter=${$("pl-filter").value}`); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
     box.replaceChildren();
+    // GalaxySMP, the official account (owner only): use the site as it
+    const q = $("pl-search").value.trim().toLowerCase();
+    if (owner && (!q || "galaxysmp".includes(q)) && ["all", "staff"].includes($("pl-filter").value)) {
+      box.append(h("button", { class: "pl-row pl-bot", type: "button", onclick: useGalaxySMP },
+        h("span", { class: "pl-head-wrap" }, headImg("/favicon.png", 36, "GalaxySMP"), h("span", { class: "pl-dot", title: "Always online" })),
+        h("span", { class: "pl-main" },
+          h("span", { class: "pl-name" }, h("b", { text: "GalaxySMP" }), h("span", { class: "pl-tag", style: "--c:#5865f2", text: "Official account" })),
+          h("span", { class: "pl-sub", text: "Tap to use the site as GalaxySMP: chat, react, edit its profile and picture." })),
+        h("span", { class: "pl-chev", "aria-hidden": "true", text: "›" })));
+    }
     if (!d.players.length) box.append(h("div", { class: "empty", text: "No players found." }));
     for (const p of d.players) {
       box.append(h("button", { class: "pl-row", type: "button", onclick: () => openPlayer(p.xuid) },
@@ -245,6 +255,17 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
   };
   $("pl-search").addEventListener("input", () => { clearTimeout(plTimer); plTimer = setTimeout(plSearch, 250); });
   $("pl-filter").addEventListener("change", plSearch);
+
+  function useGalaxySMP() {
+    openDialog({
+      title: "Use the site as GalaxySMP?",
+      body: h("p", { class: "text-2", text: "You'll use the website as the official GalaxySMP account: anything you post, react to or change is done by GalaxySMP (including its profile, bio and picture in Account settings). A bar at the top says so, with \"Back to my account\". It ends by itself after 12 hours." }),
+      actions: [{ label: "Cancel" }, { label: "Use as GalaxySMP", kind: "primary", onClick: async () => {
+        await postJson("/api/mod/use-galaxysmp", {});
+        location.href = "/community";
+      } }],
+    });
+  }
 
   let ranksCache = null;
   async function openPlayer(xuid) {

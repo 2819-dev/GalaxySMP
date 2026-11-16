@@ -201,6 +201,10 @@ const PENDING = [
     "UPDATE messages SET user_id = (SELECT id FROM users WHERE is_bot ORDER BY id LIMIT 1), game_name = NULL WHERE kind IS NOT NULL AND user_id IS NULL AND game_xuid IS NULL",
     "INSERT INTO schema_migrations (version) VALUES ('0065_galaxysmp_member') ON CONFLICT DO NOTHING",
   ]],
+  ["0066_use_as_galaxysmp", [
+    "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS owner_as bigint",
+    "INSERT INTO schema_migrations (version) VALUES ('0066_use_as_galaxysmp') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

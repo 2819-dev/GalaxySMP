@@ -4044,3 +4044,7 @@ html[data-theme="light"] .holiday-greeting { border-color: rgba(184, 134, 47, .3
 .bp-job p { margin: 2px 0 0; }
 .bp-hero .pp-hero-body { align-items: flex-start; }
 .bp-hero .pp-who { margin-top: 56px; }
+
+.acting-bar.full { background: linear-gradient(90deg, #5865f2, #8a5cff); color: #fff; }
+.pl-row.pl-bot { border: 1px solid rgba(88,101,242,.4); background: linear-gradient(90deg, rgba(88,101,242,.08), transparent); }
+.pl-row.pl-bot .pl-head-wrap img { background: #0d1530; object-fit: contain; }

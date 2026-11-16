@@ -55,6 +55,7 @@ export async function afterMessage(env, sql, user, channelId, message, broadcast
 }
 
 async function giveXp(sql, user, broadcast) {
+  if ((await botUserId(sql)) === Number(user.id)) return;  // GalaxySMP doesn't level up
   const gain = XP_MIN + Math.floor(Math.random() * (XP_MAX - XP_MIN + 1));
   const day = today();
   const [row] = await sql`

@@ -75,7 +75,10 @@ export function setupServerControl({ loaders, toast }) {
       h("div", { class: "sc-head" }, h("h2", { text: "Post as GalaxySMP" })),
       h("p", { class: "text-2", text: "GalaxySMP is the server's own member account (with the BOT tag). It posts the Question of the Day, welcomes and level-ups by itself. You can also post as it here; nobody can sign in to it." }),
       h("label", { class: "field" }, h("span", { text: "Channel" }), sel), text,
-      h("div", { class: "cx-row" }, send));
+      h("div", { class: "cx-row" }, send,
+        h("button", { class: "btn btn-secondary", type: "button", text: "Use the site as GalaxySMP", onclick: async () => {
+          try { await postJson("/api/mod/use-galaxysmp", {}); location.href = "/community"; } catch (e) { toast(e.message); }
+        } })));
   }
 
   // ---------- Question of the Day ----------

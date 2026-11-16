@@ -140,7 +140,10 @@ function actingBanner(me) {
   bar.id = "acting-bar";
   bar.className = "acting-bar";
   const text = document.createElement("span");
-  text.textContent = `You're seeing GalaxySMP as ${me.username}. Look only: nothing you do changes their account.`;
+  text.textContent = me.acting.full
+    ? `You're using the site as ${me.username}. Everything you post or change is done by ${me.username}.`
+    : `You're seeing GalaxySMP as ${me.username}. Look only: nothing you do changes their account.`;
+  if (me.acting.full) bar.classList.add("full");
   const back = document.createElement("button");
   back.type = "button";
   back.className = "btn btn-sm";

@@ -91,6 +91,7 @@ const routes = [
   ["POST", "/api/auth/logout", (req, env) => logout(req, env)],
   ["POST", "/api/act-as/stop", (req, env) => actas.stopActingRoute(req, env)],
   ["POST", "/api/mod/act-as/:id", actas.startActing],
+  ["POST", "/api/mod/use-galaxysmp", (req, env) => actas.useGalaxySMP(req, env)],
   ["GET", "/api/me", (req, env) => me(req, env)],
   ["GET", "/api/plugin/ping", (req, env) => pluginPing(req, env)],
   ["POST", "/api/plugin/link", (req, env) => pluginLink(req, env)],
