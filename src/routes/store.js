@@ -262,6 +262,10 @@ async function fulfil(env, sql, payId) {
     await (await import("./giftcards.js")).activatePaid(sql, Number(pay.item));
     return;
   }
+  if (pay.kind === "merch") {
+    await (await import("./merch.js")).paid(env, sql, pay);
+    return;
+  }
   if (pay.kind === "topup") {
     await change(sql, pay.user_id, pay.credit_cents, "topup", `${usd(pay.amount_cents)} top-up${pay.credit_cents > pay.amount_cents ? ` + ${usd(pay.credit_cents - pay.amount_cents)} bonus` : ""}`, String(pay.id));
     return;
@@ -288,7 +292,9 @@ async function fulfil(env, sql, payId) {
 async function refunded(env, sql, intentId) {
   const [pay] = await sql`UPDATE payments SET status = 'refunded' WHERE payment_intent = ${intentId} AND status = 'paid' RETURNING *`;
   if (!pay) return;
-  if (pay.kind === "giftcard") {
+  if (pay.kind === "merch") {
+    await (await import("./merch.js")).refunded(sql, pay);
+  } else if (pay.kind === "giftcard") {
     // not redeemed yet: the card stops working. Already redeemed: the credit stays (the owner can sort it out)
     await sql`UPDATE gift_cards SET status = 'refunded' WHERE id = ${Number(pay.item)} AND status IN ('active', 'pending')`;
   } else if (pay.kind === "topup") {

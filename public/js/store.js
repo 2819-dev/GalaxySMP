@@ -7,6 +7,7 @@ import { h, openDialog, postJson } from "/js/dialog.js";
 import { faceSvg } from "/js/face.js";
 import { cardEl, giftCardDialog, myCardsEl, sentDialog } from "/js/giftcards.js";
 import { DESIGNS } from "/js/giftcard-designs.js";
+import { renderMerch } from "/js/store-merch.js";
 
 const usd = (n) => `$${Number(n).toFixed(2)}`;
 let data = null;   // /api/store/plans
@@ -376,11 +377,11 @@ function renderFilters() { /* categories are shelves now */ }
 function renderCats() {
   const nav = document.getElementById("ap-cats");
   if (!nav) return;
-  const target = (id) => (id === "ranks" ? "subscriptions" : id === "credits" || id === "giftcards" ? id : `shelf-${id}`);
-  const items = [["ranks", "Ranks"], ...data.shop.map((c) => [c.id, CAT_NAMES[c.id] || c.name]), ["giftcards", "Gift cards"], ["credits", "Credits"]];
+  const target = (id) => (id === "ranks" ? "subscriptions" : ["credits", "giftcards", "merch"].includes(id) ? id : `shelf-${id}`);
+  const items = [["ranks", "Ranks"], ...data.shop.map((c) => [c.id, CAT_NAMES[c.id] || c.name]), ...(merchShown ? [["merch", "Merch"]] : []), ["giftcards", "Gift cards"], ["credits", "Credits"]];
   nav.replaceChildren(...items.map(([id, name]) => h("a", { class: "ap-cat", href: `#${target(id)}`, "data-target": target(id),
     onclick: (e) => { e.preventDefault(); document.getElementById(target(id))?.scrollIntoView({ behavior: "smooth", block: "start" }); } },
-    h("span", { class: `ap-cat-ic2 c-${id}` }, iconEl(id === "ranks" ? "star" : id === "credits" ? "wallet" : id === "giftcards" ? "gift" : CAT_ICON[id] || "cart")), h("span", { text: name }))));
+    h("span", { class: `ap-cat-ic2 c-${id}` }, iconEl(id === "ranks" ? "star" : id === "credits" ? "wallet" : id === "giftcards" ? "gift" : id === "merch" ? "bag" : CAT_ICON[id] || "cart")), h("span", { text: name }))));
   const links = [...nav.querySelectorAll(".ap-cat")];
   const io = new IntersectionObserver((entries) => {
     for (const en of entries) {
@@ -611,6 +612,7 @@ function openItem(key) {
   }
 }
 
+let merchShown = false;
 function renderAll() {
   renderStrip();
   renderCredits();
@@ -619,6 +621,11 @@ function renderAll() {
   renderShop();
   renderGiftCards();
   renderCats();  // after the shelves exist, so the bar can follow them
+  renderMerch({ shelf, signedIn: me.signedIn }).then((shown) => {
+    merchShown = shown;
+    if (shown) renderCats();
+    if (location.hash === "#merch") document.getElementById("merch")?.scrollIntoView();
+  }).catch(() => {});
 }
 
 async function refreshMine() {
@@ -660,13 +667,13 @@ function watchTabs() {
     };
     tryShow(0);
   } else if (paid) {
-    history.replaceState(null, "", "/store");
+    history.replaceState(null, "", paid === "merch" ? "/store#merch" : "/store");
     // Stripe tells us about the payment a moment later: check the balance again shortly
     setTimeout(async () => { await refreshMine(); renderAll(); }, 3000);
     openDialog({
       title: "Thank you!",
       body: h("div", { class: "co-done" }, h("div", { class: "co-done-icon" }, iconEl("check")),
-        h("p", { class: "text-2", text: paid === "credits" ? "Your credits are on their way. They show up in a few seconds." : "Your payment went through. Your item is on its way to you in game." })),
+        h("p", { class: "text-2", text: paid === "credits" ? "Your credits are on their way. They show up in a few seconds." : paid === "merch" ? "Your payment went through and your merch order is being placed. You'll get a notification with tracking when it ships." : "Your payment went through. Your item is on its way to you in game." })),
       actions: [{ label: "Done", kind: "primary" }],
     });
   }

@@ -20,7 +20,7 @@ export async function lockdownState(env) {
 export function forgetLockdown() { cache = { at: 0, value: null }; }
 
 // Always reachable: the Minecraft plugin, payments, signing in, and the files pages need.
-const OPEN_API = [/^\/api\/plugin\//, /^\/api\/voice\/server$/, /^\/api\/store\/stripe-webhook$/, /^\/api\/auth\//, /^\/api\/lockdown$/];
+const OPEN_API = [/^\/api\/plugin\//, /^\/api\/voice\/server$/, /^\/api\/store\/stripe-webhook$/, /^\/api\/store\/printify-webhook$/, /^\/api\/auth\//, /^\/api\/lockdown$/];
 const isFile = (p) => /\.(js|mjs|css|png|jpe?g|gif|webp|svg|ico|woff2?|ttf|json|webmanifest|mp3|ogg|txt)$/i.test(p);
 
 // Returns a Response when the request is blocked, or null to carry on.

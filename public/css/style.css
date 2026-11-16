@@ -3887,3 +3887,52 @@ html[data-theme="light"] .holiday-greeting { border-color: rgba(184, 134, 47, .3
 @keyframes tl-pulse { 0% { box-shadow: 0 0 0 0 rgba(255,77,94,.6); } 70% { box-shadow: 0 0 0 8px rgba(255,77,94,0); } 100% { box-shadow: 0 0 0 0 rgba(255,77,94,0); } }
 @media (prefers-reduced-motion: reduce) { .tl-now-dot { animation: none; } }
 @media (max-width: 420px) { .fs-card { padding: 12px 8px; } .fs-flame { width: 60px; height: 60px; } .fs-num { font-size: 1.3rem; margin-top: 14px; } .fs-status { font-size: .8rem; } }
+
+/* Store > Merch */
+.ap-card.ap-merch { min-height: 400px; }
+.ap-merch-img { flex: 1; min-height: 190px; display: grid; place-items: center; border-radius: 16px; background: #fff; overflow: hidden; margin: 6px 0; }
+.ap-merch-img img { width: 100%; height: 100%; max-height: 240px; object-fit: contain; }
+.ap-merch-img svg { width: 80px; height: 80px; color: var(--text-3); }
+.mx-dialog { width: min(760px, 96vw); }
+.mx-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.mx-pic { border-radius: 16px; background: #fff; overflow: hidden; aspect-ratio: 1; display: grid; place-items: center; }
+.mx-img { width: 100%; height: 100%; object-fit: contain; }
+.mx-info { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.mx-price-row { display: flex; flex-direction: column; gap: 2px; }
+.mx-price { font-size: 1.5rem; }
+.mx-desc { margin: 0; white-space: pre-line; max-height: 140px; overflow: auto; font-size: .88rem; }
+.mx-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.mx-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: .86rem; cursor: pointer; }
+.mx-chip.on { border-color: var(--accent, #3b82f6); box-shadow: 0 0 0 2px var(--accent, #3b82f6) inset; font-weight: 700; }
+.mx-chip.off { opacity: .45; text-decoration: line-through; }
+.mx-swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,.2); }
+.mx-qty { width: 90px; }
+.mx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.mx-grid .field { grid-column: span 2; margin: 0; }
+.mx-grid .field.half { grid-column: span 1; }
+.mx-total { display: flex; flex-direction: column; gap: 8px; min-width: min(420px, 80vw); }
+.mx-line { display: flex; justify-content: space-between; gap: 12px; }
+.mx-line span { color: var(--text-2); }
+.mx-line.sum { border-top: 1px solid var(--border); padding-top: 8px; font-size: 1.1rem; }
+.mx-line.sum span { color: var(--text); font-weight: 700; }
+.mx-orders, .mx-owner { padding: 16px 18px; margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+.mx-owner .fr-h svg { width: 16px; height: 16px; vertical-align: -2px; color: #f0b429; }
+.mx-order { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
+.mx-order-main { display: flex; flex-direction: column; min-width: 0; }
+.mx-order-main b { overflow: hidden; text-overflow: ellipsis; }
+.mx-order-side { display: flex; align-items: center; gap: 8px; flex: none; }
+.mx-status { font-size: .76rem; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: var(--surface-2); color: var(--text-2); white-space: nowrap; }
+.mx-status.s-shipped, .mx-status.s-delivered { background: rgba(47,168,90,.15); color: #2fa85a; }
+.mx-status.s-in_production, .mx-status.s-placed, .mx-status.s-paid { background: rgba(59,130,246,.14); color: #3b82f6; }
+.mx-status.s-failed, .mx-status.s-canceled { background: rgba(239,68,68,.14); color: #e04848; }
+.mx-err { color: #e04848; }
+.mx-check { display: flex; gap: 8px; align-items: flex-start; margin: 0; font-size: .9rem; }
+.mx-check svg { flex: none; width: 18px; height: 18px; color: #e0a020; margin-top: 1px; }
+.mx-check.ok svg { color: #2fa85a; }
+.mx-hidden { margin: 0; padding-left: 18px; font-size: .84rem; color: var(--text-2); }
+@media (max-width: 640px) {
+  .mx-body { grid-template-columns: 1fr; }
+  .mx-pic { max-height: 260px; aspect-ratio: auto; }
+  .mx-img { max-height: 260px; }
+  .mx-order { flex-direction: column; align-items: flex-start; }
+}

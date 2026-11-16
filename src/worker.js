@@ -56,6 +56,7 @@ import * as uploads from "./routes/uploads.js";
 import * as actas from "./routes/actas.js";
 import * as friends from "./routes/friends.js";
 import * as friendStreaks from "./routes/friendstreaks.js";
+import * as merch from "./routes/merch.js";
 import { isActingRequest } from "./lib/auth.js";
 import { ensureSchema } from "./lib/autoschema.js";
 import { lockdownGate, lockdownState } from "./lib/lockdown.js";
@@ -191,6 +192,11 @@ const routes = [
   ["POST", "/api/inbox", (req, env) => notifyRoutes.inboxAction(req, env)],
   ["POST", "/api/friends", (req, env) => friends.act(req, env)],
   ["POST", "/api/friends/streak", (req, env) => friendStreaks.act(req, env)],
+  ["GET", "/api/store/merch", (req, env) => merch.list(req, env)],
+  ["POST", "/api/store/merch/quote", (req, env) => merch.quote(req, env)],
+  ["POST", "/api/store/merch/checkout", (req, env) => merch.checkout(req, env)],
+  ["POST", "/api/store/merch/connect", (req, env) => merch.connect(req, env)],
+  ["POST", "/api/store/printify-webhook", (req, env) => merch.webhook(req, env)],
   ["GET", "/api/giftcards/mine", (req, env) => giftcards.mine(req, env)],
   ["GET", "/api/giftcards/open", giftcards.peek],
   ["POST", "/api/giftcards/redeem", (req, env) => giftcards.redeem(req, env)],

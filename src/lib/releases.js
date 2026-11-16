@@ -267,6 +267,11 @@ Compare on any profile now also lists the achievements you both have, and the on
 
 **Happening now:** the top of #Timeline now shows what's on right now (events, minigames, Build Contests and Bedwars games), with a Join button.`,
   },
+  {
+    id: "2026-11-24b",
+    title: "GalaxySMP merch is coming to the Store",
+    body: `The Store is getting a Merch section with real GalaxySMP gear, made to order and shipped to your door. You'll see the exact shipping cost before you pay, can pay with a card or Galaxy Credits, and get a notification with tracking when your order ships. The first items will appear in the Store soon.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
