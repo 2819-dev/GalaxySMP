@@ -208,6 +208,8 @@ export async function profile(request, env, ctx, url, params) {
   const name = String(params.name || "").trim().replace(/^\./, "").toLowerCase().slice(0, 32);
   if (!name) throw new HttpError(404, "No player with that name.");
   const sql = getDb(env);
+  const bot = await botProfile(env, sql, name);
+  if (bot) return json({ ok: true, player: bot }, 200, { "Cache-Control": "private, no-store" });
   const rows = await sql`
     SELECT p.xuid, p.gamertag, p.first_seen, p.last_seen, p.balance_cents, p.is_op, p.playtime_s, p.mined, p.placed, p.kills, p.deaths,
            p.quests_done, p.streak, p.best_streak, p.achievements, p.online_at, p.extra_plots, p.head_at, p.gamerpic_at,
@@ -270,6 +272,29 @@ export async function profile(request, env, ctx, url, params) {
   }, 200, { "Cache-Control": "private, no-store" });
 }
 
+// GalaxySMP's own player page: the official (bot) account has no Minecraft stats, so it shows what it does instead.
+async function botProfile(env, sql, name) {
+  const [u] = await sql`SELECT id, username, platform, bio, created_at FROM users WHERE is_bot AND username_lower = ${name} LIMIT 1`;
+  if (!u) return null;
+  const [c] = await sql`
+    SELECT count(*)::int AS posts,
+           count(*) FILTER (WHERE kind = 'qotd')::int AS questions,
+           count(*) FILTER (WHERE kind = 'welcome')::int AS welcomes,
+           count(*) FILTER (WHERE kind = 'levelup')::int AS levelups,
+           count(*) FILTER (WHERE kind = 'bot')::int AS answers,
+           (SELECT count(*)::int FROM message_waves w JOIN messages wm ON wm.id = w.message_id WHERE wm.user_id = ${u.id}) AS waves,
+           (SELECT count(*)::int FROM messages t JOIN messages q ON q.id = t.thread_root WHERE q.user_id = ${u.id} AND q.kind = 'qotd' AND t.deleted_at IS NULL) AS answers_to_questions
+      FROM messages WHERE user_id = ${u.id} AND deleted_at IS NULL`;
+  const [q] = await sql`SELECT m.id, m.content, m.created_at FROM messages m WHERE m.user_id = ${u.id} AND m.kind = 'qotd' AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1`;
+  return {
+    bot: true, name: u.username, userId: Number(u.id), head: "/favicon.png", online: true, joined: u.created_at, bio: u.bio || "",
+    xbox: "GalaxyPRO#9842",
+    stats: { posts: c.posts, questions: c.questions, welcomes: c.welcomes, waves: c.waves, levelups: c.levelups, answers: c.answers, qotdAnswers: c.answers_to_questions },
+    todaysQuestion: q ? { id: Number(q.id), text: String(q.content).replace(/^\*\*Question of the Day\*\*\n/, ""), at: q.created_at } : null,
+    badges: (await badgesFor(env, sql, [{ id: u.id, username: u.username, platform: u.platform }])).get(Number(u.id)) || [],
+  };
+}
+
 export async function searchPlayers(request, env, ctx, url) {
   await requireUser(request, env);  // profiles are for signed-in members
   const q = String(url.searchParams.get("q") || "").trim().replace(/^\./, "").toLowerCase().slice(0, 32);
@@ -278,7 +303,9 @@ export async function searchPlayers(request, env, ctx, url) {
   const like = q.replace(/[\\%_]/g, (c) => "\\" + c) + "%";
   const rows = await sql`SELECT gamertag, (online_at > now() - interval '150 seconds') AS online FROM players
                           WHERE lower(gamertag) LIKE ${like} ORDER BY last_seen DESC LIMIT 10`;
-  return json({ ok: true, players: rows.map((r) => ({ name: r.gamertag, online: Boolean(r.online) })) });
+  const list = rows.map((r) => ({ name: r.gamertag, online: Boolean(r.online) }));
+  if ("galaxysmp".startsWith(q)) list.unshift({ name: "GalaxySMP", online: true, bot: true });  // the official account
+  return json({ ok: true, players: list.slice(0, 10) });
 }
 
 // GET /api/players/:name/social (signed-in members): name, bio, likes, color, for the full profile page

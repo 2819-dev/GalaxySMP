@@ -67,6 +67,7 @@ async function load() {
   }
   const p = data.player;
   document.title = `${p.name} · GalaxySMP`;
+  if (p.bot) { box.replaceChildren(botPage(p)); return; }
   const s = p.stats;
   const pos = (k) => (p.positions[k] ? `#${p.positions[k].toLocaleString()} on the server` : null);
   const unlocked = p.achievements.filter((a) => a.unlocked);
@@ -256,6 +257,46 @@ async function load() {
 }
 
 // Playtime per day (bars) and money over the last 30 days (line), from the daily history.
+// GalaxySMP's own page: the official account (no game stats; what it does, and how to join from Xbox).
+function botPage(p) {
+  const s = p.stats;
+  const copy = h("button", { class: "btn btn-primary btn-sm", type: "button" }, iconEl("copy"), "Copy gamertag");
+  copy.addEventListener("click", async () => { try { await navigator.clipboard.writeText(p.xbox); toast(`Copied ${p.xbox}`); } catch { toast(p.xbox); } });
+  const stat = (n, label, icon) => h("div", { class: "bp-stat" }, h("span", { class: "bp-ic" }, iconEl(icon)), h("b", { text: Number(n || 0).toLocaleString() }), h("span", { class: "text-3 small", text: label }));
+  const jobs = [
+    ["sparkles", "Question of the Day", "Every morning at 6:30 (New York time) in #Chat. Answer in its thread."],
+    ["users", "Welcomes new players", "A welcome card with a Wave button the first time someone joins."],
+    ["trophy", "Chat levels", "Announces level-ups and answers !level, !top and !help in #Bot Commands."],
+    ["megaphone", "Official posts", "Update notes in #Updates and official ideas in #Suggestions."],
+  ];
+  return h("div", { class: "bp" },
+    h("section", { class: "pp-hero panel bp-hero" },
+      h("div", { class: "pp-banner bp-banner" }),
+      h("div", { class: "pp-hero-body" },
+        h("div", { class: "pp-avatar-wrap online" }, h("img", { class: "pp-avatar bp-avatar", src: p.head, alt: "", width: 112, height: 112 }), h("span", { class: "pp-ring", title: "Always online" })),
+        h("div", { class: "pp-who" },
+          h("h1", { class: "pp-name" }, p.name, h("span", { class: "bot-tag bp-tag" }, iconEl("check"), "BOT")),
+          h("div", { class: "pp-sub" }, h("span", { text: "The official GalaxySMP account" })),
+          h("div", { class: "pp-tags" }, h("span", { class: "pp-status on" }, h("span", { class: "online-dot" }), "Always online"),
+            h("span", { class: "pp-status", text: `Member since ${new Date(p.joined).toLocaleDateString([], { month: "long", year: "numeric" })}` })),
+          p.badges?.length ? h("div", { class: "pp-badges" }, badgeRow(p.badges, 40)) : null))),
+    p.bio ? h("section", { class: "panel bp-sec" }, h("h2", { text: "About" }), h("p", { class: "text-2", text: p.bio })) : null,
+    h("section", { class: "panel bp-sec bp-xbox" },
+      h("div", {}, h("h2", { text: "Play from Xbox, PlayStation or Switch" }),
+        h("p", { class: "text-2", text: "Add this gamertag as a friend on Xbox. GalaxySMP then shows up under Play → Friends in Minecraft, so you can join with one tap." })),
+      h("div", { class: "bp-gt" }, h("code", { text: p.xbox }), copy)),
+    h("section", { class: "panel bp-sec" }, h("h2", { text: "By the numbers" }),
+      h("div", { class: "bp-stats" },
+        stat(s.questions, "questions asked", "sparkles"), stat(s.qotdAnswers, "answers from players", "chat"),
+        stat(s.welcomes, "players welcomed", "users"), stat(s.waves, "waves received", "smile"),
+        stat(s.levelups, "level-ups announced", "trophy"), stat(s.answers, "commands answered", "bolt"))),
+    p.todaysQuestion ? h("section", { class: "panel bp-sec bp-q" }, h("h2", { text: "Latest Question of the Day" }),
+      h("p", { class: "bp-qtext", text: p.todaysQuestion.text }),
+      h("a", { class: "btn btn-primary btn-sm", href: `/community#thread-${p.todaysQuestion.id}` }, iconEl("chat"), "Answer it")) : null,
+    h("section", { class: "panel bp-sec" }, h("h2", { text: "What I do" }),
+      h("div", { class: "bp-jobs" }, ...jobs.map(([ic, t, d]) => h("div", { class: "bp-job" }, h("span", { class: "bp-ic" }, iconEl(ic)), h("div", {}, h("b", { text: t }), h("p", { class: "text-3 small", text: d })))))));
+}
+
 async function loadCharts(name, box) {
   const body = box.querySelector("p");
   let d;

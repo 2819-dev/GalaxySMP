@@ -169,7 +169,7 @@ function openProfile(member, anchor) {
   const view = el("a", "btn btn-secondary btn-sm", "View full profile");
   view.href = `/player/${encodeURIComponent(member.username)}`;
   actions.append(view);
-  if (state.me && member.id !== state.me.id) {
+  if (state.me && member.id !== state.me.id && !member.bot) {
     const dm = el("button", "btn btn-primary btn-sm", "Message");
     dm.type = "button";
     dm.addEventListener("click", () => { closeProfile(); openDM(member.id); });

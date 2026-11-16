@@ -4020,3 +4020,27 @@ html[data-theme="light"] .holiday-greeting { border-color: rgba(184, 134, 47, .3
 
 .bot-tag { display: inline-flex; align-items: center; gap: 2px; margin-left: 4px; vertical-align: middle; }
 .bot-tag svg { width: 10px; height: 10px; stroke-width: 3.5; }
+
+/* GalaxySMP's own player page */
+.bp { display: flex; flex-direction: column; gap: 16px; }
+.bp-banner { background: radial-gradient(circle at 20% 30%, rgba(255,255,255,.25) 0 2px, transparent 3px), radial-gradient(circle at 70% 60%, rgba(255,255,255,.2) 0 1.5px, transparent 2.5px), linear-gradient(120deg, #0b1a4a, #2457eb 45%, #8A5CFF 75%, #4FEBFD) !important; }
+.bp-avatar { background: #0d1530; object-fit: contain; padding: 10px; }
+.bp-tag { font-size: .75rem; padding: 3px 8px; margin-left: 10px; }
+.bp-tag svg { width: 12px; height: 12px; }
+.bp-sec { padding: 18px 20px; }
+.bp-sec h2 { margin: 0 0 10px; font-size: 1.05rem; }
+.bp-xbox { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; background: linear-gradient(135deg, rgba(16,124,16,.12), rgba(61,170,244,.08)); }
+.bp-xbox p { margin: 0; max-width: 520px; }
+.bp-gt { display: flex; align-items: center; gap: 10px; }
+.bp-gt code { font-size: 1.1rem; font-weight: 800; padding: 8px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); }
+.bp-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.bp-stat { display: flex; flex-direction: column; gap: 2px; padding: 12px; border-radius: 14px; background: var(--surface-2); }
+.bp-stat b { font-size: 1.4rem; }
+.bp-ic { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--surface); color: var(--accent-text, #5b7cfa); margin-bottom: 4px; }
+.bp-ic svg { width: 18px; height: 18px; }
+.bp-qtext { font-size: 1.15rem; font-weight: 700; margin: 0 0 10px; }
+.bp-jobs { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.bp-job { display: flex; gap: 10px; align-items: flex-start; }
+.bp-job p { margin: 2px 0 0; }
+.bp-hero .pp-hero-body { align-items: flex-start; }
+.bp-hero .pp-who { margin-top: 56px; }
