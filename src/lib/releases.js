@@ -315,6 +315,11 @@ Compare on any profile now also lists the achievements you both have, and the on
 
 **Elsewhere:** the app banner only appears on the home and voice pages and never covers anything, profile names no longer overlap the banner picture, and the Store's cart button no longer sits on top of the category tabs.`,
   },
+  {
+    id: "2026-11-27-loading",
+    title: "A new loading screen",
+    body: `When you open the website, a grass block now drops in, breaks apart into the GalaxySMP letters and fills with the logo's colors. It plays in full the first time you open the site. After that it only appears if a page takes a moment to load, so moving around the site stays quick.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
