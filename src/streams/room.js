@@ -292,7 +292,7 @@ export class StreamRoom extends DurableObject {
         const now = Date.now();
         if (now - (a.lastChat || 0) < 1200) throw new Error("Slow down a little.");
         const sql = getDb(this.env);
-        const words = compileWordList(await sql`SELECT word, match FROM filter_words`);
+        const words = compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`);
         const check = checkMessage(String(msg.text || ""), words, { allowLinks: false, maxLength: 200 });
         if (!check.ok) throw new Error(check.message || "That message isn't allowed.");
         if (!check.text.trim()) return reply({ ok: true });

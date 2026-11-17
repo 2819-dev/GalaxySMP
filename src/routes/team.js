@@ -30,7 +30,7 @@ export const QUESTIONS = [
 ];
 
 const ownerOf = (env, u) => isOwner(env, u.username, u.platform === "bedrock");
-async function words(sql) { return compileWordList(await sql`SELECT word, match FROM filter_words`); }
+async function words(sql) { return compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`); }
 function clean(raw, list, max) {
   const text = String(raw ?? "").replace(/\r/g, "").trim().slice(0, max);
   if (!text) return "";

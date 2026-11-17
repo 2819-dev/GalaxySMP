@@ -32,7 +32,7 @@ function oneLine(v, max) {
   return String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 async function filterOrThrow(sql, parts) {
-  const list = compileWordList(await sql`SELECT word, match FROM filter_words`);
+  const list = compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`);
   for (const part of parts.filter(Boolean)) {
     const check = checkMessage(String(part).replace(/\n+/g, " ").toLowerCase(), list);
     if (!check.ok) throw new HttpError(400, check.message || "That isn't allowed.");
@@ -588,6 +588,7 @@ export async function suggestionSimilar(request, env, ctx, url) {
 export async function tick(env) {
   const sql = getDb(env);
   await import("./streams.js").then((m) => m.tick(env)).catch((e) => console.error("streams tick failed", e));
+  await sql`DELETE FROM filter_blocks WHERE created_at < now() - interval '7 days'`.catch(() => {});  // the blocked-messages log keeps 7 days
   // "Starting in 15 minutes" to everyone who tapped Remind me.
   const soon = await sql`
     UPDATE events SET reminded = true

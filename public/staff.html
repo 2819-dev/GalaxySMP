@@ -133,7 +133,7 @@
         <section data-panel="words" hidden>
           <div class="panel cf-panel" style="margin-bottom:16px">
             <div>
-              <h2 style="font-size:1.05rem;margin:0 0 4px">In-game chat filter</h2>
+              <h2 style="font-size:1.05rem;margin:0 0 4px">Word filter</h2>
               <p class="text-3 small" style="margin:0" id="cf-status">Checking…</p>
             </div>
             <button class="btn btn-secondary" type="button" id="cf-toggle" disabled>…</button>
@@ -144,16 +144,34 @@
               <select class="input" id="word-match" aria-label="Match">
                 <option value="word">Whole word only</option>
                 <option value="contains">Anywhere, even inside other words</option>
+                <option value="safe">Safe word (never blocked)</option>
               </select>
               <button class="btn btn-primary" type="submit">Add</button>
             </form>
-            <p class="hint" style="margin:10px 0 0">"Whole word only" blocks the word on its own, so adding "cat" still allows "category". "Anywhere" blocks it even when hidden inside other letters. The filter also catches spellings like c@ts, caaats and c A t (if "cats" is on the list). Changes apply within a minute.</p>
+            <p class="hint" style="margin:10px 0 0">"Whole word only" blocks the word on its own, so adding "cat" still allows "category". "Anywhere" blocks it even when hidden inside other letters. The filter also catches spellings like c@ts, caaats and c A t (if "cats" is on the list). Changes apply within a minute. A "Safe word" is never blocked, for real words that look like bad ones (for example a town name).</p>
+          </div>
+          <div class="panel" style="margin-bottom:16px">
+            <h2 style="font-size:1.05rem;margin:0 0 4px">Test a message</h2>
+            <p class="text-3 small" style="margin:0 0 10px">Type anything to see if it would be allowed in chat, and which rule or word stops it.</p>
+            <form class="toolbar" id="ft-form" style="margin:0">
+              <input class="input" id="ft-input" maxlength="500" placeholder="e.g. f*ck or my phone number is…" autocomplete="off" spellcheck="false">
+              <button class="btn btn-secondary" type="submit">Test</button>
+            </form>
+            <p id="ft-result" class="ft-result" hidden></p>
           </div>
           <div class="toolbar">
             <input class="input" id="word-search" type="search" placeholder="Search the list" autocomplete="off">
             <button class="btn btn-secondary" type="button" id="word-reveal">Show words</button>
           </div>
           <div class="panel" id="word-list"></div>
+          <div class="panel" style="margin-top:16px">
+            <div class="cx-row" style="justify-content:space-between;align-items:flex-start;gap:8px">
+              <div><h2 style="font-size:1.05rem;margin:0 0 4px">Blocked messages</h2>
+                <p class="text-3 small" style="margin:0">Messages the filter stopped in the last 7 days (Community chat and DMs), so you can spot new tricks and wrong blocks.</p></div>
+              <button class="btn btn-ghost btn-sm" type="button" id="fb-refresh">Refresh</button>
+            </div>
+            <div id="fb-list" style="margin-top:10px"></div>
+          </div>
         </section>
 
         <section data-panel="ranks" hidden>

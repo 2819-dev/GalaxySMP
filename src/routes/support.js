@@ -20,7 +20,7 @@ const clean = (v, max) => String(v ?? "").replace(/[\u0000-\u0009\u000b-\u001f\u
 const isStaff = (u) => can(u, "answer_tickets");  // answering tickets is a rank permission
 
 async function filterText(sql, text) {
-  const words = await sql`SELECT word, match FROM filter_words`;
+  const words = await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`;
   const list = compileWordList(words);
   const check = checkMessage(text.replace(/\n+/g, " ").toLowerCase(), list);
   if (!check.ok) throw new HttpError(400, check.message || "That isn't allowed.");
@@ -221,7 +221,7 @@ export async function rateTicket(request, env, ctx, url, params) {
   if (!["resolved", "closed"].includes(t.status)) throw new HttpError(409, "You can rate the help once the ticket is resolved or closed.");
   let comment = String(body.comment || "").trim().slice(0, 300);
   if (comment) {
-    const check = checkMessage(comment, compileWordList(await sql`SELECT word, match FROM filter_words`), { allowLinks: false, maxLength: 300 });
+    const check = checkMessage(comment, compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`), { allowLinks: false, maxLength: 300 });
     if (!check.ok) throw new HttpError(400, check.message);
     comment = check.text;
   }

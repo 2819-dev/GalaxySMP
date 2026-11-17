@@ -84,7 +84,7 @@ export async function addComment(request, env, ctx, url, params) {
   await rateLimit(env, "AUTH_LIMITER", `feedc:${me.id}`);
   const sql = getDb(env);
   await post(sql, params.id);
-  const check = checkMessage(String((await readJson(request)).body || "").slice(0, 300), compileWordList(await sql`SELECT word, match FROM filter_words`),
+  const check = checkMessage(String((await readJson(request)).body || "").slice(0, 300), compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`),
     { allowLinks: can(me, "post_links") });
   if (!check.ok) throw new HttpError(400, check.message);
   await sql`INSERT INTO timeline_comments (post_id, user_id, body) VALUES (${params.id}, ${me.id}, ${check.text})`;

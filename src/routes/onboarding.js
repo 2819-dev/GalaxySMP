@@ -45,7 +45,7 @@ export async function finishOnboarding(request, env) {
   const user = await requireUser(request, env);
   const body = await readJson(request, 16384);
   const sql = getDb(env);
-  const words = compileWordList(await sql`SELECT word, match FROM filter_words`);
+  const words = compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`);
   const ok = (text) => checkMessage(text, words, { allowLinks: false });
 
   const first = clean(body.first, 30), last = clean(body.last, 30);
@@ -88,7 +88,7 @@ export async function editProfile(request, env) {
   const interests = [...new Set((Array.isArray(body.interests) ? body.interests : []).map(String).filter((i) => INTEREST_NAME[i]))];
   const bio = clean(body.bio, 120);
   if (bio) {
-    const words = compileWordList(await sql`SELECT word, match FROM filter_words`);
+    const words = compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`);
     const c = checkMessage(bio, words, { allowLinks: false });
     if (!c.ok) throw new HttpError(400, `About you: ${c.message}`);
   }

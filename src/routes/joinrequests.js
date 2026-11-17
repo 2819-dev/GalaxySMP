@@ -30,7 +30,7 @@ function cleanGamertag(v) {
   return g;
 }
 async function cleanText(sql, raw) {
-  const check = checkMessage(String(raw ?? "").slice(0, MAX_MSG), compileWordList(await sql`SELECT word, match FROM filter_words`), { allowLinks: false });
+  const check = checkMessage(String(raw ?? "").slice(0, MAX_MSG), compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`), { allowLinks: false });
   if (!check.ok) throw new HttpError(400, check.message || "That message isn't allowed.");
   return check.text;
 }

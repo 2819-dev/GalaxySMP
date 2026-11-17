@@ -18,7 +18,7 @@ export async function fromGame(env, msg) {
   const sql = getDb(env);
   const [ch] = await sql`SELECT id FROM channels WHERE slug = ${BRIDGED_SLUG} AND kind = 'text'`;
   if (!ch) return;
-  const check = checkMessage(text, compileWordList(await sql`SELECT word, match FROM filter_words`), { allowLinks: false, maxLength: 500 });
+  const check = checkMessage(text, compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`), { allowLinks: false, maxLength: 500 });
   if (!check.ok) return; // the game filter already handled it in game; the website keeps it out
   const [u] = await sql`SELECT u.id, u.banned FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE p.xuid = ${xuid} LIMIT 1`;
   if (u?.banned) return;

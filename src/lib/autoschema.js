@@ -238,6 +238,13 @@ const PENDING = [
     "CREATE INDEX IF NOT EXISTS suggestions_status_cat_idx ON suggestions (status, category) WHERE deleted_at IS NULL",
     "INSERT INTO schema_migrations (version) VALUES ('0069_suggestion_organize') ON CONFLICT DO NOTHING",
   ]],
+  ["0070_smarter_filter", [
+    "ALTER TABLE filter_words DROP CONSTRAINT IF EXISTS filter_words_match_check",
+    "ALTER TABLE filter_words ADD CONSTRAINT filter_words_match_check CHECK (match IN ('word', 'contains', 'safe'))",
+    "CREATE TABLE IF NOT EXISTS filter_blocks (id bigserial PRIMARY KEY, user_id bigint REFERENCES users(id) ON DELETE CASCADE, place text NOT NULL, content text NOT NULL, reason text NOT NULL, detail text, created_at timestamptz NOT NULL DEFAULT now())",
+    "CREATE INDEX IF NOT EXISTS filter_blocks_time_idx ON filter_blocks (created_at DESC)",
+    "INSERT INTO schema_migrations (version) VALUES ('0070_smarter_filter') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

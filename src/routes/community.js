@@ -75,7 +75,7 @@ const STATUSES = ["open", "planned", "progress", "done", "declined"];
 export const SUGGESTION_CATEGORIES = { gameplay: "Gameplay", minigames: "Minigames", website: "Website", events: "Events", store: "Store", other: "Other" };
 
 async function words(sql) {
-  return compileWordList(await sql`SELECT word, match FROM filter_words`);
+  return compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`);
 }
 
 export async function suggestionsList(request, env, ctx, url) {

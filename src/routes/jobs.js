@@ -37,7 +37,7 @@ async function ask(env, msg) {
 }
 
 async function filterOrThrow(sql, parts) {
-  const list = compileWordList(await sql`SELECT word, match FROM filter_words`);
+  const list = compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`);
   for (const part of parts.filter(Boolean)) {
     const check = checkMessage(String(part).replace(/\n+/g, " ").toLowerCase(), list);
     if (!check.ok) throw new HttpError(400, check.message || "That isn't allowed.");

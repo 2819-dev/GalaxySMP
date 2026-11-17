@@ -72,7 +72,7 @@ async function rightsFor(sql, user, s, m) {
 }
 
 async function clean(sql, text, max) {
-  const check = checkMessage(String(text || ""), compileWordList(await sql`SELECT word, match FROM filter_words`), { allowLinks: false, maxLength: max });
+  const check = checkMessage(String(text || ""), compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`), { allowLinks: false, maxLength: max });
   if (!check.ok) throw new HttpError(400, check.message || "That isn't allowed.");
   return check.text.replace(/\s+/g, " ").trim();
 }

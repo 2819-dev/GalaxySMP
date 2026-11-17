@@ -173,6 +173,8 @@ const routes = [
   ["POST", "/api/mod/words/:id/delete", mod.removeWord],
   ["GET", "/api/mod/chatfilter", (req, env) => mod.chatFilterState(req, env)],
   ["POST", "/api/mod/chatfilter", (req, env) => mod.chatFilterSet(req, env)],
+  ["POST", "/api/mod/filter-test", (req, env) => mod.filterTest(req, env)],
+  ["GET", "/api/mod/filter-blocks", (req, env) => mod.filterBlocks(req, env)],
   ["GET", "/api/mod/audit", mod.listAudit],
   ["GET", "/api/staff-room/logs", staffroom.staffLogs],
   ["POST", "/api/wishlist", (req, env) => wishlist.toggle(req, env)],

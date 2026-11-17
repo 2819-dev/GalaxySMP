@@ -105,7 +105,7 @@ async function validRank(env, sql, body) {
   if (prefix.length < 1 || prefix.length > 16) throw new HttpError(400, "Prefixes are 1 to 16 characters.");
   if (/[{}\[\]]/.test(prefix)) throw new HttpError(400, "Prefixes can't contain brackets; they're added automatically.");
   if (color.length !== 1 || !COLORS.includes(color)) throw new HttpError(400, "Choose a color.");
-  const words = compileWordList(await sql`SELECT word, match FROM filter_words`);
+  const words = compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`);
   for (const text of [name, prefix]) {
     // Lowercased first: rank names like "TRUSTED MEMBER" are meant to be in capitals.
     if (!checkMessage(text.toLowerCase(), words).ok) throw new HttpError(400, `"${text}" isn't allowed by the word filter.`);

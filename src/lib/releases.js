@@ -363,6 +363,17 @@ Compare on any profile now also lists the achievements you both have, and the on
 
 **No more duplicates:** staff can merge an idea into one that was already posted, and its votes and comments move over.`,
   },
+  {
+    id: "2026-11-17-smarter-filter",
+    title: "A smarter chat filter",
+    body: `We made the chat filter smarter, on the website and in game.
+
+**Catches more tricks:** fancy fonts, look-alike letters from other alphabets, letter emoji, and symbols or emoji hidden inside words.
+
+**Fewer wrong blocks:** normal sentences like "hello from my phone", "my school starts at 8" or "I forgot my password" are fine now. The filter only steps in when real personal details follow, like a phone number, an address or a school's name.
+
+**Less spam:** sending the same message over and over (even with different capitals or extra letters) is blocked.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

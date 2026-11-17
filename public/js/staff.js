@@ -248,6 +248,7 @@ const mask = (w) => (reveal ? w : w[0] + "•".repeat(Math.max(1, w.length - 1))
 
 loaders.words = async () => {
   loadChatFilter();
+  loadBlocks();
   words = (await getJson("/api/mod/words")).words;
   renderWords();
 };
@@ -257,11 +258,12 @@ function renderWords() {
   const list = $("word-list");
   list.replaceChildren();
   const shown = words.filter((w) => !q || w.word.includes(q));
-  list.append(h("p", { class: "text-3 small", style: "margin:0 0 12px", text: `${words.length} words on the list${q ? `, ${shown.length} matching` : ""}.` }));
+  const safeN = words.filter((w) => w.match === "safe").length;
+  list.append(h("p", { class: "text-3 small", style: "margin:0 0 12px", text: `${words.length - safeN} blocked words${safeN ? ` and ${safeN} safe words` : ""} on the list${q ? `, ${shown.length} matching` : ""}.` }));
   for (const w of shown) {
     list.append(h("span", { class: "word-chip", title: w.addedBy ? `Added by ${w.addedBy}` : "Starter list" },
       mask(w.word),
-      h("span", { class: "kind", text: w.match === "contains" ? "anywhere" : "word" }),
+      h("span", { class: `kind${w.match === "safe" ? " safe" : ""}`, text: w.match === "contains" ? "anywhere" : w.match === "safe" ? "safe" : "word" }),
       h("button", {
         class: "icon-btn", type: "button", "aria-label": `Remove ${w.word}`,
         onclick: async () => {
@@ -289,29 +291,63 @@ $("word-form").addEventListener("submit", async (e) => {
   }
 });
 
-// ---------- In-game chat filter switch ----------
+// ---------- Word filter switch (one switch for the game and the website) ----------
 let cfEnabled = null;
 async function loadChatFilter() {
   const btn = $("cf-toggle");
   try {
     const data = await getJson("/api/mod/chatfilter");
     cfEnabled = data.enabled;
-    const state = data.enabled == null ? "unknown (the server hasn't reported yet)" : data.enabled ? "ON" : "OFF";
-    $("cf-status").textContent = `The filter is ${state}. When it's on, words from the list below are scrambled in Minecraft chat (§k).` +
-      (data.serverOnline ? "" : " The server is offline, so it can't be changed right now.");
+    $("cf-status").textContent = data.enabled
+      ? "ON in game and on the website. Bad words from the list below are blocked on the website and scrambled in Minecraft chat. Links, personal info and spam are always checked."
+      : "OFF in game and on the website. Bad words aren't checked; links, personal info and spam still are.";
+    if (!data.serverOnline) $("cf-status").textContent += " (The server is offline: in game it changes when you use /chatfilter there.)";
     btn.textContent = data.enabled ? "Turn off" : "Turn on";
     btn.className = `btn ${data.enabled ? "btn-secondary" : "btn-primary"}`;
-    btn.disabled = !data.serverOnline;
+    btn.disabled = false;
   } catch (e) { $("cf-status").textContent = e.message; }
 }
 $("cf-toggle").addEventListener("click", async () => {
   $("cf-toggle").disabled = true;
   try {
-    await postJson("/api/mod/chatfilter", { enabled: !cfEnabled });
-    toast(!cfEnabled ? "Chat filter turned on." : "Chat filter turned off.");
+    const r = await postJson("/api/mod/chatfilter", { enabled: !cfEnabled });
+    toast(`Word filter turned ${r.enabled ? "on" : "off"}${r.inGame ? " in game and on the website." : " on the website. The server is offline, so use /chatfilter in game too."}`);
     setTimeout(loadChatFilter, 800);
   } catch (e) { toast(e.message); $("cf-toggle").disabled = false; }
 });
+
+// ---------- Test a message ----------
+$("ft-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const out = $("ft-result");
+  const text = $("ft-input").value;
+  if (!text.trim()) return;
+  try {
+    const r = await postJson("/api/mod/filter-test", { text });
+    out.hidden = false;
+    out.className = `ft-result ${r.passes ? "ok" : "bad"}`;
+    const offNow = r.filterOff && r.reason === "profanity";
+    out.className = `ft-result ${r.passes || offNow ? "ok" : "bad"}`;
+    out.textContent = r.passes ? "Allowed."
+      : offNow ? `Allowed right now, because the word filter is off. When it's on, this is blocked (${r.detail}).`
+      : `Blocked: ${r.message}${r.detail ? ` ${r.detail}.` : ""}`;
+  } catch (ex) { toast(ex.message); }
+});
+
+// ---------- Blocked messages (last 7 days) ----------
+const BLOCK_REASONS = { profanity: "Bad word", personal: "Personal info", link: "Link", spam: "Spam", caps: "All caps", length: "Too long", empty: "Empty" };
+async function loadBlocks() {
+  const box = $("fb-list");
+  let d;
+  try { d = await getJson("/api/mod/filter-blocks"); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
+  if (!d.blocks.length) { box.replaceChildren(h("p", { class: "text-3 small", style: "margin:0", text: "Nothing blocked in the last 7 days." })); return; }
+  box.replaceChildren(...d.blocks.map((b) => h("div", { class: "fb-row" },
+    h("div", { class: "fb-top" }, h("b", { text: b.username || "Someone" }), h("span", { class: `fb-reason fb-${b.reason}`, text: BLOCK_REASONS[b.reason] || b.reason }),
+      h("span", { class: "text-3 small", text: `${b.place === "dm" ? "DM" : "Chat"} · ${new Date(b.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` })),
+    h("p", { class: "fb-text", text: b.content }),
+    b.detail ? h("p", { class: "text-3 small", style: "margin:0", text: b.detail }) : null)));
+}
+$("fb-refresh").addEventListener("click", loadBlocks);
 
 // ---------- Audit log ----------
 let auditBefore = null;

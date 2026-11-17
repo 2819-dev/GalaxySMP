@@ -31,7 +31,7 @@ async function teamOf(sql, xuid) {
   return t || null;
 }
 async function filtered(sql, text, max) {
-  const check = checkMessage(text, compileWordList(await sql`SELECT word, match FROM filter_words`), { allowLinks: false, maxLength: max });
+  const check = checkMessage(text, compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`), { allowLinks: false, maxLength: max });
   if (!check.ok) throw new HttpError(400, check.message || "That isn't allowed.");
   return check.text;
 }

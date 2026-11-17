@@ -43,10 +43,13 @@ async function sendDm(env, sql, from, to, text, via, audioId = null) {
   if (from.muted_until && new Date(from.muted_until) > new Date()) throw new HttpError(403, "You're muted, so you can't send messages right now.");
   const body = clean(text);
   if (!body && !audioId) throw new HttpError(400, "Type a message first.");
-  const words = compileWordList(await sql`SELECT word, match FROM filter_words`);
+  const words = compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`);
   const fromPerms = { perms: await permsOfUser(env, sql, from.id) };
   const check = body ? checkMessage(body, words, { allowLinks: fromPerms.perms.includes("post_links"), maxLength: maxLengthFor(fromPerms) }) : { ok: true, text: "" };
-  if (!check.ok) throw new HttpError(400, check.message);
+  if (!check.ok) {
+    await import("./mod.js").then((m) => m.logBlock(env, { userId: from.id, place: "dm", content: body, reason: check.reason, detail: check.detail }));
+    throw new HttpError(400, check.message);
+  }
   if (audioId) {  // a voice message the sender just recorded (not used anywhere yet)
     const [a] = await sql`SELECT a.id FROM message_audio a WHERE a.id = ${audioId} AND a.user_id = ${from.id}
                            AND NOT EXISTS (SELECT 1 FROM messages x WHERE x.audio_id = a.id) AND NOT EXISTS (SELECT 1 FROM dm_messages y WHERE y.audio_id = a.id)`;
@@ -232,7 +235,7 @@ export async function editMessage(request, env, ctx, url, params) {
   if (from.muted_until && new Date(from.muted_until) > new Date()) throw new HttpError(403, "You're muted, so you can't edit messages right now.");
   const text = clean(body.body);
   if (!text) throw new HttpError(400, "Type a message first.");
-  const words = compileWordList(await sql`SELECT word, match FROM filter_words`);
+  const words = compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`);
   const fromPerms = { perms: await permsOfUser(env, sql, from.id) };
   const check = checkMessage(text, words, { allowLinks: fromPerms.perms.includes("post_links"), maxLength: maxLengthFor(fromPerms) });
   if (!check.ok) throw new HttpError(400, check.message);

@@ -148,7 +148,7 @@ export async function qotdSave(request, env) {
   }
   const text = String(body.text || "").replace(/\s+/g, " ").trim().slice(0, 200);
   if (text.length < 8) throw new HttpError(400, "Write a question (at least 8 characters).");
-  const check = checkMessage(text, compileWordList(await sql`SELECT word, match FROM filter_words`), { allowLinks: false, maxLength: 200 });
+  const check = checkMessage(text, compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`), { allowLinks: false, maxLength: 200 });
   if (!check.ok) throw new HttpError(400, check.message);
   await sql`INSERT INTO qotd_questions (text, created_by) VALUES (${check.text}, ${user.id})`;
   return json({ ok: true, message: "Added. New questions are asked before older ones." });

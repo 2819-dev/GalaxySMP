@@ -30,7 +30,7 @@ const out = (c, withCode) => ({
 async function cleanText(sql, v, max) {
   const t = String(v || "").replace(/\s+/g, " ").trim().slice(0, max);
   if (!t) return "";
-  const check = checkMessage(t, compileWordList(await sql`SELECT word, match FROM filter_words`), { allowLinks: false, maxLength: max });
+  const check = checkMessage(t, compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`), { allowLinks: false, maxLength: max });
   if (!check.ok) throw new HttpError(400, check.message || "That isn't allowed.");
   return check.text;
 }

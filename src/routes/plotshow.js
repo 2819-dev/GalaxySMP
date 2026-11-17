@@ -90,7 +90,7 @@ export async function plotAction(request, env, ctx, url, params) {
     const decoded = decodeImages(imgs);
     const caption = String(body.caption || "").replace(/\s+/g, " ").trim().slice(0, 200);
     if (caption) {
-      const check = checkMessage(caption, compileWordList(await sql`SELECT word, match FROM filter_words`), { allowLinks: false, maxLength: 200 });
+      const check = checkMessage(caption, compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`), { allowLinks: false, maxLength: 200 });
       if (!check.ok) throw new HttpError(400, check.message || "That isn't allowed.");
     }
     await sql`INSERT INTO plot_showcase (plot_id, owner_xuid, caption) VALUES (${id}, ${me}, ${caption})

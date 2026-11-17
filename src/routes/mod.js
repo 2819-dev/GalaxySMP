@@ -401,7 +401,7 @@ export async function addWord(request, env) {
   const actor = await requireStaff(request, env);
   const body = await readJson(request);
   const word = String(body.word || "").trim().toLowerCase();
-  const match = body.match === "contains" ? "contains" : "word";
+  const match = ["contains", "safe"].includes(body.match) ? body.match : "word";
   if (!/^[\p{L}\p{N}' -]{2,40}$/u.test(word)) throw new HttpError(400, "Words must be 2 to 40 letters or numbers.");
   const sql = getDb(env);
   const rows = await sql`
@@ -464,24 +464,65 @@ export async function staffSummary(request, env) {
   return json({ ok: true, power, owner, panel, openReports: await openReportCount(sql), openTickets: await openTicketCount(sql), muteOptions: MUTE_OPTIONS });
 }
 
-// ---------- In-game chat filter (on/off for the whole server) ----------
+// ---------- Word filter on/off (one switch for the game and the website) ----------
+// Off: bad words aren't checked anywhere. Links, personal info and spam are always checked.
+export async function setWebFilter(env, enabled) {
+  const sql = getDb(env);
+  if (enabled) await sql`DELETE FROM economy_config WHERE key = 'chatfilter_off'`;
+  else await sql`INSERT INTO economy_config (key, value, updated_by) VALUES ('chatfilter_off', 'true'::jsonb, 'server') ON CONFLICT (key) DO NOTHING`;
+  await hubBroadcast(env, { type: "words_changed" }).catch(() => {});
+  await voiceEvent(env, { type: "words_changed" }).catch(() => {});
+}
+
 export async function chatFilterState(request, env) {
   await requireStaff(request, env);
-  const state = await voiceStub(env).fetch("https://voice/internal/chatfilter").then((r) => r.json());
+  const sql = getDb(env);
+  const [off] = await sql`SELECT 1 FROM economy_config WHERE key = 'chatfilter_off'`;
+  const state = await voiceStub(env).fetch("https://voice/internal/chatfilter").then((r) => r.json()).catch(() => ({}));
   const online = await voiceStub(env).fetch("https://voice/internal/server").then((r) => r.json()).catch(() => null);
-  return json({ ok: true, enabled: state.enabled, updated: state.at, serverOnline: Boolean(online) });
+  return json({ ok: true, enabled: !off, updated: state.at, serverOnline: Boolean(online) });
 }
 
 export async function chatFilterSet(request, env) {
   const actor = await requireStaff(request, env);
   const body = await readJson(request);
   const enabled = Boolean(body.enabled);
+  await setWebFilter(env, enabled);
+  // and in game (if the server is online; otherwise staff can use /chatfilter there)
   const res = await voiceStub(env).fetch("https://voice/internal/plugin", {
     method: "POST",
     body: JSON.stringify({ type: "chatfilter", enabled, by: `${actor.username} (website)` }),
-  }).then((r) => r.json());
-  if (!res.sent) throw new HttpError(409, "The Minecraft server isn't connected right now. Try again when it's online.");
+  }).then((r) => r.json()).catch(() => ({}));
   const sql = getDb(env);
   await audit(sql, actor.id, enabled ? "chatfilter.on" : "chatfilter.off", {});
-  return json({ ok: true, enabled });
+  return json({ ok: true, enabled, inGame: Boolean(res.sent) });
+}
+
+// ---------- Staff: test a message, and the blocked-messages log ----------
+export async function filterTest(request, env) {
+  await requireStaff(request, env);
+  const { checkMessage, compileWordList } = await import("../lib/filter.js");
+  const sql = getDb(env);
+  const text = String((await readJson(request)).text || "").slice(0, 2000);
+  const words = compileWordList(await sql`SELECT word, match FROM filter_words`);
+  const [off] = await sql`SELECT 1 FROM economy_config WHERE key = 'chatfilter_off'`;
+  const r = checkMessage(text, words);
+  return json({ ok: true, passes: r.ok, reason: r.reason || null, message: r.message || null, detail: r.detail || null, filterOff: Boolean(off) });
+}
+
+export async function filterBlocks(request, env) {
+  await requireStaff(request, env);
+  const rows = await getDb(env)`
+    SELECT b.id, b.place, b.content, b.reason, b.detail, b.created_at, u.username
+      FROM filter_blocks b LEFT JOIN users u ON u.id = b.user_id
+     WHERE b.created_at > now() - interval '7 days' ORDER BY b.created_at DESC LIMIT 100`;
+  return json({ ok: true, blocks: rows.map((r) => ({ id: Number(r.id), place: r.place, content: r.content, reason: r.reason, detail: r.detail, at: r.created_at, username: r.username })) });
+}
+
+// Remember a blocked message for staff (kept 7 days). Never throws.
+export async function logBlock(env, { userId, place, content, reason, detail }) {
+  try {
+    await getDb(env)`INSERT INTO filter_blocks (user_id, place, content, reason, detail)
+                     VALUES (${userId || null}, ${String(place).slice(0, 40)}, ${String(content || "").slice(0, 500)}, ${String(reason || "").slice(0, 30)}, ${detail ? String(detail).slice(0, 200) : null})`;
+  } catch (e) { console.error("filter log failed", e); }
 }

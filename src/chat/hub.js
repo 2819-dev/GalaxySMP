@@ -5,7 +5,7 @@
 const hubCan = (u, key) => Boolean(u && (u.owner || (Array.isArray(u.perms) && u.perms.includes(key))));
 import { DurableObject } from "cloudflare:workers";
 import { getDb } from "../lib/db.js";
-import { checkMessage, compileWordList, maxLengthFor } from "../lib/filter.js";
+import { checkMessage, compileWordList, normalize, maxLengthFor } from "../lib/filter.js";
 import { REACTIONS, loadMessage, loadReactions } from "./messages.js";
 import { notify } from "../routes/notify.js";
 
@@ -13,6 +13,7 @@ const WORDS_TTL_MS = 60_000;
 const BURST = { count: 5, windowMs: 10_000 };
 const SUSTAINED = { count: 20, windowMs: 60_000 };
 const DUPLICATE_MS = 60_000;
+const REPEAT_WINDOW_MS = 120_000;
 
 export class CommunityHub extends DurableObject {
   constructor(ctx, env) {
@@ -255,26 +256,32 @@ export class CommunityHub extends DurableObject {
   async wordList() {
     if (this.words && Date.now() - this.wordsAt < WORDS_TTL_MS) return this.words;
     const sql = getDb(this.env);
-    const rows = await sql`SELECT word, match FROM filter_words`;
+    const rows = await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`;
     this.words = compileWordList(rows);
     this.wordsAt = Date.now();
     return this.words;
   }
 
+  // Spam: too many messages too fast, or the same message again (ignoring caps, punctuation and stretched
+  // letters, so "hiii!!" and "HI" count as the same). The 3rd copy within 2 minutes is blocked; an immediate repeat too.
   rateCheck(userId, text) {
     const now = Date.now();
-    const r = this.recent.get(userId) || { times: [], lastText: "", lastAt: 0 };
+    const r = this.recent.get(userId) || { times: [], said: [] };
     r.times = r.times.filter((t) => now - t < SUSTAINED.windowMs);
+    r.said = (r.said || []).filter((x) => now - x.at < REPEAT_WINDOW_MS);
     const burst = r.times.filter((t) => now - t < BURST.windowMs).length;
     if (burst >= BURST.count || r.times.length >= SUSTAINED.count) {
       return "You're sending messages too quickly. Please slow down.";
     }
-    if (text.toLowerCase() === r.lastText && now - r.lastAt < DUPLICATE_MS) {
-      return "You just sent that message.";
+    const key = normalize(text).replace(/[^a-z0-9]+/g, "").replace(/(.)\1+/g, "$1");
+    if (key) {
+      const same = r.said.filter((x) => x.key === key);
+      const last = r.said[r.said.length - 1];
+      if (last && last.key === key && now - last.at < DUPLICATE_MS) return "You just sent that message.";
+      if (same.length >= 2) return "Please don't send the same message over and over.";
     }
     r.times.push(now);
-    r.lastText = text.toLowerCase();
-    r.lastAt = now;
+    r.said.push({ key, at: now });
     this.recent.set(userId, r);
     return null;
   }
@@ -296,9 +303,10 @@ export class CommunityHub extends DurableObject {
     const check = (imageId || audioId) && !String(msg.content || "").trim()
       ? { ok: true, text: "" }
       : checkMessage(msg.content, await this.wordList(), { allowLinks: hubCan(user, "post_links"), allowUrls: Boolean(chOpts?.allow_links), maxLength: maxLengthFor(user) });
-    if (!check.ok) return reject(check.message);
+    const logIt = (reason, detail) => this.ctx.waitUntil(import("../routes/mod.js").then((m) => m.logBlock(this.env, { userId: user.id, place: `chat:${channelId}`, content: msg.content, reason, detail })));
+    if (!check.ok) { logIt(check.reason, check.detail); return reject(check.message); }
     const limited = this.rateCheck(user.id, check.text || `[media ${imageId || audioId}]`);
-    if (limited) return reject(limited);
+    if (limited) { if (!/too quickly/.test(limited)) logIt("spam", limited); return reject(limited); }
 
     const replyTo = msg.replyTo ? Number(msg.replyTo) : null;
     const sql = getDb(this.env);

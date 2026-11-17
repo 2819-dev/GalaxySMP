@@ -153,7 +153,7 @@ export class VoiceHub extends DurableObject {
 
   async wordList() {
     if (this.words && Date.now() - this.wordsAt < 60_000) return this.words;
-    const rows = await getDb(this.env)`SELECT word, match FROM filter_words`;
+    const rows = await getDb(this.env)`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`;
     this.words = compileWordList(rows);
     this.wordsAt = Date.now();
     return this.words;
@@ -436,7 +436,10 @@ export class VoiceHub extends DurableObject {
       return import("../routes/rewards.js").then((m) => m.rewardsDone(this.env, msg.ids)).catch((e) => console.error("rewards done failed", e));
     }
     if (msg.type === "chatfilter_state") {
-      return this.ctx.storage.put("chatfilter", { enabled: Boolean(msg.enabled), at: Date.now() });
+      // the word filter is one switch for the game and the website
+      return import("../routes/mod.js").then((m) => m.setWebFilter(this.env, Boolean(msg.enabled)))
+        .then(() => this.ctx.storage.put("chatfilter", { enabled: Boolean(msg.enabled), at: Date.now() }))
+        .catch((e) => console.error("chat filter sync failed", e));
     }
     if (msg.type === "events") {
       const events = (Array.isArray(msg.events) ? msg.events : []).slice(0, 50);
@@ -793,7 +796,7 @@ export class VoiceHub extends DurableObject {
   async sendWords() {
     const plugin = this.pluginSocket();
     if (!plugin) return;
-    const rows = await getDb(this.env)`SELECT word, match FROM filter_words`;
+    const rows = await getDb(this.env)`SELECT word, match FROM filter_words WHERE match <> 'safe'`;
     this.send(plugin, { type: "words", words: rows.map((r) => ({ word: r.word, match: r.match })) });
   }
 
