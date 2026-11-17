@@ -325,6 +325,11 @@ Compare on any profile now also lists the achievements you both have, and the on
     title: "Rare loading screens",
     body: `Every so often, the loading screen is a rare one. Instead of grass, you might see a **Diamond** block that turns into a gold logo, a **Gold** block with a shiny gold logo, or the super rare **Galaxy** block with a starry purple logo. About 1 in 50 loading screens is rare, and Galaxy is the rarest of the three. If you catch one, share a screenshot in #Chat!`,
   },
+  {
+    id: "2026-11-17-startup-fix",
+    title: "Server connection fix",
+    body: `We fixed a problem that stopped the server from connecting to the website after a restart. While it was happening, the website showed the server as offline and in-game features linked to the website were unavailable. Everything is back to normal once the server updates. Thanks for your patience!`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

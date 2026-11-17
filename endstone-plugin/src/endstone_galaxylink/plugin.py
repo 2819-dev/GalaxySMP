@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.49.0"
+VERSION = "2.49.1"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -203,8 +203,8 @@ class GalaxyLink(Plugin):
         self._voice = None
         from endstone_galaxylink.crashwatch import CrashWatch
         self.crashwatch = CrashWatch(self)  # tells the staff when the server didn't stop properly (and why, if it can)
+        self.economy = Economy(self)  # first: ranks read their saved copy from it
         self.ranks = RankManager(self)
-        self.economy = Economy(self)
         self.plans = Plans(self)
         self.shop = Shop(self)
         self.auction = AuctionHouse(self)
