@@ -386,6 +386,20 @@ Compare on any profile now also lists the achievements you both have, and the on
 
 **Recording:** stage hosts can now **record** a stage. The recording has everyone's voices, the screen share or cameras, and the captions, and it saves as a video on the host's device. When a stage is being recorded, everyone sees a red **Recording** sign.`,
   },
+  {
+    id: "2026-11-17-play-sessions",
+    title: "Play Sessions: you voted, we built it",
+    body: `You voted yes in #Suggestions, so **Play Sessions** are here, in **#Events**.
+
+Post a plan like "Bedwars at 7 pm, who's in?" and others tap **I'm in**. You can set a **player limit**; when it's full, people join a waitlist and move up if someone leaves. Each plan has its own **chat** to get organized, and everyone who's in gets a reminder 10 minutes before it starts.`,
+  },
+  {
+    id: "2026-11-17-episodes",
+    title: "Podcast episodes on Stages",
+    body: `Stage hosts can now post recorded **episodes** in **#Stages** so people can listen any time. Upload your podcast to YouTube as **Unlisted** and add the link. Episodes play right on GalaxySMP, and followers get a notification when a new one is out.
+
+Also: when staff change the status of your suggestion, you now always get a notification.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

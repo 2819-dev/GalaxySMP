@@ -100,7 +100,7 @@ export async function list(request, env) {
   const user = await requireUser(request, env);
   const sql = getDb(env);
   const m = await me(sql, user);
-  const [live, upcoming, recent, follows, crew, crewOf] = await Promise.all([
+  const [live, upcoming, recent, follows, crew, crewOf, episodes] = await Promise.all([
     sql`SELECT s.* FROM streams_v s WHERE s.status = 'live' ORDER BY s.started_at DESC`,
     sql`SELECT s.*, (SELECT count(*)::int FROM stream_reminders r WHERE r.stream_id = s.id) AS reminders,
                EXISTS (SELECT 1 FROM stream_reminders r WHERE r.stream_id = s.id AND r.user_id = ${user.id}) AS reminding
@@ -110,6 +110,10 @@ export async function list(request, env) {
     sql`SELECT host_user_id, team_id FROM stream_follows WHERE user_id = ${user.id}`,
     sql`SELECT c.user_id, c.role, u.username FROM stream_crew c JOIN users u ON u.id = c.user_id WHERE c.host_user_id = ${user.id} ORDER BY c.created_at`,
     sql`SELECT c.host_user_id, c.role, u.username FROM stream_crew c JOIN users u ON u.id = c.host_user_id WHERE c.user_id = ${user.id}`,
+    sql`SELECT e.id, e.title, e.description, e.youtube_id, e.plays, e.created_at, e.host_user_id, e.team_id, e.created_by,
+               hu.username AS host_name, hp.xuid AS host_xuid, hp.head_at AS host_head_at, hp.gamerpic_at AS host_gamerpic_at, t.name AS team_name, t.tag AS team_tag
+          FROM stream_episodes e LEFT JOIN users hu ON hu.id = e.host_user_id LEFT JOIN players hp ON hp.uuid = hu.mc_uuid LEFT JOIN teams t ON t.id = e.team_id
+         WHERE e.deleted_at IS NULL ORDER BY e.created_at DESC LIMIT 30`,
   ]);
   const counts = await Promise.all(live.map((s) => roomStub(env, s.id).fetch("https://stream/internal/count").then((r) => r.json()).catch(() => ({ viewers: 0, stage: [] }))));
   const followU = new Set(follows.filter((f) => f.host_user_id).map((f) => Number(f.host_user_id)));
@@ -130,6 +134,8 @@ export async function list(request, env) {
     recent: recent.map((s) => streamOut(s)),
     crew: m.soloHost ? crew.map((c) => ({ id: Number(c.user_id), username: c.username, role: c.role })) : null,
     crewOf: crewOf.map((c) => ({ hostId: Number(c.host_user_id), username: c.username, role: c.role })),
+    episodes: await Promise.all(episodes.map(async (e) => streamOut(e, { kind: "episode", description: e.description, youtubeId: e.youtube_id, plays: Number(e.plays), createdAt: e.created_at,
+      following: following(e), manage: isMod(user) || Number(e.created_by) === Number(user.id) || await manageable(e) }))),
   }, 200, { "Cache-Control": "no-store" });
 }
 
@@ -190,6 +196,27 @@ async function goLive(env, sql, id) {
   const { hubBroadcast } = await import("./chat.js");
   await hubBroadcast(env, { type: "streams_changed" }).catch(() => {});
   return s;
+}
+
+// The YouTube video id from a link (youtube.com/watch?v=, youtu.be/, /shorts/, /live/, /embed/), or null.
+export function youtubeId(url) {
+  const s = String(url || "").trim();
+  const m = s.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/) || s.match(/^([A-Za-z0-9_-]{11})$/);
+  return m ? m[1] : null;
+}
+
+// "me" | "team" | "host:<id>" -> who an episode or stage belongs to (same rules as starting a stage)
+async function whoHosts(sql, env, user, m, as) {
+  if (as === "me") { if (!m.soloHost) throw new HttpError(403, "Hosting your own podcast is a Galaxy+ and Galaxy Pro+ perk. You can also post for your team."); return { hostId: user.id, teamId: null }; }
+  if (as === "team") { if (!m.team?.manage) throw new HttpError(403, "Only your team's organizer and Admins can post for the team."); return { hostId: null, teamId: m.team.id }; }
+  if (as.startsWith("host:")) {
+    const hostId = Number(as.slice(5)) || 0;
+    const [c] = await sql`SELECT role FROM stream_crew WHERE host_user_id = ${hostId} AND user_id = ${user.id}`;
+    if (c?.role !== "editor") throw new HttpError(403, "You're not an Editor for them.");
+    if (!(await hostAllowed(env, sql, hostId))) throw new HttpError(403, "They can't host right now.");
+    return { hostId, teamId: null };
+  }
+  throw new HttpError(400, "Choose who it's from.");
 }
 
 // ---------- POST /api/streams { action, ... } ----------
@@ -270,6 +297,43 @@ export async function act(request, env) {
       if (b.on === false) await sql`DELETE FROM stream_reminders WHERE stream_id = ${s.id} AND user_id = ${user.id}`;
       else await sql`INSERT INTO stream_reminders (stream_id, user_id) VALUES (${s.id}, ${user.id}) ON CONFLICT DO NOTHING`;
       return json({ ok: true, message: b.on === false ? "Reminder removed." : "We'll let you know when it starts." });
+    }
+    case "episode-add": {   // { as, title, description, url }: a recorded podcast episode (an unlisted or public YouTube video)
+      if (m.banned) throw new HttpError(403, "You can't post episodes right now.");
+      const { hostId, teamId } = await whoHosts(sql, env, user, m, String(b.as || "me"));
+      const title = await clean(sql, b.title, 80);
+      if (title.length < 3) throw new HttpError(400, "Give the episode a title (at least 3 characters).");
+      const description = b.description ? await clean(sql, b.description, 300) : "";
+      const vid = youtubeId(b.url);
+      if (!vid) throw new HttpError(400, "Paste a YouTube link, like https://youtu.be/abc123.");
+      // YouTube says if anyone can play it: private videos can't be watched by others
+      const res = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${vid}`)}`, { signal: AbortSignal.timeout(6000) }).catch(() => null);
+      if (res && (res.status === 401 || res.status === 403)) throw new HttpError(400, "That video is private, so nobody else can watch it. In YouTube Studio, set it to Unlisted (only people with the link can see it) and try again.");
+      if (res && res.status === 404) throw new HttpError(400, "That YouTube video couldn't be found. Check the link.");
+      const [{ n }] = await sql`SELECT count(*)::int AS n FROM stream_episodes WHERE created_by = ${user.id} AND created_at > now() - interval '1 day'`;
+      if (n >= 10) throw new HttpError(429, "That's a lot of episodes today. Try again tomorrow.");
+      const [row] = await sql`INSERT INTO stream_episodes (host_user_id, team_id, title, description, youtube_id, created_by)
+                              VALUES (${hostId}, ${teamId}, ${title}, ${description}, ${vid}, ${user.id}) RETURNING id`;
+      // followers hear about it
+      const [h] = await sql`SELECT u.username, t.name, t.tag FROM (SELECT 1) x LEFT JOIN users u ON u.id = ${hostId} LEFT JOIN teams t ON t.id = ${teamId}`;
+      const who = teamId ? `[${h.tag}] ${h.name}` : h.username;
+      const ids = (await sql`SELECT user_id FROM stream_follows WHERE host_user_id = ${hostId} OR team_id = ${teamId}`).map((r) => Number(r.user_id));
+      await notify(env, ids, "streams", { title: `New episode from ${who}`, body: title, url: `/community#stages/ep-${row.id}`, tag: `ep-${row.id}` }, { exclude: [user.id] }).catch(() => {});
+      await changed();
+      return json({ ok: true, id: Number(row.id), message: "Episode posted!" });
+    }
+    case "episode-delete": {
+      const [e] = await sql`SELECT * FROM stream_episodes WHERE id = ${Number(b.id) || 0} AND deleted_at IS NULL`;
+      if (!e) throw new HttpError(404, "That episode isn't there any more.");
+      const allowed = isMod(user) || Number(e.created_by) === Number(user.id) || (await rightsFor(sql, user, e, m)).manage;
+      if (!allowed) throw new HttpError(403, "Only the host can remove this episode.");
+      await sql`UPDATE stream_episodes SET deleted_at = now() WHERE id = ${e.id}`;
+      await changed();
+      return json({ ok: true, message: "Episode removed." });
+    }
+    case "episode-play": {
+      await sql`UPDATE stream_episodes SET plays = plays + 1 WHERE id = ${Number(b.id) || 0} AND deleted_at IS NULL`;
+      return json({ ok: true });
     }
     case "follow": {   // { userId | teamId, on }
       const uid = Number(b.userId) || null, tid = Number(b.teamId) || null;

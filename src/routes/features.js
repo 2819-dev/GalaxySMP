@@ -550,6 +550,8 @@ export async function suggestionRespond(request, env, ctx, url, params) {
   const reply = clean(body.reply, 500);
   const sql = getDb(env);
   const sid = id(params.id);
+  const [before] = await sql`SELECT status FROM suggestions WHERE id = ${sid} AND deleted_at IS NULL`;
+  if (!before) throw new HttpError(404, "That suggestion no longer exists.");
   const [s] = await sql`
     UPDATE suggestions SET status = ${status},
            staff_reply = CASE WHEN ${reply} = '' THEN staff_reply ELSE ${reply} END,
@@ -558,8 +560,7 @@ export async function suggestionRespond(request, env, ctx, url, params) {
      WHERE id = ${sid} AND deleted_at IS NULL RETURNING user_id, title`;
   if (!s) throw new HttpError(404, "That suggestion no longer exists.");
   await audit(sql, user.id, "suggestion.status", { title: s.title, status, reply: reply || undefined });
-  const NAMES = { open: "Open", planned: "Planned", progress: "In progress", done: "Done", implemented: "Already implemented", declined: "Declined" };
-  await notify(env, [s.user_id], "community", { title: status === "implemented" ? "Your idea is already on GalaxySMP" : `Your suggestion is now ${NAMES[status]}`, body: reply ? `"${s.title}": ${reply.slice(0, 120)}` : `"${s.title}"`, url: `/community#suggestions/${sid}`, tag: `sg-${sid}` }, { exclude: [user.id] });
+  if (before.status !== status || reply) await import("./community.js").then((m) => m.suggestionStatusNotice(env, { id: sid }, status, reply, user.id));
   return json({ ok: true });
 }
 
@@ -588,6 +589,7 @@ export async function suggestionSimilar(request, env, ctx, url) {
 export async function tick(env) {
   const sql = getDb(env);
   await import("./streams.js").then((m) => m.tick(env)).catch((e) => console.error("streams tick failed", e));
+  await import("./sessions.js").then((m) => m.tick(env)).catch((e) => console.error("play sessions tick failed", e));
   await sql`DELETE FROM filter_blocks WHERE created_at < now() - interval '7 days'`.catch(() => {});  // the blocked-messages log keeps 7 days
   // "Starting in 15 minutes" to everyone who tapped Remind me.
   const soon = await sql`

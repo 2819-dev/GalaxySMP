@@ -250,6 +250,16 @@ const PENDING = [
     "ALTER TABLE suggestions ADD CONSTRAINT suggestions_status_check CHECK (status IN ('open', 'planned', 'progress', 'done', 'implemented', 'declined', 'duplicate'))",
     "INSERT INTO schema_migrations (version) VALUES ('0071_suggestion_implemented') ON CONFLICT DO NOTHING",
   ]],
+  ["0072_play_sessions_episodes", [
+    "CREATE TABLE IF NOT EXISTS play_sessions (id bigserial PRIMARY KEY, user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE, game text NOT NULL, note text NOT NULL DEFAULT '', starts_at timestamptz NOT NULL, max_players int, reminded boolean NOT NULL DEFAULT false, cancelled_at timestamptz, created_at timestamptz NOT NULL DEFAULT now())",
+    "CREATE INDEX IF NOT EXISTS play_sessions_time_idx ON play_sessions (starts_at) WHERE cancelled_at IS NULL",
+    "CREATE TABLE IF NOT EXISTS play_session_members (session_id bigint NOT NULL REFERENCES play_sessions(id) ON DELETE CASCADE, user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE, waiting boolean NOT NULL DEFAULT false, joined_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (session_id, user_id))",
+    "CREATE TABLE IF NOT EXISTS play_session_messages (id bigserial PRIMARY KEY, session_id bigint NOT NULL REFERENCES play_sessions(id) ON DELETE CASCADE, user_id bigint REFERENCES users(id) ON DELETE SET NULL, body text NOT NULL, created_at timestamptz NOT NULL DEFAULT now())",
+    "CREATE INDEX IF NOT EXISTS play_session_messages_idx ON play_session_messages (session_id, id)",
+    "CREATE TABLE IF NOT EXISTS stream_episodes (id bigserial PRIMARY KEY, host_user_id bigint REFERENCES users(id) ON DELETE CASCADE, team_id bigint REFERENCES teams(id) ON DELETE CASCADE, title text NOT NULL, description text NOT NULL DEFAULT '', youtube_id text NOT NULL, created_by bigint REFERENCES users(id) ON DELETE SET NULL, plays int NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz)",
+    "CREATE INDEX IF NOT EXISTS stream_episodes_time_idx ON stream_episodes (created_at DESC) WHERE deleted_at IS NULL",
+    "INSERT INTO schema_migrations (version) VALUES ('0072_play_sessions_episodes') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

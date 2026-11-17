@@ -68,9 +68,12 @@ export function renderStreams(root, helpers) {
     if (!d.upcoming.length) parts.push(h("p", { class: "text-3 st-empty", text: "No stages scheduled yet." }));
     else parts.push(h("div", { class: "st-list" }, ...d.upcoming.map((s) => upcomingRow(s))));
 
-    parts.push(h("section", { class: "st-soon" }, iconEl("headphones"),
-      h("div", {}, h("b", { text: "Recorded episodes" }), h("span", { class: "chip", text: "Coming soon" }),
-        h("p", { class: "text-3", text: "Save podcasts and shows so people can listen any time." }))));
+    // recorded podcast episodes (unlisted or public YouTube videos; the player only loads when you tap Play)
+    parts.push(h("div", { class: "st-ep-head" },
+      h("h3", { class: "st-h", style: "margin:0" }, iconEl("headphones"), "Episodes"),
+      d.canHost ? h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => episodeDialog(d) }, iconEl("plus"), "Add an episode") : null));
+    if (!d.episodes.length) parts.push(h("p", { class: "text-3 st-empty", text: d.canHost ? "No episodes yet. Record a podcast, upload it to YouTube as Unlisted, and add it here." : "No episodes yet." }));
+    else parts.push(h("div", { class: "st-eps" }, ...d.episodes.map((e) => episodeCard(e))));
 
     if (d.crew) parts.push(crewBox(d.crew));
     if (d.crewOf.length) {
@@ -87,6 +90,56 @@ export function renderStreams(root, helpers) {
     }
     box.replaceChildren(...parts);
     if (helpers.sub && /^\d+$/.test(helpers.sub)) { const id = Number(helpers.sub); helpers.sub = null; openStream(id); }
+    else if (helpers.sub && /^ep-\d+$/.test(helpers.sub)) {   // a link to one episode: scroll to it and start it
+      const el = box.querySelector(`[data-ep="${helpers.sub.slice(3)}"]`);
+      helpers.sub = null;
+      if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1600); }
+    }
+  }
+
+  function episodeCard(e) {
+    const player = h("div", { class: "st-ep-player", hidden: true });
+    const play = h("button", { class: "btn btn-primary btn-sm", type: "button" }, iconEl("headphones"), "Play");
+    play.addEventListener("click", () => {
+      if (!player.hidden) return;
+      // privacy-friendly player (youtube-nocookie), loaded only now
+      const f = h("iframe", { src: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(e.youtubeId)}?autoplay=1&rel=0&modestbranding=1&playsinline=1`,
+        title: e.title, allow: "autoplay; encrypted-media; picture-in-picture", allowfullscreen: true, referrerpolicy: "strict-origin-when-cross-origin", loading: "lazy" });
+      player.replaceChildren(f);
+      player.hidden = false;
+      play.hidden = true;
+      postJson("/api/streams", { action: "episode-play", id: e.id }).catch(() => {});
+    });
+    const ago = new Date(e.createdAt).toLocaleDateString([], { month: "short", day: "numeric", year: new Date(e.createdAt).getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
+    return h("article", { class: "panel st-ep", "data-ep": String(e.id) },
+      h("div", { class: "st-ep-main" },
+        h("span", { class: "st-ep-art", "aria-hidden": "true" }, iconEl("headphones")),
+        h("div", { class: "st-ep-info" },
+          h("b", { class: "st-title", text: e.title }),
+          hostLabel(e),
+          e.description ? h("p", { class: "text-2 small", style: "margin:2px 0 0", text: e.description }) : null,
+          h("small", { class: "text-3", text: `${ago} · ${e.plays} play${e.plays === 1 ? "" : "s"}` }))),
+      h("div", { class: "st-card-actions" }, play, e.manage ? null : followBtn(e),
+        e.manage ? h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": `Remove ${e.title}`, onclick: () => openDialog({ title: "Remove this episode?", body: h("p", { class: "text-2", style: "margin:0", text: "It's removed from GalaxySMP. The video stays on YouTube." }),
+          actions: [{ label: "Cancel" }, { label: "Remove", kind: "danger", onClick: () => act({ action: "episode-delete", id: e.id }, showList) }] }) }, iconEl("trash")) : null),
+      player);
+  }
+
+  function episodeDialog(d) {
+    const as = h("select", { class: "input", id: "ep-as" }, ...d.as.map((a) => h("option", { value: a.key, text: a.label })));
+    const url = h("input", { class: "input", id: "ep-url", type: "url", inputmode: "url", placeholder: "https://youtu.be/…" });
+    const title = h("input", { class: "input", id: "ep-title", maxlength: 80, placeholder: "e.g. Episode 1: Our first week on GalaxySMP" });
+    const desc = h("textarea", { class: "input", id: "ep-desc", maxlength: 300, rows: 3, placeholder: "What's it about? (optional)" });
+    openDialog({ title: "Add an episode", body: h("div", { class: "form" },
+      h("ol", { class: "st-ep-steps" },
+        h("li", { text: "Record your podcast (a stage recording works too)." }),
+        h("li", { text: "Upload it to YouTube and set Visibility to Unlisted (only people with the link can find it). Private videos can't be played by anyone else." }),
+        h("li", { text: "Copy the video's Share link and paste it below." })),
+      d.as.length > 1 ? field("Who's it from", as) : null, field("YouTube link", url), field("Title", title), field("Description", desc)),
+    actions: [{ label: "Cancel" }, { label: "Add episode", kind: "primary", onClick: async () => {
+      const r = await postJson("/api/streams", { action: "episode-add", as: d.as.length > 1 ? as.value : d.as[0].key, url: url.value, title: title.value, description: desc.value });
+      toast(r.message); showList();
+    } }] });
   }
 
   function followBtn(s) {

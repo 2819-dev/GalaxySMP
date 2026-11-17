@@ -4262,3 +4262,39 @@ html[data-theme="dark"] .sg-status.implemented, :root:not([data-theme="light"]) 
 .st-cap-line { margin: 0; padding: 4px 10px; border-radius: 8px; background: rgba(0, 0, 0, .72); color: #fff; font-size: 1rem; line-height: 1.35; text-align: center; overflow-wrap: anywhere; }
 .st-cap-line b { color: #9fe8ff; }
 @media (max-width: 520px) { .st-cap-line { font-size: .88rem; } }
+/* #Events > Play sessions */
+.ps-wrap { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
+.ps-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.ps-card { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.ps-card.is-now { border-color: #34c77b; }
+.ps-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.ps-game { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 1.02rem; }
+.ps-game .ic svg { width: 20px; height: 20px; }
+.ps-when { font-weight: 600; color: var(--accent); font-size: .9rem; }
+.ps-card.is-now .ps-when { color: var(--ok); }
+.ps-note { margin: 0; color: var(--text-2); overflow-wrap: anywhere; }
+.ps-people { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ps-faces { display: inline-flex; }
+.ps-face { border-radius: 7px; border: 2px solid var(--surface); margin-left: -6px; image-rendering: pixelated; background: var(--surface-2); }
+.ps-faces .ps-face:first-child { margin-left: 0; }
+.ps-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.ps-chat { border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.ps-msgs { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.ps-msg { display: flex; gap: 6px; align-items: flex-start; font-size: .9rem; color: var(--text-2); overflow-wrap: anywhere; }
+.ps-msg .ps-face { margin: 0; border: 0; border-radius: 5px; }
+.ps-msg b { color: var(--text); }
+.ps-chat-form { display: flex; gap: 6px; }
+.ps-chat-form .input { flex: 1; min-width: 0; }
+/* #Stages > Episodes */
+.st-ep-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 18px 0 8px; }
+.st-ep-head .st-h .ic svg { width: 18px; height: 18px; }
+.st-eps { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.st-ep { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.st-ep.flash { box-shadow: 0 0 0 3px var(--accent); }
+.st-ep-main { display: flex; gap: 12px; align-items: flex-start; }
+.st-ep-art { flex: none; width: 56px; height: 56px; border-radius: 12px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, #3a1d6b, #8f2a7a 55%, #2a3f8f); }
+.st-ep-art .ic svg { width: 26px; height: 26px; }
+.st-ep-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.st-ep-player { position: relative; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #000; }
+.st-ep-player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.st-ep-steps { margin: 0; padding-left: 20px; color: var(--text-2); font-size: .88rem; display: flex; flex-direction: column; gap: 4px; }

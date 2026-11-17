@@ -42,9 +42,13 @@ export function renderEvents(p, { toast, setTimer }) {
   const streams = h("div", { class: "stack", style: "gap:8px" });
   const streamsHead = h("h2", { class: "cx-h", text: "Scheduled stages", hidden: true });
   const add = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "New event", hidden: true });
+  const sessions = h("section", { class: "ps-wrap" });
+  let ps = null;
+  import("/js/play-sessions.js").then((m) => { ps = m.renderPlaySessions(sessions, { toast }); });
   p.append(h("div", { class: "cp-wrap" },
     intro("Upcoming server events. Tap Remind me to get a notification 15 minutes before it starts. The server also announces each event in game when it begins.",
       h("div", { class: "cx-row" }, add)),
+    sessions,
     h("h2", { class: "cx-h", text: "Upcoming" }), upcoming,
     streamsHead, streams,
     h("h2", { class: "cx-h", text: "Minigames running now" }),
@@ -76,7 +80,7 @@ export function renderEvents(p, { toast, setTimer }) {
     past.replaceChildren(...(d.past.length ? d.past.map((e) => h("div", { class: "cx-past-row" }, h("b", { text: e.title }), h("span", { class: "text-3", text: ` · ${day(e.startsAt)}` }))) : [h("p", { class: "text-3 small", text: "None yet." })]));
   }
   load();
-  setTimer(setInterval(load, 30000));
+  setTimer(setInterval(() => { load(); ps?.reload(); }, 30000));
 }
 
 function eventCard(e, canManage, reload, toast) {

@@ -173,6 +173,20 @@ export async function suggestionCreate(request, env) {
   return json({ ok: true, id: Number(row.id) });
 }
 
+// Tell the person who posted a suggestion that its status changed (the bell on the website + phone notification).
+const STATUS_WORDS = { open: "Open", planned: "Planned", progress: "In progress", done: "Done", implemented: "Already implemented", declined: "Declined" };
+export async function suggestionStatusNotice(env, s, status, reply, actorId) {
+  const sql = getDb(env);
+  const [row] = await sql`SELECT s.user_id, s.title, s.official, p.xuid FROM suggestions s JOIN users u ON u.id = s.user_id
+                           LEFT JOIN players p ON p.uuid = u.mc_uuid WHERE s.id = ${s.id}`;
+  if (!row || row.official) return;
+  const title = status === "implemented" ? "Your idea is already on GalaxySMP"
+    : status === "done" ? "Your suggestion was added!" : `Your suggestion is now ${STATUS_WORDS[status] || status}`;
+  const body = reply ? `"${row.title}": ${String(reply).slice(0, 120)}` : `"${row.title}"`;
+  const { notify } = await import("./notify.js");
+  await notify(env, [row.user_id], "community", { title, body, url: `/community#suggestions/${s.id}`, tag: `sg-${s.id}` }, { exclude: actorId ? [actorId] : [] }).catch(() => {});
+}
+
 export async function suggestionVote(request, env, ctx, url, params) {
   const user = await requireUser(request, env);
   if (user.banned) throw new HttpError(403, "Your account has been banned.");
@@ -203,8 +217,10 @@ export async function suggestionAction(request, env, ctx, url, params) {
     if (!staff) throw new HttpError(403, "Only staff can change a suggestion's status.");
     const status = String((await readJson(request)).status || "");
     if (!STATUSES.includes(status) && status !== "implemented") throw new HttpError(400, "Unknown status.");
+    const [before] = await sql`SELECT status FROM suggestions WHERE id = ${id}`;
     await sql`UPDATE suggestions SET status = ${status} WHERE id = ${id}`;
     await sql`INSERT INTO audit_log (actor_id, action, details) VALUES (${user.id}, 'suggestion.status', ${JSON.stringify({ title: s.title, status })}::jsonb)`;
+    if (before?.status !== status) await suggestionStatusNotice(env, s, status, "", user.id);
     return json({ ok: true });
   }
   if (params.action === "category") {   // staff, or the person who posted it
