@@ -1,4 +1,5 @@
-// StreamRoom: one Durable Object per live stream (live video stream or live podcast).
+// StreamRoom: one Durable Object per live Stage (like Discord Stages: speakers talk, share their screen or
+// camera; the audience listens, chats, reacts and can raise their hand to speak).
 //
 // Video and audio never pass through here. People on the stream ("on stage") send their mic, camera or
 // screen to Cloudflare Realtime, and viewers receive them from there (the same relay voice chat uses).
@@ -58,6 +59,7 @@ export class StreamRoom extends DurableObject {
       stage: all.filter((a) => a.onStage).map((a) => this.stageEntry(a)),
       viewers: all.length,
       invited: all.filter((a) => a.invited).map((a) => a.id),
+      hands: all.filter((a) => a.hand && !a.onStage).map((a) => ({ id: a.id, username: a.username, head: a.head })),
     };
   }
   sendState() { this.broadcast(this.state()); this.ctx.waitUntil(this.trackIdle()); }
@@ -76,7 +78,7 @@ export class StreamRoom extends DurableObject {
   async alarm() {
     if (this.info?.status !== "live") return;
     const anyone = [...this.people().values()].some(({ a }) => a.onStage);
-    if (!anyone && this.idleSince && Date.now() - this.idleSince > IDLE_END_MS) return this.end("Nobody was on the stream for 10 minutes.", "auto");
+    if (!anyone && this.idleSince && Date.now() - this.idleSince > IDLE_END_MS) return this.end("Nobody spoke for 10 minutes, so the stage closed.", "auto");
     // keep the peak viewer count up to date
     const n = this.people().size;
     if (n) await getDb(this.env)`UPDATE streams SET peak_viewers = greatest(peak_viewers, ${n}) WHERE id = ${this.info.id}`.catch(() => {});
@@ -113,7 +115,7 @@ export class StreamRoom extends DurableObject {
     }
     if (url.pathname === "/internal/end") {
       const b = await request.json();
-      await this.end(b.reason || "The stream ended.", b.by);
+      await this.end(b.reason || "The stage ended.", b.by);
       return Response.json({ ok: true });
     }
     if (url.pathname === "/internal/count") {
@@ -121,13 +123,13 @@ export class StreamRoom extends DurableObject {
     }
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected WebSocket", { status: 426 });
     const user = JSON.parse(request.headers.get("X-GSMP-User"));
-    if (!this.info || this.info.status !== "live") return new Response("This stream isn't live.", { status: 409 });
+    if (!this.info || this.info.status !== "live") return new Response("This stage isn't live.", { status: 409 });
     const people = this.people();
     if (!people.has(user.id) && people.size >= MAX_VIEWERS && !user.manage && !user.stage && !user.mod) {
-      return new Response("This stream is full right now.", { status: 409 });
+      return new Response("This stage is full right now.", { status: 409 });
     }
     for (const old of this.ctx.getWebSockets(`user:${user.id}`)) {
-      this.send(old, { type: "closed", reason: "You opened this stream in another tab." });
+      this.send(old, { type: "closed", reason: "You opened this stage in another tab." });
       try { old.serializeAttachment({ ...(old.deserializeAttachment() || {}), gone: true }); old.close(4003, "replaced"); } catch { /* gone */ }
     }
     const pair = new WebSocketPair();
@@ -172,17 +174,17 @@ export class StreamRoom extends DurableObject {
         // a receive-only connection sends a first offer (a data channel) so the session is connected before pulling
         const data = await this.rtc("POST", "/sessions/new", msg.sdp ? { sessionDescription: { type: "offer", sdp: String(msg.sdp) } } : undefined);
         if (msg.role === "pub") {
-          if (!a.onStage) throw new Error("You're not on the stream.");
+          if (!a.onStage) throw new Error("You're not a speaker.");
           this.update(ws, { pubSessionId: data.sessionId, tracks: [] });
         } else this.update(ws, { sessionId: data.sessionId });
         return reply({ ok: true, answer: data.sessionDescription || null });
       }
       case "rtc.push": {   // go on stage: send mic (+ camera/screen for video streams)
-        if (!a.onStage) throw new Error("You're not on the stream.");
-        if (!a.pubSessionId) throw new Error("No stream session.");
+        if (!a.onStage) throw new Error("You're not a speaker.");
+        if (!a.pubSessionId) throw new Error("No stage connection.");
         const want = (Array.isArray(msg.tracks) ? msg.tracks : []).slice(0, 2)
           .map((t) => ({ mid: String(t.mid), kind: t.kind === "video" ? "video" : "audio" }))
-          .filter((t) => t.kind === "audio" || this.info.kind === "video");
+          ;
         if (!want.length) throw new Error("Nothing to send.");
         const tracks = want.map((t) => ({ ...t, name: `${t.kind[0]}${a.id}-${Date.now().toString(36)}` }));
         const data = await this.rtc("POST", `/sessions/${a.pubSessionId}/tracks/new`, {
@@ -194,7 +196,7 @@ export class StreamRoom extends DurableObject {
         return reply({ ok: true, answer: data.sessionDescription });
       }
       case "rtc.pull": {   // receive the tracks of people on stage
-        if (!a.sessionId) throw new Error("No stream session.");
+        if (!a.sessionId) throw new Error("No stage connection.");
         const wanted = (Array.isArray(msg.owners) ? msg.owners : []).slice(0, MAX_STAGE);
         const list = [];
         for (const id of wanted) {
@@ -233,10 +235,10 @@ export class StreamRoom extends DurableObject {
 
       // --- the stage ---
       case "stage.join": {
-        if (!a.stage && !a.invited) throw new Error("Only the stream's hosts can go on it. Ask a host to bring you on.");
+        if (!a.stage && !a.invited) throw new Error("Only the stage's hosts can speak. Raise your hand to ask.");
         const onStage = [...people.values()].filter(({ a: x }) => x.onStage).length;
-        if (onStage >= MAX_STAGE) throw new Error(`Up to ${MAX_STAGE} people can be on a stream at once.`);
-        this.update(ws, { onStage: true, guest: !a.stage, invited: false });
+        if (onStage >= MAX_STAGE) throw new Error(`Up to ${MAX_STAGE} people can speak at once.`);
+        this.update(ws, { onStage: true, guest: !a.stage, invited: false, hand: false });
         this.sendState();
         return reply({ ok: true });
       }
@@ -246,7 +248,7 @@ export class StreamRoom extends DurableObject {
         return reply({ ok: true });
       }
       case "stage.invite": {   // bring a viewer on stage (a call-in)
-        if (!a.manage) throw new Error("Only the stream's hosts can do that.");
+        if (!a.manage) throw new Error("Only the stage's hosts can do that.");
         const p = target(msg.id);
         if (!p) throw new Error("They're not watching any more.");
         if (p.a.onStage) return reply({ ok: true });
@@ -256,12 +258,26 @@ export class StreamRoom extends DurableObject {
         return reply({ ok: true });
       }
       case "stage.decline": {
-        this.update(ws, { invited: false });
+        this.update(ws, { invited: false, hand: false });
+        this.sendState();
+        return reply({ ok: true });
+      }
+      case "hand": {   // raise / lower your hand to ask to speak
+        if (a.onStage) return reply({ ok: true });
+        this.update(ws, { hand: Boolean(msg.up) });
+        this.sendState();
+        if (msg.up) for (const { ws: w, a: x } of people.values()) if (x.manage) this.send(w, { type: "hand", username: a.username });
+        return reply({ ok: true });
+      }
+      case "hand.dismiss": {
+        if (!a.manage && !a.mod) throw new Error("Only the stage's hosts can do that.");
+        const p = target(msg.id);
+        if (p) { this.update(p.ws, { hand: false }); this.send(p.ws, { type: "hand.lowered" }); }
         this.sendState();
         return reply({ ok: true });
       }
       case "stage.remove": {
-        if (!a.manage && !a.mod) throw new Error("Only the stream's hosts can do that.");
+        if (!a.manage && !a.mod) throw new Error("Only the stage's hosts can do that.");
         const p = target(msg.id);
         if (p) {
           this.update(p.ws, { onStage: false, guest: false, invited: false, tracks: [], pubSessionId: null, mic: false, cam: false, screen: false });
@@ -289,17 +305,17 @@ export class StreamRoom extends DurableObject {
         return reply({ ok: true });
       }
       case "chat.delete": {
-        if (!a.manage && !a.mod) throw new Error("Only the stream's hosts and staff can do that.");
+        if (!a.manage && !a.mod) throw new Error("Only the stage's hosts and staff can do that.");
         this.chat = this.chat.filter((m) => m.id !== String(msg.id));
         await this.ctx.storage.put("chat", this.chat);
         this.broadcast({ type: "chat.deleted", id: String(msg.id) });
         return reply({ ok: true });
       }
       case "kick": {   // remove a viewer from this stream
-        if (!a.manage && !a.mod) throw new Error("Only the stream's hosts and staff can do that.");
+        if (!a.manage && !a.mod) throw new Error("Only the stage's hosts and staff can do that.");
         const p = target(msg.id);
         if (p && !p.a.manage) {
-          this.send(p.ws, { type: "closed", reason: "A host removed you from this stream." });
+          this.send(p.ws, { type: "closed", reason: "A host removed you from this stage." });
           this.update(p.ws, { gone: true });
           try { p.ws.close(4004, "removed"); } catch { /* gone */ }
         }
@@ -315,12 +331,12 @@ export class StreamRoom extends DurableObject {
         return;
       }
       case "end": {
-        if (!a.manage && !a.mod) throw new Error("Only the stream's hosts and staff can end it.");
-        await this.end(a.manage ? "The host ended the stream." : "Staff ended this stream.", a.username);
+        if (!a.manage && !a.mod) throw new Error("Only the stage's hosts and staff can end it.");
+        await this.end(a.manage ? "The host ended the stage." : "Staff ended this stage.", a.username);
         return;
       }
       case "viewers": {   // the list of people watching (for hosts: bring on stage, remove)
-        if (!a.manage && !a.mod) throw new Error("Only the stream's hosts can see that.");
+        if (!a.manage && !a.mod) throw new Error("Only the stage's hosts can see that.");
         return reply({ ok: true, viewers: [...people.values()].map(({ a: x }) => ({ id: x.id, username: x.username, head: x.head, onStage: Boolean(x.onStage), host: Boolean(x.stage || x.manage) })) });
       }
     }

@@ -4198,3 +4198,17 @@ body.has-install-banner { padding-bottom: calc(96px + var(--safe-bottom)); }
 }
 .ev-stream { text-decoration: none; color: inherit; }
 .ev-stream:hover { text-decoration: none; border-color: var(--accent); }
+/* Stages: audience line, raised hands, screen share gets the big spot */
+.st-audience { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; color: var(--text-2); font-size: .88rem; }
+.st-aud-count { display: inline-flex; align-items: center; gap: 6px; }
+.st-aud-count .ic svg { width: 15px; height: 15px; }
+.st-aud-hands { padding: 2px 9px; border-radius: 99px; background: rgba(255, 193, 7, .15); color: #c98a00; font-weight: 600; }
+html[data-theme="dark"] .st-aud-hands, :root:not([data-theme="light"]) .st-aud-hands { color: #ffd166; }
+.st-hand.on { border-color: #ffd166; }
+.st-hand-count { margin-left: 4px; padding: 0 6px; border-radius: 99px; background: rgba(255, 193, 7, .2); font-size: .75rem; font-weight: 700; }
+.st-people-h { margin: 10px 0 2px; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+.st-people-h:first-child { margin-top: 0; }
+.st-stage.has-share { grid-template-columns: repeat(4, 1fr); grid-template-rows: 3fr 1fr; }
+.st-stage.has-share .st-tile:first-child { grid-column: 1 / -1; }
+.st-stage.has-share .st-tile:not(:first-child) .st-avatar .st-face { width: 40px; height: 40px; }
+.st-tile.is-screen { background: #000; }

@@ -23,7 +23,7 @@ export const PERMS = [
   { key: "remove_pictures", group: "Moderation", label: "Remove pictures and stop uploads" },
   { key: "remove_timeline", group: "Moderation", label: "Remove #Timeline posts and comments" },
   { key: "see_real_names", group: "Moderation", label: "See hidden real names" },
-  { key: "moderate_streams", group: "Moderation", label: "Moderate streams", hint: "End live streams, see every live stream and stop members from streaming" },
+  { key: "moderate_streams", group: "Moderation", label: "Moderate stages", hint: "End live stages, see every live stage and stop members from hosting stages" },
   // Admin Panel
   { key: "admin_panel", group: "Admin Panel", label: "Admin Panel access", hint: "Everything in the Mod Panel's pages, plus admin tools" },
   { key: "manage_ranks", group: "Admin Panel", label: "Manage ranks" },

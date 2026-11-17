@@ -331,24 +331,24 @@ Compare on any profile now also lists the achievements you both have, and the on
     body: `We fixed a problem that stopped the server from connecting to the website after a restart. While it was happening, the website showed the server as offline and in-game features linked to the website were unavailable. Everything is back to normal once the server updates. Thanks for your patience!`,
   },
   {
-    id: "2026-11-17-streams",
-    title: "Streams are here",
-    body: `Go live for the whole community in the new **#Streams** channel, under the new **Voice & Streams** category next to #Voice Chat.
+    id: "2026-11-17-stages",
+    title: "Stages are here",
+    body: `Host live talks, podcasts and shows in the new **#Stages** channel, under the new **Voice & Stages** category next to #Voice Chat.
 
-**Two kinds of streams:** a live video stream (camera, or screen share on a computer) or a live podcast (voice only, great on phones). Viewers chat live and send reactions.
+**How it works:** speakers talk on the stage while everyone else listens in the audience, chats live and sends reactions. Speakers can **share their screen** (great for showing a build) or turn on their **camera**.
 
-**Who can stream:** Galaxy+ and Galaxy Pro+ members can stream on their own and build a crew. Editors can run your streams, and Streamers can be on them. Teams can stream together: the organizer and Admins start it, and every team member can be on it.
+**Want to speak?** Tap **Request to speak** to raise your hand, and a host can invite you up.
 
-**Bring someone on:** hosts can invite a viewer to talk on the stream, like a call-in.
+**Who can host:** Galaxy+ and Galaxy Pro+ members can host their own stage and build a crew. Editors help run your stages, and Speakers can speak on them any time. Teams can host stages together: the organizer and Admins start them, and every team member can speak.
 
-**Never miss one:** follow your favorite streamers and teams to get a notification (and a message in game) when they go live. You can also schedule streams ahead of time; they show in #Events with a Notify me button.
+**Never miss one:** follow your favorite hosts and teams to get a notification (and a message in game) when they go live. Stages can also be scheduled ahead of time; they show in #Events with a Notify me button.
 
-**Coming soon:** recorded episodes you can watch any time.`,
+**Coming soon:** recorded episodes you can listen to any time.`,
   },
   {
     id: "2026-11-17-team-admins",
     title: "Team Admins",
-    body: `Team organizers can now make members **Admins**. Admins can invite and remove members, change the team's name and tag, and run the team's streams. Only the organizer can make Admins, hand the team over or close it. When an organizer hands the team over, they stay on as an Admin.`,
+    body: `Team organizers can now make members **Admins**. Admins can invite and remove members, change the team's name and tag, and host the team's stages. Only the organizer can make Admins, hand the team over or close it. When an organizer hands the team over, they stay on as an Admin.`,
   },
 ];
 

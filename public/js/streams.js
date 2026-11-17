@@ -1,14 +1,15 @@
-// Community > Voice & Streams > #Streams: live video streams and live podcasts.
-// The list (live now, coming up, your crew), "Go live", and the stream player with live chat and reactions.
-// Video and audio go through Cloudflare Realtime (like voice chat): one connection to send (people on the
-// stream) and one to receive (everyone). The server (src/streams/room.js) decides who may send and receive.
+// Community > Voice & Stages > #Stages, like Discord Stages: speakers talk, and can share their screen or turn
+// on their camera; the audience listens, chats, reacts and can raise their hand to ask to speak. Great for
+// podcasts, shows and build tours. The list (live now, coming up, your crew), "Start a stage", and the stage view.
+// Voice and video go through Cloudflare Realtime (like voice chat): one connection to send (speakers) and one to
+// receive (everyone). The server (src/streams/room.js) decides who may speak and who receives what.
 import { h, getJson, postJson, openDialog, field } from "/js/dialog.js";
 import { iconEl } from "/js/site.js";
 import { faceSvg } from "/js/face.js";
 import { eventHooks } from "/js/chat.js";
 
 const ICE = [{ urls: "stun:stun.cloudflare.com:3478" }];
-let active = null;          // the rendered #Streams view ({ reload })
+let active = null;          // the rendered #Stages view ({ reload })
 
 eventHooks.push((data) => { if (data.type === "streams_changed" && active?.listing) active.reload(); });
 
@@ -25,13 +26,14 @@ const whenText = (iso) => {
   const day = d.toDateString() === new Date().toDateString() ? "Today" : d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
   return `${day}, ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
 };
-const kindChip = (kind) => h("span", { class: `st-kind st-kind-${kind}` }, iconEl(kind === "audio" ? "mic" : "camera"), kind === "audio" ? "Podcast" : "Video");
+const STAGE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2.5"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19A10 10 0 0 1 5 5"/></svg>';
+const stageIcon = () => { const s = h("span", { class: "ic", "aria-hidden": "true" }); s.innerHTML = STAGE_SVG; return s; };
 
 export function renderStreams(root, helpers) {
   const toast = helpers.toast;
   const box = h("div", { class: "st-wrap" });
   root.append(box);
-  let stream = null;   // the open stream player (if any)
+  let stream = null;   // the open stage (if any)
   const view = { listing: true, reload: () => showList() };
   active = view;
   helpers.setCleanup?.(() => { stream?.close(); stream = null; if (active === view) active = null; });
@@ -45,47 +47,43 @@ export function renderStreams(root, helpers) {
   async function showList() {
     view.listing = true;
     stream?.close(); stream = null;
-    try { history.replaceState(null, "", "#streams"); } catch { /* ignore */ }
+    try { history.replaceState(null, "", "#stages"); } catch { /* ignore */ }
     let d;
     try { d = await getJson("/api/streams"); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
     if (!view.listing) return;
     const parts = [];
     parts.push(h("header", { class: "st-head" },
-      h("div", {}, h("h2", { text: "Streams" }), h("p", { class: "text-2", text: "Live shows and podcasts from players and teams. Follow your favorites to hear when they go live." })),
-      d.canHost ? h("button", { class: "btn btn-primary", type: "button", onclick: () => goLiveDialog(d) }, iconEl("camera"), "Go live") : null));
-    if (d.banned) parts.push(h("p", { class: "st-note st-note-bad", text: `Staff stopped you from streaming until ${whenText(d.banned.until)}${d.banned.reason ? ` (${d.banned.reason})` : ""}.` }));
+      h("div", {}, h("h2", { text: "Stages" }), h("p", { class: "text-2", text: "Live talks, podcasts and screen shares from players and teams. Listen in, chat, and raise your hand to speak." })),
+      d.canHost ? h("button", { class: "btn btn-primary", type: "button", onclick: () => goLiveDialog(d) }, stageIcon(), "Start a stage") : null));
+    if (d.banned) parts.push(h("p", { class: "st-note st-note-bad", text: `Staff stopped you from hosting stages until ${whenText(d.banned.until)}${d.banned.reason ? ` (${d.banned.reason})` : ""}.` }));
     else if (!d.canHost) parts.push(h("p", { class: "st-note", text: d.hasTeam
-      ? "Your team's organizer and Admins can start team streams. Streaming on your own is a Galaxy+ and Galaxy Pro+ perk."
-      : "Streaming on your own is a Galaxy+ and Galaxy Pro+ perk. Teams can stream too: make or join one in Friends > Team." }));
+      ? "Your team's organizer and Admins can start team stages. Hosting your own stage is a Galaxy+ and Galaxy Pro+ perk."
+      : "Hosting your own stage is a Galaxy+ and Galaxy Pro+ perk. Teams can host stages too: make or join one in Friends > Team." }));
 
-    // live now
     parts.push(h("h3", { class: "st-h" }, h("span", { class: "st-dot" }), "Live now"));
-    if (!d.live.length) parts.push(h("p", { class: "text-3 st-empty", text: "Nobody's live right now." }));
+    if (!d.live.length) parts.push(h("p", { class: "text-3 st-empty", text: "No stages are live right now." }));
     else parts.push(h("div", { class: "st-grid" }, ...d.live.map((s) => liveCard(s))));
 
-    // coming up
     parts.push(h("h3", { class: "st-h", text: "Coming up" }));
-    if (!d.upcoming.length) parts.push(h("p", { class: "text-3 st-empty", text: "No streams scheduled yet." }));
+    if (!d.upcoming.length) parts.push(h("p", { class: "text-3 st-empty", text: "No stages scheduled yet." }));
     else parts.push(h("div", { class: "st-list" }, ...d.upcoming.map((s) => upcomingRow(s))));
 
-    // prerecorded (coming soon)
     parts.push(h("section", { class: "st-soon" }, iconEl("headphones"),
-      h("div", {}, h("b", { text: "Episodes" }), h("span", { class: "chip", text: "Coming soon" }),
-        h("p", { class: "text-3", text: "Upload recorded podcasts and videos for people to watch any time." }))));
+      h("div", {}, h("b", { text: "Recorded episodes" }), h("span", { class: "chip", text: "Coming soon" }),
+        h("p", { class: "text-3", text: "Save podcasts and shows so people can listen any time." }))));
 
-    // crew
     if (d.crew) parts.push(crewBox(d.crew));
     if (d.crewOf.length) {
       parts.push(h("section", { class: "panel st-box" }, h("h3", { class: "st-h", style: "margin-top:0", text: "Crews you're on" }),
         ...d.crewOf.map((c) => h("div", { class: "st-row" },
-          h("span", {}, h("b", { text: c.username }), h("small", { class: "text-3", text: c.role === "editor" ? " · Editor: you can start and run their streams" : " · Streamer: you can be on their streams" })),
+          h("span", {}, h("b", { text: c.username }), h("small", { class: "text-3", text: c.role === "editor" ? " · Editor: you can start and run their stages" : " · Speaker: you can speak on their stages" })),
           h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Leave", onclick: () => act({ action: "crew-remove", hostId: c.hostId }, showList) })))));
     }
     if (d.recent.length) {
       parts.push(h("h3", { class: "st-h", text: "Recently live" }));
       parts.push(h("div", { class: "st-list" }, ...d.recent.map((s) => h("div", { class: "st-row st-past" },
         h("span", { class: "st-row-main" }, h("b", { text: s.title }), hostLabel(s)),
-        h("small", { class: "text-3", text: `${s.peak} watching at most · ${whenText(s.endedAt || s.startedAt)}` })))));
+        h("small", { class: "text-3", text: `${s.peak} listening at most · ${whenText(s.endedAt || s.startedAt)}` })))));
     }
     box.replaceChildren(...parts);
     if (helpers.sub && /^\d+$/.test(helpers.sub)) { const id = Number(helpers.sub); helpers.sub = null; openStream(id); }
@@ -105,17 +103,17 @@ export function renderStreams(root, helpers) {
   }
 
   function liveCard(s) {
-    return h("article", { class: `st-card st-card-${s.kind}`, tabindex: "0", onclick: () => openStream(s.id), onkeydown: (e) => { if (e.key === "Enter") openStream(s.id); } },
+    return h("article", { class: "st-card", tabindex: "0", onclick: () => openStream(s.id), onkeydown: (e) => { if (e.key === "Enter") openStream(s.id); } },
       h("div", { class: "st-thumb" },
         h("span", { class: "st-live", text: "LIVE" }),
-        h("span", { class: "st-viewers" }, iconEl("eye"), String(s.viewers)),
-        h("span", { class: "st-thumb-ic" }, iconEl(s.kind === "audio" ? "headphones" : "camera"))),
+        h("span", { class: "st-viewers" }, iconEl("headphones"), String(s.viewers)),
+        h("span", { class: "st-thumb-ic" }, stageIcon())),
       h("div", { class: "st-card-body" },
         h("b", { class: "st-title", text: s.title }),
         hostLabel(s),
-        s.onStage.length ? h("small", { class: "text-3", text: `On now: ${s.onStage.slice(0, 4).join(", ")}${s.onStage.length > 4 ? "…" : ""}` }) : null,
-        h("div", { class: "st-card-actions" }, kindChip(s.kind), followBtn(s),
-          h("button", { class: "btn btn-primary btn-sm", type: "button", text: s.manage ? "Open" : "Watch" }))));
+        s.onStage.length ? h("small", { class: "text-3", text: `Speaking: ${s.onStage.slice(0, 4).join(", ")}${s.onStage.length > 4 ? "…" : ""}` }) : null,
+        h("div", { class: "st-card-actions" }, followBtn(s),
+          h("button", { class: "btn btn-primary btn-sm", type: "button", text: s.manage ? "Open" : "Join" }))));
   }
 
   function upcomingRow(s) {
@@ -126,7 +124,7 @@ export function renderStreams(root, helpers) {
     draw();
     return h("div", { class: "st-row" },
       h("span", { class: "st-when" }, h("b", { text: whenText(s.scheduledAt) })),
-      h("span", { class: "st-row-main" }, h("b", { text: s.title }), hostLabel(s), kindChip(s.kind)),
+      h("span", { class: "st-row-main" }, h("b", { text: s.title }), hostLabel(s)),
       h("span", { class: "st-row-btns" },
         s.manage ? h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Start now", onclick: () => act({ action: "start", id: s.id }, (r) => openStream(r.id, { autoStage: true })) }) : remind,
         s.manage ? h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Cancel", onclick: () => act({ action: "cancel", id: s.id }, showList) }) : followBtn(s)));
@@ -134,32 +132,31 @@ export function renderStreams(root, helpers) {
 
   function crewBox(crew) {
     const name = h("input", { class: "input", id: "st-crew-name", maxlength: 32, placeholder: "Member name" });
-    const role = h("select", { class: "input", id: "st-crew-role" }, h("option", { value: "streamer", text: "Streamer" }), h("option", { value: "editor", text: "Editor" }));
+    const role = h("select", { class: "input", id: "st-crew-role" }, h("option", { value: "streamer", text: "Speaker" }), h("option", { value: "editor", text: "Editor" }));
     const form = h("form", { class: "st-crew-add" }, name, role, h("button", { class: "btn btn-primary", type: "submit" }, iconEl("userPlus"), "Add"));
     form.addEventListener("submit", (e) => { e.preventDefault(); if (name.value.trim()) act({ action: "crew-add", name: name.value, role: role.value }, showList); });
     return h("section", { class: "panel st-box" },
-      h("h3", { class: "st-h", style: "margin-top:0", text: "Your stream crew" }),
-      h("p", { class: "text-3", style: "margin:0 0 8px", text: "Streamers can be on your streams. Editors can also start and end them, change the title, run the chat and bring viewers on." }),
+      h("h3", { class: "st-h", style: "margin-top:0", text: "Your stage crew" }),
+      h("p", { class: "text-3", style: "margin:0 0 8px", text: "Speakers can speak on your stages any time. Editors can also start and end them, change the topic, run the chat and bring people up to speak." }),
       ...crew.map((c) => h("div", { class: "st-row" },
-        h("span", {}, h("b", { text: c.username }), h("span", { class: "tm-role", text: c.role === "editor" ? "Editor" : "Streamer" })),
+        h("span", {}, h("b", { text: c.username }), h("span", { class: "tm-role", text: c.role === "editor" ? "Editor" : "Speaker" })),
         h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": `Remove ${c.username}`, onclick: () => act({ action: "crew-remove", userId: c.id }, showList) }, iconEl("trash")))),
       form);
   }
 
   function goLiveDialog(d) {
     const as = h("select", { class: "input", id: "st-as" }, ...d.as.map((a) => h("option", { value: a.key, text: a.label })));
-    const title = h("input", { class: "input", id: "st-title", maxlength: 80, placeholder: "e.g. Building a castle with the team" });
-    const kind = h("select", { class: "input", id: "st-kind" }, h("option", { value: "video", text: "Video stream (camera or screen)" }), h("option", { value: "audio", text: "Podcast (voice only)" }));
+    const title = h("input", { class: "input", id: "st-title", maxlength: 80, placeholder: "e.g. Survival podcast: our best builds" });
     const when = h("select", { class: "input", id: "st-when" }, h("option", { value: "now", text: "Now" }), h("option", { value: "later", text: "Schedule for later" }));
     const at = h("input", { class: "input", id: "st-at", type: "datetime-local" });
     const atField = field("Date and time", at);
     atField.hidden = true;
     when.addEventListener("change", () => { atField.hidden = when.value !== "later"; });
-    openDialog({ title: "Go live", body: h("div", { class: "form" },
-      d.as.length > 1 ? field("Who's streaming", as) : null, field("Title", title), field("Type", kind), field("When", when), atField,
-      h("p", { class: "text-3 small", style: "margin:0", text: "Be kind and follow the rules: staff can end any stream. Don't share personal information like your address, school or full name." })),
+    openDialog({ title: "Start a stage", body: h("div", { class: "form" },
+      d.as.length > 1 ? field("Who's hosting", as) : null, field("Topic", title), field("When", when), atField,
+      h("p", { class: "text-3 small", style: "margin:0", text: "Speakers can talk, share their screen and turn on their camera. Be kind and follow the rules: staff can end any stage. Don't share personal information like your address, school or full name." })),
     actions: [{ label: "Cancel" }, { label: "Continue", kind: "primary", onClick: async () => {
-      const body = { action: "create", as: d.as.length > 1 ? as.value : d.as[0].key, title: title.value, kind: kind.value };
+      const body = { action: "create", as: d.as.length > 1 ? as.value : d.as[0].key, title: title.value };
       if (when.value === "later") { if (!at.value) throw new Error("Pick a date and time."); body.at = new Date(at.value).toISOString(); }
       const r = await postJson("/api/streams", body);
       toast(r.message);
@@ -167,19 +164,19 @@ export function renderStreams(root, helpers) {
     } }] });
   }
 
-  // ---------- the stream player ----------
+  // ---------- one stage ----------
   async function openStream(id, opts = {}) {
     view.listing = false;
     stream?.close();
-    try { history.replaceState(null, "", `#streams/${id}`); } catch { /* ignore */ }
+    try { history.replaceState(null, "", `#stages/${id}`); } catch { /* ignore */ }
     let d;
     try { d = await getJson(`/api/streams/${id}`); } catch (e) { toast(e.message); return showList(); }
     const s = d.stream;
-    const back = h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => showList() }, iconEl("arrow", "flip"), "All streams");
+    const back = h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => showList() }, iconEl("arrow", "flip"), "All stages");
     if (s.status !== "live") {
       box.replaceChildren(back, h("section", { class: "panel st-box st-over" },
         h("h2", { text: s.title }), hostLabel(s),
-        h("p", { class: "text-2", text: s.status === "ended" ? "This stream has ended." : `Starts ${whenText(s.scheduledAt)}.` }),
+        h("p", { class: "text-2", text: s.status === "ended" ? "This stage has ended." : `Starts ${whenText(s.scheduledAt)}.` }),
         followBtn(s)));
       return;
     }
@@ -190,12 +187,13 @@ export function renderStreams(root, helpers) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// One open stream: WebSocket to its room, receiving video/audio, going on stage, chat, reactions.
+// One open stage: WebSocket to its room, receiving voice/video, speaking, raising your hand, chat, reactions.
 class Player {
   constructor(s, rights, ui) {
     Object.assign(this, { s, rights, ui, toast: ui.toast });
     this.req = 0; this.waiting = new Map();
-    this.state = { stage: [], viewers: 0, invited: [] };
+    this.state = { stage: [], viewers: 0, invited: [], hands: [] };
+    this.handUp = false;
     this.subs = new Map();      // owner -> { pub, mids: [] }
     this.midInfo = new Map();   // mid -> { owner, kind }
     this.media = new Map();     // owner -> { video: MediaStreamTrack, audio: MediaStreamTrack }
@@ -209,27 +207,28 @@ class Player {
   // ---------- layout ----------
   build() {
     const { s, ui } = this;
-    this.viewersEl = h("span", { class: "st-viewers st-viewers-inline" }, iconEl("eye"), "0");
+    this.viewersEl = h("span", { class: "st-viewers st-viewers-inline" }, iconEl("headphones"), "0");
     const menu = [];
     if (this.rights.manage) {
-      menu.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => this.peopleDialog() }, iconEl("users"), "People"));
-      menu.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => this.editTitle() }, iconEl("pencil"), "Title"));
+      menu.push(this.peopleBtn());
+      menu.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => this.editTitle() }, iconEl("pencil"), "Topic"));
     } else if (this.rights.mod) {
-      menu.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => this.peopleDialog() }, iconEl("users"), "People"));
+      menu.push(this.peopleBtn());
     }
-    if (this.rights.mod && !this.rights.manage && s.host.type === "user") menu.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => this.banDialog() }, iconEl("shield"), "Stop streaming"));
-    if (this.rights.manage || this.rights.mod) menu.push(h("button", { class: "btn btn-danger btn-sm", type: "button", text: "End stream", onclick: () => this.endDialog() }));
+    if (this.rights.mod && !this.rights.manage && s.host.type === "user") menu.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => this.banDialog() }, iconEl("shield"), "Stop hosting"));
+    if (this.rights.manage || this.rights.mod) menu.push(h("button", { class: "btn btn-danger btn-sm", type: "button", text: "End stage", onclick: () => this.endDialog() }));
     else menu.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => this.reportDialog() }, iconEl("flag"), "Report"));
     this.titleEl = h("h2", { class: "st-ptitle", text: s.title });
     const head = h("header", { class: "st-phead" },
       h("div", { class: "st-phead-main" }, ui.back,
         h("div", {}, h("div", { class: "st-ptitle-row" }, h("span", { class: "st-live", text: "LIVE" }), this.titleEl, this.viewersEl), hostLabel(s))),
       h("div", { class: "st-phead-btns" }, this.rights.manage ? null : ui.followBtn(s), ...menu));
-    this.stageEl = h("div", { class: `st-stage st-stage-${s.kind}` });
+    this.stageEl = h("div", { class: "st-stage" });
+    this.audienceEl = h("div", { class: "st-audience" });
     this.floatEl = h("div", { class: "st-floats", "aria-hidden": "true" });
     this.startBtn = h("button", { class: "btn btn-primary st-start", type: "button", onclick: () => this.start() },
-      iconEl(ui.autoStage ? "camera" : "eye"), ui.autoStage ? "Start streaming" : s.kind === "audio" ? "Listen" : "Watch");
-    this.gate = h("div", { class: "st-gate" }, this.startBtn, h("p", { class: "text-3 small", text: ui.autoStage ? "Your browser will ask to use your microphone" + (s.kind === "video" ? " and camera." : ".") : "Sound will play once you start." }));
+      iconEl(ui.autoStage ? "mic" : "headphones"), ui.autoStage ? "Start speaking" : "Join the stage");
+    this.gate = h("div", { class: "st-gate" }, this.startBtn, h("p", { class: "text-3 small", text: ui.autoStage ? "Your browser will ask to use your microphone. You can share your screen or turn on your camera after." : "You'll join the audience. Raise your hand to ask to speak." }));
     this.audioBox = h("div", { hidden: true });
     this.controls = h("div", { class: "st-controls" });
     this.chatList = h("div", { class: "st-chat-list", role: "log", "aria-live": "polite" });
@@ -240,7 +239,7 @@ class Player {
     const stageWrap = h("div", { class: "st-stage-wrap" }, this.stageEl, this.floatEl, this.gate);
     ui.box.replaceChildren(h("div", { class: "st-player" }, head,
       h("div", { class: "st-body" },
-        h("div", { class: "st-main" }, stageWrap, this.controls, this.reactBar),
+        h("div", { class: "st-main" }, stageWrap, this.audienceEl, this.controls, this.reactBar),
         h("aside", { class: "st-chat" }, h("h3", { class: "st-h", style: "margin:0 0 6px", text: "Live chat" }), this.chatList, chatForm)),
       this.audioBox));
     this.renderStage();
@@ -256,7 +255,7 @@ class Player {
     ws.addEventListener("close", (e) => {
       if (this.closed) return;
       if (e.code === 4003 || e.code === 4004 || this.endedShown) return;
-      this.finish(e.reason && e.reason !== "bye" ? e.reason : "You were disconnected from the stream.");
+      this.finish(e.reason && e.reason !== "bye" ? e.reason : "You were disconnected from the stage.");
     });
   }
   request(type, data = {}) {
@@ -264,7 +263,7 @@ class Player {
     return new Promise((resolve, reject) => {
       this.waiting.set(req, { resolve, reject });
       try { this.ws.send(JSON.stringify({ type, req, ...data })); } catch (e) { this.waiting.delete(req); reject(e); }
-      setTimeout(() => { if (this.waiting.has(req)) { this.waiting.delete(req); reject(new Error("The stream didn't answer. Try again.")); } }, 15_000);
+      setTimeout(() => { if (this.waiting.has(req)) { this.waiting.delete(req); reject(new Error("The stage didn't answer. Try again.")); } }, 15_000);
     });
   }
   enqueue(fn) { this.queue = this.queue.then(fn).catch((e) => console.warn("stream:", e.message)); }
@@ -272,15 +271,24 @@ class Player {
   onMessage(m) {
     switch (m.type) {
       case "reply": { const w = this.waiting.get(m.req); if (!w) return; this.waiting.delete(m.req); m.error ? w.reject(new Error(m.error)) : w.resolve(m); return; }
-      case "hello": this._self = m.you; this.rights = m.rights; this.reactions = m.reactions; this.chatList.replaceChildren(); m.chat.forEach((c) => this.addChat(c)); this.renderReactions(); return;
-      case "state": this.state = m; if (m.info?.title) this.titleEl.textContent = m.info.title; this.viewersEl.lastChild.textContent = String(m.viewers); this.renderStage(); this.syncSubs(); return;
+      case "hello": this._self = m.you; this.rights = m.rights; this.reactions = m.reactions; this.chatList.replaceChildren(); m.chat.forEach((c) => this.addChat(c)); this.renderReactions(); this.renderControls(); return;
+      case "state": {
+        this.state = m;
+        if (m.info?.title) this.titleEl.textContent = m.info.title;
+        this.viewersEl.lastChild.textContent = String(m.viewers);
+        this.handUp = (m.hands || []).some((x) => x.id === this._self);
+        this.renderStage(); this.renderControls(); this.drawPeopleBtn(); this.syncSubs();
+        return;
+      }
+      case "hand": this.toast(`✋ ${m.username} wants to speak. Open People to bring them up.`); return;
+      case "hand.lowered": this.handUp = false; this.renderControls(); this.toast("A host lowered your hand."); return;
       case "chat": this.addChat(m.message); return;
       case "chat.deleted": this.chatList.querySelector(`[data-id="${CSS.escape(m.id)}"]`)?.remove(); return;
       case "react": this.floatReaction(m.emoji); return;
       case "invited": this.invitedDialog(m.by); return;
-      case "removed": this.stopPublishing(); this.toast("A host took you off the stream."); return;
-      case "ended": this.endedShown = true; this.finish(m.reason || "The stream ended."); return;
-      case "closed": this.endedShown = true; this.finish(m.reason || "You left the stream."); return;
+      case "removed": this.stopPublishing(); this.toast("A host moved you back to the audience."); return;
+      case "ended": this.endedShown = true; this.finish(m.reason || "The stage ended."); return;
+      case "closed": this.endedShown = true; this.finish(m.reason || "You left the stage."); return;
     }
   }
 
@@ -385,38 +393,29 @@ class Player {
     await this.request("stage.join");
     this.onStage = true;
     try {
-      this.local = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        video: this.s.kind === "video" ? { width: { ideal: 960 }, height: { ideal: 540 }, frameRate: { ideal: 24, max: 30 } } : false,
-      }).catch(async (e) => {
-        if (this.s.kind !== "video") throw e;
-        this.toast("Couldn't start your camera, so you're on with your microphone only.");
-        return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-      });
+      // speakers start with just their microphone; screen share and camera are buttons
+      this.local = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     } catch {
       await this.request("stage.leave").catch(() => {});
       this.onStage = false;
-      throw new Error("Allow the microphone to go on the stream (check your browser's site settings).");
+      throw new Error("Allow the microphone to speak on the stage (check your browser's site settings).");
     }
     this.mic = this.local.getAudioTracks()[0];
-    this.cam = this.local.getVideoTracks()[0] || null;
+    this.cam = null;
     await this.request("rtc.session", { role: "pub" });
     const pc = new RTCPeerConnection({ iceServers: ICE, bundlePolicy: "max-bundle" });
     this.pub = pc;
     this.aTx = pc.addTransceiver(this.mic, { direction: "sendonly" });
     const tracks = [];
-    if (this.s.kind === "video") {
-      this.vTx = pc.addTransceiver(this.cam || "video", { direction: "sendonly" });
-      this.limitVideo(900_000);
-    }
+    this.vTx = pc.addTransceiver("video", { direction: "sendonly" });   // filled by screen share or camera
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     tracks.push({ mid: this.aTx.mid, kind: "audio" });
     if (this.vTx) tracks.push({ mid: this.vTx.mid, kind: "video" });
-    const res = await this.request("rtc.push", { sdp: offer.sdp, tracks, cam: Boolean(this.cam) });
+    const res = await this.request("rtc.push", { sdp: offer.sdp, tracks, cam: false });
     await pc.setRemoteDescription(res.answer);
-    this.micOn = true; this.camOn = Boolean(this.cam); this.screenOn = false;
-    if (asGuest) this.toast("You're on the stream!");
+    this.micOn = true; this.camOn = false; this.screenOn = false;
+    if (asGuest) this.toast("You're a speaker now!");
     this.renderControls(); this.renderStage();
   }
 
@@ -481,37 +480,63 @@ class Player {
     const tiles = stage.map((p) => {
       const mine = this.onStage && this._self === p.id;
       const m = this.media.get(p.id) || {};
-      const showVideo = this.s.kind === "video" && (p.cam || p.screen);
       let vid = null;
-      if (showVideo) {
+      if (p.cam || p.screen) {
         vid = h("video", { class: p.screen ? "st-video st-screen" : "st-video", playsinline: true, autoplay: true });
         vid.muted = true;
         const track = mine ? (this.screen || this.cam) : m.video;
         if (track) { vid.srcObject = new MediaStream([track]); vid.play().catch(() => {}); }
       }
-      return h("div", { class: `st-tile${vid ? " has-video" : ""}${p.guest ? " is-guest" : ""}` },
+      return h("div", { class: `st-tile${vid ? " has-video" : ""}${p.screen ? " is-screen" : ""}${p.guest ? " is-guest" : ""}` },
         vid || h("div", { class: "st-avatar" }, face(p.head, p.username, 72)),
-        h("div", { class: "st-tile-name" }, p.mic ? null : iconEl("mic", "st-muted-ic"), h("span", { text: p.username }), p.guest ? h("small", { text: "Guest" }) : null));
+        h("div", { class: "st-tile-name" }, p.mic ? null : iconEl("mic", "st-muted-ic"), h("span", { text: p.username }),
+          p.screen ? h("small", { text: "Sharing screen" }) : p.guest ? h("small", { text: "Guest" }) : null));
     });
-    if (!tiles.length) tiles.push(h("div", { class: "st-tile st-tile-empty" }, h("p", { class: "text-2", text: "Starting soon. The hosts haven't come on yet." })));
+    if (!tiles.length) tiles.push(h("div", { class: "st-tile st-tile-empty" }, h("p", { class: "text-2", text: "Starting soon. No one is speaking yet." })));
+    // a screen share takes the big spot
+    const shareIdx = stage.findIndex((p) => p.screen);
+    if (shareIdx > 0) tiles.unshift(tiles.splice(shareIdx, 1)[0]);
     this.stageEl.dataset.n = String(Math.min(tiles.length, 4));
+    this.stageEl.classList.toggle("has-share", shareIdx >= 0);
     this.stageEl.replaceChildren(...tiles);
+    // the audience
+    const listeners = Math.max(0, (this.state.viewers || 0) - stage.length);
+    const hands = this.state.hands || [];
+    this.audienceEl.replaceChildren(
+      h("span", { class: "st-aud-count" }, iconEl("headphones"), `${listeners} in the audience`),
+      hands.length ? h("span", { class: "st-aud-hands" }, `✋ ${hands.length} want${hands.length === 1 ? "s" : ""} to speak`) : null);
   }
 
   renderControls() {
     const c = [];
     if (this.onStage) {
       c.push(h("button", { class: `btn ${this.micOn ? "btn-secondary" : "btn-danger"} btn-sm`, type: "button", onclick: () => this.toggleMic() }, iconEl("mic"), this.micOn ? "Mute" : "Unmute"));
-      if (this.s.kind === "video") {
-        c.push(h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => this.toggleCam() }, iconEl("camera"), this.camOn ? "Camera off" : "Camera on"));
-        c.push(h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => this.toggleScreen() }, iconEl("image"), this.screenOn ? "Stop sharing" : "Share screen"));
-      }
-      c.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Leave the stream", onclick: () => this.leaveStage() }));
-    } else if (this.sub && this.rights.stage) {
-      c.push(h("button", { class: "btn btn-primary btn-sm", type: "button", onclick: () => this.goOnStage().catch((e) => this.toast(e.message)) }, iconEl(this.s.kind === "audio" ? "mic" : "camera"), "Go on the stream"));
+      c.push(h("button", { class: `btn ${this.screenOn ? "btn-primary" : "btn-secondary"} btn-sm`, type: "button", onclick: () => this.toggleScreen() }, iconEl("image"), this.screenOn ? "Stop sharing" : "Share screen"));
+      c.push(h("button", { class: `btn ${this.camOn ? "btn-primary" : "btn-secondary"} btn-sm`, type: "button", onclick: () => this.toggleCam() }, iconEl("camera"), this.camOn ? "Camera off" : "Camera"));
+      c.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Move to audience", onclick: () => this.leaveStage() }));
+    } else if (this.rights.stage) {
+      c.push(h("button", { class: "btn btn-primary btn-sm", type: "button", onclick: () => this.goOnStage().catch((e) => this.toast(e.message)) }, iconEl("mic"), "Become a speaker"));
+    } else {
+      c.push(this.handUp
+        ? h("button", { class: "btn btn-secondary btn-sm st-hand on", type: "button", onclick: () => this.raiseHand(false) }, "✋ Hand raised · Lower")
+        : h("button", { class: "btn btn-primary btn-sm st-hand", type: "button", onclick: () => this.raiseHand(true) }, "✋ Request to speak"));
     }
     this.controls.replaceChildren(...c);
     this.controls.hidden = !c.length;
+  }
+  async raiseHand(up) {
+    try { await this.request("hand", { up }); this.handUp = up; this.renderControls(); if (up) this.toast("The hosts can see your raised hand."); }
+    catch (e) { this.toast(e.message); }
+  }
+  peopleBtn() {
+    this.peopleEl = h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => this.peopleDialog() });
+    this.drawPeopleBtn();
+    return this.peopleEl;
+  }
+  drawPeopleBtn() {
+    if (!this.peopleEl) return;
+    const n = (this.state.hands || []).length;
+    this.peopleEl.replaceChildren(iconEl("users"), "People", n ? h("span", { class: "st-hand-count", text: `✋ ${n}` }) : "");
   }
 
   renderReactions() {
@@ -546,47 +571,59 @@ class Player {
   async peopleDialog() {
     let res;
     try { res = await this.request("viewers"); } catch (e) { this.toast(e.message); return; }
-    const rows = res.viewers.filter((v) => v.id !== this._self).map((v) => h("div", { class: "st-row" },
-      h("span", { class: "st-host" }, face(v.head, v.username, 26), h("b", { text: v.username }), v.onStage ? h("span", { class: "tm-role", text: "On stream" }) : v.host ? h("span", { class: "tm-role", text: "Crew" }) : null),
+    const hands = new Set((this.state.hands || []).map((x) => x.id));
+    const others = res.viewers.filter((v) => v.id !== this._self);
+    const bringUp = (v) => h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Invite to speak", onclick: async (e) => { e.target.disabled = true; try { await this.request("stage.invite", { id: v.id }); this.toast(`Invited ${v.username} to speak.`); } catch (er) { this.toast(er.message); } } });
+    const row = (v) => h("div", { class: "st-row" },
+      h("span", { class: "st-host" }, face(v.head, v.username, 26), h("b", { text: v.username }),
+        v.onStage ? h("span", { class: "tm-role", text: "Speaker" }) : hands.has(v.id) ? h("span", { class: "tm-role", text: "✋ Wants to speak" }) : v.host ? h("span", { class: "tm-role", text: "Crew" }) : null),
       h("span", { class: "st-row-btns" },
-        this.rights.manage && !v.onStage ? h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Bring on", onclick: async (e) => { e.target.disabled = true; try { await this.request("stage.invite", { id: v.id }); this.toast(`Asked ${v.username} to come on.`); } catch (er) { this.toast(er.message); } } }) : null,
-        v.onStage ? h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Take off", onclick: () => this.request("stage.remove", { id: v.id }).then(() => this.toast(`${v.username} is off the stream.`)).catch((er) => this.toast(er.message)) }) : null,
-        !v.host ? h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": `Remove ${v.username}`, onclick: () => this.request("kick", { id: v.id }).then(() => this.toast(`${v.username} was removed.`)).catch((er) => this.toast(er.message)) }, iconEl("trash")) : null)));
-    openDialog({ title: `Watching (${res.viewers.length})`, body: h("div", { class: "st-people" }, ...(rows.length ? rows : [h("p", { class: "text-3", text: "Nobody else is here yet." })])), actions: [{ label: "Done" }] });
+        this.rights.manage && !v.onStage ? bringUp(v) : null,
+        this.rights.manage && hands.has(v.id) ? h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Dismiss", onclick: (e) => { e.target.disabled = true; this.request("hand.dismiss", { id: v.id }).catch((er) => this.toast(er.message)); } }) : null,
+        v.onStage ? h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Move to audience", onclick: () => this.request("stage.remove", { id: v.id }).then(() => this.toast(`${v.username} is back in the audience.`)).catch((er) => this.toast(er.message)) }) : null,
+        !v.host ? h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": `Remove ${v.username} from the stage`, onclick: () => this.request("kick", { id: v.id }).then(() => this.toast(`${v.username} was removed.`)).catch((er) => this.toast(er.message)) }, iconEl("trash")) : null));
+    const groups = [
+      ["Requests to speak", others.filter((v) => hands.has(v.id) && !v.onStage)],
+      ["Speakers", others.filter((v) => v.onStage)],
+      ["Audience", others.filter((v) => !v.onStage && !hands.has(v.id))],
+    ].filter(([, list]) => list.length);
+    openDialog({ title: `On this stage (${res.viewers.length})`, body: h("div", { class: "st-people" },
+      ...(groups.length ? groups.flatMap(([name, list]) => [h("h4", { class: "st-people-h", text: name }), ...list.map(row)]) : [h("p", { class: "text-3", text: "Nobody else is here yet." })])),
+    actions: [{ label: "Done" }] });
   }
   invitedDialog(by) {
-    openDialog({ title: "Come on the stream?", body: h("p", { class: "text-2", style: "margin:0", text: `${by} invited you to talk on the stream${this.s.kind === "video" ? " (your camera is optional)" : ""}. Everyone watching will hear you.` }),
+    openDialog({ title: "Speak on the stage?", body: h("p", { class: "text-2", style: "margin:0", text: `${by} invited you to speak. Everyone on the stage will hear you. You can share your screen or turn on your camera if you want.` }),
       actions: [{ label: "No thanks", onClick: () => { this.request("stage.decline").catch(() => {}); } },
-        { label: "Join", kind: "primary", onClick: async () => { this.gate.hidden = true; await this.goOnStage(true); this.renderControls(); } }] });
+        { label: "Speak", kind: "primary", onClick: async () => { this.gate.hidden = true; await this.goOnStage(true); this.renderControls(); } }] });
   }
   editTitle() {
     const input = h("input", { class: "input", id: "st-edit-title", maxlength: 80 });
     input.value = this.titleEl.textContent;
-    openDialog({ title: "Stream title", body: field("Title", input), actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: async () => { await postJson("/api/streams", { action: "edit", id: this.s.id, title: input.value }); } }] });
+    openDialog({ title: "Stage topic", body: field("Topic", input), actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: async () => { await postJson("/api/streams", { action: "edit", id: this.s.id, title: input.value }); } }] });
   }
   endDialog() {
-    openDialog({ title: "End the stream?", body: h("p", { class: "text-2", style: "margin:0", text: "Everyone watching will see that it ended." }),
-      actions: [{ label: "Cancel" }, { label: "End stream", kind: "danger", onClick: async () => { await postJson("/api/streams", { action: "end", id: this.s.id }); } }] });
+    openDialog({ title: "End the stage?", body: h("p", { class: "text-2", style: "margin:0", text: "Everyone on it will see that it ended." }),
+      actions: [{ label: "Cancel" }, { label: "End stage", kind: "danger", onClick: async () => { await postJson("/api/streams", { action: "end", id: this.s.id }); } }] });
   }
   reportDialog() {
     const reason = h("select", { class: "input", id: "st-report-reason" }, ...["Inappropriate content", "Bullying or hate", "Sharing personal info", "Scam or spam", "Other"].map((r) => h("option", { value: r, text: r })));
     const details = h("textarea", { class: "input", id: "st-report-details", maxlength: 300, rows: 3, placeholder: "What happened? (optional)" });
-    openDialog({ title: "Report this stream", body: h("div", { class: "form" }, field("Reason", reason), field("Details", details)),
+    openDialog({ title: "Report this stage", body: h("div", { class: "form" }, field("Reason", reason), field("Details", details)),
       actions: [{ label: "Cancel" }, { label: "Send report", kind: "primary", onClick: async () => { const r = await postJson("/api/streams", { action: "report", id: this.s.id, reason: reason.value, details: details.value }); this.toast(r.message); } }] });
   }
   banDialog() {
     const days = h("select", { class: "input", id: "st-ban-days" }, ...[[1, "1 day"], [7, "1 week"], [30, "30 days"], [3650, "Permanently"]].map(([v, t]) => h("option", { value: String(v), text: t })));
     const reason = h("input", { class: "input", id: "st-ban-reason", maxlength: 120, placeholder: "Reason (they'll see it)" });
-    openDialog({ title: `Stop ${this.s.host.name} from streaming`, body: h("div", { class: "form" }, field("For how long", days), field("Reason", reason),
-      h("p", { class: "text-3 small", style: "margin:0", text: "Their live stream ends now. They can still watch other streams." })),
-    actions: [{ label: "Cancel" }, { label: "Stop streaming", kind: "danger", onClick: async () => { const r = await postJson("/api/streams", { action: "ban", userId: this.s.host.id, days: Number(days.value), reason: reason.value }); this.toast(r.message); } }] });
+    openDialog({ title: `Stop ${this.s.host.name} from hosting stages`, body: h("div", { class: "form" }, field("For how long", days), field("Reason", reason),
+      h("p", { class: "text-3 small", style: "margin:0", text: "Their live stage ends now. They can still listen to other stages." })),
+    actions: [{ label: "Cancel" }, { label: "Stop hosting", kind: "danger", onClick: async () => { const r = await postJson("/api/streams", { action: "ban", userId: this.s.host.id, days: Number(days.value), reason: reason.value }); this.toast(r.message); } }] });
   }
 
   // ---------- the end ----------
   finish(reason) {
     if (this.closed) return;
     this.close();
-    document.querySelectorAll("dialog.dialog").forEach((d) => { try { d.close(); } catch { /* ignore */ } d.remove(); });  // e.g. an open "Come on the stream?"
+    document.querySelectorAll("dialog.dialog").forEach((d) => { try { d.close(); } catch { /* ignore */ } d.remove(); });  // e.g. an open "Speak on the stage?"
 
     this.ui.box.replaceChildren(this.ui.back, h("section", { class: "panel st-box st-over" }, h("h2", { text: this.s.title }), hostLabel(this.s),
       h("p", { class: "text-2", text: reason }), this.ui.followBtn(this.s)));

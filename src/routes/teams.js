@@ -1,7 +1,7 @@
 // Teams: a group of up to 8 players with a name and a short tag (up to 5 letters/numbers, shown gray before
 // names in chat on the website and in game). The organizer invites players, manages the team and can hand it
 // over. The organizer can make members Admins: Admins can invite, remove regular members, edit the name/tag and
-// run the team's streams; only the organizer makes Admins, hands the team over or closes it. The site Owner's
+// host the team's stages; only the organizer makes Admins, hands the team over or closes it. The site Owner's
 // team tag can be longer (up to 32 letters, numbers and spaces). Teams have a private team chat (website + /tc in game), shared plot building in game, and a leaderboard.
 // Lives in Community > Friends > Team (no separate page).
 import { getDb } from "../lib/db.js";
@@ -233,7 +233,7 @@ export async function act(request, env) {
       if (!m) throw new HttpError(404, "That player isn't in your team.");
       if (role === "admin") {
         const [u] = await sql`SELECT u.id FROM users u JOIN players x ON x.uuid = u.mc_uuid WHERE x.xuid = ${x}`;
-        if (u) await notify(env, [Number(u.id)], "friends", { title: `You're an Admin of ${t.name}`, body: "You can now invite and remove members, edit the team and run its streams.", url: "/community#friends", tag: `team-admin-${t.id}` }).catch(() => {});
+        if (u) await notify(env, [Number(u.id)], "friends", { title: `You're an Admin of ${t.name}`, body: "You can now invite and remove members, edit the team and host its stages.", url: "/community#friends", tag: `team-admin-${t.id}` }).catch(() => {});
       }
       return done(role === "admin" ? `${m.gamertag} is now an Admin.` : `${m.gamertag} is no longer an Admin.`);
     }

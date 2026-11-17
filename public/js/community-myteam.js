@@ -97,7 +97,7 @@ export function renderMyTeam(root, { toast, setTimer }) {
     if (t.isLeader) {
       btns.push(m.admin
         ? h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove Admin", onclick: () => act({ action: "unadmin", xuid: m.xuid }) })
-        : h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Make Admin", onclick: () => confirmAct(`Make ${m.name} an Admin?`, "Admins can invite and remove members, edit the team name and tag, and run the team's streams. Only you can make Admins, hand over the team or close it.", "Make Admin", { action: "admin", xuid: m.xuid }, "primary") }));
+        : h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Make Admin", onclick: () => confirmAct(`Make ${m.name} an Admin?`, "Admins can invite and remove members, edit the team name and tag, and host the team's stages. Only you can make Admins, hand over the team or close it.", "Make Admin", { action: "admin", xuid: m.xuid }, "primary") }));
       btns.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Make organizer", onclick: () => confirmAct(`Make ${m.name} the organizer?`, "They'll own the team instead of you. You'll stay on as an Admin.", "Make organizer", { action: "transfer", xuid: m.xuid }) }));
     }
     if (t.isLeader || !m.admin) btns.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": `Remove ${m.name}`, onclick: () => confirmAct(`Remove ${m.name}?`, "They can be invited again later.", "Remove", { action: "kick", xuid: m.xuid }) }, iconEl("trash")));

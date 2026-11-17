@@ -225,6 +225,11 @@ const PENDING = [
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS stream_ban_reason text",
     "INSERT INTO schema_migrations (version) VALUES ('0067_team_admins_streams') ON CONFLICT DO NOTHING",
   ]],
+  ["0068_stages", [
+    "UPDATE categories SET name = 'Voice & Stages' WHERE name = 'Voice & Streams'",
+    "UPDATE channels SET slug = 'stages', name = 'Stages', topic = 'Live talks, podcasts and screen shares. Raise your hand to speak.' WHERE slug = 'streams'",
+    "INSERT INTO schema_migrations (version) VALUES ('0068_stages') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;
