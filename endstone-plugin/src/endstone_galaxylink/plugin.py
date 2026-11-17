@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.51.0"
+VERSION = "2.52.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -203,6 +203,8 @@ class GalaxyLink(Plugin):
         self._voice = None
         from endstone_galaxylink.crashwatch import CrashWatch
         self.crashwatch = CrashWatch(self)  # tells the staff when the server didn't stop properly (and why, if it can)
+        from endstone_galaxylink.diagnostics import Diagnostics
+        self.diagnostics = Diagnostics(self)  # console, errors and health readings to the website, for troubleshooting
         self.economy = Economy(self)  # first: ranks read their saved copy from it
         self.ranks = RankManager(self)
         self.plans = Plans(self)
@@ -601,10 +603,14 @@ class GalaxyLink(Plugin):
             if only_if is not None and not only_if():
                 return fn()
             cw.mark(what)
+            t0 = time.perf_counter()
             try:
                 return fn()
             finally:
                 cw.mark("idle")
+                diag = getattr(self, "diagnostics", None)
+                if diag is not None:
+                    diag.timed(what, (time.perf_counter() - t0) * 1000)
         return run
 
     def on_disable(self) -> None:
@@ -612,6 +618,11 @@ class GalaxyLink(Plugin):
             self.blocklog.flush()
         if getattr(self, "progress", None):
             self.progress.save()
+        if getattr(self, "diagnostics", None):
+            try:
+                self.diagnostics.stopping()
+            except Exception:
+                pass
         if getattr(self, "_voice", None):
             self.economy.sync()
             self._voice.stop()

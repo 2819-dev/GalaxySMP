@@ -419,12 +419,49 @@ export class VoiceHub extends DurableObject {
         by: "Server", lastSeen: clip(msg.lastSeen, 40), uptimeMinutes: Number(msg.uptimeMinutes) || null, doing: clip(msg.doing, 200),
         players: (Array.isArray(msg.players) ? msg.players : []).slice(0, 40).map((p) => clip(p, 32)),
         logFile: msg.log?.file ? clip(msg.log.file, 120) : null,
-        log: (Array.isArray(msg.log?.lines) ? msg.log.lines : []).slice(-60).map((l) => clip(l, 300)),
+        log: (Array.isArray(msg.log?.lines) ? msg.log.lines : []).slice(-150).map((l) => clip(l, 300)),
+        cause: msg.cause ? clip(msg.cause, 300) : null, downSeconds: Number(msg.downSeconds) || null,
+        containerRestarted: Boolean(msg.containerRestarted),
+        lastHealth: msg.lastHealth && typeof msg.lastHealth === "object" && JSON.stringify(msg.lastHealth).length < 4000 ? msg.lastHealth : null,
+        cgroup: msg.cgroup && typeof msg.cgroup === "object" ? Object.fromEntries(Object.entries(msg.cgroup).slice(0, 8).map(([k, v]) => [clip(k, 20), Number(v) || 0])) : {},
         traceback: (Array.isArray(msg.traceback) ? msg.traceback : []).slice(0, 80).map((l) => clip(l, 300)),
         memory: Object.fromEntries(Object.entries(msg.memory && typeof msg.memory === "object" ? msg.memory : {}).slice(0, 8).map(([k, v]) => [clip(k, 20), Number(v) || 0])),
       };
       return getDb(this.env)`INSERT INTO audit_log (actor_id, action, details) VALUES (NULL, 'server.crash', ${JSON.stringify(details)}::jsonb)`
         .catch((e) => console.error("crash report failed", e));
+    }
+    // Diagnostics (troubleshooting): the console, grouped errors, health readings, start/stop. Stored only.
+    if (msg.type === "diag_console") {
+      const lines = (Array.isArray(msg.lines) ? msg.lines : []).slice(0, 500).filter((l) => Array.isArray(l) && l.length >= 3);
+      if (Number(msg.dropped) > 0) lines.push([Date.now(), "WARNING", `(${Number(msg.dropped)} console lines were skipped while the website was unreachable)`]);
+      if (!lines.length) return;
+      const at = lines.map((l) => new Date(Number(l[0]) || Date.now()).toISOString());
+      const level = lines.map((l) => String(l[1] || "INFO").slice(0, 12));
+      const text = lines.map((l) => String(l[2] ?? "").slice(0, 4000));
+      return getDb(this.env)`INSERT INTO server_console (at, level, text) SELECT * FROM unnest(${at}::timestamptz[], ${level}::text[], ${text}::text[])`
+        .catch((e) => console.error("console save failed", e));
+    }
+    if (msg.type === "diag_errors") {
+      const sql = getDb(this.env);
+      return (async () => {
+        for (const e of (Array.isArray(msg.errors) ? msg.errors : []).slice(0, 50)) {
+          const sig = String(e.sig || "").slice(0, 32);
+          if (!sig) continue;
+          const first = new Date(Number(e.first) || Date.now()).toISOString(), last = new Date(Number(e.last) || Date.now()).toISOString();
+          // an error that comes back after being marked fixed is shown as new again
+          await sql`INSERT INTO server_errors (sig, level, message, detail, count, first_at, last_at)
+                    VALUES (${sig}, ${String(e.level || "ERROR").slice(0, 12)}, ${String(e.message || "").slice(0, 300)}, ${String(e.detail || "").slice(0, 4000)}, ${Math.max(1, Number(e.count) || 1)}, ${first}, ${last})
+                    ON CONFLICT (sig) DO UPDATE SET count = server_errors.count + EXCLUDED.count, last_at = EXCLUDED.last_at, detail = EXCLUDED.detail, fixed_at = NULL`;
+        }
+      })().catch((e) => console.error("errors save failed", e));
+    }
+    if (msg.type === "diag_health") {
+      const data = JSON.stringify(msg.health && typeof msg.health === "object" ? msg.health : {}).slice(0, 6000);
+      return getDb(this.env)`INSERT INTO server_health (data) VALUES (${data.endsWith("}") ? data : "{}"}::jsonb)`.catch((e) => console.error("health save failed", e));
+    }
+    if (msg.type === "diag_event") {
+      const data = JSON.stringify(msg.data && typeof msg.data === "object" ? msg.data : {}).slice(0, 6000);
+      return getDb(this.env)`INSERT INTO server_events (kind, data) VALUES (${String(msg.event || "event").slice(0, 20)}, ${data.endsWith("}") ? data : "{}"}::jsonb)`.catch((e) => console.error("event save failed", e));
     }
     if (msg.type === "ah_sale") {  // for the Auction House price history
       return import("../routes/community.js").then((m) => m.recordAhSale(this.env, msg)).catch((e) => console.error("ah sale failed", e));

@@ -451,6 +451,17 @@ Also: when staff change the status of your suggestion, you now always get a noti
 - **Comments** on episodes and videos.
 - **Live polls:** hosts can ask a quick question during a stage and everyone sees the results live.`,
   },
+  {
+    id: "2026-11-17-server-diagnostics",
+    title: "Better tools for keeping the server running",
+    body: `We've improved how the server reports problems, so outages can be found and fixed faster.
+
+- **Clearer crash reports:** when the server stops unexpectedly, the report now says what most likely caused it and how long the server was down.
+- **Error tracking:** errors are now recorded with full details, so they can be found and fixed even when nobody was online to report them.
+- **Health checks:** the server records its performance every minute, which helps us find the cause of lag.
+
+Server logs are kept for 3 days and error reports for 30 days. See the Privacy Policy for details.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

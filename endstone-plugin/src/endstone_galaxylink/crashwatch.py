@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 BEAT_SECONDS = 10
-LOG_LINES = 60
+LOG_LINES = 150
 
 
 def _kb(path, key):
@@ -80,6 +80,9 @@ class CrashWatch:
         except Exception:
             prev = {}
         self.fault_file = folder / "crash_traceback.txt"
+        from endstone_galaxylink import diagnostics as dg
+        self.boot = dg.boot_time()
+        self.container = dg.container_start()
         if prev is not None:
             self.report = self.build_report(prev)
             plugin.logger.warning(f"The server didn't stop properly last time (last seen {self.report['lastSeen']}). "
@@ -111,7 +114,12 @@ class CrashWatch:
             players = [p.name for p in self.plugin.server.online_players]
         except Exception:
             players = []
-        data = {"started": self.started, "t": now, "doing": self.doing, "players": players[:40], "memory": memory()}
+        from endstone_galaxylink.diagnostics import cgroup_memory
+        cg = cgroup_memory()
+        diag = getattr(self.plugin, "diagnostics", None)
+        data = {"started": self.started, "t": now, "doing": self.doing, "players": players[:40], "memory": memory(),
+                "bootTime": self.boot, "containerStart": self.container, "oomKills": cg.get("oomKills"), "cgroup": cg,
+                "health": getattr(diag, "latest", None)}
         try:
             tmp = self.file.with_suffix(".tmp")
             tmp.write_text(json.dumps(data), "utf-8")
@@ -123,6 +131,12 @@ class CrashWatch:
         """Every second: keep the note fresh, and send a waiting crash report once the website is connected."""
         self.beat()
         self.copy_log()
+        diag = getattr(self.plugin, "diagnostics", None)
+        if diag is not None:
+            try:
+                diag.tick()
+            except Exception:
+                pass
         voice = getattr(self.plugin, "_voice", None)
         if self.report and voice is not None and getattr(voice, "ws", None):
             voice.send_json({"type": "server_crash", **self.report})
@@ -160,14 +174,26 @@ class CrashWatch:
         last = prev.get("t") or 0
         fmt = lambda t: time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(t)) if t else "unknown"
         up = (last - prev["started"]) / 60 if prev.get("started") and last else None
+        from endstone_galaxylink.diagnostics import crash_cause, cgroup_memory
+        tb = self.traceback()
+        try:
+            cause = crash_cause(prev, {"bootTime": self.boot, "containerStart": self.container,
+                                       "oomKills": cgroup_memory().get("oomKills"), "traceback": tb})
+        except Exception:
+            cause = None
         return {
+            "cause": cause,
+            "downSeconds": round(self.started - last) if last else None,
+            "lastHealth": prev.get("health") or None,
+            "cgroup": prev.get("cgroup") or {},
+            "containerRestarted": bool(prev.get("containerStart") and self.container and abs(self.container - prev["containerStart"]) > 5),
             "lastSeen": fmt(last),
             "lastSeenAt": int(last * 1000) if last else None,
             "uptimeMinutes": round(up) if up is not None else None,
             "doing": str(prev.get("doing") or "unknown")[:200],
             "players": [str(p)[:32] for p in (prev.get("players") or [])][:40],
             "log": self.log_tail(last),
-            "traceback": self.traceback(),
+            "traceback": tb,
             "memory": prev.get("memory") or {},
         }
 

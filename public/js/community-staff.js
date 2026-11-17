@@ -39,6 +39,8 @@ const KIND = (a) => (a === "server.crash" ? "bad" : /ban|kick/.test(a) && !/unba
 // A crash report: what the plugin was doing, who was online and the end of the server log.
 function crashDetails(d) {
   const facts = [
+    d.cause ? `Likely cause: ${d.cause}` : null,
+    d.downSeconds != null ? `Back up after ${d.downSeconds < 120 ? `${d.downSeconds} seconds` : `${Math.round(d.downSeconds / 60)} minutes`}` : null,
     `Last activity: ${d.doing || "unknown"}`,
     d.uptimeMinutes != null ? `Up for ${d.uptimeMinutes} min before it stopped` : null,
     `Online: ${d.players?.length ? d.players.join(", ") : "nobody"}`,

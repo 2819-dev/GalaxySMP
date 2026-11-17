@@ -591,6 +591,11 @@ export async function tick(env) {
   await import("./streams.js").then((m) => m.tick(env)).catch((e) => console.error("streams tick failed", e));
   await import("./sessions.js").then((m) => m.tick(env)).catch((e) => console.error("play sessions tick failed", e));
   await sql`DELETE FROM filter_blocks WHERE created_at < now() - interval '7 days'`.catch(() => {});  // the blocked-messages log keeps 7 days
+  // server diagnostics: the console and health readings keep 3 days; errors and start/stop events 30 days
+  await sql`DELETE FROM server_console WHERE at < now() - interval '3 days'`.catch(() => {});
+  await sql`DELETE FROM server_health WHERE at < now() - interval '3 days'`.catch(() => {});
+  await sql`DELETE FROM server_errors WHERE last_at < now() - interval '30 days'`.catch(() => {});
+  await sql`DELETE FROM server_events WHERE at < now() - interval '30 days'`.catch(() => {});
   // "Starting in 15 minutes" to everyone who tapped Remind me.
   const soon = await sql`
     UPDATE events SET reminded = true
