@@ -94,6 +94,7 @@ export async function eventsList(request, env) {
     ok: true, canManage: isStaff(user), now: new Date().toISOString(),
     upcoming: upcoming.map(eventOut), past: past.map(eventOut),
     minigames: live.events || [], updated: live.at, events: live.events || [],
+    streams: await import("./streams.js").then((m) => m.upcomingForEvents(sql)).catch(() => []),
   });
 }
 
@@ -586,6 +587,7 @@ export async function suggestionSimilar(request, env, ctx, url) {
 // =====================================================================
 export async function tick(env) {
   const sql = getDb(env);
+  await import("./streams.js").then((m) => m.tick(env)).catch((e) => console.error("streams tick failed", e));
   // "Starting in 15 minutes" to everyone who tapped Remind me.
   const soon = await sql`
     UPDATE events SET reminded = true

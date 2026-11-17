@@ -28,12 +28,14 @@
   "durable_objects": {
     "bindings": [
       { "name": "HUB", "class_name": "CommunityHub" },
-      { "name": "VOICE", "class_name": "VoiceHub" }
+      { "name": "VOICE", "class_name": "VoiceHub" },
+      { "name": "STREAMS", "class_name": "StreamRoom" }
     ]
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["CommunityHub"] },
-    { "tag": "v2", "new_sqlite_classes": ["VoiceHub"] }
+    { "tag": "v2", "new_sqlite_classes": ["VoiceHub"] },
+    { "tag": "v3", "new_sqlite_classes": ["StreamRoom"] }
   ],
 
   // Free built-in rate limiters (per visitor IP) for sign-in and code requests.

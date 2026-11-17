@@ -953,6 +953,7 @@ $("help-reset").addEventListener("click", () => openDialog({
   if (has("promo_codes")) setupPromos({ loaders, toast });
   if (has("custom_emoji")) setupEmoji({ loaders, toast });
   if (has("voice_rooms")) setupRooms({ loaders, toast });
+  if (has("moderate_streams")) import("/js/streams-panel.js").then((m) => m.setupStreamsMod({ loaders, toast })).catch(() => {});
   if (has("manage_badges")) setupBadges({ loaders, toast });
   if (summary.owner) {
     setupPayments({ loaders });

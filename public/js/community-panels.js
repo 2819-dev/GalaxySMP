@@ -49,7 +49,7 @@ export function showPanel(channel, context) {
   voiceBox().hidden = true;
   p.hidden = false;
   p.scrollTop = 0;
-  const helpers = { toast: (m) => ctx.toast(m), setTimer: (t) => { refreshTimer = t; } };
+  const helpers = { toast: (m) => ctx.toast(m), setTimer: (t) => { refreshTimer = t; }, setCleanup: (fn) => { cleanup = fn; }, sub: ctx.sub, me: ctx.me };
   const render = {
     info: renderInfo, auction: renderAuction, suggestions: renderSuggestions, support: renderSupport, dms: renderDMs,
     events: (el) => extra.renderEvents(el, helpers), news: (el) => extra.renderNews(el, helpers),
@@ -57,6 +57,7 @@ export function showPanel(channel, context) {
     timeline: (el) => renderTimeline(el, helpers), team: (el) => renderTeam(el, helpers), applications: (el) => renderApplications(el, helpers),
     stafflogs: (el) => renderStaffLogs(el, helpers), reports: (el) => renderReports(el, helpers), shifts: (el) => renderShifts(el, helpers),
     jobs: (el) => renderJobs(el, helpers),
+    streams: (el) => import("/js/streams.js").then((m) => m.renderStreams(el, helpers)),
     friends: (el) => renderFriends(el, { ...helpers, openDM: ctx.openDM }),
   }[channel.kind];
   if (render) render(p);

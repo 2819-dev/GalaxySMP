@@ -39,11 +39,14 @@ export function renderEvents(p, { toast, setTimer }) {
   const upcoming = h("div", { class: "stack", style: "gap:10px" });
   const live = h("div", { class: "stack", style: "gap:10px" });
   const past = h("div", { class: "stack", style: "gap:8px" });
+  const streams = h("div", { class: "stack", style: "gap:8px" });
+  const streamsHead = h("h2", { class: "cx-h", text: "Scheduled streams", hidden: true });
   const add = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "New event", hidden: true });
   p.append(h("div", { class: "cp-wrap" },
     intro("Upcoming server events. Tap Remind me to get a notification 15 minutes before it starts. The server also announces each event in game when it begins.",
       h("div", { class: "cx-row" }, add)),
     h("h2", { class: "cx-h", text: "Upcoming" }), upcoming,
+    streamsHead, streams,
     h("h2", { class: "cx-h", text: "Minigames running now" }),
     h("p", { class: "text-3 small", style: "margin:-8px 0 0" }, "Hosted by players and run by Minigame Staff. Join at a Minigame Computer or with ", h("code", { text: "/minigames" }), "."),
     live,
@@ -55,6 +58,12 @@ export function renderEvents(p, { toast, setTimer }) {
     add.hidden = !d.canManage;
     add.onclick = () => eventDialog(null, load, toast);
     upcoming.replaceChildren(...(d.upcoming.length ? d.upcoming.map((e) => eventCard(e, d.canManage, load, toast)) : [h("div", { class: "panel empty", text: "No upcoming events. Check back soon." })]));
+    const ss = d.streams || [];
+    streamsHead.hidden = !ss.length;
+    streams.replaceChildren(...ss.map((x) => h("a", { class: "panel ev-card ev-stream", href: `/community#streams/${x.id}` },
+      h("div", { class: "ev-main" }, h("h3", { class: "sg-title", text: x.title }),
+        h("p", { class: "sg-foot", style: "margin:0", text: `${x.host.type === "team" ? `[${x.host.tag}] ${x.host.name}` : x.host.name} · ${x.kind === "audio" ? "Podcast" : "Video stream"} · ${new Date(x.scheduledAt).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` })),
+      h("span", { class: "sg-status planned", text: "Open in #Streams" }))));
     const now = Date.now() / 1000;
     live.replaceChildren(...(d.minigames.length ? d.minigames.map((g) => {
       const open = g.signupEnds > now;

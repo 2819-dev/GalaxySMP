@@ -17,6 +17,7 @@ export const KINDS = {
   news: { name: "Updates & polls", hint: "New posts in #Updates (when staff choose to notify) and new polls", default: true },
   jobs: { name: "Jobs", hint: "When someone offers to do your job, takes it or finishes it, and when you're hired or paid", default: true },
   friends: { name: "Friends", hint: "Friend requests, and when a friend joins the server", default: true },
+  streams: { name: "Streams", hint: "When people and teams you follow go live, and streams you asked to be reminded about", default: true },
   bedwars: { name: "Bedwars games", hint: "When players are waiting for a Bedwars game, so you can join", default: false },
   wishlist: { name: "Wishlist sales", hint: "When something on your Store wishlist is on sale", default: true },
   trades: { name: "Trades", hint: "Trade offers to you, and answers to your offers", default: true },

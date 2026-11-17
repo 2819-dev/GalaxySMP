@@ -1,6 +1,8 @@
 // Teams: a group of up to 8 players with a name and a short tag (up to 5 letters/numbers, shown gray before
 // names in chat on the website and in game). The organizer invites players, manages the team and can hand it
-// over. Teams have a private team chat (website + /tc in game), shared plot building in game, and a leaderboard.
+// over. The organizer can make members Admins: Admins can invite, remove regular members, edit the name/tag and
+// run the team's streams; only the organizer makes Admins, hands the team over or closes it. The site Owner's
+// team tag can be longer (up to 32 letters, numbers and spaces). Teams have a private team chat (website + /tc in game), shared plot building in game, and a leaderboard.
 // Lives in Community > Friends > Team (no separate page).
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
@@ -13,6 +15,7 @@ import { toPlugin } from "./economy.js";
 
 const MAX_MEMBERS = 8;
 const TAG_RE = /^[A-Za-z0-9]{1,5}$/;
+const OWNER_TAG_RE = /^[A-Za-z0-9][A-Za-z0-9 ]{0,31}$/;  // the site Owner: any length (up to 32 so names still fit)
 
 async function myPlayer(sql, user) {
   const [p] = await sql`SELECT p.xuid, p.gamertag FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${user.id}`;
@@ -24,7 +27,7 @@ async function needPlayer(sql, user) {
   return p;
 }
 async function teamOf(sql, xuid) {
-  const [t] = await sql`SELECT t.* FROM team_members m JOIN teams t ON t.id = m.team_id WHERE m.xuid = ${xuid}`;
+  const [t] = await sql`SELECT t.*, m.role AS my_role FROM team_members m JOIN teams t ON t.id = m.team_id WHERE m.xuid = ${xuid}`;
   return t || null;
 }
 async function filtered(sql, text, max) {
@@ -61,15 +64,15 @@ export async function teamTags(sql, xuids) {
 async function teamView(sql, t, meXuid) {
   const members = await sql`
     SELECT p.xuid, p.gamertag, p.head_at, p.gamerpic_at, p.playtime_s, p.balance_cents, cardinality(p.achievements) AS ach,
-           (p.online_at > now() - interval '150 seconds') AS online, m.joined_at
+           (p.online_at > now() - interval '150 seconds') AS online, m.joined_at, m.role
       FROM team_members m JOIN players p ON p.xuid = m.xuid WHERE m.team_id = ${t.id}
-     ORDER BY (p.xuid = ${t.leader_xuid}) DESC, m.joined_at`;
+     ORDER BY (p.xuid = ${t.leader_xuid}) DESC, (m.role = 'admin') DESC, m.joined_at`;
   const invites = await sql`SELECT p.xuid, p.gamertag FROM team_invites i JOIN players p ON p.xuid = i.xuid WHERE i.team_id = ${t.id} ORDER BY i.created_at`;
   const sum = (k) => members.reduce((a, m) => a + Number(m[k] || 0), 0);
   return {
-    id: Number(t.id), name: t.name, tag: t.tag, isLeader: t.leader_xuid === meXuid,
-    members: members.map((m) => ({ xuid: m.xuid, name: m.gamertag, head: headUrlFor(m), online: Boolean(m.online), leader: m.xuid === t.leader_xuid })),
-    invites: t.leader_xuid === meXuid ? invites.map((i) => ({ xuid: i.xuid, name: i.gamertag })) : [],
+    id: Number(t.id), name: t.name, tag: t.tag, isLeader: t.leader_xuid === meXuid, isAdmin: t.leader_xuid === meXuid || t.my_role === "admin",
+    members: members.map((m) => ({ xuid: m.xuid, name: m.gamertag, head: headUrlFor(m), online: Boolean(m.online), leader: m.xuid === t.leader_xuid, admin: m.role === "admin" })),
+    invites: t.leader_xuid === meXuid || t.my_role === "admin" ? invites.map((i) => ({ xuid: i.xuid, name: i.gamertag })) : [],
     stats: { playtime: sum("playtime_s"), money: sum("balance_cents") / 100, achievements: sum("ach") },
     max: MAX_MEMBERS,
   };
@@ -85,7 +88,7 @@ export async function mine(request, env) {
   const invites = t ? [] : await sql`
     SELECT t.id, t.name, t.tag, (SELECT count(*)::int FROM team_members x WHERE x.team_id = t.id) AS members
       FROM team_invites i JOIN teams t ON t.id = i.team_id WHERE i.xuid = ${p.xuid} ORDER BY i.created_at DESC`;
-  return json({ ok: true, linked: true, team: t ? await teamView(sql, t, p.xuid) : null,
+  return json({ ok: true, linked: true, longTags: Boolean(user.owner), team: t ? await teamView(sql, t, p.xuid) : null,
     invites: invites.map((i) => ({ id: Number(i.id), name: i.name, tag: i.tag, members: i.members })) }, 200, { "Cache-Control": "no-store" });
 }
 
@@ -111,14 +114,22 @@ export async function act(request, env) {
   const t = await teamOf(sql, me.xuid);
   const leader = t && t.leader_xuid === me.xuid;
   const done = async (message) => { await sync(env, sql); return json({ ok: true, message }); };
+  const admin = t && (leader || t.my_role === "admin");
   const needLeader = () => { if (!t) throw new HttpError(409, "You're not in a team."); if (!leader) throw new HttpError(403, "Only the team organizer can do that."); };
+  const needAdmin = () => { if (!t) throw new HttpError(409, "You're not in a team."); if (!admin) throw new HttpError(403, "Only the team organizer and Admins can do that."); };
   const cleanName = async (v) => {
     const name = String(v || "").replace(/\s+/g, " ").trim().slice(0, 24);
     if (name.length < 2) throw new HttpError(400, "Give the team a name (2 to 24 characters).");
     return filtered(sql, name, 24);
   };
   const cleanTag = async (v) => {
-    const tag = String(v || "").trim();
+    const tag = String(v || "").replace(/\s+/g, " ").trim();
+    if (t && tag === t.tag) return tag;   // unchanged (an Owner's long tag stays when an Admin edits the name)
+    if (user.owner) {
+      if (!OWNER_TAG_RE.test(tag)) throw new HttpError(400, "The tag can be up to 32 letters, numbers and spaces.");
+      await filtered(sql, tag, 32);
+      return tag;
+    }
     if (!TAG_RE.test(tag)) throw new HttpError(400, "The tag can be 1 to 5 letters and numbers (no spaces or symbols).");
     await filtered(sql, tag, 5);
     return tag;
@@ -139,14 +150,14 @@ export async function act(request, env) {
       return done(`Team ${name} created. Invite players from here.`);
     }
     case "edit": {
-      needLeader();
+      needAdmin();
       const name = await cleanName(b.name), tag = await cleanTag(b.tag);
       try { await sql`UPDATE teams SET name = ${name}, tag = ${tag} WHERE id = ${t.id}`; }
       catch (e) { if (String(e.code) === "23505" || String(e.message).includes("unique")) throw new HttpError(409, "Another team already has that name or tag."); throw e; }
       return done("Team updated.");
     }
     case "invite": {
-      needLeader();
+      needAdmin();
       const name = String(b.name || "").trim().replace(/^\./, "").toLowerCase();
       const [p] = await sql`SELECT xuid, gamertag FROM players WHERE lower(gamertag) = ${name} ORDER BY last_seen DESC LIMIT 1`;
       if (!p) throw new HttpError(404, "No player with that name has joined GalaxySMP.");
@@ -160,7 +171,7 @@ export async function act(request, env) {
       return json({ ok: true, message: u ? `Invite sent to ${p.gamertag}.` : `Invite saved. ${p.gamertag} sees it once they make a website account.` });
     }
     case "cancel-invite": {
-      needLeader();
+      needAdmin();
       await sql`DELETE FROM team_invites WHERE team_id = ${t.id} AND xuid = ${String(b.xuid || "")}`;
       return json({ ok: true, message: "Invite cancelled." });
     }
@@ -190,9 +201,14 @@ export async function act(request, env) {
       return done(`You left ${t.name}.`);
     }
     case "kick": {
-      needLeader();
+      needAdmin();
       const x = String(b.xuid || "");
       if (x === me.xuid) throw new HttpError(400, "Use Leave to leave your own team.");
+      if (x === t.leader_xuid) throw new HttpError(403, "The organizer can't be removed.");
+      if (!leader) {
+        const [r] = await sql`SELECT role FROM team_members WHERE team_id = ${t.id} AND xuid = ${x}`;
+        if (r?.role === "admin") throw new HttpError(403, "Only the organizer can remove an Admin.");
+      }
       const [gone] = await sql`DELETE FROM team_members m USING players p WHERE m.team_id = ${t.id} AND m.xuid = ${x} AND p.xuid = m.xuid RETURNING p.gamertag`;
       if (!gone) throw new HttpError(404, "That player isn't in your team.");
       await sql`INSERT INTO team_messages (team_id, xuid, name, content) VALUES (${t.id}, NULL, 'GalaxySMP', ${`${gone.gamertag} was removed from the team.`})`;
@@ -204,7 +220,22 @@ export async function act(request, env) {
       const [m] = await sql`SELECT p.gamertag FROM team_members m JOIN players p ON p.xuid = m.xuid WHERE m.team_id = ${t.id} AND m.xuid = ${x}`;
       if (!m) throw new HttpError(404, "That player isn't in your team.");
       await sql`UPDATE teams SET leader_xuid = ${x} WHERE id = ${t.id}`;
-      return done(`${m.gamertag} is now the team organizer.`);
+      await sql`UPDATE team_members SET role = CASE WHEN xuid = ${x} THEN 'member' WHEN xuid = ${me.xuid} THEN 'admin' ELSE role END WHERE team_id = ${t.id}`;
+      return done(`${m.gamertag} is now the team organizer. You're an Admin now.`);
+    }
+    case "admin":
+    case "unadmin": {
+      needLeader();
+      const x = String(b.xuid || "");
+      if (x === me.xuid) throw new HttpError(400, "You're the organizer.");
+      const role = b.action === "admin" ? "admin" : "member";
+      const [m] = await sql`UPDATE team_members m SET role = ${role} FROM players p WHERE m.team_id = ${t.id} AND m.xuid = ${x} AND p.xuid = m.xuid RETURNING p.gamertag`;
+      if (!m) throw new HttpError(404, "That player isn't in your team.");
+      if (role === "admin") {
+        const [u] = await sql`SELECT u.id FROM users u JOIN players x ON x.uuid = u.mc_uuid WHERE x.xuid = ${x}`;
+        if (u) await notify(env, [Number(u.id)], "friends", { title: `You're an Admin of ${t.name}`, body: "You can now invite and remove members, edit the team and run its streams.", url: "/community#friends", tag: `team-admin-${t.id}` }).catch(() => {});
+      }
+      return done(role === "admin" ? `${m.gamertag} is now an Admin.` : `${m.gamertag} is no longer an Admin.`);
     }
     case "disband": {
       needLeader();

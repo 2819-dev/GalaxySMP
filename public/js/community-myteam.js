@@ -9,6 +9,9 @@ export function renderMyTeam(root, { toast, setTimer }) {
   const box = h("div", { class: "fr-lists" }, h("p", { class: "text-3", text: "Loading…" }));
   root.append(box);
   let chatTimer = null;
+  let longTags = false;  // the site Owner can use a tag of up to 32 letters, numbers and spaces
+  const tagMax = () => (longTags ? 32 : 5);
+  const tagLabel = () => (longTags ? "Tag (as long as you like, up to 32 letters, numbers and spaces)" : "Tag (up to 5 letters and numbers)");
   const act = async (body, after) => {
     try { const r = await postJson("/api/teams", body); if (r.message) toast(r.message); after?.(); load(); }
     catch (e) { toast(e.message); }
@@ -23,6 +26,7 @@ export function renderMyTeam(root, { toast, setTimer }) {
         h("p", { class: "text-3", style: "margin:0", text: "Link your Minecraft account first (Account settings > Link), so your team works in game too." })));
       return;
     }
+    longTags = Boolean(d.longTags);
     box.replaceChildren(...(d.team ? teamView(d.team) : noTeam(d.invites)), leaderboardButton());
   }
 
@@ -38,12 +42,12 @@ export function renderMyTeam(root, { toast, setTimer }) {
             h("button", { class: "btn btn-sm btn-ghost", type: "button", text: "Decline", onclick: () => act({ action: "decline", teamId: i.id }) }))))));
     }
     const name = h("input", { class: "input", id: "tm-name", maxlength: 24, placeholder: "e.g. Star Builders" });
-    const tag = h("input", { class: "input", id: "tm-tag", maxlength: 5, placeholder: "e.g. STAR", autocapitalize: "characters" });
+    const tag = h("input", { class: "input", id: "tm-tag", maxlength: tagMax(), placeholder: "e.g. STAR", autocapitalize: "characters" });
     const preview = h("span", { class: "tm-preview" });
     const draw = () => preview.replaceChildren(h("span", { class: "team-tag", text: `[${tag.value.trim() || "TAG"}]` }), h("b", { text: "YourName" }), h("span", { class: "text-3", text: ": hi team!" }));
     tag.addEventListener("input", draw);
     draw();
-    const form = h("form", { class: "form tm-form" }, field("Team name", name), field("Tag (up to 5 letters and numbers)", tag),
+    const form = h("form", { class: "form tm-form" }, field("Team name", name), field(tagLabel(), tag),
       h("div", { class: "tm-preview-row" }, h("span", { class: "text-3 small", text: "In chat:" }), preview),
       h("button", { class: "btn btn-primary", type: "submit" }, iconEl("users"), "Create team"));
     form.addEventListener("submit", (e) => { e.preventDefault(); act({ action: "create", name: name.value, tag: tag.value }); });
@@ -59,20 +63,19 @@ export function renderMyTeam(root, { toast, setTimer }) {
       h("div", { class: "tm-head" },
         h("div", {}, h("h3", { class: "fr-h", style: "margin:0" }, h("span", { class: "team-tag", text: `[${t.tag}]` }), t.name),
           h("span", { class: "text-3 small", text: `${t.members.length} of ${t.max} players · ${hours(t.stats.playtime)} played together · ${t.stats.achievements} achievements` })),
-        t.isLeader ? h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => editTeam(t) }, iconEl("pencil"), "Edit") : null),
+        t.isAdmin ? h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => editTeam(t) }, iconEl("pencil"), "Edit") : null),
       ...t.members.map((m) => {
         const img = h("img", { class: "fr-face", alt: "", width: 36, height: 36, src: m.head || faceSvg(m.name) });
         img.onerror = () => { img.onerror = null; img.src = faceSvg(m.name); };
         return h("div", { class: "fr-row" },
           h("a", { class: "fr-who", href: `/player/${encodeURIComponent(m.name)}` },
             h("span", { class: "fr-face-wrap" }, img, m.online ? h("span", { class: "fr-dot", title: "In game now" }) : null),
-            h("span", { class: "fr-name" }, h("b", { text: m.name }), h("small", { class: m.online ? "fr-on" : "text-3", text: m.leader ? `Organizer${m.online ? " · in game" : ""}` : m.online ? "In game now" : "Member" }))),
-          t.isLeader && !m.leader ? h("span", { class: "fr-btns" },
-            h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Make organizer", onclick: () => confirmAct(`Make ${m.name} the organizer?`, "They'll manage the team instead of you.", "Make organizer", { action: "transfer", xuid: m.xuid }) }),
-            h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": `Remove ${m.name}`, onclick: () => confirmAct(`Remove ${m.name}?`, "They can be invited again later.", "Remove", { action: "kick", xuid: m.xuid }) }, iconEl("trash"))) : null);
+            h("span", { class: "fr-name" }, h("b", {}, m.name, m.leader ? h("span", { class: "tm-role tm-role-org", text: "Organizer" }) : m.admin ? h("span", { class: "tm-role", text: "Admin" }) : null),
+              h("small", { class: m.online ? "fr-on" : "text-3", text: m.online ? "In game now" : m.leader ? "Owns the team" : m.admin ? "Helps run the team" : "Member" }))),
+          memberButtons(t, m));
       }));
     const parts = [members];
-    if (t.isLeader) {
+    if (t.isAdmin) {
       const who = h("input", { class: "input", id: "tm-invite", maxlength: 32, placeholder: "Minecraft name" });
       const inv = h("form", { class: "fr-add" }, who, h("button", { class: "btn btn-primary", type: "submit" }, iconEl("userPlus"), "Invite"));
       inv.addEventListener("submit", (e) => { e.preventDefault(); if (who.value.trim()) act({ action: "invite", name: who.value }, () => { who.value = ""; }); });
@@ -87,15 +90,29 @@ export function renderMyTeam(root, { toast, setTimer }) {
     return parts;
   }
 
-  function confirmAct(title, text, label, body) {
-    openDialog({ title, body: h("p", { class: "text-2", style: "margin:0", text }), actions: [{ label: "Cancel" }, { label, kind: "danger", onClick: () => act(body) }] });
+  // Organizer: make/remove Admins, hand over the team, remove anyone. Admins: remove regular members.
+  function memberButtons(t, m) {
+    if (m.leader || !t.isAdmin) return null;
+    const btns = [];
+    if (t.isLeader) {
+      btns.push(m.admin
+        ? h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove Admin", onclick: () => act({ action: "unadmin", xuid: m.xuid }) })
+        : h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Make Admin", onclick: () => confirmAct(`Make ${m.name} an Admin?`, "Admins can invite and remove members, edit the team name and tag, and run the team's streams. Only you can make Admins, hand over the team or close it.", "Make Admin", { action: "admin", xuid: m.xuid }, "primary") }));
+      btns.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Make organizer", onclick: () => confirmAct(`Make ${m.name} the organizer?`, "They'll own the team instead of you. You'll stay on as an Admin.", "Make organizer", { action: "transfer", xuid: m.xuid }) }));
+    }
+    if (t.isLeader || !m.admin) btns.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": `Remove ${m.name}`, onclick: () => confirmAct(`Remove ${m.name}?`, "They can be invited again later.", "Remove", { action: "kick", xuid: m.xuid }) }, iconEl("trash")));
+    return h("span", { class: "fr-btns" }, ...btns);
+  }
+
+  function confirmAct(title, text, label, body, kind = "danger") {
+    openDialog({ title, body: h("p", { class: "text-2", style: "margin:0", text }), actions: [{ label: "Cancel" }, { label, kind, onClick: () => act(body) }] });
   }
 
   function editTeam(t) {
     const name = h("input", { class: "input", id: "tm-edit-name", maxlength: 24, value: t.name });
-    const tag = h("input", { class: "input", id: "tm-edit-tag", maxlength: 5, value: t.tag });
+    const tag = h("input", { class: "input", id: "tm-edit-tag", maxlength: Math.max(tagMax(), t.tag.length), value: t.tag });
     name.value = t.name; tag.value = t.tag;
-    openDialog({ title: "Edit team", body: h("div", { class: "form" }, field("Team name", name), field("Tag (up to 5 letters and numbers)", tag)),
+    openDialog({ title: "Edit team", body: h("div", { class: "form" }, field("Team name", name), field(tagLabel(), tag)),
       actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: async () => { const r = await postJson("/api/teams", { action: "edit", name: name.value, tag: tag.value }); toast(r.message); load(); } }] });
   }
 

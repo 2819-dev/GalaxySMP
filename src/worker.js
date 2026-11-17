@@ -65,6 +65,7 @@ import { lockdownGate, lockdownState } from "./lib/lockdown.js";
 
 export { CommunityHub } from "./chat/hub.js";
 export { VoiceHub } from "./voice/hub.js";
+export { StreamRoom } from "./streams/room.js";
 
 // Each entry: [method, path, handler]. A path segment like ":id" matches any value.
 const routes = [
@@ -240,6 +241,11 @@ const routes = [
   ["GET", "/api/showcase/options", (req, env) => showcase.options(req, env)],
   ["POST", "/api/showcase", (req, env) => showcase.save(req, env)],
   ["GET", "/api/voice/connect", (req, env) => voiceConnect(req, env)],
+  ["GET", "/api/streams", (req, env) => import("./routes/streams.js").then((m) => m.list(req, env))],
+  ["POST", "/api/streams", (req, env) => import("./routes/streams.js").then((m) => m.act(req, env))],
+  ["GET", "/api/streams/staff", (req, env) => import("./routes/streams.js").then((m) => m.staffList(req, env))],
+  ["GET", "/api/streams/:id", (req, env, ctx, url, params) => import("./routes/streams.js").then((m) => m.one(req, env, ctx, url, params))],
+  ["GET", "/api/streams/:id/ws", (req, env, ctx, url, params) => import("./routes/streams.js").then((m) => m.connect(req, env, ctx, url, params))],
   ["GET", "/api/voice/server", (req, env) => voiceServer(req, env)],
   ["POST", "/api/cube/pair/start", (req, env) => cube.pairStart(req, env)],
   ["POST", "/api/cube/pair/poll", (req, env) => cube.pairPoll(req, env)],

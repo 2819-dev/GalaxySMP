@@ -23,7 +23,7 @@ class Teams:
                 tid = int(t["id"])
             except (KeyError, TypeError, ValueError):
                 continue
-            tag = "".join(c for c in str(t.get("tag") or "") if c in ALLOWED_TAG)[:5]
+            tag = "".join(c for c in str(t.get("tag") or "") if c in ALLOWED_TAG or c == " ").strip()[:32]  # the Owner can have a longer tag
             team = {"id": tid, "name": str(t.get("name") or "")[:32], "tag": tag,
                     "members": [str(x) for x in (t.get("members") or [])][:8]}
             self.teams[tid] = team

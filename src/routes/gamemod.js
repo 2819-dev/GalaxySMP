@@ -31,7 +31,7 @@ export async function openGameReportCount(sql) {
   return n;
 }
 
-async function notifyStaff(env, sql) {
+export async function notifyStaff(env, sql) {
   const [{ n }] = await sql`SELECT count(DISTINCT message_id)::int AS n FROM reports WHERE status = 'open'`;
   await hubBroadcast(env, { type: "reports_open", count: n + (await openGameReportCount(sql)), staffOnly: true });
 }

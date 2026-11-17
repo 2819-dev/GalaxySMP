@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.49.1",
+                    "User-Agent": "GalaxyLink-Endstone/2.50.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -242,6 +242,14 @@ class VoiceLink:
             self._on_main(lambda: self.plugin.economy.from_website(msg))
         elif msg.get("type") == "announce":
             self._on_main(lambda: self.plugin.announcements.announce(str(msg.get("text") or "")[:300], by=str(msg.get("by") or "staff")))
+        elif msg.get("type") == "stream_live":  # someone this player follows went live on the website (#Streams)
+            def tell_live():
+                wanted = {str(x) for x in (msg.get("xuids") or [])}
+                text = str(msg.get("text") or "")[:200]
+                for p in self.plugin.server.online_players:
+                    if str(p.xuid) in wanted:
+                        p.send_message(f"§d● LIVE §f{text}")
+            self._on_main(tell_live)
         elif msg.get("type") == "voice_invite":
             def tell():
                 p = next((x for x in self.plugin.server.online_players if str(x.xuid) == str(msg.get("toXuid"))), None)

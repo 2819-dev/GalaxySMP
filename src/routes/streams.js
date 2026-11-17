@@ -1,0 +1,370 @@
+// Streams (Community > Voice & Streams > #Streams): live video streams and live podcasts.
+//   - A member with Galaxy+ / Galaxy Pro+ (or staff) can stream on their own, and pick a crew: Editors run their
+//     streams (start, end, title, chat, bring viewers on), Streamers can be on them.
+//   - A team streams as the team: the organizer and Admins run it, every team member can be on it.
+//   - Streams can be scheduled ("Notify me"; they show in #Events too). Followers get a notification (and an
+//     in-game message) when someone they follow goes live.
+//   - Staff with "Moderate streams" see every live stream, can end any of them and stop members from streaming.
+// The live part (video relay, chat, reactions, stage) is the StreamRoom Durable Object (src/streams/room.js).
+// Prerecorded episodes are "coming soon" (they need file storage).
+import { getDb } from "../lib/db.js";
+import { json, readJson, HttpError } from "../lib/http.js";
+import { requireUser } from "../lib/auth.js";
+import { can } from "../lib/perms.js";
+import { limit as rateLimit } from "../lib/ratelimit.js";
+import { checkMessage, compileWordList } from "../lib/filter.js";
+import { headUrlFor } from "./heads.js";
+import { notify } from "./notify.js";
+import { toPlugin } from "./economy.js";
+import { isOwner } from "../lib/names.js";
+
+const MAX_LIVE = 6;                  // streams live at the same time, site-wide (keeps relay usage low)
+const MAX_SCHEDULED = 5;             // upcoming streams per member / team
+const MAX_CREW = 12;
+
+export const roomStub = (env, id) => env.STREAMS.get(env.STREAMS.idFromName(`stream:${id}`));
+const isStaffHost = (user) => Boolean(user.owner) || can(user, "mod_panel");
+const isMod = (user) => Boolean(user.owner) || can(user, "moderate_streams");
+
+async function me(sql, user) {
+  const [r] = await sql`
+    SELECT u.stream_banned_until, u.stream_ban_reason, p.xuid, p.gamertag, p.head_at, p.gamerpic_at,
+           (SELECT s.plan FROM subscriptions s WHERE s.xuid = p.xuid AND (s.expires_at IS NULL OR s.expires_at > now())) AS plan,
+           m.team_id, m.role AS team_role, t.leader_xuid, t.name AS team_name, t.tag AS team_tag
+      FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid
+      LEFT JOIN team_members m ON m.xuid = p.xuid LEFT JOIN teams t ON t.id = m.team_id
+     WHERE u.id = ${user.id}`;
+  const banned = r?.stream_banned_until && new Date(r.stream_banned_until) > new Date();
+  const teamManager = Boolean(r?.team_id) && (r.leader_xuid === r.xuid || r.team_role === "admin");
+  return {
+    ...r, banned: banned ? { until: r.stream_banned_until, reason: r.stream_ban_reason || "" } : null,
+    head: r?.xuid ? headUrlFor(r) : null,
+    soloHost: !banned && (isStaffHost(user) || r?.plan === "plus" || r?.plan === "pro"),
+    team: r?.team_id ? { id: Number(r.team_id), name: r.team_name, tag: r.team_tag, manage: teamManager } : null,
+  };
+}
+
+// Can this member host on their own? (used for a crew Editor starting a stream for their host)
+async function hostAllowed(env, sql, hostId) {
+  const [h] = await sql`
+    SELECT u.stream_banned_until, u.username, u.platform,
+           (SELECT s.plan FROM subscriptions s JOIN players p ON p.xuid = s.xuid WHERE p.uuid = u.mc_uuid AND (s.expires_at IS NULL OR s.expires_at > now()) LIMIT 1) AS plan,
+           EXISTS (SELECT 1 FROM players pl JOIN player_ranks x ON x.xuid = pl.xuid JOIN ranks rk ON rk.id = x.rank_id
+                    WHERE pl.uuid = u.mc_uuid AND 'mod_panel' = ANY(rk.web_perms)) AS staff
+      FROM users u WHERE u.id = ${hostId}`;
+  if (!h) return false;
+  if (h.stream_banned_until && new Date(h.stream_banned_until) > new Date()) return false;
+  return h.plan === "plus" || h.plan === "pro" || h.staff || isOwner(env, h.username, h.platform === "bedrock");
+}
+
+// What `user` may do on `s` (a streams row): manage (run it), stage (be on it), mod (staff)
+async function rightsFor(sql, user, s, m) {
+  const mod = isMod(user);
+  if (m.banned) return { manage: false, stage: false, mod };
+  if (s.team_id) {
+    const mine = m.team && m.team.id === Number(s.team_id);
+    return { manage: Boolean(mine && m.team.manage), stage: Boolean(mine), mod };
+  }
+  if (Number(s.host_user_id) === Number(user.id)) return { manage: true, stage: true, mod };
+  const [c] = await sql`SELECT role FROM stream_crew WHERE host_user_id = ${s.host_user_id} AND user_id = ${user.id}`;
+  return { manage: c?.role === "editor", stage: Boolean(c), mod };
+}
+
+async function clean(sql, text, max) {
+  const check = checkMessage(String(text || ""), compileWordList(await sql`SELECT word, match FROM filter_words`), { allowLinks: false, maxLength: max });
+  if (!check.ok) throw new HttpError(400, check.message || "That isn't allowed.");
+  return check.text.replace(/\s+/g, " ").trim();
+}
+
+// streams_v = streams + the host's name/picture fields and the team's name/tag (a view, see migration 0067)
+
+
+function streamOut(r, extra = {}) {
+  return {
+    id: Number(r.id), title: r.title, kind: r.kind, status: r.status,
+    scheduledAt: r.scheduled_at, startedAt: r.started_at, endedAt: r.ended_at, peak: Number(r.peak_viewers || 0),
+    host: r.team_id ? { type: "team", id: Number(r.team_id), name: r.team_name, tag: r.team_tag }
+      : { type: "user", id: Number(r.host_user_id), name: r.host_name, head: headUrlFor({ xuid: r.host_xuid, head_at: r.host_head_at, gamerpic_at: r.host_gamerpic_at }) },
+    ...extra,
+  };
+}
+
+async function loadStream(sql, id) {
+  const [r] = await sql`SELECT s.* FROM streams_v s WHERE s.id = ${Number(id) || 0}`;
+  return r || null;
+}
+
+// ---------- GET /api/streams ----------
+export async function list(request, env) {
+  const user = await requireUser(request, env);
+  const sql = getDb(env);
+  const m = await me(sql, user);
+  const [live, upcoming, recent, follows, crew, crewOf] = await Promise.all([
+    sql`SELECT s.* FROM streams_v s WHERE s.status = 'live' ORDER BY s.started_at DESC`,
+    sql`SELECT s.*, (SELECT count(*)::int FROM stream_reminders r WHERE r.stream_id = s.id) AS reminders,
+               EXISTS (SELECT 1 FROM stream_reminders r WHERE r.stream_id = s.id AND r.user_id = ${user.id}) AS reminding
+          FROM streams_v s
+         WHERE s.status = 'scheduled' AND s.scheduled_at > now() - interval '3 hours' ORDER BY s.scheduled_at LIMIT 20`,
+    sql`SELECT s.* FROM streams_v s WHERE s.status = 'ended' AND s.started_at IS NOT NULL ORDER BY s.ended_at DESC LIMIT 6`,
+    sql`SELECT host_user_id, team_id FROM stream_follows WHERE user_id = ${user.id}`,
+    sql`SELECT c.user_id, c.role, u.username FROM stream_crew c JOIN users u ON u.id = c.user_id WHERE c.host_user_id = ${user.id} ORDER BY c.created_at`,
+    sql`SELECT c.host_user_id, c.role, u.username FROM stream_crew c JOIN users u ON u.id = c.host_user_id WHERE c.user_id = ${user.id}`,
+  ]);
+  const counts = await Promise.all(live.map((s) => roomStub(env, s.id).fetch("https://stream/internal/count").then((r) => r.json()).catch(() => ({ viewers: 0, stage: [] }))));
+  const followU = new Set(follows.filter((f) => f.host_user_id).map((f) => Number(f.host_user_id)));
+  const followT = new Set(follows.filter((f) => f.team_id).map((f) => Number(f.team_id)));
+  const following = (s) => (s.team_id ? followT.has(Number(s.team_id)) : followU.has(Number(s.host_user_id)));
+  // where this member can start a stream: as themselves, as their team, for hosts they're an Editor for
+  const as = [];
+  if (m.soloHost) as.push({ key: "me", label: `Me (${user.username})` });
+  if (m.team?.manage && !m.banned) as.push({ key: "team", label: `My team: ${m.team.name}` });
+  if (!m.banned) for (const c of crewOf) if (c.role === "editor") as.push({ key: `host:${c.host_user_id}`, label: `${c.username} (you're an Editor)` });
+  const manageable = async (s) => (await rightsFor(sql, user, s, m)).manage;
+  return json({
+    ok: true, now: new Date().toISOString(),
+    canHost: as.length > 0, as, banned: m.banned, soloHost: m.soloHost, mod: isMod(user),
+    hasTeam: Boolean(m.team), maxLive: MAX_LIVE,
+    live: await Promise.all(live.map(async (s, i) => streamOut(s, { viewers: counts[i].viewers || 0, onStage: counts[i].stage || [], following: following(s), manage: await manageable(s) }))),
+    upcoming: await Promise.all(upcoming.map(async (s) => streamOut(s, { reminders: s.reminders, reminding: s.reminding, following: following(s), manage: await manageable(s) }))),
+    recent: recent.map((s) => streamOut(s)),
+    crew: m.soloHost ? crew.map((c) => ({ id: Number(c.user_id), username: c.username, role: c.role })) : null,
+    crewOf: crewOf.map((c) => ({ hostId: Number(c.host_user_id), username: c.username, role: c.role })),
+  }, 200, { "Cache-Control": "no-store" });
+}
+
+// ---------- GET /api/streams/:id ----------
+export async function one(request, env, ctx, url, params) {
+  const user = await requireUser(request, env);
+  const sql = getDb(env);
+  const s = await loadStream(sql, params.id);
+  if (!s) throw new HttpError(404, "That stream doesn't exist.");
+  const m = await me(sql, user);
+  const rights = await rightsFor(sql, user, s, m);
+  const [f] = await sql`SELECT 1 FROM stream_follows WHERE user_id = ${user.id} AND (host_user_id = ${s.host_user_id} OR team_id = ${s.team_id})`;
+  return json({ ok: true, stream: streamOut(s, { following: Boolean(f) }), rights }, 200, { "Cache-Control": "no-store" });
+}
+
+// ---------- GET /api/streams/:id/ws (WebSocket to the stream's room) ----------
+export async function connect(request, env, ctx, url, params) {
+  if (request.headers.get("Upgrade") !== "websocket") throw new HttpError(426, "Expected a WebSocket.");
+  const origin = request.headers.get("Origin");
+  if (!origin || new URL(origin).host !== new URL(request.url).host) throw new HttpError(403, "Forbidden.");
+  if (!env.REALTIME_APP_ID || !env.REALTIME_APP_SECRET) throw new HttpError(503, "Streams aren't set up yet.");
+  const user = await requireUser(request, env);
+  if (user.banned) throw new HttpError(403, "Your account has been banned.");
+  const sql = getDb(env);
+  const s = await loadStream(sql, params.id);
+  if (!s || s.status !== "live") throw new HttpError(409, "This stream isn't live.");
+  const m = await me(sql, user);
+  const rights = await rightsFor(sql, user, s, m);
+  const head = m.head || null;
+  return roomStub(env, s.id).fetch(new Request("https://stream/ws", {
+    headers: { Upgrade: "websocket", "X-GSMP-User": JSON.stringify({ id: Number(user.id), username: user.username, head, ...rights }) },
+  }));
+}
+
+// Tell followers (and the team / crew, and people who asked for a reminder) that a stream is live.
+async function announceLive(env, sql, s) {
+  const who = s.team_id ? `[${s.team_tag}] ${s.team_name}` : s.host_name;
+  const ids = (await sql`
+    SELECT user_id AS id FROM stream_follows WHERE (host_user_id = ${s.host_user_id} OR team_id = ${s.team_id})
+    UNION SELECT user_id FROM stream_reminders WHERE stream_id = ${s.id}
+    UNION SELECT c.user_id FROM stream_crew c WHERE c.host_user_id = ${s.host_user_id}
+    UNION SELECT u.id FROM team_members tm JOIN players p ON p.xuid = tm.xuid JOIN users u ON u.mc_uuid = p.uuid WHERE tm.team_id = ${s.team_id}`).map((r) => Number(r.id));
+  const kind = s.kind === "audio" ? "a live podcast" : "live";
+  await notify(env, ids, "streams", { title: `${who} is ${kind === "live" ? "live" : "on " + kind}`, body: s.title, url: `/community#streams/${s.id}`, tag: `stream-${s.id}` },
+    { exclude: [s.created_by] }).catch(() => {});
+  // in game: a message to followers who are online
+  const xuids = (await sql`SELECT p.xuid FROM players p JOIN users u ON u.mc_uuid = p.uuid WHERE u.id = ANY(${ids})`).map((r) => r.xuid);
+  if (xuids.length) await toPlugin(env, { type: "stream_live", xuids, text: `${who} is ${s.kind === "audio" ? "on a live podcast" : "live"}: ${s.title}. Watch on galaxymc.us (Community > Streams)` }).catch(() => {});
+}
+
+async function goLive(env, sql, id) {
+  const [{ n }] = await sql`SELECT count(*)::int AS n FROM streams WHERE status = 'live'`;
+  if (n >= MAX_LIVE) throw new HttpError(409, `${MAX_LIVE} streams are live right now, which is the most at once. Try again a little later.`);
+  const [row] = await sql`UPDATE streams SET status = 'live', started_at = now() WHERE id = ${id} AND status = 'scheduled' RETURNING id`;
+  if (!row) throw new HttpError(409, "That stream already started or ended.");
+  const s = await loadStream(sql, id);
+  await roomStub(env, id).fetch("https://stream/internal/start", { method: "POST", body: JSON.stringify({ id: Number(id), title: s.title, kind: s.kind, status: "live" }) });
+  await announceLive(env, sql, s);
+  const { hubBroadcast } = await import("./chat.js");
+  await hubBroadcast(env, { type: "streams_changed" }).catch(() => {});
+  return s;
+}
+
+// ---------- POST /api/streams { action, ... } ----------
+export async function act(request, env) {
+  const user = await requireUser(request, env);
+  if (user.banned) throw new HttpError(403, "Your account has been banned.");
+  await rateLimit(env, "AUTH_LIMITER", `streams:${user.id}`);
+  const b = await readJson(request);
+  const sql = getDb(env);
+  const m = await me(sql, user);
+  const changed = async () => { const { hubBroadcast } = await import("./chat.js"); await hubBroadcast(env, { type: "streams_changed" }).catch(() => {}); };
+  const needStream = async (id) => { const s = await loadStream(sql, id); if (!s) throw new HttpError(404, "That stream doesn't exist."); return s; };
+
+  switch (b.action) {
+    case "create": {   // { as: "me" | "team" | "host:<id>", title, kind, at? }
+      if (m.banned) throw new HttpError(403, `You can't stream right now${m.banned.reason ? ` (${m.banned.reason})` : ""}.`);
+      let hostId = null, teamId = null;
+      const as = String(b.as || "me");
+      if (as === "me") { if (!m.soloHost) throw new HttpError(403, "Streaming on your own is a Galaxy+ and Galaxy Pro+ perk. You can also stream with your team."); hostId = user.id; }
+      else if (as === "team") { if (!m.team?.manage) throw new HttpError(403, "Only your team's organizer and Admins can start a team stream."); teamId = m.team.id; }
+      else if (as.startsWith("host:")) {
+        hostId = Number(as.slice(5)) || 0;
+        const [c] = await sql`SELECT role FROM stream_crew WHERE host_user_id = ${hostId} AND user_id = ${user.id}`;
+        if (c?.role !== "editor") throw new HttpError(403, "You're not an Editor for them.");
+        if (!(await hostAllowed(env, sql, hostId))) throw new HttpError(403, "They can't stream right now.");
+      } else throw new HttpError(400, "Choose who's streaming.");
+      const title = await clean(sql, b.title, 80);
+      if (title.length < 3) throw new HttpError(400, "Give your stream a title (at least 3 characters).");
+      const kind = b.kind === "audio" ? "audio" : "video";
+      const at = b.at ? new Date(b.at) : null;
+      if (at && (isNaN(at) || at < new Date(Date.now() - 60_000) || at > new Date(Date.now() + 60 * 86400_000))) throw new HttpError(400, "Pick a time in the next 60 days.");
+      const [busy] = await sql`SELECT id FROM streams WHERE status = 'live' AND (host_user_id = ${hostId} OR team_id = ${teamId})`;
+      if (!at && busy) throw new HttpError(409, "That stream is already live. End it before starting another.");
+      if (at) {
+        const [{ n }] = await sql`SELECT count(*)::int AS n FROM streams WHERE status = 'scheduled' AND (host_user_id = ${hostId} OR team_id = ${teamId})`;
+        if (n >= MAX_SCHEDULED) throw new HttpError(409, `You can have up to ${MAX_SCHEDULED} upcoming streams.`);
+      }
+      const [row] = await sql`INSERT INTO streams (host_user_id, team_id, title, kind, status, scheduled_at, created_by)
+                              VALUES (${hostId}, ${teamId}, ${title}, ${kind}, 'scheduled', ${at ? at.toISOString() : null}, ${user.id}) RETURNING id`;
+      if (at) { await changed(); return json({ ok: true, id: Number(row.id), message: "Scheduled. People can tap Notify me, and it shows in #Events." }); }
+      try { await goLive(env, sql, row.id); }
+      catch (e) { await sql`DELETE FROM streams WHERE id = ${row.id}`; throw e; }
+      return json({ ok: true, id: Number(row.id), live: true, message: "You're live! Go on the stream to start." });
+    }
+    case "start": {   // start a scheduled stream now
+      const s = await needStream(b.id);
+      if (!(await rightsFor(sql, user, s, m)).manage) throw new HttpError(403, "Only the stream's hosts can start it.");
+      const [busy] = await sql`SELECT id FROM streams WHERE status = 'live' AND (host_user_id = ${s.host_user_id} OR team_id = ${s.team_id})`;
+      if (busy) throw new HttpError(409, "Another stream of yours is already live.");
+      await goLive(env, sql, s.id);
+      return json({ ok: true, id: Number(s.id), live: true, message: "You're live!" });
+    }
+    case "edit": {
+      const s = await needStream(b.id);
+      if (!(await rightsFor(sql, user, s, m)).manage) throw new HttpError(403, "Only the stream's hosts can change it.");
+      const title = await clean(sql, b.title, 80);
+      if (title.length < 3) throw new HttpError(400, "Give your stream a title (at least 3 characters).");
+      await sql`UPDATE streams SET title = ${title} WHERE id = ${s.id}`;
+      if (s.status === "live") await roomStub(env, s.id).fetch("https://stream/internal/start", { method: "POST", body: JSON.stringify({ id: Number(s.id), title, kind: s.kind, status: "live" }) });
+      await changed();
+      return json({ ok: true, message: "Saved." });
+    }
+    case "end":
+    case "cancel": {
+      const s = await needStream(b.id);
+      const r = await rightsFor(sql, user, s, m);
+      if (!r.manage && !r.mod) throw new HttpError(403, "Only the stream's hosts and staff can do that.");
+      if (s.status === "live") {
+        await roomStub(env, s.id).fetch("https://stream/internal/end", { method: "POST", body: JSON.stringify({ reason: r.manage ? "The host ended the stream." : "Staff ended this stream.", by: user.username }) });
+      } else if (s.status === "scheduled") {
+        await sql`UPDATE streams SET status = 'ended', ended_by = ${user.username} WHERE id = ${s.id}`;
+      }
+      await changed();
+      return json({ ok: true, message: s.status === "live" ? "The stream ended." : "The stream was cancelled." });
+    }
+    case "remind": {
+      const s = await needStream(b.id);
+      if (b.on === false) await sql`DELETE FROM stream_reminders WHERE stream_id = ${s.id} AND user_id = ${user.id}`;
+      else await sql`INSERT INTO stream_reminders (stream_id, user_id) VALUES (${s.id}, ${user.id}) ON CONFLICT DO NOTHING`;
+      return json({ ok: true, message: b.on === false ? "Reminder removed." : "We'll let you know when it starts." });
+    }
+    case "follow": {   // { userId | teamId, on }
+      const uid = Number(b.userId) || null, tid = Number(b.teamId) || null;
+      if (!uid && !tid) throw new HttpError(400, "Follow who?");
+      if (uid === Number(user.id)) throw new HttpError(400, "You can't follow yourself.");
+      if (b.on === false) await sql`DELETE FROM stream_follows WHERE user_id = ${user.id} AND (host_user_id = ${uid} OR team_id = ${tid})`;
+      else {
+        const [{ n }] = await sql`SELECT count(*)::int AS n FROM stream_follows WHERE user_id = ${user.id}`;
+        if (n >= 200) throw new HttpError(409, "You're following a lot of streamers already.");
+        await sql`INSERT INTO stream_follows (user_id, host_user_id, team_id) VALUES (${user.id}, ${uid}, ${tid}) ON CONFLICT DO NOTHING`;
+      }
+      return json({ ok: true, message: b.on === false ? "Unfollowed." : "Following. You'll get a notification when they go live." });
+    }
+    case "crew-add": {   // { name, role }
+      if (!m.soloHost) throw new HttpError(403, "A stream crew is for members who can stream on their own (Galaxy+ and Galaxy Pro+).");
+      const name = String(b.name || "").trim().replace(/^@/, "").toLowerCase();
+      const [u] = await sql`SELECT u.id, u.username FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid
+                             WHERE (u.username_lower = ${name} OR lower(p.gamertag) = ${name}) AND NOT u.banned AND NOT u.is_bot LIMIT 1`;
+      if (!u) throw new HttpError(404, "No member with that name.");
+      if (Number(u.id) === Number(user.id)) throw new HttpError(400, "You're already the host.");
+      const [{ n }] = await sql`SELECT count(*)::int AS n FROM stream_crew WHERE host_user_id = ${user.id}`;
+      if (n >= MAX_CREW) throw new HttpError(409, `Your crew can have up to ${MAX_CREW} people.`);
+      const role = b.role === "editor" ? "editor" : "streamer";
+      await sql`INSERT INTO stream_crew (host_user_id, user_id, role) VALUES (${user.id}, ${u.id}, ${role})
+                ON CONFLICT (host_user_id, user_id) DO UPDATE SET role = ${role}`;
+      await notify(env, [Number(u.id)], "streams", { title: `You're on ${user.username}'s stream crew`,
+        body: role === "editor" ? "As an Editor you can start their streams, run the chat and bring viewers on." : "As a Streamer you can be on their streams.",
+        url: "/community#streams", tag: `crew-${user.id}` }).catch(() => {});
+      return json({ ok: true, message: `${u.username} is now ${role === "editor" ? "an Editor" : "a Streamer"} on your crew.` });
+    }
+    case "crew-remove": {
+      await sql`DELETE FROM stream_crew WHERE (host_user_id = ${user.id} AND user_id = ${Number(b.userId) || 0})
+                                       OR (user_id = ${user.id} AND host_user_id = ${Number(b.hostId) || 0})`;
+      return json({ ok: true, message: "Removed." });
+    }
+    case "report": {   // { id, reason, details } goes to the Reports queue
+      const s = await needStream(b.id);
+      const reason = String(b.reason || "Other").slice(0, 40);
+      const details = String(b.details || "").trim().slice(0, 300);
+      const [mine] = await sql`SELECT coalesce(p.gamertag, u.username) AS name, p.xuid FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${user.id}`;
+      const [{ recent }] = await sql`SELECT count(*)::int AS recent FROM game_reports WHERE lower(reporter_name) = lower(${mine.name}) AND created_at > now() - interval '1 day'`;
+      if (recent >= 5) throw new HttpError(429, "You've sent a lot of reports today. Please try again tomorrow, or open a ticket in #support.");
+      const target = s.team_id ? `[${s.team_tag}] ${s.team_name} (team)` : s.host_name;
+      await sql`INSERT INTO game_reports (reporter_xuid, reporter_name, target_xuid, target_name, reason, details, world)
+                VALUES (${mine.xuid || null}, ${mine.name}, ${s.team_id ? null : s.host_xuid}, ${target}, ${reason},
+                        ${`Stream "${s.title}" (#${s.id}). ${details}`.slice(0, 400)}, 'stream')`;
+      await import("./gamemod.js").then((g) => g.notifyStaff(env, sql)).catch(() => {});
+      return json({ ok: true, message: "Thanks. Your report was sent to staff." });
+    }
+    case "ban":
+    case "unban": {   // staff: stop a member from streaming { userId, days, reason }
+      if (!isMod(user)) throw new HttpError(403, "Only staff can do that.");
+      const uid = Number(b.userId) || 0;
+      if (b.action === "unban") {
+        await sql`UPDATE users SET stream_banned_until = NULL, stream_ban_reason = NULL WHERE id = ${uid}`;
+        return json({ ok: true, message: "They can stream again." });
+      }
+      const days = Math.min(3650, Math.max(1, Number(b.days) || 7));
+      const reason = String(b.reason || "").trim().slice(0, 120);
+      const [u] = await sql`UPDATE users SET stream_banned_until = now() + make_interval(days => ${days}), stream_ban_reason = ${reason || null}
+                             WHERE id = ${uid} RETURNING username`;
+      if (!u) throw new HttpError(404, "That member doesn't exist.");
+      // end their live streams (their own)
+      for (const s of await sql`SELECT id FROM streams WHERE status = 'live' AND host_user_id = ${uid}`) {
+        await roomStub(env, s.id).fetch("https://stream/internal/end", { method: "POST", body: JSON.stringify({ reason: "Staff ended this stream.", by: user.username }) });
+      }
+      await changed();
+      return json({ ok: true, message: `${u.username} can't stream for ${days} day${days === 1 ? "" : "s"}.` });
+    }
+  }
+  throw new HttpError(400, "Unknown action.");
+}
+
+// ---------- staff: GET /api/streams/staff (every live stream + who's stopped from streaming) ----------
+export async function staffList(request, env) {
+  const user = await requireUser(request, env);
+  if (!isMod(user)) throw new HttpError(403, "Only staff can see this.");
+  const sql = getDb(env);
+  const [live, banned] = await Promise.all([
+    sql`SELECT s.* FROM streams_v s WHERE s.status = 'live' ORDER BY s.started_at`,
+    sql`SELECT id, username, stream_banned_until, stream_ban_reason FROM users WHERE stream_banned_until > now() ORDER BY stream_banned_until`,
+  ]);
+  const counts = await Promise.all(live.map((s) => roomStub(env, s.id).fetch("https://stream/internal/count").then((r) => r.json()).catch(() => ({ viewers: 0, stage: [] }))));
+  return json({ ok: true, live: live.map((s, i) => streamOut(s, { viewers: counts[i].viewers, onStage: counts[i].stage })),
+    banned: banned.map((u) => ({ id: Number(u.id), username: u.username, until: u.stream_banned_until, reason: u.stream_ban_reason || "" })) });
+}
+
+// Scheduled streams for #Events (upcoming, not started yet).
+export async function upcomingForEvents(sql) {
+  const rows = await sql`SELECT s.* FROM streams_v s WHERE s.status = 'scheduled' AND s.scheduled_at > now() - interval '1 hour'
+                          ORDER BY s.scheduled_at LIMIT 10`;
+  return rows.map((s) => streamOut(s));
+}
+
+// Every 5 minutes: scheduled streams that never started 3 hours after their time are closed.
+export async function tick(env) {
+  await getDb(env)`UPDATE streams SET status = 'ended', ended_by = 'expired' WHERE status = 'scheduled' AND scheduled_at < now() - interval '3 hours'`;
+}
