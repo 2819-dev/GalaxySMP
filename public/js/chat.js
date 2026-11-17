@@ -512,8 +512,24 @@ function applyLayout() {
   back.innerHTML = app ? icon("arrow") : icon("sidebar");   // fixed icons only
   back.classList.toggle("cx-back", app);
   back.setAttribute("aria-label", app ? "Back to channels" : "Channels");
-  if (app) buildTabs();
+  if (app) { buildTabs(); buildMenuButton(); }
   setScreen(app ? state.screen : "channel");
+}
+
+// phones: the website's menu (Home, Rules, Store...) from the top of the channel list, to leave Community
+function buildMenuButton() {
+  if ($("cx-menu")) return;
+  const b = el("button", "icon-btn cx-menu");
+  b.id = "cx-menu";
+  b.type = "button";
+  b.setAttribute("aria-label", "Website menu: Home, Store and more");
+  b.title = "Website menu";
+  b.innerHTML = icon("menu");   // fixed icon only
+  b.addEventListener("click", () => {
+    const toggle = document.querySelector(".nav-toggle");
+    if (toggle) toggle.click(); else location.href = "/";
+  });
+  $("chat-side").querySelector(".server-head")?.append(b);
 }
 
 // swipes (phones): right = back to the channels, left = members; the channel follows your finger

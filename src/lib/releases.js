@@ -502,6 +502,11 @@ export const OFFICIAL_SUGGESTIONS = [
     title: "Friend list joining: setup improvements",
     body: `The Xbox friend bot that lets Xbox, PlayStation and Switch players join from **Play > Friends** is now easier for staff to set up and keep running, and it still shows GalaxySMP correctly when the server's details can't be read.`,
   },
+  {
+    id: "2026-11-17-community-menu",
+    title: "Leaving Community on phones",
+    body: `On phones, tap the **menu button** (three lines) at the top of the Community home screen to open the website menu and go to any page: Home, the Store, the Map and more.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

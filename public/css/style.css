@@ -4526,7 +4526,12 @@ html[data-theme="dark"] .sg-status.implemented, :root:not([data-theme="light"]) 
 
 /* ---------- phones: the app layout ---------- */
 body.cx-app { --top-h: 0px; --tab-h: calc(60px + var(--safe-bottom)); overscroll-behavior-y: none; }
-body.cx-app .site-header-slot, body.cx-app .site-header, body.cx-app #site-header { display: none !important; }
+/* the header is hidden, but its menu (the site drawer, in the same slot) stays usable from the menu button */
+body.cx-app .site-header { display: none !important; }
+body.cx-app .site-header-slot { min-height: 0; }
+.cx-menu { display: none; }
+body.cx-app .cx-menu { display: inline-grid; margin-left: auto; width: 40px; height: 40px; }
+body.cx-app .cx-menu svg { width: 22px; height: 22px; }
 body.cx-app .chat { position: relative; display: block; overflow: hidden; height: 100vh; height: 100dvh; }
 body.cx-app .chat-side, body.cx-app .chat-main { position: absolute; left: 0; right: 0; top: var(--safe-top); bottom: 0; width: auto; }
 body.cx-app .chat-side {
