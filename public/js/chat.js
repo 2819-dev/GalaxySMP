@@ -38,6 +38,9 @@ const state = {
   hasMore: false,
   replyTo: null,
   unread: new Set(),
+  counts: new Map(),   // channelId -> { n, mentions } (new messages since you last read the channel)
+  screen: "channel",   // phones: "list" (the channel list) or "channel"
+  app: false,          // phones: the app layout (bottom tabs, full-screen channel list)
   ws: null,
   wsRetry: 0,
   pingTimer: null,
@@ -239,7 +242,9 @@ function renderChannels() {
       b.type = "button";
       b.dataset.id = ch.id;
       if (ch.id === state.channelId) b.setAttribute("aria-current", "true");
-      if (state.unread.has(ch.id)) b.classList.add("unread");
+      const cnt = state.counts.get(ch.id);
+      if (state.unread.has(ch.id) || cnt?.n) b.classList.add("unread");
+      if (cnt?.n) b.classList.add("has-count");
       const mark = el("span", "hash");
       if (ch.kind === "voice") mark.innerHTML = MIC_SVG;
       else if (ch.kind === "streams") mark.innerHTML = LIVE_SVG;
@@ -247,25 +252,35 @@ function renderChannels() {
       else if (ch.kind === "dms") mark.innerHTML = DM_SVG;
       else if (ch.kind === "friends") mark.innerHTML = FRIENDS_SVG;
       else mark.textContent = "#";
-      b.append(mark, el("span", "", ch.name));
-      if (!ch.canPost && ch.kind === "text") {
+      b.append(mark, el("span", "ch-name", ch.name));
+      if (cnt?.mentions) b.append(Object.assign(el("span", "ch-badge ch-at", cnt.mentions > 99 ? "99+" : String(cnt.mentions)), { title: `${cnt.mentions} mention${cnt.mentions === 1 ? "" : "s"}` }));
+      else if (cnt?.n) b.append(el("span", "ch-badge", cnt.n > 99 ? "99+" : String(cnt.n)));
+      if (!ch.canPost && ch.kind === "text" && !cnt?.n) {
         const ro = el("span", "ro");
         ro.innerHTML = icon("megaphone");
         ro.title = "Staff only";
         b.append(ro);
       }
       b.addEventListener("click", () => {
-        selectChannel(ch.id);
         closeDrawers();
+        go(ch.id);
       });
       list.append(b);
     }
   }
+  if ([...state.counts.values()].some((c) => c.n)) {
+    const all = el("button", "ch-readall", "Mark all as read");
+    all.type = "button";
+    all.addEventListener("click", markAllRead);
+    list.prepend(all);
+  }
+  renderTabs();
 }
 
 // ---------- What's on screen (so you aren't notified about a chat you're already looking at) ----------
 function setView(view) {
   state.view = view || null;
+  queueMicrotask(renderTabs);
   reportView();
 }
 function reportView() {
@@ -283,14 +298,18 @@ async function selectChannel(id) {
   state.channelId = id;
   state.viewingOld = false;
   renderTyping();
-  state.unread.delete(id);
+  if (!(state.app && state.screen === "list")) {   // loaded behind the channel list on phones: not read yet
+    state.unread.delete(id);
+    state.counts.delete(id);
+    rememberRecent(id);
+  }
   state.replyTo = null;
   renderReplyBar();
   const ch = currentChannel();
   $("channel-name").textContent = ch.name;
   $("channel-topic").textContent = ch.topic || "";
   document.querySelector(".chat-top .hash").textContent = ["voice", "support", "dms", "friends", "streams"].includes(ch.kind) ? "" : "#";
-  try { history.replaceState(null, "", "#" + ch.slug); } catch { /* ignore */ }
+  if (state.screen !== "list") { try { history.replaceState(history.state, "", "#" + ch.slug); } catch { /* ignore */ } }
   renderChannels();
   // Special channels (Information, Auction House, Suggestions, Voice Chat, Events) have their own views.
   const special = ch.kind && ch.kind !== "text";
@@ -308,7 +327,324 @@ async function selectChannel(id) {
   }
   hidePanel();
   renderComposer();
+  const box = $("messages");
+  box.classList.remove("cx-fade"); void box.offsetWidth; box.classList.add("cx-fade");
   await loadMessages();
+  markRead();
+}
+
+// ---------- read / unread ----------
+let readTimer = null;
+function markRead() {
+  clearTimeout(readTimer);
+  readTimer = setTimeout(() => {
+    const ch = currentChannel();
+    if (!ch || ch.kind !== "text" || document.visibilityState !== "visible" || (state.app && state.screen === "list")) return;
+    const last = Math.max(0, ...[...state.messages.keys()].map(Number).filter((n) => n > 0));
+    if (!last || last <= (state.readUpTo.get(ch.id) || 0)) return;
+    state.readUpTo.set(ch.id, last);
+    fetch(`/api/chat/channels/${ch.id}/read`, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lastId: last }) }).catch(() => {});
+  }, 600);
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && state.channelId) markRead(); });
+async function markAllRead() {
+  state.counts.clear();
+  for (const id of [...state.unread]) if (id > 0) state.unread.delete(id);
+  renderChannels();
+  await fetch("/api/chat/read-all", { method: "POST", credentials: "same-origin" }).catch(() => {});
+  toast("All caught up.");
+}
+function isMention(m) {
+  const me = state.me?.username;
+  if (!me || m.author?.id === state.me?.id) return false;
+  return new RegExp(`@${me.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(m.content || "") || (/@(everyone|here)\b/i.test(m.content || "") && roleOf(m.author.role).power >= 50) ||
+    Boolean(m.replyTo && m.replyTo.username === me);
+}
+
+// ---------- getting around: history (Back), the phone layout, the quick switcher ----------
+const RECENT_KEY = "gx_recent_channels";
+function rememberRecent(id) {
+  try {
+    const list = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]").filter((x) => x !== id);
+    localStorage.setItem(RECENT_KEY, JSON.stringify([id, ...list].slice(0, 6)));
+  } catch { /* storage blocked */ }
+}
+function recentChannels() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { return []; }
+}
+const depth = () => Number(history.state?.d) || 0;
+// Open a channel as a new step, so Back returns to where you were.
+function go(id, opts = {}) {
+  const ch = state.channels.find((c) => c.id === id);
+  if (!ch) return;
+  const same = id === state.channelId;
+  if (!same || state.screen !== "channel") {
+    try { history.pushState({ cx: "ch", d: depth() + 1 }, "", "#" + ch.slug); } catch { /* ignore */ }
+  }
+  setScreen("channel");
+  if (!same || opts.force) selectChannel(id);
+}
+// Phones: back to the channel list.
+function toList() {
+  if (!state.app) return;
+  if (history.state?.cx === "ch" && depth() > 0) { history.back(); return; }
+  try { history.replaceState({ cx: "list", d: 0 }, "", location.pathname); } catch { /* ignore */ }
+  setScreen("list");
+}
+function setScreen(screen) {
+  state.screen = screen;
+  $("view-chat").dataset.screen = screen;
+  if (screen === "list") setView(null);
+  else if (state.channelId != null) {
+    const ch = currentChannel();
+    if (ch?.kind === "text") setView(ch.slug);
+    // opening the channel that was already loaded behind the list: now it's read
+    if (state.counts.has(state.channelId) || state.unread.has(state.channelId)) {
+      state.counts.delete(state.channelId); state.unread.delete(state.channelId); rememberRecent(state.channelId);
+      renderChannels(); markRead();
+    }
+  }
+  renderTabs();
+}
+function onPop() {
+  state.popAt = Date.now();
+  if (closeOverlays()) return;
+  const hash = location.hash.slice(1);
+  if (!hash || history.state?.cx === "list") {
+    if (state.app) { setScreen("list"); return; }
+    const chat = state.channels.find((c) => c.slug === "chat") || state.channels[0];
+    if (chat.id !== state.channelId) selectChannel(chat.id);
+    return;
+  }
+  const dm = /^dm-(\d+)$/.exec(hash);
+  if (dm) { state.dmWith = Number(dm[1]); setScreen("channel"); selectChannel(DM_CHANNEL); return; }
+  const [slug, sub] = hash.split("/");
+  const ch = state.channels.find((c) => c.slug === slug);
+  if (!ch) return;
+  setScreen("channel");
+  if (ch.id !== state.channelId || sub) { state.sub = sub || null; selectChannel(ch.id); }
+}
+
+// the bottom tabs (phones)
+const TABS = [
+  { key: "home", label: "Home", svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>' },
+  { key: "messages", label: "Messages", svg: DM_SVG },
+  { key: "friends", label: "Friends", svg: FRIENDS_SVG },
+  { key: "alerts", label: "Alerts", svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>' },
+  { key: "you", label: "You", svg: null },
+];
+function buildTabs() {
+  if ($("cx-tabs")) return;
+  const bar = el("nav", "cx-tabs");
+  bar.id = "cx-tabs";
+  bar.setAttribute("aria-label", "Community");
+  for (const t of TABS) {
+    const b = el("button", "cx-tab");
+    b.type = "button";
+    b.dataset.tab = t.key;
+    const ic = el("span", "cx-tab-ic");
+    if (t.svg) ic.innerHTML = t.svg;   // fixed icons only
+    else {
+      const meMember = state.members.get(state.me.id);
+      const img = el("img", "cx-tab-face");
+      img.alt = "";
+      img.src = meMember?.head || faceSvg(state.me.username);
+      img.addEventListener("error", () => { img.src = faceSvg(state.me.username); }, { once: true });
+      ic.append(img);
+    }
+    ic.append(el("span", "cx-tab-badge"));
+    b.append(ic, el("span", "cx-tab-label", t.label));
+    // the header's bell and account menu are hidden in the app layout; these tabs open them as sheets
+    let wasOpen = false;
+    b.addEventListener("pointerdown", () => { wasOpen = Boolean(document.querySelector(t.key === "alerts" ? ".inbox-card" : ".acct-card")); });
+    b.addEventListener("click", () => tabClick(t.key, wasOpen));
+    bar.append(b);
+  }
+  $("view-chat").append(bar);
+  // keep the Alerts badge in step with the bell's count
+  const count = document.querySelector(".inbox-count");
+  if (count) new MutationObserver(renderTabs).observe(count, { childList: true, characterData: true, subtree: true, attributes: true });
+}
+function tabClick(key, wasOpen) {
+  if (key === "alerts" || key === "you") {
+    if (wasOpen) return;   // a tap outside already closed it
+    document.querySelector(key === "alerts" ? ".inbox-btn" : ".acct-btn")?.click();
+    return;
+  }
+  document.querySelector(".inbox-card, .acct-card") && document.body.click();
+  if (key === "home") { toList(); return; }
+  const id = key === "messages" ? DM_CHANNEL : FRIENDS_CHANNEL;
+  if (key === "messages") state.dmWith = null;
+  if (state.screen === "channel" && state.channelId === id) { go(id, { force: true }); return; }
+  if (state.screen === "list") go(id);
+  else { try { history.replaceState({ cx: "ch", d: depth() }, "", "#" + (key === "messages" ? "messages" : "friends")); } catch { /* ignore */ } setScreen("channel"); selectChannel(id); }
+}
+function renderTabs() {
+  const bar = $("cx-tabs");
+  if (!bar) return;
+  const ch = currentChannel();
+  const active = state.screen === "list" ? "home" : ch?.kind === "dms" ? "messages" : ch?.kind === "friends" ? "friends" : "home";
+  // the tabs show on the top screens; inside a channel or a conversation, the message box takes the bottom
+  const top = state.screen === "list" || (ch?.kind === "friends") || (ch?.kind === "dms" && !String(state.view || "").startsWith("dm:"));
+  $("view-chat").dataset.tabs = top ? "on" : "off";
+  let mentions = 0;
+  for (const c of state.counts.values()) mentions += c.mentions || 0;
+  const anyUnread = [...state.counts.values()].some((c) => c.n) || [...state.unread].some((id) => id > 0);
+  const inbox = Number(document.querySelector(".inbox-count")?.textContent) || 0;
+  const badges = { home: mentions ? String(mentions > 99 ? "99+" : mentions) : anyUnread ? "•" : "", messages: state.unread.has(DM_CHANNEL) ? "•" : "", friends: "", alerts: inbox ? String(inbox > 99 ? "99+" : inbox) : "", you: "" };
+  for (const b of bar.querySelectorAll(".cx-tab")) {
+    const k = b.dataset.tab;
+    b.setAttribute("aria-current", String(k === active));
+    const badge = b.querySelector(".cx-tab-badge");
+    badge.textContent = badges[k] === "•" ? "" : badges[k];
+    badge.hidden = !badges[k];
+    badge.classList.toggle("dot", badges[k] === "•");
+  }
+}
+
+// phones get the app layout: full-screen channel list, bottom tabs, swipes
+function applyLayout() {
+  const app = matchMedia("(max-width: 760px)").matches;
+  if (app === state.app && $("cx-tabs")) return;
+  state.app = app;
+  document.body.classList.toggle("cx-app", app);
+  const back = $("open-channels");
+  back.innerHTML = app ? icon("arrow") : icon("sidebar");   // fixed icons only
+  back.classList.toggle("cx-back", app);
+  back.setAttribute("aria-label", app ? "Back to channels" : "Channels");
+  if (app) buildTabs();
+  setScreen(app ? state.screen : "channel");
+}
+
+// swipes (phones): right = back to the channels, left = members; the channel follows your finger
+function wireSwipes() {
+  const root = $("view-chat");
+  const main = root.querySelector(".chat-main");
+  let t = null;
+  const scrollsSideways = (node) => {
+    for (let n = node; n && n !== root; n = n.parentElement) {
+      if (n.matches?.("input, textarea, select, [data-noswipe], .emoji-menu, dialog")) return true;
+      if (n.scrollWidth > n.clientWidth + 4) { const ox = getComputedStyle(n).overflowX; if (ox === "auto" || ox === "scroll") return true; }
+    }
+    return false;
+  };
+  root.addEventListener("touchstart", (e) => {
+    if (!state.app || e.touches.length !== 1) { t = null; return; }
+    const p = e.touches[0];
+    t = { x: p.clientX, y: p.clientY, at: Date.now(), dir: null, blocked: scrollsSideways(e.target), dx: 0 };
+  }, { passive: true });
+  root.addEventListener("touchmove", (e) => {
+    if (!t || t.blocked) return;
+    const p = e.touches[0];
+    const dx = p.clientX - t.x, dy = p.clientY - t.y;
+    if (!t.dir) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      t.dir = Math.abs(dx) > Math.abs(dy) * 1.3 ? "x" : "y";
+    }
+    if (t.dir !== "x") return;
+    t.dx = dx;
+    const membersOpen = $("chat-members").classList.contains("open");
+    if (state.screen === "channel" && !membersOpen && dx > 0) {
+      main.style.transition = "none";
+      main.style.transform = `translateX(${dx}px)`;
+      root.style.setProperty("--cx-drag", String(Math.min(1, dx / root.clientWidth)));
+    }
+  }, { passive: true });
+  root.addEventListener("touchend", () => {
+    if (!t || t.blocked || t.dir !== "x") { t = null; return; }
+    const { dx } = t;
+    const fast = Math.abs(dx) / Math.max(1, Date.now() - t.at) > 0.45;
+    const membersOpen = $("chat-members").classList.contains("open");
+    main.style.transition = ""; main.style.transform = ""; root.style.removeProperty("--cx-drag");
+    if (membersOpen) { if (dx > 50) closeDrawers(); }
+    else if (state.screen === "channel" && dx > 0 && (dx > root.clientWidth * 0.33 || (fast && dx > 40))) toList();
+    else if (state.screen === "channel" && dx < -60) openDrawer("chat-members");
+    else if (state.screen === "list" && dx < -60 && state.channelId != null) go(state.channelId);
+    t = null;
+  });
+}
+
+// the quick switcher: jump to any channel or person (Ctrl+K / Cmd+K, or the search button above the channels)
+let qs = null;
+function quickSwitcher() {
+  if (qs) return;
+  const box = el("div", "qs");
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-modal", "true");
+  box.setAttribute("aria-label", "Jump to a channel or person");
+  const card = el("div", "qs-card");
+  const input = el("input", "input qs-input");
+  input.type = "search";
+  input.placeholder = "Where to? Channels or people";
+  input.setAttribute("aria-label", "Search channels and people");
+  input.autocomplete = "off";
+  const list = el("div", "qs-list");
+  list.setAttribute("role", "listbox");
+  card.append(input, list, el("p", "qs-hint", "↑ ↓ to choose · Enter to open · Esc to close"));
+  box.append(card);
+  let items = [], sel = 0;
+  const close = (fromPop) => {
+    if (!qs) return;
+    box.remove(); qs = null;
+    if (!fromPop && history.state?.cx === "sheet") history.back();
+  };
+  const choose = (it) => {
+    close();
+    setTimeout(() => {
+      if (it.type === "channel") go(it.id);
+      else openDM(it.id);
+    }, 30);
+  };
+  const draw = () => {
+    const q = input.value.trim().toLowerCase().replace(/^[#@]/, "");
+    const chans = state.channels.filter((c) => !q || c.name.toLowerCase().includes(q) || c.slug.includes(q));
+    const recent = recentChannels();
+    let ch = q ? chans : [...recent.map((id) => chans.find((c) => c.id === id)).filter(Boolean), ...chans.filter((c) => state.counts.get(c.id)?.n && !recent.includes(c.id))];
+    if (!q && !ch.length) ch = chans.slice(0, 8);
+    const people = q ? [...state.members.values()].filter((m) => m.id !== state.me.id && !m.bot && m.username.toLowerCase().includes(q)).slice(0, 8) : [];
+    items = [...ch.slice(0, 12).map((c) => ({ type: "channel", id: c.id, label: c.name, sub: state.categories.find((k) => k.id === c.categoryId)?.name || "", count: state.counts.get(c.id) })),
+      ...people.map((m) => ({ type: "person", id: m.id, label: m.username, sub: state.online.has(m.id) ? "Online · Send a message" : "Send a message", head: m.head }))];
+    sel = Math.min(sel, Math.max(0, items.length - 1));
+    list.replaceChildren(
+      ...(!q && items.length ? [el("div", "qs-group", "Recent and unread")] : []),
+      ...items.map((it, i) => {
+        const row = el("button", `qs-row${i === sel ? " on" : ""}`);
+        row.type = "button";
+        row.setAttribute("role", "option");
+        row.setAttribute("aria-selected", String(i === sel));
+        const ic = el("span", "qs-ic");
+        if (it.type === "person") { const img = el("img", "qs-face"); img.alt = ""; img.src = it.head || faceSvg(it.label); ic.append(img); }
+        else ic.textContent = "#";
+        const text = el("span", "qs-text");
+        text.append(el("b", "", it.label), el("small", "", it.sub));
+        row.append(ic, text);
+        if (it.count?.mentions) row.append(el("span", "ch-badge ch-at", String(it.count.mentions)));
+        else if (it.count?.n) row.append(el("span", "ch-badge", String(it.count.n > 99 ? "99+" : it.count.n)));
+        row.addEventListener("click", () => choose(it));
+        return row;
+      }),
+      ...(items.length ? [] : [el("p", "qs-empty", "Nothing found.")]));
+    list.querySelector(".qs-row.on")?.scrollIntoView({ block: "nearest" });
+  };
+  input.addEventListener("input", () => { sel = 0; draw(); });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); sel = Math.min(items.length - 1, sel + 1); draw(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); sel = Math.max(0, sel - 1); draw(); }
+    else if (e.key === "Enter") { e.preventDefault(); if (items[sel]) choose(items[sel]); }
+    else if (e.key === "Escape") { e.preventDefault(); close(); }
+  });
+  box.addEventListener("click", (e) => { if (e.target === box) close(); });
+  qs = { close };
+  document.body.append(box);
+  try { history.pushState({ cx: "sheet", d: depth() }, "", location.href); } catch { /* ignore */ }
+  draw();
+  input.focus();
+}
+// Back closes whatever is open on top (the switcher, the members list, the channel list drawer)
+function closeOverlays() {
+  if (qs) { qs.close(true); return true; }
+  if ($("chat-members").classList.contains("open") || $("chat-side").classList.contains("open")) { closeDrawers(true); return true; }
+  return false;
 }
 
 // ---------- Messages ----------
@@ -752,13 +1088,16 @@ function addMessage(m) {
     state.members.set(m.author.id, { id: m.author.id, username: m.author.username, role: m.author.role });
     renderMembers();
   }
-  if (m.channelId !== state.channelId) {
+  if (m.channelId !== state.channelId || (state.app && state.screen === "list")) {
     if (m.author.id !== state.me.id) {
-      state.unread.add(m.channelId);
+      const c = state.counts.get(m.channelId) || { n: 0, mentions: 0 };
+      c.n += 1;
+      if (isMention(m)) c.mentions += 1;
+      state.counts.set(m.channelId, c);
+      if (m.channelId !== state.channelId) { renderChannels(); return; }
       renderChannels();
-    }
-    return;
-  }
+    } else if (m.channelId !== state.channelId) return;
+  } else markRead();
   const stick = nearBottom() || m.author.id === state.me.id;
   const list = sortedMessages();
   const last = list[list.length - 1];
@@ -1135,23 +1474,42 @@ function handleEvent(data) {
 }
 
 // ---------- Drawers (phones) ----------
-function closeDrawers() {
+function closeDrawers(fromPop) {
+  const was = $("chat-side").classList.contains("open") || $("chat-members").classList.contains("open");
   $("chat-side").classList.remove("open");
   $("chat-members").classList.remove("open");
   $("drawer-scrim").classList.remove("open");
+  if (was && !fromPop && history.state?.cx === "sheet") history.back();
 }
 
 function openDrawer(id) {
-  closeDrawers();
+  const was = $("chat-side").classList.contains("open") || $("chat-members").classList.contains("open");
+  $("chat-side").classList.remove("open");
+  $("chat-members").classList.remove("open");
   $(id).classList.add("open");
   $("drawer-scrim").classList.add("open");
+  // on phones and tablets Back closes it
+  if (!was && matchMedia("(max-width: 1100px)").matches) { try { history.pushState({ cx: "sheet", d: depth() }, "", location.href); } catch { /* ignore */ } }
 }
 
 let wired = false;
 function wireUi() {
   if (wired) return;
   wired = true;
-  $("open-channels").addEventListener("click", () => openDrawer("chat-side"));
+  $("open-channels").addEventListener("click", () => (state.app ? toList() : openDrawer("chat-side")));
+  // the quick switcher: a search button above the channels, and Ctrl+K / Cmd+K
+  const find = el("button", "qs-open");
+  find.type = "button";
+  find.innerHTML = icon("search");   // fixed icon only
+  find.append(el("span", "", "Find a channel or person"), el("kbd", "", /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘K" : "Ctrl K"));
+  find.addEventListener("click", () => { closeDrawers(); quickSwitcher(); });
+  $("chat-side").insertBefore(find, $("channel-list"));
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k" && !$("view-chat").hidden) { e.preventDefault(); qs ? qs.close() : quickSwitcher(); }
+  });
+  window.addEventListener("popstate", onPop);
+  matchMedia("(max-width: 760px)").addEventListener("change", applyLayout);
+  wireSwipes();
   $("open-members").addEventListener("click", () => openDrawer("chat-members"));
   $("drawer-scrim").addEventListener("click", closeDrawers);
   $("reply-cancel").addEventListener("click", () => {
@@ -1218,6 +1576,8 @@ export async function startChat({ onSignedOut }) {
     { id: FRIENDS_CHANNEL, categoryId: DM_CHANNEL, slug: "friends", name: "Friends", topic: "Your friends, your team and who's in game", kind: "friends", canPost: false });
   state.categories = [{ id: DM_CHANNEL, name: "Messages" }, ...data.categories];
   if (data.dmUnread) state.unread.add(DM_CHANNEL);
+  state.counts = new Map(Object.entries(data.unread || {}).map(([k, v]) => [Number(k), v]));
+  state.readUpTo = new Map();
   state.reactions = data.reactions;
   state.maxLength = data.maxLength || 500;  // staff can write longer messages
   $("composer-input").maxLength = state.maxLength;
@@ -1237,11 +1597,22 @@ export async function startChat({ onSignedOut }) {
   renderMembers();
   // Links like /community#suggestions switch channels, even while the page is open.
   window.addEventListener("hashchange", () => {
+    if (Date.now() - (state.popAt || 0) < 400) return;      // Back/Forward: already handled
     const [slug, sub] = location.hash.slice(1).split("/");  // e.g. #streams/12 opens stream 12
     const ch = state.channels.find((c) => c.slug === slug);
-    if (ch && (ch.id !== state.channelId || sub)) { state.sub = sub || null; selectChannel(ch.id); }
+    if (ch && (ch.id !== state.channelId || sub || state.screen !== "channel")) { state.sub = sub || null; setScreen("channel"); selectChannel(ch.id); }
   });
   const wanted = location.hash.slice(1);
+  // Phones open on the channel list (like an app). A link to a channel opens it, with the list one Back away.
+  const phone = matchMedia("(max-width: 760px)").matches;
+  try {
+    if (phone) {
+      history.replaceState({ cx: "list", d: 0 }, "", location.pathname);
+      if (wanted) history.pushState({ cx: "ch", d: 1 }, "", "#" + wanted);
+    } else history.replaceState({ cx: "ch", d: 0 }, "", location.href);
+  } catch { /* ignore */ }
+  state.screen = phone && !wanted ? "list" : "channel";
+  applyLayout();
   const dmWith = /^dm-(\d+)$/.exec(wanted);
   if (dmWith && state.members.has(Number(dmWith[1]))) {
     state.dmWith = Number(dmWith[1]); // "Message" on a full profile
@@ -1266,8 +1637,8 @@ export function stopChat() {
 // Opens the Direct Messages view on a conversation with this member.
 export function openDM(userId) {
   state.dmWith = userId;
-  selectChannel(DM_CHANNEL);
   closeDrawers();
+  go(DM_CHANNEL, { force: true });
 }
 
 export { openProfile };

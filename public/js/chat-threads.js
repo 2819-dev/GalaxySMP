@@ -55,7 +55,7 @@ export async function openThread(rootId) {
   if (!d.replies.length) list.append(h("p", { class: "text-3 small thread-empty", text: "No replies yet. Start the conversation." }));
   document.querySelector(".chat-main")?.append(el);
   requestAnimationFrame(() => { el.classList.add("open"); scrollDown(); });
-  try { history.replaceState(null, "", `#thread-${rootId}`); } catch { /* ignore */ }
+  try { history.replaceState(history.state, "", `#thread-${rootId}`); } catch { /* ignore */ }
 
   input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 140) + "px"; });
   input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); } });
@@ -81,7 +81,7 @@ function closeThread() {
   el.classList.remove("open");
   setTimeout(() => el.remove(), 200);
   const ch = currentChannel();
-  if (location.hash.startsWith("#thread-") && ch) { try { history.replaceState(null, "", `#${ch.slug}`); } catch { /* ignore */ } }
+  if (location.hash.startsWith("#thread-") && ch) { try { history.replaceState(history.state, "", `#${ch.slug}`); } catch { /* ignore */ } }
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && panel && !document.querySelector("dialog[open]")) closeThread(); });
 

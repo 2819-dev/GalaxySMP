@@ -277,7 +277,7 @@ function renderSuggestions(p) {
     extra.setSuggestionCategories(data.categories);
     drawTabs(data.counts); drawCats(data.categories);
     banner.hidden = !st.one;
-    banner.replaceChildren(h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => { st.one = null; try { history.replaceState(null, "", "#suggestions"); } catch { /* ignore */ } load(); } }, iconEl("arrow", "flip"), "All suggestions"));
+    banner.replaceChildren(h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => { st.one = null; try { history.replaceState(history.state, "", "#suggestions"); } catch { /* ignore */ } load(); } }, iconEl("arrow", "flip"), "All suggestions"));
     list.replaceChildren();
     if (!data.suggestions.length) {
       const name = SG_TABS.find(([k]) => k === st.status)[1];

@@ -476,6 +476,22 @@ export const OFFICIAL_SUGGESTIONS = [
     title: "Play Sessions",
     body: "Post a plan like \"Bedwars at 7 pm, who's in?\" in #Events. Other players tap I'm in, and everyone who joined gets a reminder 10 minutes before it starts. Vote below to tell us if you'd use this.",
   },
+  {
+    id: "2026-11-17-community-app",
+    title: "Community feels like an app",
+    body: `Getting around Community is faster, especially on phones.
+
+**On phones:**
+- **Bottom tabs:** Home, Messages, Friends, Alerts and You, like a chat app. The chat now uses the whole screen.
+- **Home** is your channel list. Tap a channel and it slides in; tap the arrow or swipe right to go back.
+- **Swipe left** in a channel to see who's online.
+- **Your phone's Back button** now goes back to the previous screen and closes open menus, instead of leaving the page.
+
+**Everywhere:**
+- **Unread counts:** channels with new messages show how many you missed, and a **red badge** when someone @mentions you or replies to you. They're remembered between visits, and **Mark all as read** clears them.
+- **Quick switcher:** tap **Find a channel or person** above the channels (or press Ctrl+K, or Cmd+K on a Mac) to jump to any channel or start a message with anyone.
+- **Back and Forward** in your browser move between the channels you visited.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

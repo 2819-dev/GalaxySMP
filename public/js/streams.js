@@ -75,7 +75,7 @@ export function renderStreams(root, helpers) {
 
   function setHash() {
     const hsh = lib.item ? `#stages/ep-${lib.item}` : lib.show ? `#stages/show-${lib.show}` : "#stages";
-    try { if (location.hash !== hsh) history.replaceState(null, "", hsh); } catch { /* ignore */ }
+    try { if (location.hash !== hsh) history.replaceState(history.state, "", hsh); } catch { /* ignore */ }
   }
   const parts = () => {
     const d = lib.d;
@@ -548,7 +548,7 @@ export function renderStreams(root, helpers) {
   function setupWizard(d, only = null) {
     const checkOnly = Boolean(only);
     view.listing = false;
-    try { history.replaceState(null, "", "#stages"); } catch { /* ignore */ }
+    try { history.replaceState(history.state, "", "#stages"); } catch { /* ignore */ }
     const st = { step: checkOnly ? 3 : 0, kind: only?.kind || "podcast", as: d.as?.[0]?.key || "me", title: "", description: "", category: "", when: "now", at: "",
       saveVideo: false, speakMode: "hand", chatOn: true, teamOnly: false };
     let test = null;   // the running mic / camera test
@@ -758,7 +758,7 @@ export function renderStreams(root, helpers) {
   async function openStream(id, opts = {}) {
     view.listing = false;
     stream?.close();
-    try { history.replaceState(null, "", `#stages/${id}`); } catch { /* ignore */ }
+    try { history.replaceState(history.state, "", `#stages/${id}`); } catch { /* ignore */ }
     let d;
     try { d = await getJson(`/api/streams/${id}`); } catch (e) { toast(e.message); return showList(); }
     const s = d.stream;

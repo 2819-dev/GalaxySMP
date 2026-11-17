@@ -313,6 +313,10 @@ const PENDING = [
     "CREATE TABLE IF NOT EXISTS server_events (id bigserial PRIMARY KEY, at timestamptz NOT NULL DEFAULT now(), kind text NOT NULL, data jsonb NOT NULL DEFAULT '{}')",
     "INSERT INTO schema_migrations (version) VALUES ('0078_server_diagnostics') ON CONFLICT DO NOTHING",
   ]],
+  ["0079_channel_reads", [
+    "CREATE TABLE IF NOT EXISTS channel_reads (user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE, channel_id integer NOT NULL REFERENCES channels(id) ON DELETE CASCADE, last_id bigint NOT NULL DEFAULT 0, PRIMARY KEY (user_id, channel_id))",
+    "INSERT INTO schema_migrations (version) VALUES ('0079_channel_reads') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

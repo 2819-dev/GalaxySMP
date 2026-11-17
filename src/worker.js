@@ -99,6 +99,8 @@ const routes = [
   ["GET", "/api/chat/bootstrap", (req, env) => bootstrap(req, env)],
   ["GET", "/api/chat/channels/:id/messages", history],
   ["GET", "/api/chat/channels/:id/pins", chatPins],
+  ["POST", "/api/chat/channels/:id/read", (req, env, ctx, url, params) => import("./routes/chat.js").then((m) => m.markRead(req, env, ctx, url, params))],
+  ["POST", "/api/chat/read-all", (req, env) => import("./routes/chat.js").then((m) => m.markAllRead(req, env))],
   ["GET", "/api/chat/threads/:id", (req, env, ctx, url, params) => import("./routes/chat.js").then((m) => m.thread(req, env, ctx, url, params))],
   ["POST", "/api/chat/channels/:id/slowmode", (req, env, ctx, url, params) => import("./routes/chat.js").then((m) => m.slowmode(req, env, ctx, url, params))],
   ["GET", "/api/chat/search", chatSearch],

@@ -6,7 +6,7 @@ import { badgesFor } from "./badges.js";
 import { isOwner } from "../lib/names.js";
 import { INTEREST_NAME } from "./onboarding.js";
 import { getDb } from "../lib/db.js";
-import { json, HttpError } from "../lib/http.js";
+import { json, HttpError, readJson } from "../lib/http.js";
 import { requireUser, publicUser } from "../lib/auth.js";
 import { REACTIONS, loadHistory, rankOf, loadAround, loadPins, searchMessages, loadMessage, loadThread } from "../chat/messages.js";
 import { maxLengthFor } from "../lib/filter.js";
@@ -21,6 +21,42 @@ export function hubStub(env) {
 // Sends an event to everyone connected (used by staff tools).
 export async function hubBroadcast(env, event) {
   await hubStub(env).fetch("https://hub/internal/broadcast", { method: "POST", body: JSON.stringify(event) });
+}
+
+// ---------- unread counts ----------
+// Each member's place in each channel. A channel you've never opened starts as read (no 500-message badges).
+const mentionRe = (name) => `@${String(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\W|$)`;
+async function unreadCounts(sql, user, ids) {
+  if (!ids.length) return {};
+  await sql`INSERT INTO channel_reads (user_id, channel_id, last_id)
+            SELECT ${user.id}, c.id, coalesce((SELECT max(m.id) FROM messages m WHERE m.channel_id = c.id), 0) FROM channels c WHERE c.id = ANY(${ids})
+            ON CONFLICT DO NOTHING`;
+  const rows = await sql`
+    SELECT r.channel_id,
+           (SELECT count(*) FROM (SELECT 1 FROM messages m WHERE m.channel_id = r.channel_id AND m.id > r.last_id AND m.deleted_at IS NULL
+                                     AND m.user_id IS DISTINCT FROM ${user.id} LIMIT 100) x)::int AS n,
+           (SELECT count(*) FROM (SELECT 1 FROM messages m LEFT JOIN messages p ON p.id = m.reply_to
+                                   WHERE m.channel_id = r.channel_id AND m.id > r.last_id AND m.deleted_at IS NULL AND m.user_id IS DISTINCT FROM ${user.id}
+                                     AND (m.content ~* ${mentionRe(user.username)} OR p.user_id = ${user.id}) LIMIT 100) y)::int AS mentions
+      FROM channel_reads r WHERE r.user_id = ${user.id} AND r.channel_id = ANY(${ids})`;
+  return Object.fromEntries(rows.filter((r) => r.n > 0).map((r) => [r.channel_id, { n: r.n, mentions: r.mentions }]));
+}
+
+// POST /api/chat/channels/:id/read { lastId }   and   POST /api/chat/read-all
+export async function markRead(request, env, ctx, url, params) {
+  const user = await requireUser(request, env);
+  const b = await readJson(request).catch(() => ({}));
+  const id = Number(params.id) || 0, last = Math.max(0, Number(b.lastId) || 0);
+  await getDb(env)`INSERT INTO channel_reads (user_id, channel_id, last_id) SELECT ${user.id}, id, ${last} FROM channels WHERE id = ${id}
+                   ON CONFLICT (user_id, channel_id) DO UPDATE SET last_id = greatest(channel_reads.last_id, EXCLUDED.last_id)`;
+  return json({ ok: true });
+}
+export async function markAllRead(request, env) {
+  const user = await requireUser(request, env);
+  await getDb(env)`INSERT INTO channel_reads (user_id, channel_id, last_id)
+                   SELECT ${user.id}, c.id, coalesce((SELECT max(m.id) FROM messages m WHERE m.channel_id = c.id), 0) FROM channels c
+                   ON CONFLICT (user_id, channel_id) DO UPDATE SET last_id = greatest(channel_reads.last_id, EXCLUDED.last_id)`;
+  return json({ ok: true, message: "All caught up." });
 }
 
 export async function bootstrap(request, env) {
@@ -55,6 +91,7 @@ export async function bootstrap(request, env) {
       FROM dm_threads WHERE user_a = ${user.id} OR user_b = ${user.id}`;
   const me = publicUser(user);
   const [{ onboarded_at: onboarded }] = await sql`SELECT onboarded_at FROM users WHERE id = ${user.id}`;
+  const unread = await unreadCounts(sql, user, channels.filter((c) => c.kind === "text").map((c) => c.id));
   return json({
     ok: true,
     me,
@@ -70,6 +107,7 @@ export async function bootstrap(request, env) {
       canPost: c.kind === "text" && (c.min_post_power <= 10 || can(user, "post_staff_channels")),
       slow: Number(c.slow_seconds || 0),
     })),
+    unread,   // { channelId: { n, mentions } } for channels with new messages since you last read them
     roles: roles.map((r) => ({ key: r.key, name: r.name, color: r.color, power: r.power })),
     members: members.map((m) => ({
       id: Number(m.id), username: m.username, role: m.role, rank: displayRank(rankOf(m), m.plan, planPriority, PLANS),
