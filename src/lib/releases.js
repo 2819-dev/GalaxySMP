@@ -350,6 +350,19 @@ Compare on any profile now also lists the achievements you both have, and the on
     title: "Team Admins",
     body: `Team organizers can now make members **Admins**. Admins can invite and remove members, change the team's name and tag, and host the team's stages. Only the organizer can make Admins, hand the team over or close it. When an organizer hands the team over, they stay on as an Admin.`,
   },
+  {
+    id: "2026-11-17-suggestions",
+    title: "A tidier #Suggestions",
+    body: `**#Suggestions** is easier to browse now:
+
+**Status tabs:** Open, Planned, In progress, Done and Declined, each with a count. **In progress** is new, so you can see what's being worked on right now.
+
+**Categories:** every idea has a category (Gameplay, Minigames, Website, Events, Store or Other). Tap one to see only those ideas, and pick one when you post.
+
+**Search:** find ideas by any word.
+
+**No more duplicates:** staff can merge an idea into one that was already posted, and its votes and comments move over.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

@@ -525,7 +525,7 @@ export async function suggestionComment(request, env, ctx, url, params) {
   await filterOrThrow(sql, [text]);
   const [c] = await sql`INSERT INTO suggestion_comments (suggestion_id, user_id, body) VALUES (${sid}, ${user.id}, ${text}) RETURNING id`;
   if (Number(s.user_id) !== Number(user.id)) {
-    await notify(env, [s.user_id], "community", { title: `${user.username} commented on your suggestion`, body: `"${s.title}": ${text.slice(0, 120)}`, url: "/community#suggestions", tag: `sg-${sid}` });
+    await notify(env, [s.user_id], "community", { title: `${user.username} commented on your suggestion`, body: `"${s.title}": ${text.slice(0, 120)}`, url: `/community#suggestions/${sid}`, tag: `sg-${sid}` });
   }
   return json({ ok: true, id: Number(c.id) });
 }
@@ -545,7 +545,7 @@ export async function suggestionRespond(request, env, ctx, url, params) {
   const user = await requireUser(request, env);
   if (!isStaff(user)) throw new HttpError(403, "Only staff can respond to suggestions.");
   const body = await readJson(request);
-  const status = ["open", "planned", "done", "declined"].includes(body.status) ? body.status : null;
+  const status = ["open", "planned", "progress", "done", "declined"].includes(body.status) ? body.status : null;
   if (!status) throw new HttpError(400, "Choose a status.");
   const reply = clean(body.reply, 500);
   const sql = getDb(env);
@@ -558,8 +558,8 @@ export async function suggestionRespond(request, env, ctx, url, params) {
      WHERE id = ${sid} AND deleted_at IS NULL RETURNING user_id, title`;
   if (!s) throw new HttpError(404, "That suggestion no longer exists.");
   await audit(sql, user.id, "suggestion.status", { title: s.title, status, reply: reply || undefined });
-  const NAMES = { open: "Open", planned: "Planned", done: "Done", declined: "Declined" };
-  await notify(env, [s.user_id], "community", { title: `Your suggestion is now ${NAMES[status]}`, body: reply ? `"${s.title}": ${reply.slice(0, 120)}` : `"${s.title}"`, url: "/community#suggestions", tag: `sg-${sid}` }, { exclude: [user.id] });
+  const NAMES = { open: "Open", planned: "Planned", progress: "In progress", done: "Done", declined: "Declined" };
+  await notify(env, [s.user_id], "community", { title: `Your suggestion is now ${NAMES[status]}`, body: reply ? `"${s.title}": ${reply.slice(0, 120)}` : `"${s.title}"`, url: `/community#suggestions/${sid}`, tag: `sg-${sid}` }, { exclude: [user.id] });
   return json({ ok: true });
 }
 
@@ -577,7 +577,7 @@ export async function suggestionSimilar(request, env, ctx, url) {
            (SELECT count(*) FROM unnest(${patterns}::text[]) p WHERE s.title ILIKE p) AS hits,
            (SELECT coalesce(sum(CASE WHEN v.value > 0 THEN 1 ELSE 0 END), 0) FROM suggestion_votes v WHERE v.suggestion_id = s.id) AS likes
       FROM suggestions s
-     WHERE s.deleted_at IS NULL AND s.title ILIKE ANY(${patterns}::text[])
+     WHERE s.deleted_at IS NULL AND s.status <> 'duplicate' AND s.title ILIKE ANY(${patterns}::text[])
      ORDER BY hits DESC, likes DESC LIMIT 5`;
   return json({ ok: true, similar: rows.map((r) => ({ id: Number(r.id), title: r.title, status: r.status, likes: Number(r.likes) })) });
 }

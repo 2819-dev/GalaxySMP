@@ -225,34 +225,65 @@ function confirmBuy(l, done) {
 }
 
 // ---------- Suggestions ----------
-const STATUS_NAMES = { open: "Open", planned: "Planned", done: "Done", declined: "Declined" };
+// #Suggestions, organized: status tabs with counts, category chips, search, Top/New. Duplicates are merged by staff.
+const SG_TABS = [["open", "Open"], ["planned", "Planned"], ["progress", "In progress"], ["done", "Done"], ["declined", "Declined"]];
 
 function renderSuggestions(p) {
-  let sort = "top";
+  const st = { sort: "top", status: "open", category: null, q: "", one: /^\d+$/.test(ctx.sub || "") ? Number(ctx.sub) : null };
   const list = h("div", { class: "stack", style: "gap:10px" });
+  const tabs = h("div", { class: "sg-tabs", role: "tablist", "aria-label": "Suggestion status" });
+  const cats = h("div", { class: "sg-cats", role: "group", "aria-label": "Categories" });
+  const search = h("input", { class: "input sg-search", id: "sg-search", type: "search", maxlength: 60, placeholder: "Search ideas", "aria-label": "Search suggestions" });
   const top = h("button", { type: "button", "aria-pressed": "true", text: "Top" });
   const newest = h("button", { type: "button", "aria-pressed": "false", text: "New" });
-  const add = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "New suggestion", onclick: () => extra.newSuggestion(load, ctx.toast) });
+  const add = h("button", { class: "btn btn-primary btn-sm", type: "button", onclick: () => extra.newSuggestion(load, ctx.toast) }, iconEl("plus"), "New suggestion");
+  const banner = h("div", { hidden: true });
   p.append(h("div", { class: "cp-wrap" },
-    h("section", { class: "panel", style: "padding:16px" },
-      h("p", { class: "text-2", style: "margin:0 0 12px", text: "Have an idea for GalaxySMP? Share it, vote and discuss other ideas in the comments. Staff mark ideas as Planned, Done or Declined and can respond." }),
-      h("div", { class: "cp-toolbar", style: "justify-content:space-between" }, h("div", { class: "tabs-mini" }, top, newest), add)),
-    list));
+    h("section", { class: "panel sg-head" },
+      h("div", { class: "sg-head-top" },
+        h("p", { class: "text-2", style: "margin:0", text: "Have an idea for GalaxySMP? Share it, vote, and discuss in the comments. Staff move ideas along from Open to Planned, In progress and Done." }),
+        add),
+      tabs,
+      h("div", { class: "sg-tools" }, search, h("div", { class: "tabs-mini" }, top, newest)),
+      cats),
+    banner, list));
+
+  let timer = null;
+  search.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => { st.q = search.value.trim(); st.one = null; load(); }, 300); });
+  for (const [btn, key] of [[top, "top"], [newest, "new"]]) {
+    btn.addEventListener("click", () => { st.sort = key; top.setAttribute("aria-pressed", String(key === "top")); newest.setAttribute("aria-pressed", String(key === "new")); load(); });
+  }
+  // "Similar ideas" in the New suggestion dialog, and notifications, open one suggestion
+  const openOne = (e) => { st.one = Number(e.detail); load(); };
+  window.addEventListener("sg-open", openOne);
+  cleanup = () => window.removeEventListener("sg-open", openOne);
+
+  function drawTabs(counts) {
+    tabs.replaceChildren(...SG_TABS.map(([key, name]) => h("button", { class: `sg-tab sg-tab-${key}`, type: "button", role: "tab", "aria-selected": String(!st.one && st.status === key),
+      onclick: () => { st.status = key; st.one = null; load(); } }, name, h("span", { class: "sg-tab-n", text: String(counts[key] || 0) }))));
+  }
+  function drawCats(categories) {
+    const chip = (key, name) => h("button", { class: "sg-cat", type: "button", "aria-pressed": String(st.category === key), onclick: () => { st.category = key; st.one = null; load(); } }, name);
+    cats.replaceChildren(chip(null, "All"), ...Object.entries(categories).map(([k, n]) => chip(k, n)));
+  }
 
   async function load() {
+    const qs = new URLSearchParams({ sort: st.sort, status: st.status });
+    if (st.category) qs.set("category", st.category);
+    if (st.q) qs.set("q", st.q);
+    if (st.one) qs.set("id", String(st.one));
     let data;
-    try { data = await getJson(`/api/community/suggestions?sort=${sort}`); } catch (e) { list.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
+    try { data = await getJson(`/api/community/suggestions?${qs}`); } catch (e) { list.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
+    extra.setSuggestionCategories(data.categories);
+    drawTabs(data.counts); drawCats(data.categories);
+    banner.hidden = !st.one;
+    banner.replaceChildren(h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => { st.one = null; try { history.replaceState(null, "", "#suggestions"); } catch { /* ignore */ } load(); } }, iconEl("arrow", "flip"), "All suggestions"));
     list.replaceChildren();
-    if (!data.suggestions.length) list.append(h("div", { class: "panel empty", text: "No suggestions yet. Share the first one." }));
+    if (!data.suggestions.length) {
+      const name = SG_TABS.find(([k]) => k === st.status)[1];
+      list.append(h("div", { class: "panel empty", text: st.q ? `No ${name.toLowerCase()} ideas match "${st.q}".` : st.status === "open" ? "No open suggestions yet. Share the first one." : `Nothing is ${name.toLowerCase()} yet.` }));
+    }
     for (const s of data.suggestions) list.append(extra.suggestionCard(s, data.canModerate, load, ctx.toast));
-  }
-  for (const [btn, key] of [[top, "top"], [newest, "new"]]) {
-    btn.addEventListener("click", () => {
-      sort = key;
-      top.setAttribute("aria-pressed", String(key === "top"));
-      newest.setAttribute("aria-pressed", String(key === "new"));
-      load();
-    });
   }
   load();
 }

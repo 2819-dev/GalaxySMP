@@ -493,7 +493,9 @@ function buildDialog(done, toast) {
 // =====================================================================
 // Suggestions: card with staff response and comments; new-suggestion dialog with similar check
 // =====================================================================
-const STATUS_NAMES = { open: "Open", planned: "Planned", done: "Done", declined: "Declined" };
+const STATUS_NAMES = { open: "Open", planned: "Planned", progress: "In progress", done: "Done", declined: "Declined" };
+let CATEGORY_NAMES = { gameplay: "Gameplay", minigames: "Minigames", website: "Website", events: "Events", store: "Store", other: "Other" };
+export function setSuggestionCategories(c) { if (c) CATEGORY_NAMES = c; }
 
 export function suggestionCard(s, canModerate, reload, toast) {
   const vote = async (value) => {
@@ -516,8 +518,11 @@ export function suggestionCard(s, canModerate, reload, toast) {
   });
   const foot = h("div", { class: "sg-foot" },
     h("span", { class: `sg-status ${s.status}`, text: STATUS_NAMES[s.status] }),
+    h("span", { class: "sg-catchip", text: CATEGORY_NAMES[s.category] || "Other" }),
+    s.merged ? h("span", { class: "sg-merged", title: "Duplicate ideas merged into this one", text: `+${s.merged} merged` }) : null,
     h("span", { text: `${who} · ${new Date(s.createdAt).toLocaleDateString()}` }), toggle);
-  if (canModerate) foot.append(h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Respond", onclick: () => respondDialog(s, reload, toast) }));
+  if (canModerate) foot.append(h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Respond", onclick: () => respondDialog(s, reload, toast) }),
+    h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Merge", onclick: () => mergeDialog(s, reload, toast) }));
   if (canModerate || s.mine) {
     foot.append(h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Delete", onclick: () => openDialog({
       title: "Delete this suggestion?", body: h("p", { class: "text-2", text: s.title }),
@@ -555,16 +560,43 @@ async function loadComments(s, box, toast, setCount) {
     h("div", { class: "sg-comment-new" }, input, send));
 }
 
+// Staff: this idea is a duplicate. Pick the original; votes and comments move there.
+function mergeDialog(s, done, toast) {
+  const q = h("input", { class: "input", id: "sg-merge-q", maxlength: 60, placeholder: "Search for the original idea" });
+  const results = h("div", { class: "sg-similar" });
+  let pick = null;
+  const find = async () => {
+    const d = await getJson(`/api/community/suggestions/similar?q=${encodeURIComponent(q.value.trim() || s.title)}`).catch(() => ({ similar: [] }));
+    const rows = d.similar.filter((x) => x.id !== s.id);
+    results.replaceChildren(...(rows.length ? rows.map((x) => h("button", { class: "sg-similar-row", type: "button", "aria-pressed": String(pick === x.id), onclick: () => { pick = x.id; find(); } },
+      h("span", { class: `sg-status ${x.status}`, text: STATUS_NAMES[x.status] || x.status }), h("span", { text: x.title }), h("span", { class: "text-3 small", text: `${x.likes} like${x.likes === 1 ? "" : "s"}` })))
+      : [h("p", { class: "text-3 small", style: "margin:0", text: "No matches. Try other words." })]));
+  };
+  let t = null;
+  q.addEventListener("input", () => { clearTimeout(t); t = setTimeout(find, 300); });
+  find();
+  openDialog({ title: "Merge as a duplicate", body: h("div", { class: "form" },
+    h("p", { class: "text-2", style: "margin:0" }, "Merging ", h("b", { text: s.title }), " into the original. Its votes and comments move over, it disappears from the list, and the person who posted it gets a notification."),
+    field("Original idea", q), results),
+  actions: [{ label: "Cancel" }, { label: "Merge", kind: "primary", onClick: async () => {
+    if (!pick) throw new Error("Pick the original idea.");
+    await postJson(`/api/community/suggestions/${s.id}/merge`, { into: pick });
+    toast("Merged."); done();
+  } }] });
+}
+
 function respondDialog(s, done, toast) {
   const status = select("sg-status", Object.entries(STATUS_NAMES), s.status);
+  const category = select("sg-category", Object.entries(CATEGORY_NAMES), s.category || "other");
   const reply = h("textarea", { class: "input", id: "sg-reply", rows: 3, maxlength: 500, placeholder: "e.g. Great idea! We're adding this next week." });
   reply.value = s.staffReply?.text || "";
   openDialog({
     title: "Respond to suggestion",
-    body: h("div", { class: "form" }, h("p", { class: "text-2", style: "margin:0", text: s.title }), field("Status", status),
+    body: h("div", { class: "form" }, h("p", { class: "text-2", style: "margin:0", text: s.title }), field("Status", status), field("Category", category),
       field("Response (optional)", reply, "Shown on the suggestion. The person who posted it gets a notification.")),
     actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: async () => {
       await postJson(`/api/community/suggestions/${s.id}/respond`, { status: status.value, reply: reply.value });
+      if (category.value !== (s.category || "other")) await postJson(`/api/community/suggestions/${s.id}/category`, { category: category.value });
       toast("Response saved.");
       done();
     } }],
@@ -576,6 +608,7 @@ export function newSuggestion(done, toast) {
   const similar = h("div", { class: "sg-similar", hidden: true });
   const body = h("textarea", { class: "input", id: "sg-body", maxlength: 500, rows: 4, placeholder: "Details (optional)" });
   const anon = h("input", { type: "checkbox", id: "sg-anon" });
+  const category = select("sg-new-category", [["", "Choose one"], ...Object.entries(CATEGORY_NAMES)], "");
   let t = null;
   title.addEventListener("input", () => {
     clearTimeout(t);
@@ -589,10 +622,7 @@ export function newSuggestion(done, toast) {
           e.preventDefault();
           document.querySelector("dialog.dialog")?.close();
           document.querySelector("dialog.dialog")?.remove();
-          const el = document.getElementById(`sg-${x.id}`);
-          el?.scrollIntoView({ behavior: "smooth", block: "center" });
-          el?.classList.add("flash");
-          setTimeout(() => el?.classList.remove("flash"), 1600);
+          window.dispatchEvent(new CustomEvent("sg-open", { detail: x.id }));   // show that idea (any tab)
         } }, h("span", { class: `sg-status ${x.status}`, text: STATUS_NAMES[x.status] }), h("span", { text: x.title }), h("span", { class: "text-3 small", text: `${x.likes} like${x.likes === 1 ? "" : "s"}` }))));
     }, 350);
   });
@@ -600,12 +630,14 @@ export function newSuggestion(done, toast) {
     title: "New suggestion",
     body: h("div", { class: "form" },
       field("Title", title), similar,
+      field("Category", category),
       field("Details", body),
       h("label", { class: "check" }, anon, "Post anonymously ", h("span", { class: "text-3 small", text: "(other players won't see your name; only the server owners can)" }))),
     actions: [{ label: "Cancel" }, {
       label: "Post", kind: "primary",
       onClick: async () => {
-        await postJson("/api/community/suggestions", { title: title.value, body: body.value, anonymous: anon.checked });
+        if (!category.value) throw new Error("Choose a category.");
+        await postJson("/api/community/suggestions", { title: title.value, body: body.value, anonymous: anon.checked, category: category.value });
         toast("Suggestion submitted.");
         done();
       },
