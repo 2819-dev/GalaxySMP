@@ -507,6 +507,11 @@ export const OFFICIAL_SUGGESTIONS = [
     title: "Leaving Community on phones",
     body: `On phones, tap the **menu button** (three lines) at the top of the Community home screen to open the website menu and go to any page: Home, the Store, the Map and more.`,
   },
+  {
+    id: "2026-11-17-headings-admins",
+    title: "Message headings are for Admins",
+    body: `Big headings (**#**, **##**, **###**) and small text (**-#**) in Community messages and DMs now only format for Admins, so announcements stand out and chats stay easy to read. For everyone else, those lines show as normal text. Bold, italics, lists, quotes and code still work for everyone.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

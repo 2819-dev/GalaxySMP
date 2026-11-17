@@ -403,7 +403,9 @@ function renderDMs(p) {
     const meId = ctx.me?.id;
     const fill = (node, m) => {
       const text = node.querySelector(".dm-text");
-      text.replaceChildren(renderMarkdown(m.body || "", { channels: chatState.channels }));
+      const sender = chatState.members.get(m.from);
+      const admin = (chatState.roles.get(sender?.role)?.power || 0) >= 100;   // headings and -# small text: Admins only
+      text.replaceChildren(renderMarkdown(m.body || "", { channels: chatState.channels, noHeadings: !admin }));
       text.hidden = !m.body && Boolean(m.audio);
       if (m.audio && !node.querySelector(".vp")) text.before(voicePlayer({ src: `/api/chat/voice/${m.audio.id}`, ms: m.audio.ms, seed: m.audio.id }));
       node.querySelector(".dm-meta").textContent = `${dmTime(m.at)}${m.via === "game" ? " · from the game" : ""}${m.editedAt ? " · edited" : ""}${m.from === meId ? (m.read ? " · Read" : " · Sent") : ""}`;

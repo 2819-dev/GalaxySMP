@@ -55,12 +55,13 @@ export function renderMarkdown(text, ctx = {}) {
       continue;
     }
     let m;
-    if ((m = line.match(/^(#{1,3}) (.+)$/))) {
+    // headings and small text are for Admins only (ctx.noHeadings: the line shows as normal text)
+    if (!ctx.noHeadings && (m = line.match(/^(#{1,3}) (.+)$/))) {
       endBlocks();
       const hd = el(`h${m[1].length + 2}`, `md-h md-h${m[1].length}`);
       hd.append(inline(m[2], ctx));
       root.append(hd);
-    } else if ((m = line.match(/^-# (.+)$/))) {
+    } else if (!ctx.noHeadings && (m = line.match(/^-# (.+)$/))) {
       endBlocks();
       const sm = el("div", "md-subtext");
       sm.append(inline(m[1], ctx));

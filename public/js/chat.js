@@ -886,7 +886,8 @@ function renderMessage(m, prev, opts = {}) {
     head.append(pinTag);
   }
   const text = el("div", "msg-text");
-  text.append(renderMarkdown(m.content, mdContext()));
+  // # / ## / ### headings and -# small text only work in messages from Admins
+  text.append(renderMarkdown(m.content, { ...mdContext(), noHeadings: !m.bot && !m.author?.bot && roleOf(state.members.get(m.author?.id)?.role || m.author?.role).power < 100 }));
   if (m.editedAt) {
     const ed = el("span", "msg-edited", "(edited)");
     ed.title = `Edited ${new Date(m.editedAt).toLocaleString()}`;
