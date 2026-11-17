@@ -624,7 +624,9 @@ export async function tick(env) {
     ["anniversaries", () => import("./anniversary.js").then((m) => m.anniversaryTick(env, sql))],
     ["bedwars champion", () => import("./bedwars.js").then((m) => m.weeklyChampion(env, sql))],
     ["pro+ streak freezes", () => proFreezes(sql)],
-    ["inbox cleanup", () => sql`DELETE FROM notifications WHERE created_at < now() - interval '60 days'`],
+    // each member chooses how long the bell keeps notifications (Account > Notifications); a month if they haven't chosen
+    ["inbox cleanup", () => sql`DELETE FROM notifications n WHERE n.created_at < now() - coalesce((SELECT CASE p.keep WHEN 'day' THEN interval '1 day' WHEN 'week' THEN interval '7 days'
+                                   WHEN 'month' THEN interval '30 days' ELSE interval '365 days' END FROM notification_prefs p WHERE p.user_id = n.user_id), interval '30 days')`],
     ["rewards", () => import("./rewards.js").then((m) => m.sendRewards(env, sql))],
     ["question of the day", () => import("../chat/engage.js").then(async (m) => {
       const { hubBroadcast } = await import("./chat.js");

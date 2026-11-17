@@ -415,6 +415,13 @@ Also: when staff change the status of your suggestion, you now always get a noti
     title: "Episodes: no YouTube needed",
     body: `Podcast episodes in **#Stages** are now uploaded straight to GalaxySMP, so you don't need a YouTube account. Tap **Add an episode** and either upload an audio file (MP3, M4A, WAV and more) or tap **Record now** to record one right there on your phone or computer. Episodes play right on the site.`,
   },
+  {
+    id: "2026-11-17-notif-history",
+    title: "Smarter notifications",
+    body: `**Choose how long notifications stay:** in **Account settings > Notifications**, pick what the bell keeps: the past day, week or month, everything, or only unread (each one is deleted once you've read it).
+
+**No more notifications for what you're already looking at:** if you have a channel, DM or page open in Community, you won't get a notification about it.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

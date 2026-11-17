@@ -280,6 +280,10 @@ const PENDING = [
     "ALTER TABLE stream_episodes ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'ready'",
     "INSERT INTO schema_migrations (version) VALUES ('0075_episode_uploads') ON CONFLICT DO NOTHING",
   ]],
+  ["0076_notif_keep", [
+    "ALTER TABLE notification_prefs ADD COLUMN IF NOT EXISTS keep text NOT NULL DEFAULT 'month'",
+    "INSERT INTO schema_migrations (version) VALUES ('0076_notif_keep') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

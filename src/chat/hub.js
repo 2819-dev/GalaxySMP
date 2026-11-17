@@ -32,6 +32,9 @@ export class CommunityHub extends DurableObject {
       const viewers = this.viewersOf(url.searchParams.get("view") || "");
       return Response.json({ viewing: viewers.has(Number(url.searchParams.get("user"))) });
     }
+    if (url.pathname === "/internal/viewers") { // who has this open on screen right now
+      return Response.json({ ids: [...this.viewersOf(url.searchParams.get("view") || "")] });
+    }
     if (url.pathname === "/internal/broadcast") {
       const event = await request.json();
       this.handleInternal(event);

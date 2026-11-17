@@ -24,15 +24,24 @@ export const KINDS = {
   community: { name: "Suggestions & builds", hint: "Replies to your suggestions, and Build of the Week", default: true },
   summary: { name: "Daily summary", hint: "Each evening: who played today, your money and streak", default: true },
 };
+// How long the bell keeps notifications
+export const KEEP = { day: { name: "Past day", sql: "1 day" }, week: { name: "Past week", sql: "7 days" }, month: { name: "Past month", sql: "30 days" },
+  all: { name: "Everything (up to a year)", sql: "365 days" }, read: { name: "Only unread (delete once read)", sql: "365 days" } };
+const keepOf = (k) => (KEEP[k] ? k : "month");
+async function keepFor(sql, userId) {
+  const [r] = await sql`SELECT keep FROM notification_prefs WHERE user_id = ${userId}`;
+  return keepOf(r?.keep);
+}
 const prefsOf = (stored) => Object.fromEntries(Object.entries(KINDS).map(([k, v]) => [k, stored && typeof stored[k] === "boolean" ? stored[k] : v.default]));
 
 // ---------- the member's own settings ----------
 export async function getSettings(request, env) {
   const user = await requireUser(request, env);
   const sql = getDb(env);
-  const [row] = await sql`SELECT prefs FROM notification_prefs WHERE user_id = ${user.id}`;
+  const [row] = await sql`SELECT prefs, keep FROM notification_prefs WHERE user_id = ${user.id}`;
   const [{ n }] = await sql`SELECT count(*)::int AS n FROM push_subscriptions WHERE user_id = ${user.id}`;
-  return json({ ok: true, publicKey: env.VAPID_PUBLIC_KEY || null, prefs: prefsOf(row?.prefs), kinds: KINDS, devices: n });
+  return json({ ok: true, publicKey: env.VAPID_PUBLIC_KEY || null, prefs: prefsOf(row?.prefs), kinds: KINDS, devices: n,
+    keep: keepOf(row?.keep), keepOptions: Object.entries(KEEP).map(([k, v]) => ({ key: k, name: v.name })) });
 }
 
 export async function subscribe(request, env) {
@@ -72,11 +81,15 @@ export async function unsubscribe(request, env) {
 export async function savePrefs(request, env) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
-  const prefs = prefsOf(body.prefs);
   const sql = getDb(env);
-  await sql`INSERT INTO notification_prefs (user_id, prefs) VALUES (${user.id}, ${JSON.stringify(prefs)}::jsonb)
-            ON CONFLICT (user_id) DO UPDATE SET prefs = EXCLUDED.prefs, updated_at = now()`;
-  return json({ ok: true, prefs });
+  const [cur] = await sql`SELECT prefs, keep FROM notification_prefs WHERE user_id = ${user.id}`;
+  const prefs = body.prefs ? prefsOf(body.prefs) : prefsOf(cur?.prefs);
+  const keep = body.keep ? keepOf(body.keep) : keepOf(cur?.keep);
+  await sql`INSERT INTO notification_prefs (user_id, prefs, keep) VALUES (${user.id}, ${JSON.stringify(prefs)}::jsonb, ${keep})
+            ON CONFLICT (user_id) DO UPDATE SET prefs = EXCLUDED.prefs, keep = EXCLUDED.keep, updated_at = now()`;
+  if (keep === "read") await sql`DELETE FROM notifications WHERE user_id = ${user.id} AND read_at IS NOT NULL`;
+  else await sql`DELETE FROM notifications WHERE user_id = ${user.id} AND created_at < now() - ${KEEP[keep].sql}::interval`;
+  return json({ ok: true, prefs, keep });
 }
 
 export async function testPush(request, env) {
@@ -104,8 +117,12 @@ async function toInbox(sql, ids, kind, m) {
 export async function inbox(request, env, ctx, url) {
   const user = await requireUser(request, env);
   if (url?.searchParams.has("count")) return json({ ok: true, unread: await unreadCount(getDb(env), user.id) }, 200, { "Cache-Control": "no-store" });
-  const rows = await getDb(env)`SELECT id, kind, title, body, url, created_at, read_at FROM notifications
-                                 WHERE user_id = ${user.id} AND created_at > now() - interval '60 days' ORDER BY created_at DESC LIMIT 60`;
+  const sql = getDb(env);
+  const keep = await keepFor(sql, user.id);
+  const rows = await sql`SELECT id, kind, title, body, url, created_at, read_at FROM notifications
+                          WHERE user_id = ${user.id} AND created_at > now() - ${KEEP[keep].sql}::interval
+                            AND (${keep} <> 'read' OR read_at IS NULL)
+                          ORDER BY created_at DESC LIMIT 100`;
   return json({ ok: true, unread: rows.filter((r) => !r.read_at).length,
     items: rows.map((r) => ({ id: Number(r.id), kind: r.kind, title: r.title, body: r.body, url: r.url, at: r.created_at, read: Boolean(r.read_at) })) },
     200, { "Cache-Control": "no-store" });
@@ -119,12 +136,22 @@ export async function inboxAction(request, env) {
   if (b.action === "clear") await sql`DELETE FROM notifications WHERE user_id = ${user.id}`;
   else if (b.id) await sql`UPDATE notifications SET read_at = now() WHERE user_id = ${user.id} AND id = ${Number(b.id)} AND read_at IS NULL`;
   else await sql`UPDATE notifications SET read_at = now() WHERE user_id = ${user.id} AND read_at IS NULL`;
+  if (b.action !== "clear" && (await keepFor(sql, user.id)) === "read") await sql`DELETE FROM notifications WHERE user_id = ${user.id} AND read_at IS NOT NULL`;
   return json({ ok: true });
 }
 
 export async function unreadCount(sql, userId) {
-  const [r] = await sql`SELECT count(*)::int AS n FROM notifications WHERE user_id = ${userId} AND read_at IS NULL AND created_at > now() - interval '60 days'`;
+  const keep = await keepFor(sql, userId);
+  const [r] = await sql`SELECT count(*)::int AS n FROM notifications WHERE user_id = ${userId} AND read_at IS NULL AND created_at > now() - ${KEEP[keep].sql}::interval`;
   return r.n;
+}
+
+// "/community#suggestions/5" -> "suggestions"; "/community#dm-12" -> "dm:12". Pages outside Community: none.
+function viewFromUrl(url) {
+  const m = /^\/community#([a-z0-9-]+)/.exec(String(url || ""));
+  if (!m) return null;
+  const dm = /^dm-(\d+)$/.exec(m[1]);
+  return dm ? `dm:${dm[1]}` : m[1];
 }
 
 // ---------- sending ----------
@@ -134,6 +161,16 @@ export async function unreadCount(sql, userId) {
 export async function notify(env, userIds, kind, message, options = {}) {
   const sql = getDb(env);
   const skip = new Set((options.exclude || []).map(Number));
+  // Nobody is notified about something they're looking at right now (e.g. #Suggestions open on screen).
+  // The page a notification opens says what it's about: "/community#suggestions/5" -> "suggestions"; options.view overrides.
+  const view = options.view || viewFromUrl(message?.url);
+  if (view && userIds !== "all") {
+    try {
+      const { hubStub } = await import("./chat.js");
+      const r = await hubStub(env).fetch(`https://hub/internal/viewers?view=${encodeURIComponent(view)}`).then((x) => x.json());
+      for (const id of r.ids || []) skip.add(Number(id));
+    } catch { /* best effort */ }
+  }
   const ids = userIds === "all" ? null : [...new Set(userIds.map(Number).filter((id) => id && !skip.has(id)))];
   if (ids && !ids.length) return 0;
   if (ids && kind && !NOT_IN_INBOX.has(kind)) await toInbox(sql, ids, kind, message).catch((e) => console.error("inbox failed", e));

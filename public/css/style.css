@@ -4305,3 +4305,7 @@ html[data-theme="dark"] .sg-status.implemented, :root:not([data-theme="light"]) 
 .st-ep-source { padding: 10px 12px; border: 1px dashed var(--border-strong); border-radius: 12px; }
 .st-ep-or { margin: 8px 0; text-align: center; color: var(--text-3); font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; }
 .st-ep-progress { width: 100%; height: 8px; }
+.np-keep { flex-wrap: wrap; cursor: default; }
+.np-keep .np-text { flex: 1 1 220px; }
+.np-keep select { flex: 0 1 260px; }
+@media (max-width: 560px) { .np-keep select { flex-basis: 100%; } }

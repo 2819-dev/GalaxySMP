@@ -262,7 +262,18 @@ const SECTIONS = {
       save.disabled = true;
       try { await postJson("/api/notify/prefs", { prefs }); toast("Notification preferences saved."); } catch (e) { toast(e.message); save.disabled = false; }
     });
+    // how long the bell keeps notifications
+    const keep = h("select", { class: "input", id: "np-keep", "aria-label": "Keep notifications for" },
+      ...s.keepOptions.map((o) => h("option", { value: o.key, text: o.name, selected: o.key === s.keep })));
+    keep.value = s.keep;
+    keep.addEventListener("change", async () => {
+      try { await postJson("/api/notify/prefs", { keep: keep.value }); toast("Saved. The bell now keeps: " + keep.options[keep.selectedIndex].text.toLowerCase() + "."); }
+      catch (e) { toast(e.message); }
+    });
     return [
+      card("Notification history", "How long the bell at the top of the page keeps your notifications. Older ones are deleted.",
+        h("label", { class: "np-row np-keep" }, h("span", { class: "np-text" }, h("b", { text: "Keep notifications for" }),
+          h("span", { class: "text-3 small", text: "\"Only unread\" deletes each notification as soon as you've read it." })), keep)),
       card("This device", s.devices ? `${s.devices} device${s.devices === 1 ? "" : "s"} with notifications on.` : null,
         h("div", { class: "np-device" }, iconEl("bell"), h("div", { class: "np-device-text" }, status), toggle)),
       card("Notification preferences", "What you're notified about, on every device.", h("div", { class: "np-list" }, switches), h("div", { class: "acc-card-foot" }, save)),
