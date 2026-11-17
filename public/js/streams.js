@@ -43,38 +43,107 @@ export function renderStreams(root, helpers) {
     catch (e) { toast(e.message); return null; }
   };
 
-  // ---------- the list ----------
+  // ---------- the library ----------
+  // Tabs: Live (live now, coming up, recently live, crews) · Episodes (continue listening, all episodes) · Shows (one per
+  // host or team, each with its own page). One mini player at the bottom plays episodes and remembers where you stopped.
+  const lib = { tab: "live", q: "", sort: "new", show: null, d: null };
+  const player = miniPlayer();
+
   async function showList() {
     view.listing = true;
     stream?.close(); stream = null;
-    try { history.replaceState(null, "", "#stages"); } catch { /* ignore */ }
     let d;
     try { d = await getJson("/api/streams"); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
     if (!view.listing) return;
-    const parts = [];
-    parts.push(h("header", { class: "st-head" },
-      h("div", {}, h("h2", { text: "Stages" }), h("p", { class: "text-2", text: "Live talks, podcasts and screen shares from players and teams. Listen in, chat, and raise your hand to speak." })),
-      d.canHost ? h("button", { class: "btn btn-primary", type: "button", onclick: () => goLiveDialog(d) }, stageIcon(), "Start a stage") : null));
-    if (d.banned) parts.push(h("p", { class: "st-note st-note-bad", text: `Staff stopped you from hosting stages until ${whenText(d.banned.until)}${d.banned.reason ? ` (${d.banned.reason})` : ""}.` }));
-    else if (!d.canHost) parts.push(h("p", { class: "st-note", text: d.hasTeam
+    lib.d = d;
+    const sub = helpers.sub; helpers.sub = null;
+    if (sub && /^\d+$/.test(sub)) return openStream(Number(sub));
+    if (sub && /^ep-\d+$/.test(sub)) { lib.tab = "episodes"; lib.show = null; const e = d.episodes.find((x) => x.id === Number(sub.slice(3))); if (e) player.load(e); }
+    if (sub && /^show-[ut]\d+$/.test(sub)) { lib.tab = "shows"; lib.show = sub.slice(5); }
+    draw();
+  }
+
+  function setHash() {
+    try { history.replaceState(null, "", lib.show ? `#stages/show-${lib.show}` : "#stages"); } catch { /* ignore */ }
+  }
+
+  function draw() {
+    const d = lib.d;
+    setHash();
+    const head = h("header", { class: "st-head" },
+      h("div", {}, h("h2", { text: "Stages" }), h("p", { class: "text-2", text: "Live talks, podcasts and screen shares from players and teams." })),
+      h("div", { class: "st-head-btns" },
+        d.episodeAs.length ? h("button", { class: "btn btn-secondary", type: "button", onclick: () => episodeDialog(d) }, iconEl("plus"), "Add an episode") : null,
+        d.canHost ? h("button", { class: "btn btn-primary", type: "button", onclick: () => goLiveDialog(d) }, stageIcon(), "Start a stage") : null));
+    const note = d.banned ? h("p", { class: "st-note st-note-bad", text: `Staff stopped you from hosting stages until ${whenText(d.banned.until)}${d.banned.reason ? ` (${d.banned.reason})` : ""}.` }) : null;
+    const tab = (key, label, extra) => h("button", { class: "stl-tab", type: "button", role: "tab", "aria-selected": String(lib.tab === key),
+      onclick: () => { lib.tab = key; lib.show = null; draw(); } }, label, extra || null);
+    const tabs = h("div", { class: "stl-tabs", role: "tablist" },
+      tab("live", "Live", d.live.length ? h("span", { class: "stl-tab-live", text: String(d.live.length) }) : null),
+      tab("episodes", "Episodes", d.episodes.length ? h("span", { class: "stl-tab-n", text: String(d.episodes.length) }) : null),
+      tab("shows", "Shows"));
+    // search + sort (Episodes and Shows)
+    const search = h("input", { class: "input st-search", type: "search", placeholder: lib.tab === "shows" ? "Search shows" : "Search episodes", value: lib.q, "aria-label": "Search" });
+    search.value = lib.q;
+    let t = null;
+    search.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { lib.q = search.value.trim().toLowerCase(); drawBody(); }, 200); });
+    const sorter = h("div", { class: "tabs-mini" }, ...[["new", "Newest"], ["popular", "Most played"]].map(([k, n]) =>
+      h("button", { type: "button", "aria-pressed": String(lib.sort === k), text: n, onclick: (ev) => { lib.sort = k; ev.target.parentElement.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === ev.target))); drawBody(); } })));
+    const tools = h("div", { class: "st-tools", hidden: lib.tab === "live" || Boolean(lib.show) }, search, sorter);
+    const body = h("div", { class: "st-lib-body" });
+    box.replaceChildren(...[head, note, tabs, tools, body, player.el].filter(Boolean));
+    function drawBody() { body.replaceChildren(...(lib.show ? showPage(lib.show) : lib.tab === "episodes" ? episodesTab() : lib.tab === "shows" ? showsTab() : liveTab())); }
+    drawBody();
+  }
+
+  // ---------- covers (made from the show's name and the host's head) ----------
+  function hues(name) {
+    let x = 0;
+    for (const c of String(name)) x = (x * 31 + c.codePointAt(0)) >>> 0;
+    return [x % 360, (x >> 9) % 360];
+  }
+  function cover(host, size = "md") {
+    const [a, b] = hues(host.name + (host.type || ""));
+    const el = h("span", { class: `st-cover st-cover-${size}`, style: `background:linear-gradient(135deg,hsl(${a} 70% 42%),hsl(${(a + 60 + b % 80) % 360} 75% 30%))`, "aria-hidden": "true" });
+    if (host.type === "team") el.append(h("span", { class: "st-cover-tag", text: host.tag }));
+    else el.append(face(host.head, host.name, 64));
+    el.append(h("span", { class: "st-cover-ic" }, iconEl("headphones")));
+    return el;
+  }
+  const hostKey = (x) => `${x.host.type === "team" ? "t" : "u"}${x.host.id}`;
+  const fmtLen = (s) => (s ? `${Math.floor(s / 3600) ? `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}` : Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : "");
+  const dateText = (iso) => new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", year: new Date(iso).getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
+
+  function shows() {
+    const d = lib.d, map = new Map();
+    const add = (x, list) => {
+      const k = hostKey(x);
+      if (!map.has(k)) map.set(k, { key: k, host: x.host, episodes: [], live: [], upcoming: [], past: [], following: false, last: 0, plays: 0 });
+      const s = map.get(k);
+      s[list].push(x);
+      if (x.following) s.following = true;
+      s.last = Math.max(s.last, new Date(x.createdAt || x.startedAt || x.scheduledAt || 0).getTime());
+      if (list === "episodes") s.plays += x.plays || 0;
+    };
+    d.episodes.forEach((x) => add(x, "episodes")); d.live.forEach((x) => add(x, "live")); d.upcoming.forEach((x) => add(x, "upcoming")); d.recent.forEach((x) => add(x, "past"));
+    return [...map.values()];
+  }
+  const openShow = (key) => { lib.show = key; lib.tab = "shows"; draw(); document.querySelector(".st-wrap")?.scrollIntoView({ block: "start" }); };
+
+  // ---------- Live tab ----------
+  function liveTab() {
+    const d = lib.d, parts = [];
+    if (!d.canHost && !d.banned) parts.push(h("p", { class: "st-note", text: d.hasTeam
       ? "Your team's organizer and Admins can start team stages. Hosting your own stage and posting episodes are Galaxy Pro+ perks."
       : "Hosting your own stage and posting episodes are Galaxy Pro+ perks. Teams can host stages too: make or join one in Friends > Team." }));
-
     parts.push(h("h3", { class: "st-h" }, h("span", { class: "st-dot" }), "Live now"));
-    if (!d.live.length) parts.push(h("p", { class: "text-3 st-empty", text: "No stages are live right now." }));
-    else parts.push(h("div", { class: "st-grid" }, ...d.live.map((s) => liveCard(s))));
-
+    parts.push(d.live.length ? h("div", { class: "st-grid" }, ...d.live.map((s) => liveCard(s))) : h("p", { class: "text-3 st-empty", text: "No stages are live right now." }));
     parts.push(h("h3", { class: "st-h", text: "Coming up" }));
-    if (!d.upcoming.length) parts.push(h("p", { class: "text-3 st-empty", text: "No stages scheduled yet." }));
-    else parts.push(h("div", { class: "st-list" }, ...d.upcoming.map((s) => upcomingRow(s))));
-
-    // recorded podcast episodes (unlisted or public YouTube videos; the player only loads when you tap Play)
-    parts.push(h("div", { class: "st-ep-head" },
-      h("h3", { class: "st-h", style: "margin:0" }, iconEl("headphones"), "Episodes"),
-      d.episodeAs.length ? h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => episodeDialog(d) }, iconEl("plus"), "Add an episode") : null));
-    if (!d.episodes.length) parts.push(h("p", { class: "text-3 st-empty", text: d.episodeAs.length ? "No episodes yet. Tap Add an episode to upload a podcast or record one right here." : "No episodes yet." }));
-    else parts.push(h("div", { class: "st-eps" }, ...d.episodes.map((e) => episodeCard(e))));
-
+    parts.push(d.upcoming.length ? h("div", { class: "st-list" }, ...d.upcoming.map((s) => upcomingRow(s))) : h("p", { class: "text-3 st-empty", text: "No stages scheduled yet." }));
+    if (d.recent.length) {
+      parts.push(h("h3", { class: "st-h", text: "Recently live" }));
+      parts.push(h("div", { class: "st-list" }, ...d.recent.slice(0, 8).map((s) => pastRow(s))));
+    }
     if (d.crew) parts.push(crewBox(d.crew));
     if (d.crewOf.length) {
       parts.push(h("section", { class: "panel st-box" }, h("h3", { class: "st-h", style: "margin-top:0", text: "Crews you're on" }),
@@ -82,39 +151,157 @@ export function renderStreams(root, helpers) {
           h("span", {}, h("b", { text: c.username }), h("small", { class: "text-3", text: c.role === "editor" ? " · Editor: you can start and run their stages" : " · Speaker: you can speak on their stages" })),
           h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Leave", onclick: () => act({ action: "crew-remove", hostId: c.hostId }, showList) })))));
     }
-    if (d.recent.length) {
-      parts.push(h("h3", { class: "st-h", text: "Recently live" }));
-      parts.push(h("div", { class: "st-list" }, ...d.recent.map((s) => h("div", { class: "st-row st-past" },
-        h("span", { class: "st-row-main" }, h("b", { text: s.title }), hostLabel(s)),
-        h("small", { class: "text-3", text: `${s.peak} listening at most · ${whenText(s.endedAt || s.startedAt)}` })))));
-    }
-    box.replaceChildren(...parts);
-    if (helpers.sub && /^\d+$/.test(helpers.sub)) { const id = Number(helpers.sub); helpers.sub = null; openStream(id); }
-    else if (helpers.sub && /^ep-\d+$/.test(helpers.sub)) {   // a link to one episode: scroll to it and start it
-      const el = box.querySelector(`[data-ep="${helpers.sub.slice(3)}"]`);
-      helpers.sub = null;
-      if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1600); }
-    }
+    return parts;
+  }
+  function pastRow(s) {
+    return h("div", { class: "st-row st-past" },
+      h("button", { class: "st-show-link", type: "button", onclick: () => openShow(hostKey(s)) }, cover(s.host, "xs")),
+      h("span", { class: "st-row-main" }, h("b", { text: s.title }), hostLabel(s)),
+      h("small", { class: "text-3", text: `${s.peak} listening at most · ${whenText(s.endedAt || s.startedAt)}` }));
   }
 
-  function episodeCard(e) {
-    const audio = h("audio", { class: "st-ep-audio", controls: true, preload: "none", src: e.audio });
-    let counted = false;
-    audio.addEventListener("play", () => { if (!counted) { counted = true; postJson("/api/streams", { action: "episode-play", id: e.id }).catch(() => {}); } });
-    const len = e.seconds ? ` · ${Math.floor(e.seconds / 60)}:${String(e.seconds % 60).padStart(2, "0")}` : "";
-    const ago = new Date(e.createdAt).toLocaleDateString([], { month: "short", day: "numeric", year: new Date(e.createdAt).getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
-    return h("article", { class: "panel st-ep", "data-ep": String(e.id) },
-      h("div", { class: "st-ep-main" },
-        h("span", { class: "st-ep-art", "aria-hidden": "true" }, iconEl("headphones")),
-        h("div", { class: "st-ep-info" },
-          h("b", { class: "st-title", text: e.title }),
-          hostLabel(e),
-          e.description ? h("p", { class: "text-2 small", style: "margin:2px 0 0", text: e.description }) : null,
-          h("small", { class: "text-3", text: `${ago}${len} · ${e.plays} play${e.plays === 1 ? "" : "s"}` }))),
-      audio,
-      h("div", { class: "st-card-actions" }, e.manage ? null : followBtn(e),
-        e.manage ? h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": `Remove ${e.title}`, onclick: () => openDialog({ title: "Remove this episode?", body: h("p", { class: "text-2", style: "margin:0", text: "It's taken off #Stages." }),
-          actions: [{ label: "Cancel" }, { label: "Remove", kind: "danger", onClick: () => act({ action: "episode-delete", id: e.id }, showList) }] }) }, iconEl("trash"), "Remove") : null));
+  // ---------- Episodes tab ----------
+  function matches(e) {
+    if (!lib.q) return true;
+    return `${e.title} ${e.description || ""} ${e.host.name} ${e.host.tag || ""}`.toLowerCase().includes(lib.q);
+  }
+  function sorted(list) {
+    return [...list].sort((a, b) => (lib.sort === "popular" ? b.plays - a.plays : 0) || new Date(b.createdAt) - new Date(a.createdAt));
+  }
+  function episodesTab() {
+    const d = lib.d, parts = [];
+    if (!d.episodes.length) return [h("div", { class: "st-empty-big" }, iconEl("headphones"), h("b", { text: "No episodes yet" }),
+      h("p", { class: "text-3", text: d.episodeAs.length ? "Tap Add an episode to upload a podcast or record one right here." : "When hosts post podcast episodes, they show up here." }))];
+    const prog = player.progress();
+    const cont = lib.q ? [] : d.episodes.filter((e) => prog[e.id] && prog[e.id].t > 5 && (!prog[e.id].d || prog[e.id].t < prog[e.id].d - 10))
+      .sort((a, b) => prog[b.id].at - prog[a.id].at).slice(0, 10);
+    if (cont.length) {
+      parts.push(h("h3", { class: "st-h", text: "Continue listening" }));
+      parts.push(h("div", { class: "st-shelf" }, ...cont.map((e) => episodeTile(e, prog[e.id]))));
+    }
+    const list = sorted(d.episodes.filter(matches));
+    parts.push(h("h3", { class: "st-h", text: lib.q ? `Results (${list.length})` : lib.sort === "popular" ? "Most played" : "All episodes" }));
+    parts.push(list.length ? h("div", { class: "st-tiles" }, ...list.map((e) => episodeTile(e, prog[e.id]))) : h("p", { class: "text-3 st-empty", text: "No episodes match your search." }));
+    return parts;
+  }
+  function episodeTile(e, p) {
+    const pct = p?.d ? Math.min(100, Math.round((p.t / p.d) * 100)) : 0;
+    const playing = player.current?.id === e.id;
+    return h("article", { class: `st-tile-ep${playing ? " is-playing" : ""}`, "data-ep": String(e.id) },
+      h("button", { class: "st-tile-art", type: "button", "aria-label": `Play ${e.title}`, onclick: () => player.play(e) },
+        cover(e.host, "lg"), h("span", { class: "st-tile-play" }, iconEl("headphones")), pct ? h("span", { class: "st-tile-bar", style: `width:${pct}%` }) : null),
+      h("b", { class: "st-tile-title", text: e.title }),
+      h("button", { class: "st-tile-show", type: "button", onclick: () => openShow(hostKey(e)) }, e.host.type === "team" ? `[${e.host.tag}] ${e.host.name}` : e.host.name),
+      h("small", { class: "text-3", text: [dateText(e.createdAt), fmtLen(e.seconds), `${e.plays} play${e.plays === 1 ? "" : "s"}`].filter(Boolean).join(" · ") }));
+  }
+
+  // ---------- Shows tab and show pages ----------
+  function showsTab() {
+    let list = shows();
+    if (lib.q) list = list.filter((s) => `${s.host.name} ${s.host.tag || ""} ${s.episodes.map((e) => e.title).join(" ")}`.toLowerCase().includes(lib.q));
+    list.sort((a, b) => (b.live.length - a.live.length) || (lib.sort === "popular" ? b.plays - a.plays : b.last - a.last));
+    if (!list.length) return [h("div", { class: "st-empty-big" }, iconEl("users"), h("b", { text: lib.q ? "No shows match your search" : "No shows yet" }),
+      h("p", { class: "text-3", text: "Every host and team that streams or posts episodes gets a show here." }))];
+    return [h("div", { class: "st-shows" }, ...list.map((s) => h("button", { class: "st-show-card", type: "button", onclick: () => openShow(s.key) },
+      h("span", { class: "st-show-art" }, cover(s.host, "lg"), s.live.length ? h("span", { class: "st-live", text: "LIVE" }) : null),
+      h("b", { class: "st-tile-title", text: s.host.type === "team" ? `[${s.host.tag}] ${s.host.name}` : s.host.name }),
+      h("small", { class: "text-3", text: [`${s.episodes.length} episode${s.episodes.length === 1 ? "" : "s"}`, s.past.length ? `${s.past.length} stage${s.past.length === 1 ? "" : "s"}` : null, s.following ? "Following" : null].filter(Boolean).join(" · ") }))))];
+  }
+  function showPage(key) {
+    const s = shows().find((x) => x.key === key);
+    const back = h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => { lib.show = null; draw(); } }, iconEl("arrow", "flip"), "All shows");
+    if (!s) return [back, h("p", { class: "text-3", text: "This show doesn't have anything yet." })];
+    const total = s.episodes.reduce((n, e) => n + (e.seconds || 0), 0);
+    const first = sorted(s.episodes)[0];
+    const parts = [back,
+      h("section", { class: "st-show-hero" }, cover(s.host, "xl"),
+        h("div", { class: "st-show-info" },
+          h("span", { class: "st-eyebrow", text: s.host.type === "team" ? "Team show" : "Show" }),
+          h("h2", { text: s.host.type === "team" ? `[${s.host.tag}] ${s.host.name}` : s.host.name }),
+          h("p", { class: "text-3", text: [`${s.episodes.length} episode${s.episodes.length === 1 ? "" : "s"}`, total ? `${Math.round(total / 60)} min` : null, `${s.plays} play${s.plays === 1 ? "" : "s"}`].filter(Boolean).join(" · ") }),
+          h("div", { class: "st-card-actions" },
+            first ? h("button", { class: "btn btn-primary btn-sm", type: "button", onclick: () => player.play(first) }, iconEl("headphones"), "Play latest") : null,
+            (s.episodes[0] || s.live[0] || s.upcoming[0] || s.past[0])?.manage ? null : followBtn({ host: s.host, following: s.following }))))];
+    if (s.live.length) { parts.push(h("h3", { class: "st-h" }, h("span", { class: "st-dot" }), "Live now")); parts.push(h("div", { class: "st-grid" }, ...s.live.map((x) => liveCard(x)))); }
+    if (s.upcoming.length) { parts.push(h("h3", { class: "st-h", text: "Coming up" })); parts.push(h("div", { class: "st-list" }, ...s.upcoming.map((x) => upcomingRow(x)))); }
+    parts.push(h("h3", { class: "st-h", text: "Episodes" }));
+    parts.push(s.episodes.length ? h("div", { class: "st-ep-list" }, ...sorted(s.episodes).map((e) => episodeRow(e))) : h("p", { class: "text-3 st-empty", text: "No episodes yet." }));
+    if (s.past.length) { parts.push(h("h3", { class: "st-h", text: "Past stages" })); parts.push(h("div", { class: "st-list" }, ...s.past.map((x) => pastRow(x)))); }
+    return parts;
+  }
+  function episodeRow(e) {
+    const p = player.progress()[e.id];
+    const pct = p?.d ? Math.min(100, Math.round((p.t / p.d) * 100)) : 0;
+    return h("div", { class: `st-ep-row${player.current?.id === e.id ? " is-playing" : ""}`, "data-ep": String(e.id) },
+      h("button", { class: "st-ep-play", type: "button", "aria-label": `Play ${e.title}`, onclick: () => player.play(e) }, iconEl("headphones")),
+      h("div", { class: "st-ep-row-main" },
+        h("b", { text: e.title }),
+        e.description ? h("p", { class: "text-2 small", style: "margin:2px 0 0", text: e.description }) : null,
+        h("small", { class: "text-3", text: [dateText(e.createdAt), fmtLen(e.seconds), `${e.plays} play${e.plays === 1 ? "" : "s"}`, pct ? `${pct}% listened` : null].filter(Boolean).join(" · ") })),
+      e.manage ? h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": `Remove ${e.title}`, onclick: () => openDialog({ title: "Remove this episode?", body: h("p", { class: "text-2", style: "margin:0", text: "It's taken off #Stages." }),
+        actions: [{ label: "Cancel" }, { label: "Remove", kind: "danger", onClick: () => act({ action: "episode-delete", id: e.id }, showList) }] }) }, iconEl("trash")) : null);
+  }
+
+  // ---------- the mini player ----------
+  function miniPlayer() {
+    const KEY = "gsmp-ep-progress";
+    const read = () => { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { return {}; } };
+    const write = (p) => { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* ignore */ } };
+    const audio = h("audio", { preload: "metadata" });
+    const art = h("span", { class: "st-mp-art" });
+    const title = h("b", { class: "st-mp-title" });
+    const showName = h("small", { class: "text-3 st-mp-show" });
+    const playBtn = h("button", { class: "st-mp-btn st-mp-main", type: "button", "aria-label": "Play" });
+    const back = h("button", { class: "st-mp-btn", type: "button", "aria-label": "Back 15 seconds", text: "−15" });
+    const fwd = h("button", { class: "st-mp-btn", type: "button", "aria-label": "Forward 30 seconds", text: "+30" });
+    const bar = h("input", { class: "st-mp-bar", type: "range", min: 0, max: 1000, value: 0, "aria-label": "Position" });
+    const time = h("small", { class: "text-3 st-mp-time", text: "0:00" });
+    const close = h("button", { class: "icon-btn st-mp-close", type: "button", "aria-label": "Close player" }, iconEl("x"));
+    const el = h("div", { class: "st-mp", hidden: true }, art, h("div", { class: "st-mp-info" }, title, showName), h("div", { class: "st-mp-ctrl" }, back, playBtn, fwd), h("div", { class: "st-mp-seek" }, bar, time), close, audio);
+    const drawBtn = () => { playBtn.replaceChildren(audio.paused ? "▶" : "❚❚"); playBtn.setAttribute("aria-label", audio.paused ? "Play" : "Pause"); };
+    const api = { el, current: null, progress: read };
+    let counted = new Set(), lastSave = 0;
+    api.load = (e) => {
+      api.current = e;
+      el.hidden = false;
+      art.replaceChildren(cover(e.host, "sm"));
+      title.textContent = e.title;
+      showName.textContent = e.host.type === "team" ? `[${e.host.tag}] ${e.host.name}` : e.host.name;
+      audio.src = e.audio;
+      const p = read()[e.id];
+      audio.addEventListener("loadedmetadata", () => { if (p && p.t > 5 && (!audio.duration || p.t < audio.duration - 10)) audio.currentTime = p.t; }, { once: true });
+      drawBtn();
+      document.querySelectorAll(".is-playing").forEach((x) => x.classList.remove("is-playing"));
+      document.querySelectorAll(`[data-ep="${e.id}"]`).forEach((x) => x.classList.add("is-playing"));
+    };
+    api.play = (e) => {
+      if (api.current?.id !== e.id) api.load(e);
+      audio.play().catch(() => {});
+      if (!counted.has(e.id)) { counted.add(e.id); postJson("/api/streams", { action: "episode-play", id: e.id }).catch(() => {}); }
+    };
+    playBtn.addEventListener("click", () => { if (!api.current) return; audio.paused ? api.play(api.current) : audio.pause(); });
+    back.addEventListener("click", () => { audio.currentTime = Math.max(0, audio.currentTime - 15); });
+    fwd.addEventListener("click", () => { audio.currentTime = Math.min(audio.duration || 1e9, audio.currentTime + 30); });
+    bar.addEventListener("input", () => { if (audio.duration) audio.currentTime = (bar.value / 1000) * audio.duration; });
+    close.addEventListener("click", () => { audio.pause(); el.hidden = true; api.current = null; document.querySelectorAll(".is-playing").forEach((x) => x.classList.remove("is-playing")); });
+    audio.addEventListener("play", drawBtn);
+    audio.addEventListener("pause", () => { drawBtn(); save(true); });
+    audio.addEventListener("timeupdate", () => {
+      if (audio.duration) bar.value = String(Math.round((audio.currentTime / audio.duration) * 1000));
+      time.textContent = `${fmtLen(Math.floor(audio.currentTime)) || "0:00"}${audio.duration ? ` / ${fmtLen(Math.floor(audio.duration))}` : ""}`;
+      save(false);
+    });
+    audio.addEventListener("ended", () => { const p = read(); delete p[api.current?.id]; write(p); drawBtn(); });
+    function save(now) {
+      if (!api.current || (!now && Date.now() - lastSave < 5000)) return;
+      lastSave = Date.now();
+      const p = read();
+      p[api.current.id] = { t: Math.floor(audio.currentTime), d: Math.floor(audio.duration || 0), at: Date.now() };
+      const keys = Object.keys(p);
+      if (keys.length > 50) keys.sort((a, b) => p[a].at - p[b].at).slice(0, keys.length - 50).forEach((k) => delete p[k]);
+      write(p);
+    }
+    return api;
   }
 
   // Add an episode: upload an audio file, or record one right here (voice only)

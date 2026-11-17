@@ -110,14 +110,14 @@ export async function list(request, env) {
                EXISTS (SELECT 1 FROM stream_reminders r WHERE r.stream_id = s.id AND r.user_id = ${user.id}) AS reminding
           FROM streams_v s
          WHERE s.status = 'scheduled' AND s.scheduled_at > now() - interval '3 hours' ORDER BY s.scheduled_at LIMIT 20`,
-    sql`SELECT s.* FROM streams_v s WHERE s.status = 'ended' AND s.started_at IS NOT NULL ORDER BY s.ended_at DESC LIMIT 6`,
+    sql`SELECT s.* FROM streams_v s WHERE s.status = 'ended' AND s.started_at IS NOT NULL ORDER BY s.ended_at DESC LIMIT 30`,
     sql`SELECT host_user_id, team_id FROM stream_follows WHERE user_id = ${user.id}`,
     sql`SELECT c.user_id, c.role, u.username FROM stream_crew c JOIN users u ON u.id = c.user_id WHERE c.host_user_id = ${user.id} ORDER BY c.created_at`,
     sql`SELECT c.host_user_id, c.role, u.username FROM stream_crew c JOIN users u ON u.id = c.host_user_id WHERE c.user_id = ${user.id}`,
     sql`SELECT e.id, e.title, e.description, e.seconds, e.plays, e.created_at, e.host_user_id, e.team_id, e.created_by,
                hu.username AS host_name, hp.xuid AS host_xuid, hp.head_at AS host_head_at, hp.gamerpic_at AS host_gamerpic_at, t.name AS team_name, t.tag AS team_tag
           FROM stream_episodes e LEFT JOIN users hu ON hu.id = e.host_user_id LEFT JOIN players hp ON hp.uuid = hu.mc_uuid LEFT JOIN teams t ON t.id = e.team_id
-         WHERE e.deleted_at IS NULL AND e.status = 'ready' AND e.r2_key IS NOT NULL ORDER BY e.created_at DESC LIMIT 30`,
+         WHERE e.deleted_at IS NULL AND e.status = 'ready' AND e.r2_key IS NOT NULL ORDER BY e.created_at DESC LIMIT 300`,
   ]);
   const counts = await Promise.all(live.map((s) => roomStub(env, s.id).fetch("https://stream/internal/count").then((r) => r.json()).catch(() => ({ viewers: 0, stage: [] }))));
   const followU = new Set(follows.filter((f) => f.host_user_id).map((f) => Number(f.host_user_id)));

@@ -422,6 +422,19 @@ Also: when staff change the status of your suggestion, you now always get a noti
 
 **No more notifications for what you're already looking at:** if you have a channel, DM or page open in Community, you won't get a notification about it.`,
   },
+  {
+    id: "2026-11-17-stages-library",
+    title: "A new home for Stages",
+    body: `**#Stages is now a library**, organized into three tabs:
+
+- **Live:** stages happening now, coming up and recently live.
+- **Episodes:** every podcast episode, with search and a Newest / Most played sort.
+- **Shows:** every host and team gets their own show page with all their episodes, past stages and a Follow button.
+
+**Continue listening:** the new player at the bottom remembers where you stopped, so you can pick up an episode right where you left off. It has buttons to skip back 15 seconds or forward 30.
+
+**Covers:** every show gets its own colorful cover automatically.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
