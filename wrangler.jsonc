@@ -32,6 +32,8 @@
       { "name": "STREAMS", "class_name": "StreamRoom" }
     ]
   },
+  // Stage recordings (Cloudflare R2, capped at 9.5 GB in src/routes/recordings.js to stay free)
+  "r2_buckets": [{ "binding": "RECORDINGS", "bucket_name": "galaxysmp-recordings" }],
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["CommunityHub"] },
     { "tag": "v2", "new_sqlite_classes": ["VoiceHub"] },

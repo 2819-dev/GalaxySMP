@@ -24,12 +24,14 @@ const MAX_SCHEDULED = 5;             // upcoming streams per member / team
 const MAX_CREW = 12;
 
 export const roomStub = (env, id) => env.STREAMS.get(env.STREAMS.idFromName(`stream:${id}`));
-const isStaffHost = (user) => Boolean(user.owner) || can(user, "mod_panel");
+// Hosting your own stage, and posting episodes (even for a team), is for Galaxy Pro+ members and members the
+// Owner has allowed (Control Panel > Reports > Allowed to host). The Owner can always. Team stages are open to the
+// team's organizer and Admins.
 const isMod = (user) => Boolean(user.owner) || can(user, "moderate_streams");
 
 async function me(sql, user) {
   const [r] = await sql`
-    SELECT u.stream_banned_until, u.stream_ban_reason, p.xuid, p.gamertag, p.head_at, p.gamerpic_at,
+    SELECT u.stream_banned_until, u.stream_ban_reason, u.stream_allowed, p.xuid, p.gamertag, p.head_at, p.gamerpic_at,
            (SELECT s.plan FROM subscriptions s WHERE s.xuid = p.xuid AND (s.expires_at IS NULL OR s.expires_at > now())) AS plan,
            m.team_id, m.role AS team_role, t.leader_xuid, t.name AS team_name, t.tag AS team_tag
       FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid
@@ -40,7 +42,7 @@ async function me(sql, user) {
   return {
     ...r, banned: banned ? { until: r.stream_banned_until, reason: r.stream_ban_reason || "" } : null,
     head: r?.xuid ? headUrlFor(r) : null,
-    soloHost: !banned && (isStaffHost(user) || r?.plan === "plus" || r?.plan === "pro"),
+    soloHost: !banned && (Boolean(user.owner) || r?.plan === "pro" || Boolean(r?.stream_allowed)),
     team: r?.team_id ? { id: Number(r.team_id), name: r.team_name, tag: r.team_tag, manage: teamManager } : null,
   };
 }
@@ -48,14 +50,12 @@ async function me(sql, user) {
 // Can this member host on their own? (used for a crew Editor starting a stream for their host)
 async function hostAllowed(env, sql, hostId) {
   const [h] = await sql`
-    SELECT u.stream_banned_until, u.username, u.platform,
-           (SELECT s.plan FROM subscriptions s JOIN players p ON p.xuid = s.xuid WHERE p.uuid = u.mc_uuid AND (s.expires_at IS NULL OR s.expires_at > now()) LIMIT 1) AS plan,
-           EXISTS (SELECT 1 FROM players pl JOIN player_ranks x ON x.xuid = pl.xuid JOIN ranks rk ON rk.id = x.rank_id
-                    WHERE pl.uuid = u.mc_uuid AND 'mod_panel' = ANY(rk.web_perms)) AS staff
+    SELECT u.stream_banned_until, u.stream_allowed, u.username, u.platform,
+           (SELECT s.plan FROM subscriptions s JOIN players p ON p.xuid = s.xuid WHERE p.uuid = u.mc_uuid AND (s.expires_at IS NULL OR s.expires_at > now()) LIMIT 1) AS plan
       FROM users u WHERE u.id = ${hostId}`;
   if (!h) return false;
   if (h.stream_banned_until && new Date(h.stream_banned_until) > new Date()) return false;
-  return h.plan === "plus" || h.plan === "pro" || h.staff || isOwner(env, h.username, h.platform === "bedrock");
+  return h.plan === "pro" || Boolean(h.stream_allowed) || isOwner(env, h.username, h.platform === "bedrock");
 }
 
 // What `user` may do on `s` (a streams row): manage (run it), stage (be on it), mod (staff)
@@ -130,7 +130,8 @@ export async function list(request, env) {
   const manageable = async (s) => (await rightsFor(sql, user, s, m)).manage;
   return json({
     ok: true, now: new Date().toISOString(),
-    canHost: as.length > 0, as, banned: m.banned, soloHost: m.soloHost, mod: isMod(user),
+    canHost: as.length > 0, as, banned: m.banned, soloHost: m.soloHost, mod: isMod(user), owner: Boolean(user.owner),
+    episodeAs: m.soloHost ? as : [],   // posting episodes: Pro+ or allowed members only (for themselves, their team or a host they edit for)
     hasTeam: Boolean(m.team), maxLive: MAX_LIVE,
     live: await Promise.all(live.map(async (s, i) => streamOut(s, { viewers: counts[i].viewers || 0, onStage: counts[i].stage || [], following: following(s), manage: await manageable(s) }))),
     upcoming: await Promise.all(upcoming.map(async (s) => streamOut(s, { reminders: s.reminders, reminding: s.reminding, following: following(s), manage: await manageable(s) }))),
@@ -210,7 +211,8 @@ export function youtubeId(url) {
 
 // "me" | "team" | "host:<id>" -> who an episode or stage belongs to (same rules as starting a stage)
 async function whoHosts(sql, env, user, m, as) {
-  if (as === "me") { if (!m.soloHost) throw new HttpError(403, "Hosting your own podcast is a Galaxy+ and Galaxy Pro+ perk. You can also post for your team."); return { hostId: user.id, teamId: null }; }
+  if (!m.soloHost) throw new HttpError(403, "Posting episodes is a Galaxy Pro+ perk (or ask the Owner to allow you).");
+  if (as === "me") return { hostId: user.id, teamId: null };
   if (as === "team") { if (!m.team?.manage) throw new HttpError(403, "Only your team's organizer and Admins can post for the team."); return { hostId: null, teamId: m.team.id }; }
   if (as.startsWith("host:")) {
     const hostId = Number(as.slice(5)) || 0;
@@ -238,7 +240,7 @@ export async function act(request, env) {
       if (m.banned) throw new HttpError(403, `You can't host stages right now${m.banned.reason ? ` (${m.banned.reason})` : ""}.`);
       let hostId = null, teamId = null;
       const as = String(b.as || "me");
-      if (as === "me") { if (!m.soloHost) throw new HttpError(403, "Hosting your own stage is a Galaxy+ and Galaxy Pro+ perk. You can also host one with your team."); hostId = user.id; }
+      if (as === "me") { if (!m.soloHost) throw new HttpError(403, "Hosting your own stage is a Galaxy Pro+ perk (or ask the Owner to allow you). You can also host one with your team."); hostId = user.id; }
       else if (as === "team") { if (!m.team?.manage) throw new HttpError(403, "Only your team's organizer and Admins can start a team stage."); teamId = m.team.id; }
       else if (as.startsWith("host:")) {
         hostId = Number(as.slice(5)) || 0;
@@ -351,7 +353,7 @@ export async function act(request, env) {
       return json({ ok: true, message: b.on === false ? "Unfollowed." : "Following. You'll get a notification when they go live." });
     }
     case "crew-add": {   // { name, role }
-      if (!m.soloHost) throw new HttpError(403, "A stage crew is for members who can host their own stage (Galaxy+ and Galaxy Pro+).");
+      if (!m.soloHost) throw new HttpError(403, "A stage crew is for members who can host their own stage (Galaxy Pro+, or allowed by the Owner).");
       const name = String(b.name || "").trim().replace(/^@/, "").toLowerCase();
       const [u] = await sql`SELECT u.id, u.username FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid
                              WHERE (u.username_lower = ${name} OR lower(p.gamertag) = ${name}) AND NOT u.banned AND NOT u.is_bot LIMIT 1`;
@@ -386,6 +388,21 @@ export async function act(request, env) {
       await import("./gamemod.js").then((g) => g.notifyStaff(env, sql)).catch(() => {});
       return json({ ok: true, message: "Thanks. Your report was sent to staff." });
     }
+    case "allow":
+    case "disallow": {   // the Owner lets a member host stages and post episodes without Pro+ { name } / { userId }
+      if (!user.owner) throw new HttpError(403, "Only the Owner can do that.");
+      let uid = Number(b.userId) || 0;
+      if (!uid && b.name) {
+        const name = String(b.name).trim().replace(/^@/, "").toLowerCase();
+        const [u] = await sql`SELECT u.id FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid WHERE (u.username_lower = ${name} OR lower(p.gamertag) = ${name}) AND NOT u.is_bot LIMIT 1`;
+        if (!u) throw new HttpError(404, "No member with that name.");
+        uid = Number(u.id);
+      }
+      const [u] = await sql`UPDATE users SET stream_allowed = ${b.action === "allow"} WHERE id = ${uid} RETURNING id, username`;
+      if (!u) throw new HttpError(404, "No member with that name.");
+      if (b.action === "allow") await notify(env, [uid], "streams", { title: "You can host stages now", body: "Start your own stage or post podcast episodes in #Stages.", url: "/community#stages", tag: "stream-allowed" }).catch(() => {});
+      return json({ ok: true, message: b.action === "allow" ? `${u.username} can host stages and post episodes now.` : `${u.username} can't host their own stages any more.` });
+    }
     case "ban":
     case "unban": {   // staff: stop a member from streaming { userId, days, reason }
       if (!isMod(user)) throw new HttpError(403, "Only staff can do that.");
@@ -415,13 +432,15 @@ export async function staffList(request, env) {
   const user = await requireUser(request, env);
   if (!isMod(user)) throw new HttpError(403, "Only staff can see this.");
   const sql = getDb(env);
-  const [live, banned] = await Promise.all([
+  const [live, banned, allowed] = await Promise.all([
     sql`SELECT s.* FROM streams_v s WHERE s.status = 'live' ORDER BY s.started_at`,
     sql`SELECT id, username, stream_banned_until, stream_ban_reason FROM users WHERE stream_banned_until > now() ORDER BY stream_banned_until`,
+    sql`SELECT id, username FROM users WHERE stream_allowed ORDER BY username_lower`,
   ]);
   const counts = await Promise.all(live.map((s) => roomStub(env, s.id).fetch("https://stream/internal/count").then((r) => r.json()).catch(() => ({ viewers: 0, stage: [] }))));
   return json({ ok: true, live: live.map((s, i) => streamOut(s, { viewers: counts[i].viewers, onStage: counts[i].stage })),
-    banned: banned.map((u) => ({ id: Number(u.id), username: u.username, until: u.stream_banned_until, reason: u.stream_ban_reason || "" })) });
+    banned: banned.map((u) => ({ id: Number(u.id), username: u.username, until: u.stream_banned_until, reason: u.stream_ban_reason || "" })),
+    owner: Boolean(user.owner), allowed: allowed.map((u) => ({ id: Number(u.id), username: u.username })) });
 }
 
 // Scheduled streams for #Events (upcoming, not started yet).

@@ -57,8 +57,8 @@ export function renderStreams(root, helpers) {
       d.canHost ? h("button", { class: "btn btn-primary", type: "button", onclick: () => goLiveDialog(d) }, stageIcon(), "Start a stage") : null));
     if (d.banned) parts.push(h("p", { class: "st-note st-note-bad", text: `Staff stopped you from hosting stages until ${whenText(d.banned.until)}${d.banned.reason ? ` (${d.banned.reason})` : ""}.` }));
     else if (!d.canHost) parts.push(h("p", { class: "st-note", text: d.hasTeam
-      ? "Your team's organizer and Admins can start team stages. Hosting your own stage is a Galaxy+ and Galaxy Pro+ perk."
-      : "Hosting your own stage is a Galaxy+ and Galaxy Pro+ perk. Teams can host stages too: make or join one in Friends > Team." }));
+      ? "Your team's organizer and Admins can start team stages. Hosting your own stage and posting episodes are Galaxy Pro+ perks."
+      : "Hosting your own stage and posting episodes are Galaxy Pro+ perks. Teams can host stages too: make or join one in Friends > Team." }));
 
     parts.push(h("h3", { class: "st-h" }, h("span", { class: "st-dot" }), "Live now"));
     if (!d.live.length) parts.push(h("p", { class: "text-3 st-empty", text: "No stages are live right now." }));
@@ -71,8 +71,8 @@ export function renderStreams(root, helpers) {
     // recorded podcast episodes (unlisted or public YouTube videos; the player only loads when you tap Play)
     parts.push(h("div", { class: "st-ep-head" },
       h("h3", { class: "st-h", style: "margin:0" }, iconEl("headphones"), "Episodes"),
-      d.canHost ? h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => episodeDialog(d) }, iconEl("plus"), "Add an episode") : null));
-    if (!d.episodes.length) parts.push(h("p", { class: "text-3 st-empty", text: d.canHost ? "No episodes yet. Record a podcast, upload it to YouTube as Unlisted, and add it here." : "No episodes yet." }));
+      d.episodeAs.length ? h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => episodeDialog(d) }, iconEl("plus"), "Add an episode") : null));
+    if (!d.episodes.length) parts.push(h("p", { class: "text-3 st-empty", text: d.episodeAs.length ? "No episodes yet. Record a podcast, upload it to YouTube as Unlisted, and add it here." : "No episodes yet." }));
     else parts.push(h("div", { class: "st-eps" }, ...d.episodes.map((e) => episodeCard(e))));
 
     if (d.crew) parts.push(crewBox(d.crew));
@@ -126,7 +126,8 @@ export function renderStreams(root, helpers) {
   }
 
   function episodeDialog(d) {
-    const as = h("select", { class: "input", id: "ep-as" }, ...d.as.map((a) => h("option", { value: a.key, text: a.label })));
+    const opts = d.episodeAs;
+    const as = h("select", { class: "input", id: "ep-as" }, ...opts.map((a) => h("option", { value: a.key, text: a.label })));
     const url = h("input", { class: "input", id: "ep-url", type: "url", inputmode: "url", placeholder: "https://youtu.be/…" });
     const title = h("input", { class: "input", id: "ep-title", maxlength: 80, placeholder: "e.g. Episode 1: Our first week on GalaxySMP" });
     const desc = h("textarea", { class: "input", id: "ep-desc", maxlength: 300, rows: 3, placeholder: "What's it about? (optional)" });
@@ -135,9 +136,9 @@ export function renderStreams(root, helpers) {
         h("li", { text: "Record your podcast (a stage recording works too)." }),
         h("li", { text: "Upload it to YouTube and set Visibility to Unlisted (only people with the link can find it). Private videos can't be played by anyone else." }),
         h("li", { text: "Copy the video's Share link and paste it below." })),
-      d.as.length > 1 ? field("Who's it from", as) : null, field("YouTube link", url), field("Title", title), field("Description", desc)),
+      opts.length > 1 ? field("Who's it from", as) : null, field("YouTube link", url), field("Title", title), field("Description", desc)),
     actions: [{ label: "Cancel" }, { label: "Add episode", kind: "primary", onClick: async () => {
-      const r = await postJson("/api/streams", { action: "episode-add", as: d.as.length > 1 ? as.value : d.as[0].key, url: url.value, title: title.value, description: desc.value });
+      const r = await postJson("/api/streams", { action: "episode-add", as: opts.length > 1 ? as.value : opts[0].key, url: url.value, title: title.value, description: desc.value });
       toast(r.message); showList();
     } }] });
   }

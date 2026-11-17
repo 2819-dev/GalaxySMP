@@ -19,11 +19,22 @@ export function setupStreamsMod({ loaders, toast }) {
         h("button", { class: "btn btn-danger btn-sm", type: "button", text: "End", onclick: () => openDialog({ title: `End "${s.title}"?`, body: h("p", { class: "text-2", text: "Everyone on it sees that staff ended it." }),
           actions: [{ label: "Cancel" }, { label: "End stage", kind: "danger", onClick: () => act({ action: "end", id: s.id }) }] }) }))))
       : [h("div", { class: "panel empty", text: "No stages are live right now." })]));
+    const allowBox = document.getElementById("streams-allowed");
+    allowBox.hidden = !d.owner;
+    if (d.owner) document.getElementById("sa-list").replaceChildren(...(d.allowed.length ? d.allowed.map((u) => h("div", { class: "member-row" },
+      h("div", { class: "info" }, h("strong", { text: u.username })),
+      h("div", { class: "row-actions" }, h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: () => act({ action: "disallow", userId: u.id }) }))))
+      : [h("p", { class: "text-3 small", style: "margin:0", text: "Nobody yet. Pro+ members can always host." })]));
     banned.replaceChildren(...(d.banned.length ? [h("h3", { style: "font-size:.95rem;margin:0 0 8px", text: "Stopped from hosting stages" }),
       ...d.banned.map((u) => h("div", { class: "member-row" },
         h("div", { class: "info" }, h("strong", { text: u.username }), h("span", { text: `Until ${new Date(u.until).toLocaleDateString()}${u.reason ? ` · ${u.reason}` : ""}` })),
         h("div", { class: "row-actions" }, h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Allow again", onclick: () => act({ action: "unban", userId: u.id }) }))))] : []));
   }
+  document.getElementById("sa-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const n = document.getElementById("sa-name");
+    if (n.value.trim()) act({ action: "allow", name: n.value }).then(() => { n.value = ""; });
+  });
   function banDialog(host) {
     const days = h("select", { class: "input", id: "sm-days" }, ...[[1, "1 day"], [7, "1 week"], [30, "30 days"], [3650, "Permanently"]].map(([v, t]) => h("option", { value: String(v), text: t })));
     const reason = h("input", { class: "input", id: "sm-reason", maxlength: 120, placeholder: "Reason (they'll see it)" });

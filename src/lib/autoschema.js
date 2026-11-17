@@ -265,6 +265,10 @@ const PENDING = [
     "CREATE INDEX IF NOT EXISTS stream_recordings_time_idx ON stream_recordings (started_at DESC)",
     "INSERT INTO schema_migrations (version) VALUES ('0073_stage_recordings') ON CONFLICT DO NOTHING",
   ]],
+  ["0074_stream_allowed", [
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS stream_allowed boolean NOT NULL DEFAULT false",
+    "INSERT INTO schema_migrations (version) VALUES ('0074_stream_allowed') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;
