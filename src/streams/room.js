@@ -7,7 +7,7 @@
 // bringing a viewer on stage, and ending the stream. The stream itself is a row in Postgres (streams).
 import { DurableObject } from "cloudflare:workers";
 import { getDb } from "../lib/db.js";
-import { checkMessage, compileWordList } from "../lib/filter.js";
+import { checkMessage, compileWordList, findProfanity } from "../lib/filter.js";
 
 const RTC_BASE = "https://rtc.live.cloudflare.com/v1/apps";
 const CHAT_KEEP = 80;
@@ -60,6 +60,7 @@ export class StreamRoom extends DurableObject {
       viewers: all.length,
       invited: all.filter((a) => a.invited).map((a) => a.id),
       hands: all.filter((a) => a.hand && !a.onStage).map((a) => ({ id: a.id, username: a.username, head: a.head })),
+      recording: all.filter((a) => a.recording).map((a) => a.username),   // everyone sees a "Recording" sign
     };
   }
   sendState() { this.broadcast(this.state()); this.ctx.waitUntil(this.trackIdle()); }
@@ -96,6 +97,13 @@ export class StreamRoom extends DurableObject {
                            peak_viewers = greatest(peak_viewers, ${n}) WHERE id = ${this.info.id} AND status <> 'ended'`.catch((e) => console.error("stream end", e));
     this.broadcast({ type: "ended", reason });
     for (const ws of this.sockets()) { try { ws.close(1000, "ended"); } catch { /* gone */ } }
+  }
+
+  async captionWords() {   // bad words in captions are shown as •••
+    if (this.capWords && Date.now() - this.capWordsAt < 60_000) return this.capWords;
+    this.capWords = compileWordList(await getDb(this.env)`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`);
+    this.capWordsAt = Date.now();
+    return this.capWords;
   }
 
   // ---------- connections ----------
@@ -136,7 +144,7 @@ export class StreamRoom extends DurableObject {
     const [client, server] = Object.values(pair);
     this.ctx.acceptWebSocket(server, ["viewer", `user:${user.id}`]);
     server.serializeAttachment({ ...user, onStage: false, invited: false, guest: false, sessionId: null, tracks: [], mic: false, cam: false, screen: false, lastChat: 0 });
-    this.send(server, { type: "hello", you: user.id, rights: { manage: user.manage, stage: user.stage, mod: user.mod }, chat: this.chat, reactions: REACTIONS });
+    this.send(server, { type: "hello", you: user.id, rights: { manage: user.manage, stage: user.stage, mod: user.mod, record: Boolean(user.manage || user.owner) }, chat: this.chat, reactions: REACTIONS });
     this.sendState();
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -333,6 +341,22 @@ export class StreamRoom extends DurableObject {
       case "end": {
         if (!a.manage && !a.mod) throw new Error("Only the stage's hosts and staff can end it.");
         await this.end(a.manage ? "The host ended the stage." : "Staff ended this stage.", a.username);
+        return;
+      }
+      case "record": {   // hosts and the site Owner record the stage on their own device; everyone is told
+        if (!a.manage && !a.owner) throw new Error("Only the stage's hosts can record it.");
+        this.update(ws, { recording: Boolean(msg.on) });
+        this.sendState();
+        return reply({ ok: true });
+      }
+      case "caption": {  // live captions: a speaker's browser turns their voice into text and sends it here
+        if (!a.onStage) return;
+        const now = Date.now();
+        if (!msg.final && now - (a.lastCap || 0) < 250) return;
+        this.update(ws, { lastCap: now });
+        const words = await this.captionWords();
+        const text = String(msg.text || "").slice(-220).split(/(\s+)/).map((w) => (w.trim() && findProfanity(w, words) ? "•".repeat(Math.min(w.length, 5)) : w)).join("");
+        this.broadcast({ type: "caption", id: a.id, username: a.username, text, final: Boolean(msg.final) });
         return;
       }
       case "viewers": {   // the list of people watching (for hosts: bring on stage, remove)

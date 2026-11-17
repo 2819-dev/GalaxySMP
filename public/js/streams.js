@@ -218,14 +218,24 @@ class Player {
     if (this.rights.mod && !this.rights.manage && s.host.type === "user") menu.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => this.banDialog() }, iconEl("shield"), "Stop hosting"));
     if (this.rights.manage || this.rights.mod) menu.push(h("button", { class: "btn btn-danger btn-sm", type: "button", text: "End stage", onclick: () => this.endDialog() }));
     else menu.push(h("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: () => this.reportDialog() }, iconEl("flag"), "Report"));
+    if (this.rights.record) {
+      this.recBtn = h("button", { class: "btn btn-ghost btn-sm st-rec-btn", type: "button", onclick: () => (this.recorder ? this.stopRecording() : this.startRecording()) });
+      menu.unshift(this.recBtn);
+    }
+    this.ccOn = (() => { try { return localStorage.getItem("gsmp-cc") !== "0"; } catch { return true; } })();
+    this.ccBtn = h("button", { class: "btn btn-ghost btn-sm st-cc-btn", type: "button", "aria-pressed": String(this.ccOn), title: "Live captions", onclick: () => this.toggleCC() }, "CC");
+    menu.unshift(this.ccBtn);
+    this.recBadge = h("span", { class: "st-rec", hidden: true }, "● Recording");
     this.titleEl = h("h2", { class: "st-ptitle", text: s.title });
     const head = h("header", { class: "st-phead" },
       h("div", { class: "st-phead-main" }, ui.back,
-        h("div", {}, h("div", { class: "st-ptitle-row" }, h("span", { class: "st-live", text: "LIVE" }), this.titleEl, this.viewersEl), hostLabel(s))),
+        h("div", {}, h("div", { class: "st-ptitle-row" }, h("span", { class: "st-live", text: "LIVE" }), this.titleEl, this.viewersEl, this.recBadge), hostLabel(s))),
       h("div", { class: "st-phead-btns" }, this.rights.manage ? null : ui.followBtn(s), ...menu));
     this.stageEl = h("div", { class: "st-stage" });
     this.audienceEl = h("div", { class: "st-audience" });
     this.floatEl = h("div", { class: "st-floats", "aria-hidden": "true" });
+    this.capEl = h("div", { class: "st-captions", "aria-live": "polite", hidden: !this.ccOn });
+    this.captions = new Map();   // speaker id -> { username, text, at }
     this.startBtn = h("button", { class: "btn btn-primary st-start", type: "button", onclick: () => this.start() },
       iconEl(ui.autoStage ? "mic" : "headphones"), ui.autoStage ? "Start speaking" : "Join the stage");
     this.gate = h("div", { class: "st-gate" }, this.startBtn, h("p", { class: "text-3 small", text: ui.autoStage ? "Your browser will ask to use your microphone. You can share your screen or turn on your camera after." : "You'll join the audience. Raise your hand to ask to speak." }));
@@ -236,7 +246,7 @@ class Player {
     const chatForm = h("form", { class: "st-chat-form" }, this.chatInput, h("button", { class: "btn btn-primary", type: "submit", "aria-label": "Send" }, iconEl("send")));
     chatForm.addEventListener("submit", (e) => { e.preventDefault(); this.sendChat(); });
     this.reactBar = h("div", { class: "st-react" });
-    const stageWrap = h("div", { class: "st-stage-wrap" }, this.stageEl, this.floatEl, this.gate);
+    const stageWrap = h("div", { class: "st-stage-wrap" }, this.stageEl, this.floatEl, this.capEl, this.gate);
     ui.box.replaceChildren(h("div", { class: "st-player" }, head,
       h("div", { class: "st-body" },
         h("div", { class: "st-main" }, stageWrap, this.audienceEl, this.controls, this.reactBar),
@@ -278,6 +288,10 @@ class Player {
         this.viewersEl.lastChild.textContent = String(m.viewers);
         this.handUp = (m.hands || []).some((x) => x.id === this._self);
         this.renderStage(); this.renderControls(); this.drawPeopleBtn(); this.syncSubs();
+        const rec = m.recording || [];
+        this.recBadge.hidden = !rec.length;
+        this.recBadge.title = rec.length ? `Recorded by ${rec.join(", ")}` : "";
+        this.drawRecBtn();
         return;
       }
       case "hand": this.toast(`✋ ${m.username} wants to speak. Open People to bring them up.`); return;
@@ -285,6 +299,7 @@ class Player {
       case "chat": this.addChat(m.message); return;
       case "chat.deleted": this.chatList.querySelector(`[data-id="${CSS.escape(m.id)}"]`)?.remove(); return;
       case "react": this.floatReaction(m.emoji); return;
+      case "caption": this.showCaption(m); return;
       case "invited": this.invitedDialog(m.by); return;
       case "removed": this.stopPublishing(); this.toast("A host moved you back to the audience."); return;
       case "ended": this.endedShown = true; this.finish(m.reason || "The stage ended."); return;
@@ -416,6 +431,7 @@ class Player {
     await pc.setRemoteDescription(res.answer);
     this.micOn = true; this.camOn = false; this.screenOn = false;
     if (asGuest) this.toast("You're a speaker now!");
+    this.startCaptions();
     this.renderControls(); this.renderStage();
   }
 
@@ -429,7 +445,7 @@ class Player {
   }
 
   sendMedia() { this.request("media", { mic: this.micOn, cam: this.camOn, screen: this.screenOn }).catch(() => {}); this.renderControls(); this.renderStage(); }
-  toggleMic() { this.micOn = !this.micOn; if (this.mic) this.mic.enabled = this.micOn; this.sendMedia(); }
+  toggleMic() { this.micOn = !this.micOn; if (this.mic) this.mic.enabled = this.micOn; this.sendMedia(); this.micOn ? this.startCaptions() : this.stopCaptions(); }
   async toggleCam() {
     if (!this.vTx) return;
     if (this.screenOn) await this.stopScreen();
@@ -466,6 +482,7 @@ class Player {
   }
   stopPublishing() {
     this.onStage = false;
+    this.stopCaptions?.();
     for (const t of [this.mic, this.cam, this.screen]) t?.stop();
     this.local?.getTracks().forEach((t) => t.stop());
     this.mic = this.cam = this.screen = this.local = null;
@@ -502,9 +519,9 @@ class Player {
     // the audience
     const listeners = Math.max(0, (this.state.viewers || 0) - stage.length);
     const hands = this.state.hands || [];
-    this.audienceEl.replaceChildren(
+    this.audienceEl.replaceChildren(...[
       h("span", { class: "st-aud-count" }, iconEl("headphones"), `${listeners} in the audience`),
-      hands.length ? h("span", { class: "st-aud-hands" }, `✋ ${hands.length} want${hands.length === 1 ? "s" : ""} to speak`) : null);
+      hands.length ? h("span", { class: "st-aud-hands" }, `✋ ${hands.length} want${hands.length === 1 ? "s" : ""} to speak`) : null].filter(Boolean));
   }
 
   renderControls() {
@@ -565,6 +582,179 @@ class Player {
     const text = this.chatInput.value.trim();
     if (!text) return;
     try { await this.request("chat", { text }); this.chatInput.value = ""; } catch (e) { this.toast(e.message); }
+  }
+
+  // ---------- live captions ----------
+  // Speakers: the browser's own speech recognition (free, on the device) turns your voice into text,
+  // which goes to everyone on the stage. Listeners turn captions on or off with CC.
+  startCaptions() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR || !this.onStage || !this.micOn || this.sr) {
+      if (!SR && this.onStage && !this.srWarned) { this.srWarned = true; this.toast("Live captions of your voice need Chrome, Edge or Safari."); }
+      return;
+    }
+    const sr = new SR();
+    sr.continuous = true; sr.interimResults = true; sr.lang = navigator.language || "en-US";
+    sr.onresult = (e) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        const text = r[0].transcript.trim();
+        if (!text) continue;
+        try { this.ws.send(JSON.stringify({ type: "caption", text, final: r.isFinal })); } catch { /* ignore */ }
+        this.showCaption({ id: this._self, username: "You", text, final: r.isFinal });
+      }
+    };
+    sr.onend = () => { if (this.sr === sr && this.onStage && this.micOn && !this.closed) { try { sr.start(); } catch { /* ignore */ } } };
+    sr.onerror = (e) => { if (e.error === "not-allowed" || e.error === "service-not-allowed") { this.sr = null; } };
+    this.sr = sr;
+    try { sr.start(); } catch { this.sr = null; }
+  }
+  stopCaptions() {
+    const sr = this.sr;
+    this.sr = null;
+    try { sr?.stop(); } catch { /* ignore */ }
+  }
+  showCaption(m) {
+    this.captions.set(m.id, { username: m.username, text: m.text, at: Date.now() });
+    this.drawCaptions();
+    clearTimeout(this.capTimer);
+    this.capTimer = setTimeout(() => this.drawCaptions(), 4200);
+  }
+  drawCaptions() {
+    const now = Date.now();
+    for (const [id, c] of this.captions) if (now - c.at > 4000) this.captions.delete(id);
+    const lines = [...this.captions.values()].slice(-2);
+    this.capEl.replaceChildren(...lines.map((c) => h("p", { class: "st-cap-line" }, h("b", { text: `${c.username}: ` }), c.text.slice(-140))));
+  }
+  toggleCC() {
+    this.ccOn = !this.ccOn;
+    try { localStorage.setItem("gsmp-cc", this.ccOn ? "1" : "0"); } catch { /* ignore */ }
+    this.ccBtn.setAttribute("aria-pressed", String(this.ccOn));
+    this.capEl.hidden = !this.ccOn;
+  }
+
+  // ---------- recording (hosts and the site Owner; saved to this device) ----------
+  drawRecBtn() {
+    if (!this.recBtn) return;
+    this.recBtn.replaceChildren(h("span", { class: `st-rec-dot${this.recorder ? " on" : ""}` }), this.recorder ? `Stop recording ${this.recClock || ""}` : "Record");
+  }
+  async startRecording() {
+    if (!window.MediaRecorder) { this.toast("This browser can't record. Try Chrome, Edge or Safari on a computer."); return; }
+    this.gate.hidden = true;
+    // join the stage's sound in the background; voices are added to the recording as they arrive
+    if (!this.sub) this.ensureSub().then(() => this.renderControls()).catch(() => this.toast("Couldn't connect to the speakers' voices. The recording keeps going with what this device hears."));
+    // the picture: the stage drawn onto a canvas (the screen share big, or everyone's tiles), with captions
+    const W = 1280, H = 720;
+    const canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H;
+    canvas.style.cssText = "position:fixed;left:-10000px;top:0;width:2px;height:2px;pointer-events:none";   // on the page (browsers only capture attached canvases reliably)
+    document.body.append(canvas);
+    const g = canvas.getContext("2d");
+    // the sound: every speaker's voice (and yours) mixed together
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const dest = ac.createMediaStreamDestination();
+    // a silent tone keeps the audio track running even before anyone speaks (otherwise some browsers record nothing)
+    const hush = ac.createGain(); hush.gain.value = 0;
+    const osc = ac.createOscillator(); osc.connect(hush).connect(dest); osc.start();
+    ac.resume?.().catch(() => {});
+    const plugged = new Set();
+    const plug = () => {
+      const tracks = [];
+      for (const [owner, m] of this.media) if (m.audio) tracks.push([`r${owner}:${m.audio.id}`, m.audio]);
+      if (this.mic) tracks.push([`me:${this.mic.id}`, this.mic]);
+      for (const [key, t] of tracks) {
+        if (plugged.has(key) || t.readyState !== "live") continue;
+        plugged.add(key);
+        try { ac.createMediaStreamSource(new MediaStream([t])).connect(dest); } catch { /* ignore */ }
+      }
+    };
+    plug();
+    const draw = () => {
+      plug();
+      g.fillStyle = "#0a0c1b"; g.fillRect(0, 0, W, H);
+      const tiles = [...this.stageEl.querySelectorAll(".st-tile")].filter((t) => !t.classList.contains("st-tile-empty"));
+      const shared = tiles.find((t) => t.classList.contains("is-screen") && t.querySelector("video")?.videoWidth);
+      const box = (el, x, y, w, hh) => {
+        g.save(); g.fillStyle = "#1a1f45"; g.fillRect(x, y, w, hh);
+        const v = el.querySelector("video");
+        const img = el.querySelector("img");
+        if (v && v.videoWidth) {
+          const r = Math.min(w / v.videoWidth, hh / v.videoHeight);
+          const vw = v.videoWidth * r, vh = v.videoHeight * r;
+          g.drawImage(v, x + (w - vw) / 2, y + (hh - vh) / 2, vw, vh);
+        } else if (img && img.complete && img.naturalWidth) {
+          const s = Math.min(w, hh) * 0.35;
+          g.imageSmoothingEnabled = false;
+          g.drawImage(img, x + (w - s) / 2, y + (hh - s) / 2 - 14, s, s);
+        }
+        const name = el.querySelector(".st-tile-name > span:not(.ic)")?.textContent || "";
+        g.font = "600 20px system-ui, sans-serif"; g.fillStyle = "rgba(0,0,0,.55)";
+        const tw = g.measureText(name).width;
+        g.fillRect(x + 10, y + hh - 40, tw + 20, 30); g.fillStyle = "#fff"; g.fillText(name, x + 20, y + hh - 18);
+        g.restore();
+      };
+      if (shared) {
+        box(shared, 0, 0, W, H - 120);
+        const rest = tiles.filter((t) => t !== shared).slice(0, 6);
+        rest.forEach((t, i) => box(t, i * (W / 6), H - 118, W / 6 - 4, 116));
+      } else if (tiles.length) {
+        const cols = tiles.length > 4 ? 3 : tiles.length > 1 ? 2 : 1;
+        const rows = Math.ceil(Math.min(tiles.length, 9) / cols);
+        const tw = W / cols, th = H / rows;
+        tiles.slice(0, 9).forEach((t, i) => box(t, (i % cols) * tw + 3, Math.floor(i / cols) * th + 3, tw - 6, th - 6));
+      } else {
+        g.fillStyle = "#c9d0f0"; g.font = "600 28px system-ui, sans-serif"; g.textAlign = "center";
+        g.fillText(this.titleEl.textContent, W / 2, H / 2); g.textAlign = "start";
+      }
+      // captions (always in the recording)
+      const now = Date.now();
+      const caps = [...this.captions.values()].filter((c) => now - c.at < 4000).slice(-2);
+      g.font = "600 26px system-ui, sans-serif"; g.textAlign = "center";
+      caps.forEach((c, i) => {
+        const line = `${c.username}: ${c.text}`.slice(-90);
+        const y = H - 40 - (caps.length - 1 - i) * 40;
+        const w = g.measureText(line).width + 28;
+        g.fillStyle = "rgba(0,0,0,.7)"; g.fillRect(W / 2 - w / 2, y - 30, w, 38);
+        g.fillStyle = "#fff"; g.fillText(line, W / 2, y);
+      });
+      g.textAlign = "start";
+      // a small GalaxySMP tag in the corner
+      g.font = "700 18px system-ui, sans-serif"; g.fillStyle = "rgba(255,255,255,.7)"; g.fillText("galaxymc.us · Stages", 16, 30);
+    };
+    const tick = setInterval(draw, 1000 / 24);
+    const stream = new MediaStream([...canvas.captureStream(24).getVideoTracks(), ...dest.stream.getAudioTracks()]);
+    const type = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"].find((t) => MediaRecorder.isTypeSupported?.(t)) || "";
+    let rec;
+    try { rec = new MediaRecorder(stream, { mimeType: type || undefined, videoBitsPerSecond: 2_500_000, audioBitsPerSecond: 128_000 }); }
+    catch { clearInterval(tick); ac.close(); this.toast("This browser can't record the stage."); return; }
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    const started = Date.now();
+    rec.onstop = () => {
+      clearInterval(tick); clearInterval(this.recClockTimer); canvas.remove();
+      ac.close().catch(() => {});
+      const blob = new Blob(chunks, { type: rec.mimeType || "video/webm" });
+      const ext = /mp4/.test(blob.type) ? "mp4" : "webm";
+      const name = `${this.titleEl.textContent.replace(/[^\w\- ]+/g, "").trim().slice(0, 40) || "stage"} ${new Date(started).toISOString().slice(0, 10)}.${ext}`;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+      this.toast(`Recording saved: ${name}`);
+    };
+    rec.start(1000);
+    this.recorder = rec;
+    this.recClock = "0:00";
+    this.recClockTimer = setInterval(() => { const s = Math.floor((Date.now() - started) / 1000); this.recClock = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; this.drawRecBtn(); }, 1000);
+    this.request("record", { on: true }).catch(() => {});
+    this.drawRecBtn();
+    this.toast("Recording. Everyone on the stage can see that you're recording. The video saves to this device when you stop.");
+  }
+  stopRecording() {
+    const rec = this.recorder;
+    this.recorder = null;
+    try { rec?.stop(); } catch { /* ignore */ }
+    if (!this.closed) this.request("record", { on: false }).catch(() => {});
+    this.drawRecBtn();
   }
 
   // ---------- dialogs ----------
@@ -631,6 +821,7 @@ class Player {
   close() {
     this.closed = true;
     clearInterval(this.ping);
+    if (this.recorder) this.stopRecording();   // the file still saves
     this.stopPublishing?.();
     try { this.sub?.close(); } catch { /* ignore */ }
     try { this.ws?.close(1000, "bye"); } catch { /* ignore */ }

@@ -142,7 +142,7 @@ export async function one(request, env, ctx, url, params) {
   const m = await me(sql, user);
   const rights = await rightsFor(sql, user, s, m);
   const [f] = await sql`SELECT 1 FROM stream_follows WHERE user_id = ${user.id} AND (host_user_id = ${s.host_user_id} OR team_id = ${s.team_id})`;
-  return json({ ok: true, stream: streamOut(s, { following: Boolean(f) }), rights }, 200, { "Cache-Control": "no-store" });
+  return json({ ok: true, stream: streamOut(s, { following: Boolean(f) }), rights: { ...rights, record: Boolean(rights.manage || user.owner) } }, 200, { "Cache-Control": "no-store" });
 }
 
 // ---------- GET /api/streams/:id/ws (WebSocket to the stream's room) ----------
@@ -160,7 +160,7 @@ export async function connect(request, env, ctx, url, params) {
   const rights = await rightsFor(sql, user, s, m);
   const head = m.head || null;
   return roomStub(env, s.id).fetch(new Request("https://stream/ws", {
-    headers: { Upgrade: "websocket", "X-GSMP-User": JSON.stringify({ id: Number(user.id), username: user.username, head, ...rights }) },
+    headers: { Upgrade: "websocket", "X-GSMP-User": JSON.stringify({ id: Number(user.id), username: user.username, head, ...rights, owner: Boolean(user.owner) }) },
   }));
 }
 

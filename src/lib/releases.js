@@ -379,6 +379,13 @@ Compare on any profile now also lists the achievements you both have, and the on
     title: "\"Already implemented\" in #Suggestions",
     body: `Some ideas are already on the server! Staff can now mark a suggestion as **Already implemented** and tell you where to find it. These show in the **Done** tab, and you get a notification if it was your idea.`,
   },
+  {
+    id: "2026-11-17-stage-captions-recording",
+    title: "Live captions and recording on Stages",
+    body: `**Live captions:** what speakers say now shows as captions on the stage, as they talk. Tap **CC** to turn captions on or off. Captions work when the speaker uses Chrome, Edge or Safari (including phones).
+
+**Recording:** stage hosts can now **record** a stage. The recording has everyone's voices, the screen share or cameras, and the captions, and it saves as a video on the host's device. When a stage is being recorded, everyone sees a red **Recording** sign.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
