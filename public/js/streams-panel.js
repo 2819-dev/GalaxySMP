@@ -70,11 +70,13 @@ export function setupStreamsMod({ loaders, toast }) {
     }) : [h("div", { class: "panel empty", text: "No recordings yet." })]));
     epAll.replaceChildren(...(d.episodes.length ? d.episodes.map((e) => h("div", { class: "member-row" },
       h("div", { class: "info" }, h("strong", { text: e.title }),
-        h("span", { text: [e.host, e.by && e.by !== e.host ? `posted by ${e.by}` : null, new Date(e.createdAt).toLocaleDateString(), `${e.plays} plays`, e.removed ? "Removed" : null].filter(Boolean).join(" · ") })),
+        h("span", { text: [e.host, e.by && e.by !== e.host ? `posted by ${e.by}` : null, new Date(e.createdAt).toLocaleDateString(), e.size ? gb(e.size) : null, `${e.plays} plays`, e.removed ? "Removed" : null].filter(Boolean).join(" · ") })),
       h("div", { class: "row-actions" },
-        h("a", { class: "btn btn-ghost btn-sm", href: `https://www.youtube.com/watch?v=${encodeURIComponent(e.youtubeId)}`, target: "_blank", rel: "noopener noreferrer", text: "Open on YouTube" }),
+        e.audio ? h("a", { class: "btn btn-ghost btn-sm", href: e.audio, target: "_blank", rel: "noopener", text: "Listen" }) : null,
         e.removed ? h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Restore", onclick: async () => { try { const x = await postJson(`/api/recordings/episodes/${e.id}/restore`, {}); toast(x.message); loadRecordings(); } catch (er) { toast(er.message); } } })
-          : h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: async () => { try { const x = await postJson("/api/streams", { action: "episode-delete", id: e.id }); toast(x.message); loadRecordings(); } catch (er) { toast(er.message); } } }))))
+          : h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: async () => { try { const x = await postJson("/api/streams", { action: "episode-delete", id: e.id }); toast(x.message); loadRecordings(); } catch (er) { toast(er.message); } } }),
+        h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Delete for good", onclick: () => openDialog({ title: `Delete "${e.title}" for good?`, body: h("p", { class: "text-2", text: "The audio file is deleted and can't be restored. This frees up storage." }),
+          actions: [{ label: "Cancel" }, { label: "Delete", kind: "danger", onClick: async () => { const x = await postJson(`/api/recordings/episodes/${e.id}/purge`, {}); toast(x.message); loadRecordings(); } }] }) }))))
       : [h("div", { class: "panel empty", text: "No episodes yet." })]));
   }
 

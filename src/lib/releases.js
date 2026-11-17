@@ -410,6 +410,11 @@ Also: when staff change the status of your suggestion, you now always get a noti
     title: "Hosting stages is now a Galaxy Pro+ perk",
     body: `Hosting your own stage and posting podcast episodes are now **Galaxy Pro+** perks (the Owner can also allow other members). Team stages are still open to every team's organizer and Admins. Posting episodes for a team also needs Galaxy Pro+.`,
   },
+  {
+    id: "2026-11-17-episodes-upload",
+    title: "Episodes: no YouTube needed",
+    body: `Podcast episodes in **#Stages** are now uploaded straight to GalaxySMP, so you don't need a YouTube account. Tap **Add an episode** and either upload an audio file (MP3, M4A, WAV and more) or tap **Record now** to record one right there on your phone or computer. Episodes play right on the site.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

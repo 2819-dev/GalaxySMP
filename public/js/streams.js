@@ -72,7 +72,7 @@ export function renderStreams(root, helpers) {
     parts.push(h("div", { class: "st-ep-head" },
       h("h3", { class: "st-h", style: "margin:0" }, iconEl("headphones"), "Episodes"),
       d.episodeAs.length ? h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => episodeDialog(d) }, iconEl("plus"), "Add an episode") : null));
-    if (!d.episodes.length) parts.push(h("p", { class: "text-3 st-empty", text: d.episodeAs.length ? "No episodes yet. Record a podcast, upload it to YouTube as Unlisted, and add it here." : "No episodes yet." }));
+    if (!d.episodes.length) parts.push(h("p", { class: "text-3 st-empty", text: d.episodeAs.length ? "No episodes yet. Tap Add an episode to upload a podcast or record one right here." : "No episodes yet." }));
     else parts.push(h("div", { class: "st-eps" }, ...d.episodes.map((e) => episodeCard(e))));
 
     if (d.crew) parts.push(crewBox(d.crew));
@@ -98,18 +98,10 @@ export function renderStreams(root, helpers) {
   }
 
   function episodeCard(e) {
-    const player = h("div", { class: "st-ep-player", hidden: true });
-    const play = h("button", { class: "btn btn-primary btn-sm", type: "button" }, iconEl("headphones"), "Play");
-    play.addEventListener("click", () => {
-      if (!player.hidden) return;
-      // privacy-friendly player (youtube-nocookie), loaded only now
-      const f = h("iframe", { src: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(e.youtubeId)}?autoplay=1&rel=0&modestbranding=1&playsinline=1`,
-        title: e.title, allow: "autoplay; encrypted-media; picture-in-picture", allowfullscreen: true, referrerpolicy: "strict-origin-when-cross-origin", loading: "lazy" });
-      player.replaceChildren(f);
-      player.hidden = false;
-      play.hidden = true;
-      postJson("/api/streams", { action: "episode-play", id: e.id }).catch(() => {});
-    });
+    const audio = h("audio", { class: "st-ep-audio", controls: true, preload: "none", src: e.audio });
+    let counted = false;
+    audio.addEventListener("play", () => { if (!counted) { counted = true; postJson("/api/streams", { action: "episode-play", id: e.id }).catch(() => {}); } });
+    const len = e.seconds ? ` · ${Math.floor(e.seconds / 60)}:${String(e.seconds % 60).padStart(2, "0")}` : "";
     const ago = new Date(e.createdAt).toLocaleDateString([], { month: "short", day: "numeric", year: new Date(e.createdAt).getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
     return h("article", { class: "panel st-ep", "data-ep": String(e.id) },
       h("div", { class: "st-ep-main" },
@@ -118,28 +110,96 @@ export function renderStreams(root, helpers) {
           h("b", { class: "st-title", text: e.title }),
           hostLabel(e),
           e.description ? h("p", { class: "text-2 small", style: "margin:2px 0 0", text: e.description }) : null,
-          h("small", { class: "text-3", text: `${ago} · ${e.plays} play${e.plays === 1 ? "" : "s"}` }))),
-      h("div", { class: "st-card-actions" }, play, e.manage ? null : followBtn(e),
-        e.manage ? h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": `Remove ${e.title}`, onclick: () => openDialog({ title: "Remove this episode?", body: h("p", { class: "text-2", style: "margin:0", text: "It's removed from GalaxySMP. The video stays on YouTube." }),
-          actions: [{ label: "Cancel" }, { label: "Remove", kind: "danger", onClick: () => act({ action: "episode-delete", id: e.id }, showList) }] }) }, iconEl("trash")) : null),
-      player);
+          h("small", { class: "text-3", text: `${ago}${len} · ${e.plays} play${e.plays === 1 ? "" : "s"}` }))),
+      audio,
+      h("div", { class: "st-card-actions" }, e.manage ? null : followBtn(e),
+        e.manage ? h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": `Remove ${e.title}`, onclick: () => openDialog({ title: "Remove this episode?", body: h("p", { class: "text-2", style: "margin:0", text: "It's taken off #Stages." }),
+          actions: [{ label: "Cancel" }, { label: "Remove", kind: "danger", onClick: () => act({ action: "episode-delete", id: e.id }, showList) }] }) }, iconEl("trash"), "Remove") : null));
   }
 
+  // Add an episode: upload an audio file, or record one right here (voice only)
   function episodeDialog(d) {
     const opts = d.episodeAs;
     const as = h("select", { class: "input", id: "ep-as" }, ...opts.map((a) => h("option", { value: a.key, text: a.label })));
-    const url = h("input", { class: "input", id: "ep-url", type: "url", inputmode: "url", placeholder: "https://youtu.be/…" });
     const title = h("input", { class: "input", id: "ep-title", maxlength: 80, placeholder: "e.g. Episode 1: Our first week on GalaxySMP" });
-    const desc = h("textarea", { class: "input", id: "ep-desc", maxlength: 300, rows: 3, placeholder: "What's it about? (optional)" });
+    const desc = h("textarea", { class: "input", id: "ep-desc", maxlength: 300, rows: 2, placeholder: "What's it about? (optional)" });
+    let blob = null, seconds = 0;
+    // a file from the device
+    const fileIn = h("input", { type: "file", id: "ep-file", accept: "audio/*,.mp3,.m4a,.wav,.ogg,.webm,.aac,.opus" });
+    const fileInfo = h("p", { class: "text-3 small", style: "margin:4px 0 0" });
+    fileIn.addEventListener("change", () => {
+      const f = fileIn.files[0];
+      if (!f) return;
+      blob = f;
+      fileInfo.textContent = `${f.name} · ${(f.size / 1024 / 1024).toFixed(1)} MB`;
+      const probe = new Audio(); probe.preload = "metadata"; probe.src = URL.createObjectURL(f);
+      probe.onloadedmetadata = () => { if (isFinite(probe.duration)) seconds = Math.round(probe.duration); URL.revokeObjectURL(probe.src); };
+      if (!title.value) title.value = f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, 80);
+    });
+    // or record now
+    const recBtn = h("button", { class: "btn btn-secondary btn-sm", type: "button" }, iconEl("mic"), "Record now");
+    const recInfo = h("span", { class: "text-3 small" });
+    const preview = h("audio", { controls: true, hidden: true, style: "width:100%;margin-top:6px" });
+    let rec = null, recTimer = null;
+    recBtn.addEventListener("click", async () => {
+      if (rec) { rec.stop(); return; }
+      let stream;
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+      catch { toast("Allow the microphone to record an episode."); return; }
+      const type = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"].find((t) => window.MediaRecorder?.isTypeSupported?.(t)) || "";
+      const chunks = [];
+      rec = new MediaRecorder(stream, { mimeType: type || undefined, audioBitsPerSecond: 64_000 });
+      rec.ondataavailable = (ev) => { if (ev.data.size) chunks.push(ev.data); };
+      const start = Date.now();
+      rec.onstop = () => {
+        clearInterval(recTimer); stream.getTracks().forEach((t) => t.stop());
+        blob = new Blob(chunks, { type: (rec.mimeType || "audio/webm").split(";")[0] });
+        seconds = Math.round((Date.now() - start) / 1000);
+        preview.src = URL.createObjectURL(blob); preview.hidden = false;
+        recInfo.textContent = `Recorded ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}. Listen back, or record again.`;
+        recBtn.replaceChildren(iconEl("mic"), "Record again");
+        fileIn.value = ""; fileInfo.textContent = "";
+        rec = null;
+      };
+      rec.start(1000);
+      recBtn.replaceChildren(h("span", { class: "st-rec-dot on" }), "Stop recording");
+      recTimer = setInterval(() => { const s = Math.round((Date.now() - start) / 1000); recInfo.textContent = `Recording ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }, 500);
+    });
+    const progress = h("progress", { class: "st-ep-progress", max: 100, value: 0, hidden: true });
     openDialog({ title: "Add an episode", body: h("div", { class: "form" },
-      h("ol", { class: "st-ep-steps" },
-        h("li", { text: "Record your podcast (a stage recording works too)." }),
-        h("li", { text: "Upload it to YouTube and set Visibility to Unlisted (only people with the link can find it). Private videos can't be played by anyone else." }),
-        h("li", { text: "Copy the video's Share link and paste it below." })),
-      opts.length > 1 ? field("Who's it from", as) : null, field("YouTube link", url), field("Title", title), field("Description", desc)),
-    actions: [{ label: "Cancel" }, { label: "Add episode", kind: "primary", onClick: async () => {
-      const r = await postJson("/api/streams", { action: "episode-add", as: opts.length > 1 ? as.value : opts[0].key, url: url.value, title: title.value, description: desc.value });
-      toast(r.message); showList();
+      h("div", { class: "st-ep-source" },
+        field("Upload an audio file", fileIn, "MP3, M4A, WAV, OGG or WEBM, up to 300 MB."), fileInfo,
+        h("p", { class: "st-ep-or", text: "or" }),
+        h("div", { class: "cx-row", style: "gap:8px;align-items:center;flex-wrap:wrap" }, recBtn, recInfo), preview),
+      opts.length > 1 ? field("Who's it from", as) : null, field("Title", title), field("Description", desc), progress),
+    actions: [{ label: "Cancel", onClick: () => { if (rec) rec.stop(); } }, { label: "Post episode", kind: "primary", onClick: async () => {
+      if (rec) throw new Error("Stop the recording first.");
+      if (!blob) throw new Error("Choose an audio file or record one.");
+      progress.hidden = false;
+      const r = await postJson("/api/episodes/start", { as: opts.length > 1 ? as.value : opts[0].key, title: title.value, description: desc.value,
+        mime: blob.type || "audio/mpeg", size: blob.size, seconds });
+      try {
+        let n = 0;
+        for (let off = 0; off < blob.size; off += r.partBytes) {
+          const piece = blob.slice(off, off + r.partBytes);
+          n += 1;
+          let ok = false;
+          for (let tries = 0; tries < 3 && !ok; tries++) {
+            const res = await fetch(`/api/episodes/${r.id}/part?n=${n}`, { method: "PUT", body: piece, credentials: "same-origin", headers: { "Content-Type": "application/octet-stream" } }).catch(() => null);
+            ok = Boolean(res?.ok);
+            if (!ok) await new Promise((w) => setTimeout(w, 1500 * (tries + 1)));
+          }
+          if (!ok) throw new Error("The upload stopped. Check your internet and try again.");
+          progress.value = Math.round(((off + piece.size) / blob.size) * 100);
+        }
+        const done = await postJson(`/api/episodes/${r.id}/finish`, {});
+        toast(done.message || "Episode posted!");
+        showList();
+      } catch (er) {
+        postJson(`/api/episodes/${r.id}/cancel`, {}).catch(() => {});
+        progress.hidden = true;
+        throw er;
+      }
     } }] });
   }
 
