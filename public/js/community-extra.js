@@ -493,7 +493,7 @@ function buildDialog(done, toast) {
 // =====================================================================
 // Suggestions: card with staff response and comments; new-suggestion dialog with similar check
 // =====================================================================
-const STATUS_NAMES = { open: "Open", planned: "Planned", progress: "In progress", done: "Done", declined: "Declined" };
+const STATUS_NAMES = { open: "Open", planned: "Planned", progress: "In progress", done: "Done", implemented: "Already implemented", declined: "Declined" };
 let CATEGORY_NAMES = { gameplay: "Gameplay", minigames: "Minigames", website: "Website", events: "Events", store: "Store", other: "Other" };
 export function setSuggestionCategories(c) { if (c) CATEGORY_NAMES = c; }
 
@@ -589,6 +589,8 @@ function respondDialog(s, done, toast) {
   const status = select("sg-status", Object.entries(STATUS_NAMES), s.status);
   const category = select("sg-category", Object.entries(CATEGORY_NAMES), s.category || "other");
   const reply = h("textarea", { class: "input", id: "sg-reply", rows: 3, maxlength: 500, placeholder: "e.g. Great idea! We're adding this next week." });
+  // "Already implemented": suggest telling them where to find it
+  status.addEventListener("change", () => { reply.placeholder = status.value === "implemented" ? "Where to find it, e.g. \"Use /tpa <name>\" or \"At spawn, next to the shops\"" : "e.g. Great idea! We're adding this next week."; });
   reply.value = s.staffReply?.text || "";
   openDialog({
     title: "Respond to suggestion",

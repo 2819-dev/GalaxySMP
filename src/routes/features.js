@@ -545,7 +545,7 @@ export async function suggestionRespond(request, env, ctx, url, params) {
   const user = await requireUser(request, env);
   if (!isStaff(user)) throw new HttpError(403, "Only staff can respond to suggestions.");
   const body = await readJson(request);
-  const status = ["open", "planned", "progress", "done", "declined"].includes(body.status) ? body.status : null;
+  const status = ["open", "planned", "progress", "done", "implemented", "declined"].includes(body.status) ? body.status : null;
   if (!status) throw new HttpError(400, "Choose a status.");
   const reply = clean(body.reply, 500);
   const sql = getDb(env);
@@ -558,8 +558,8 @@ export async function suggestionRespond(request, env, ctx, url, params) {
      WHERE id = ${sid} AND deleted_at IS NULL RETURNING user_id, title`;
   if (!s) throw new HttpError(404, "That suggestion no longer exists.");
   await audit(sql, user.id, "suggestion.status", { title: s.title, status, reply: reply || undefined });
-  const NAMES = { open: "Open", planned: "Planned", progress: "In progress", done: "Done", declined: "Declined" };
-  await notify(env, [s.user_id], "community", { title: `Your suggestion is now ${NAMES[status]}`, body: reply ? `"${s.title}": ${reply.slice(0, 120)}` : `"${s.title}"`, url: `/community#suggestions/${sid}`, tag: `sg-${sid}` }, { exclude: [user.id] });
+  const NAMES = { open: "Open", planned: "Planned", progress: "In progress", done: "Done", implemented: "Already implemented", declined: "Declined" };
+  await notify(env, [s.user_id], "community", { title: status === "implemented" ? "Your idea is already on GalaxySMP" : `Your suggestion is now ${NAMES[status]}`, body: reply ? `"${s.title}": ${reply.slice(0, 120)}` : `"${s.title}"`, url: `/community#suggestions/${sid}`, tag: `sg-${sid}` }, { exclude: [user.id] });
   return json({ ok: true });
 }
 

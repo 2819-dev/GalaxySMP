@@ -4248,3 +4248,6 @@ button.sg-similar-row { width: 100%; border: 1px solid transparent; background: 
 .fb-profanity, .fb-personal { background: rgba(240, 86, 111, .12); color: var(--bad); }
 .fb-spam, .fb-link { background: rgba(255, 176, 32, .16); color: #c27c00; }
 .fb-text { margin: 4px 0 2px; overflow-wrap: anywhere; font-family: var(--mono, monospace); font-size: .85rem; }
+.sg-status.implemented { background: rgba(124, 92, 255, .14); color: #7c5cff; }
+html[data-theme="dark"] .sg-status.implemented, :root:not([data-theme="light"]) .sg-status.implemented { color: #a993ff; }
+.sg-reply.implemented { border-left-color: #7c5cff; }

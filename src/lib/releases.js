@@ -374,6 +374,11 @@ Compare on any profile now also lists the achievements you both have, and the on
 
 **Less spam:** sending the same message over and over (even with different capitals or extra letters) is blocked.`,
   },
+  {
+    id: "2026-11-17-already-implemented",
+    title: "\"Already implemented\" in #Suggestions",
+    body: `Some ideas are already on the server! Staff can now mark a suggestion as **Already implemented** and tell you where to find it. These show in the **Done** tab, and you get a notification if it was your idea.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

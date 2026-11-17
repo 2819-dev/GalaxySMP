@@ -102,7 +102,7 @@ export async function suggestionsList(request, env, ctx, url) {
       LEFT JOIN suggestion_votes v ON v.suggestion_id = s.id
      WHERE s.deleted_at IS NULL AND s.status <> 'duplicate'
        AND (${one}::bigint IS NOT NULL AND s.id = ${one}::bigint
-            OR ${one}::bigint IS NULL AND s.status = ${status} AND (${category}::text IS NULL OR s.category = ${category})
+            OR ${one}::bigint IS NULL AND (s.status = ${status} OR ${status} = 'done' AND s.status = 'implemented') AND (${category}::text IS NULL OR s.category = ${category})
                AND (${like}::text IS NULL OR s.title ILIKE ${like} OR s.body ILIKE ${like}))
      GROUP BY s.id, u.username, ru.username
      ORDER BY CASE WHEN ${sort} = 'top' THEN coalesce(sum(v.value), 0) END DESC NULLS LAST, s.created_at DESC
@@ -114,7 +114,10 @@ export async function suggestionsList(request, env, ctx, url) {
        AND (${like}::text IS NULL OR title ILIKE ${like} OR body ILIKE ${like})
      GROUP BY status`;
   const counts = Object.fromEntries(STATUSES.map((k) => [k, 0]));
-  for (const r of countRows) if (STATUSES.includes(r.status)) counts[r.status] = r.n;
+  for (const r of countRows) {
+    const tab = r.status === "implemented" ? "done" : r.status;   // "Already implemented" ideas show in the Done tab
+    if (STATUSES.includes(tab)) counts[tab] += r.n;
+  }
   return json({
     ok: true,
     canModerate: Number(user.role_power) >= STAFF,
@@ -199,7 +202,7 @@ export async function suggestionAction(request, env, ctx, url, params) {
   if (params.action === "status") {
     if (!staff) throw new HttpError(403, "Only staff can change a suggestion's status.");
     const status = String((await readJson(request)).status || "");
-    if (!STATUSES.includes(status)) throw new HttpError(400, "Unknown status.");
+    if (!STATUSES.includes(status) && status !== "implemented") throw new HttpError(400, "Unknown status.");
     await sql`UPDATE suggestions SET status = ${status} WHERE id = ${id}`;
     await sql`INSERT INTO audit_log (actor_id, action, details) VALUES (${user.id}, 'suggestion.status', ${JSON.stringify({ title: s.title, status })}::jsonb)`;
     return json({ ok: true });

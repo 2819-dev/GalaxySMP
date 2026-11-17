@@ -241,7 +241,7 @@ function renderSuggestions(p) {
   p.append(h("div", { class: "cp-wrap" },
     h("section", { class: "panel sg-head" },
       h("div", { class: "sg-head-top" },
-        h("p", { class: "text-2", style: "margin:0", text: "Have an idea for GalaxySMP? Share it, vote, and discuss in the comments. Staff move ideas along from Open to Planned, In progress and Done." }),
+        h("p", { class: "text-2", style: "margin:0", text: "Have an idea for GalaxySMP? Share it, vote, and discuss in the comments. Staff move ideas along from Open to Planned, In progress and Done. Ideas that already exist are marked Already implemented (in Done)." }),
         add),
       tabs,
       h("div", { class: "sg-tools" }, search, h("div", { class: "tabs-mini" }, top, newest)),
