@@ -7,7 +7,7 @@
 //     in-game message) when someone they follow goes live.
 //   - Staff with "Moderate streams" see every live stream, can end any of them and stop members from streaming.
 // The live part (video relay, chat, reactions, stage) is the StreamRoom Durable Object (src/streams/room.js).
-// Prerecorded episodes are "coming soon" (they need file storage).
+// Episodes and other posts are files in R2 (src/routes/recordings.js).
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
@@ -22,6 +22,12 @@ import { isOwner } from "../lib/names.js";
 const MAX_LIVE = 6;                  // streams live at the same time, site-wide (keeps relay usage low)
 const MAX_SCHEDULED = 5;             // upcoming streams per member / team
 const MAX_CREW = 12;
+// Two kinds of live stage: a Podcast (voice only, saved as an episode when it ends) and a Live Stream (voice, camera,
+// screen; gone when it ends unless the host chose "Save as a video"). Episodes: podcast (uploaded or a saved live
+// podcast), video (a saved live stream), more (other videos or audio, e.g. a team's rules).
+export const CATEGORIES = ["Talk", "Survival", "Bedwars", "Skyblock", "Creative", "Building", "Minigames", "Tutorial", "News", "Other"];
+const stageKind = (k) => (k === "podcast" ? "podcast" : "live");
+const roomInfo = (s, status) => ({ id: Number(s.id), title: s.title, kind: stageKind(s.kind), status: status || s.status, speakMode: s.speak_mode || "hand", chatOn: s.chat_on !== false });
 
 export { me as memberInfo };
 export const roomStub = (env, id) => env.STREAMS.get(env.STREAMS.idFromName(`stream:${id}`));
@@ -86,13 +92,23 @@ async function clean(sql, text, max) {
 
 function streamOut(r, extra = {}) {
   return {
-    id: Number(r.id), title: r.title, kind: r.kind, status: r.status,
+    id: Number(r.id), title: r.title, kind: stageKind(r.kind), status: r.status,
+    description: r.description || "", category: r.category || null, teamOnly: Boolean(r.team_only),
     scheduledAt: r.scheduled_at, startedAt: r.started_at, endedAt: r.ended_at, peak: Number(r.peak_viewers || 0),
     host: r.team_id ? { type: "team", id: Number(r.team_id), name: r.team_name, tag: r.team_tag }
       : { type: "user", id: Number(r.host_user_id), name: r.host_name, head: headUrlFor({ xuid: r.host_xuid, head_at: r.host_head_at, gamerpic_at: r.host_gamerpic_at }) },
+    ...(r.speak_mode ? { speakMode: r.speak_mode, chatOn: r.chat_on !== false, saveVideo: Boolean(r.save_video) } : {}),
     ...extra,
   };
 }
+
+// Team-only stages and posts are for that team's members (and staff).
+const visibleTo = (m, user) => (x) => !x.team_only || isMod(user) || (m.team && m.team.id === Number(x.team_id));
+const parseChapters = (text) => String(text || "").split(/\n/).map((line) => {
+  const mm = line.trim().match(/^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\s*[-–:]?\s*(.+)$/);
+  if (!mm) return null;
+  return { t: (Number(mm[1] || 0) * 3600) + Number(mm[2]) * 60 + Number(mm[3]), title: mm[4].trim().slice(0, 60) };
+}).filter(Boolean).sort((a, b) => a.t - b.t).slice(0, 30);
 
 async function loadStream(sql, id) {
   const [r] = await sql`SELECT s.* FROM streams_v s WHERE s.id = ${Number(id) || 0}`;
@@ -104,7 +120,7 @@ export async function list(request, env) {
   const user = await requireUser(request, env);
   const sql = getDb(env);
   const m = await me(sql, user);
-  const [live, upcoming, recent, follows, crew, crewOf, episodes] = await Promise.all([
+  const [liveAll, upcomingAll, recentAll, follows, crew, crewOf, episodesAll, backstageAll] = await Promise.all([
     sql`SELECT s.* FROM streams_v s WHERE s.status = 'live' ORDER BY s.started_at DESC`,
     sql`SELECT s.*, (SELECT count(*)::int FROM stream_reminders r WHERE r.stream_id = s.id) AS reminders,
                EXISTS (SELECT 1 FROM stream_reminders r WHERE r.stream_id = s.id AND r.user_id = ${user.id}) AS reminding
@@ -114,11 +130,17 @@ export async function list(request, env) {
     sql`SELECT host_user_id, team_id FROM stream_follows WHERE user_id = ${user.id}`,
     sql`SELECT c.user_id, c.role, u.username FROM stream_crew c JOIN users u ON u.id = c.user_id WHERE c.host_user_id = ${user.id} ORDER BY c.created_at`,
     sql`SELECT c.host_user_id, c.role, u.username FROM stream_crew c JOIN users u ON u.id = c.host_user_id WHERE c.user_id = ${user.id}`,
-    sql`SELECT e.id, e.title, e.description, e.seconds, e.plays, e.created_at, e.host_user_id, e.team_id, e.created_by,
+    sql`SELECT e.id, e.title, e.description, e.seconds, e.plays, e.created_at, e.host_user_id, e.team_id, e.created_by, e.kind, e.category, e.team_only, e.chapters, e.mime, e.r2_key,
+               (SELECT count(*)::int FROM episode_comments c WHERE c.episode_id = e.id AND c.deleted_at IS NULL) AS comments,
                hu.username AS host_name, hp.xuid AS host_xuid, hp.head_at AS host_head_at, hp.gamerpic_at AS host_gamerpic_at, t.name AS team_name, t.tag AS team_tag
           FROM stream_episodes e LEFT JOIN users hu ON hu.id = e.host_user_id LEFT JOIN players hp ON hp.uuid = hu.mc_uuid LEFT JOIN teams t ON t.id = e.team_id
          WHERE e.deleted_at IS NULL AND e.status = 'ready' AND e.r2_key IS NOT NULL ORDER BY e.created_at DESC LIMIT 300`,
+    sql`SELECT s.* FROM streams_v s WHERE s.status = 'backstage' ORDER BY s.created_at DESC`,
   ]);
+  const vis = visibleTo(m, user);
+  const [live, upcoming, recent, episodes] = [liveAll.filter(vis), upcomingAll.filter(vis), recentAll.filter(vis), episodesAll.filter(vis)];
+  const backstage = [];
+  for (const s of backstageAll) { const r = await rightsFor(sql, user, s, m); if (r.stage || r.manage) backstage.push(streamOut(s, { manage: r.manage })); }
   const counts = await Promise.all(live.map((s) => roomStub(env, s.id).fetch("https://stream/internal/count").then((r) => r.json()).catch(() => ({ viewers: 0, stage: [] }))));
   const followU = new Set(follows.filter((f) => f.host_user_id).map((f) => Number(f.host_user_id)));
   const followT = new Set(follows.filter((f) => f.team_id).map((f) => Number(f.team_id)));
@@ -133,13 +155,14 @@ export async function list(request, env) {
     ok: true, now: new Date().toISOString(),
     canHost: as.length > 0, as, banned: m.banned, soloHost: m.soloHost, mod: isMod(user), owner: Boolean(user.owner),
     episodeAs: m.soloHost ? as : [],   // posting episodes: Pro+ or allowed members only (for themselves, their team or a host they edit for)
-    hasTeam: Boolean(m.team), maxLive: MAX_LIVE,
+    hasTeam: Boolean(m.team), maxLive: MAX_LIVE, categories: CATEGORIES, teamAs: Boolean(m.team?.manage), backstage,
     live: await Promise.all(live.map(async (s, i) => streamOut(s, { viewers: counts[i].viewers || 0, onStage: counts[i].stage || [], following: following(s), manage: await manageable(s) }))),
     upcoming: await Promise.all(upcoming.map(async (s) => streamOut(s, { reminders: s.reminders, reminding: s.reminding, following: following(s), manage: await manageable(s) }))),
     recent: recent.map((s) => streamOut(s)),
     crew: m.soloHost ? crew.map((c) => ({ id: Number(c.user_id), username: c.username, role: c.role })) : null,
     crewOf: crewOf.map((c) => ({ hostId: Number(c.host_user_id), username: c.username, role: c.role })),
-    episodes: await Promise.all(episodes.map(async (e) => streamOut(e, { kind: "episode", description: e.description, audio: `/api/episodes/${e.id}/audio`, seconds: e.seconds, plays: Number(e.plays), createdAt: e.created_at,
+    episodes: await Promise.all(episodes.map(async (e) => streamOut(e, { kind: e.kind || "podcast", media: /^video\//.test(e.mime || "") ? "video" : "audio", description: e.description, audio: `/api/episodes/${e.id}/audio`,
+      seconds: e.seconds, plays: Number(e.plays), createdAt: e.created_at, chapters: e.chapters || [], comments: Number(e.comments || 0),
       following: following(e), manage: isMod(user) || Number(e.created_by) === Number(user.id) || await manageable(e) }))),
   }, 200, { "Cache-Control": "no-store" });
 }
@@ -151,7 +174,9 @@ export async function one(request, env, ctx, url, params) {
   const s = await loadStream(sql, params.id);
   if (!s) throw new HttpError(404, "That stage doesn't exist.");
   const m = await me(sql, user);
+  if (!visibleTo(m, user)(s)) throw new HttpError(403, "This stage is for the team's members only.");
   const rights = await rightsFor(sql, user, s, m);
+  if (s.status === "backstage" && !rights.stage && !rights.manage && !rights.mod) throw new HttpError(409, "This stage hasn't started yet.");
   const [f] = await sql`SELECT 1 FROM stream_follows WHERE user_id = ${user.id} AND (host_user_id = ${s.host_user_id} OR team_id = ${s.team_id})`;
   return json({ ok: true, stream: streamOut(s, { following: Boolean(f) }), rights: { ...rights, record: Boolean(rights.manage || user.owner) } }, 200, { "Cache-Control": "no-store" });
 }
@@ -166,9 +191,11 @@ export async function connect(request, env, ctx, url, params) {
   if (user.banned) throw new HttpError(403, "Your account has been banned.");
   const sql = getDb(env);
   const s = await loadStream(sql, params.id);
-  if (!s || s.status !== "live") throw new HttpError(409, "This stage isn't live.");
+  if (!s || (s.status !== "live" && s.status !== "backstage")) throw new HttpError(409, "This stage isn't live.");
   const m = await me(sql, user);
+  if (!visibleTo(m, user)(s)) throw new HttpError(403, "This stage is for the team's members only.");
   const rights = await rightsFor(sql, user, s, m);
+  if (s.status === "backstage" && !rights.stage && !rights.manage && !rights.mod) throw new HttpError(409, "This stage hasn't started yet.");
   const head = m.head || null;
   return roomStub(env, s.id).fetch(new Request("https://stream/ws", {
     headers: { Upgrade: "websocket", "X-GSMP-User": JSON.stringify({ id: Number(user.id), username: user.username, head, ...rights, owner: Boolean(user.owner) }) },
@@ -178,25 +205,35 @@ export async function connect(request, env, ctx, url, params) {
 // Tell followers (and the team / crew, and people who asked for a reminder) that a stream is live.
 async function announceLive(env, sql, s) {
   const who = s.team_id ? `[${s.team_tag}] ${s.team_name}` : s.host_name;
-  const ids = (await sql`
+  const what = stageKind(s.kind) === "podcast" ? "is live with a podcast" : "is live";
+  const ids = s.team_only ? (await sql`SELECT u.id FROM team_members tm JOIN players p ON p.xuid = tm.xuid JOIN users u ON u.mc_uuid = p.uuid WHERE tm.team_id = ${s.team_id}`).map((r) => Number(r.id)) : (await sql`
     SELECT user_id AS id FROM stream_follows WHERE (host_user_id = ${s.host_user_id} OR team_id = ${s.team_id})
     UNION SELECT user_id FROM stream_reminders WHERE stream_id = ${s.id}
     UNION SELECT c.user_id FROM stream_crew c WHERE c.host_user_id = ${s.host_user_id}
     UNION SELECT u.id FROM team_members tm JOIN players p ON p.xuid = tm.xuid JOIN users u ON u.mc_uuid = p.uuid WHERE tm.team_id = ${s.team_id}`).map((r) => Number(r.id));
-  await notify(env, ids, "streams", { title: `${who} is live on stage`, body: s.title, url: `/community#stages/${s.id}`, tag: `stream-${s.id}` },
+  await notify(env, ids, "streams", { title: `${who} ${what}`, body: s.title, url: `/community#stages/${s.id}`, tag: `stream-${s.id}` },
     { exclude: [s.created_by] }).catch(() => {});
   // in game: a message to followers who are online
   const xuids = (await sql`SELECT p.xuid FROM players p JOIN users u ON u.mc_uuid = p.uuid WHERE u.id = ANY(${ids})`).map((r) => r.xuid);
-  if (xuids.length) await toPlugin(env, { type: "stream_live", xuids, text: `${who} is live on stage: ${s.title}. Join on galaxymc.us (Community > Stages)` }).catch(() => {});
+  if (xuids.length) await toPlugin(env, { type: "stream_live", xuids, text: `${who} ${what}: ${s.title}. Join on galaxymc.us (Community > Stages)` }).catch(() => {});
+}
+
+// Setup is done: the hosts and speakers meet backstage first (nobody else can join or see it), then Go Live.
+async function toBackstage(env, sql, id) {
+  const [row] = await sql`UPDATE streams SET status = 'backstage', created_at = now() WHERE id = ${id} AND status = 'scheduled' RETURNING id`;
+  if (!row) throw new HttpError(409, "That stage already started or ended.");
+  const s = await loadStream(sql, id);
+  await roomStub(env, id).fetch("https://stream/internal/start", { method: "POST", body: JSON.stringify(roomInfo(s, "backstage")) });
+  return s;
 }
 
 async function goLive(env, sql, id) {
   const [{ n }] = await sql`SELECT count(*)::int AS n FROM streams WHERE status = 'live'`;
   if (n >= MAX_LIVE) throw new HttpError(409, `${MAX_LIVE} stages are live right now, which is the most at once. Try again a little later.`);
-  const [row] = await sql`UPDATE streams SET status = 'live', started_at = now() WHERE id = ${id} AND status = 'scheduled' RETURNING id`;
+  const [row] = await sql`UPDATE streams SET status = 'live', started_at = now() WHERE id = ${id} AND status = 'backstage' RETURNING id`;
   if (!row) throw new HttpError(409, "That stage already started or ended.");
   const s = await loadStream(sql, id);
-  await roomStub(env, id).fetch("https://stream/internal/start", { method: "POST", body: JSON.stringify({ id: Number(id), title: s.title, kind: s.kind, status: "live" }) });
+  await roomStub(env, id).fetch("https://stream/internal/start", { method: "POST", body: JSON.stringify(roomInfo(s, "live")) });
   await announceLive(env, sql, s);
   const { hubBroadcast } = await import("./chat.js");
   await hubBroadcast(env, { type: "streams_changed" }).catch(() => {});
@@ -231,7 +268,7 @@ export async function act(request, env) {
   const needStream = async (id) => { const s = await loadStream(sql, id); if (!s) throw new HttpError(404, "That stage doesn't exist."); return s; };
 
   switch (b.action) {
-    case "create": {   // { as: "me" | "team" | "host:<id>", title, kind, at? }
+    case "create": {   // { as, kind: podcast|live, title, description, category, saveVideo, speakMode, chatOn, teamOnly, at? }
       if (m.banned) throw new HttpError(403, `You can't host stages right now${m.banned.reason ? ` (${m.banned.reason})` : ""}.`);
       let hostId = null, teamId = null;
       const as = String(b.as || "me");
@@ -245,37 +282,53 @@ export async function act(request, env) {
       } else throw new HttpError(400, "Choose who's hosting.");
       const title = await clean(sql, b.title, 80);
       if (title.length < 3) throw new HttpError(400, "Give your stage a topic (at least 3 characters).");
-      const kind = "video";  // every Stage has voice, screen share and camera
+      const kind = b.kind === "podcast" ? "podcast" : "live";
+      const description = b.description ? await clean(sql, b.description, 300) : null;
+      const category = CATEGORIES.includes(b.category) ? b.category : null;
+      const saveVideo = kind === "live" && Boolean(b.saveVideo);
+      const speakMode = b.speakMode === "invite" ? "invite" : "hand";
+      const chatOn = b.chatOn !== false;
+      const teamOnly = Boolean(teamId) && Boolean(b.teamOnly);
       const at = b.at ? new Date(b.at) : null;
       if (at && (isNaN(at) || at < new Date(Date.now() - 60_000) || at > new Date(Date.now() + 60 * 86400_000))) throw new HttpError(400, "Pick a time in the next 60 days.");
-      const [busy] = await sql`SELECT id FROM streams WHERE status = 'live' AND (host_user_id = ${hostId} OR team_id = ${teamId})`;
-      if (!at && busy) throw new HttpError(409, "That stage is already live. End it before starting another.");
+      const [busy] = await sql`SELECT id FROM streams WHERE status IN ('live', 'backstage') AND (host_user_id = ${hostId} OR team_id = ${teamId})`;
+      if (!at && busy) throw new HttpError(409, "You already have a stage open. End it before starting another.");
       if (at) {
         const [{ n }] = await sql`SELECT count(*)::int AS n FROM streams WHERE status = 'scheduled' AND (host_user_id = ${hostId} OR team_id = ${teamId})`;
         if (n >= MAX_SCHEDULED) throw new HttpError(409, `You can have up to ${MAX_SCHEDULED} upcoming stages.`);
       }
-      const [row] = await sql`INSERT INTO streams (host_user_id, team_id, title, kind, status, scheduled_at, created_by)
-                              VALUES (${hostId}, ${teamId}, ${title}, ${kind}, 'scheduled', ${at ? at.toISOString() : null}, ${user.id}) RETURNING id`;
-      if (at) { await changed(); return json({ ok: true, id: Number(row.id), message: "Scheduled. People can tap Notify me, and it shows in #Events." }); }
-      try { await goLive(env, sql, row.id); }
+      const [row] = await sql`INSERT INTO streams (host_user_id, team_id, title, kind, status, scheduled_at, created_by, description, category, save_video, speak_mode, chat_on, team_only)
+                              VALUES (${hostId}, ${teamId}, ${title}, ${kind}, 'scheduled', ${at ? at.toISOString() : null}, ${user.id}, ${description}, ${category}, ${saveVideo}, ${speakMode}, ${chatOn}, ${teamOnly}) RETURNING id`;
+      if (at) { await changed(); return json({ ok: true, id: Number(row.id), message: teamOnly ? "Scheduled. Your team can tap Notify me." : "Scheduled. People can tap Notify me, and it shows in #Events." }); }
+      try { await toBackstage(env, sql, row.id); }
       catch (e) { await sql`DELETE FROM streams WHERE id = ${row.id}`; throw e; }
-      return json({ ok: true, id: Number(row.id), live: true, message: "Your stage is live!" });
+      return json({ ok: true, id: Number(row.id), backstage: true, message: "You're backstage. Press Go live when you're ready." });
+    }
+    case "golive": {   // backstage -> live (followers are told now)
+      const s = await needStream(b.id);
+      if (!(await rightsFor(sql, user, s, m)).manage) throw new HttpError(403, "Only the stage's hosts can start it.");
+      await goLive(env, sql, s.id);
+      return json({ ok: true, id: Number(s.id), live: true, message: "You're live!" });
     }
     case "start": {   // start a scheduled stream now
       const s = await needStream(b.id);
       if (!(await rightsFor(sql, user, s, m)).manage) throw new HttpError(403, "Only the stage's hosts can start it.");
-      const [busy] = await sql`SELECT id FROM streams WHERE status = 'live' AND (host_user_id = ${s.host_user_id} OR team_id = ${s.team_id})`;
-      if (busy) throw new HttpError(409, "Another stage of yours is already live.");
-      await goLive(env, sql, s.id);
-      return json({ ok: true, id: Number(s.id), live: true, message: "Your stage is live!" });
+      const [busy] = await sql`SELECT id FROM streams WHERE status IN ('live', 'backstage') AND (host_user_id = ${s.host_user_id} OR team_id = ${s.team_id})`;
+      if (busy) throw new HttpError(409, "Another stage of yours is already open.");
+      await toBackstage(env, sql, s.id);
+      return json({ ok: true, id: Number(s.id), backstage: true, message: "You're backstage. Press Go live when you're ready." });
     }
     case "edit": {
       const s = await needStream(b.id);
       if (!(await rightsFor(sql, user, s, m)).manage) throw new HttpError(403, "Only the stage's hosts can change it.");
-      const title = await clean(sql, b.title, 80);
-      if (title.length < 3) throw new HttpError(400, "Give your stage a topic (at least 3 characters).");
-      await sql`UPDATE streams SET title = ${title} WHERE id = ${s.id}`;
-      if (s.status === "live") await roomStub(env, s.id).fetch("https://stream/internal/start", { method: "POST", body: JSON.stringify({ id: Number(s.id), title, kind: s.kind, status: "live" }) });
+      const title = await clean(sql, b.title ?? s.title, 80);
+      if (title.length < 3) throw new HttpError(400, "Give your stage a title (at least 3 characters).");
+      const description = b.description !== undefined ? (b.description ? await clean(sql, b.description, 300) : null) : s.description;
+      const category = b.category !== undefined ? (CATEGORIES.includes(b.category) ? b.category : null) : s.category;
+      const speakMode = b.speakMode !== undefined ? (b.speakMode === "invite" ? "invite" : "hand") : s.speak_mode;
+      const chatOn = b.chatOn !== undefined ? b.chatOn !== false : s.chat_on;
+      await sql`UPDATE streams SET title = ${title}, description = ${description}, category = ${category}, speak_mode = ${speakMode}, chat_on = ${chatOn} WHERE id = ${s.id}`;
+      if (s.status === "live" || s.status === "backstage") await roomStub(env, s.id).fetch("https://stream/internal/start", { method: "POST", body: JSON.stringify(roomInfo({ ...s, title, speak_mode: speakMode, chat_on: chatOn })) });
       await changed();
       return json({ ok: true, message: "Saved." });
     }
@@ -284,13 +337,13 @@ export async function act(request, env) {
       const s = await needStream(b.id);
       const r = await rightsFor(sql, user, s, m);
       if (!r.manage && !r.mod) throw new HttpError(403, "Only the stage's hosts and staff can do that.");
-      if (s.status === "live") {
+      if (s.status === "live" || s.status === "backstage") {
         await roomStub(env, s.id).fetch("https://stream/internal/end", { method: "POST", body: JSON.stringify({ reason: r.manage ? "The host ended the stage." : "Staff ended this stage.", by: user.username }) });
       } else if (s.status === "scheduled") {
         await sql`UPDATE streams SET status = 'ended', ended_by = ${user.username} WHERE id = ${s.id}`;
       }
       await changed();
-      return json({ ok: true, message: s.status === "live" ? "The stage ended." : "The stage was cancelled." });
+      return json({ ok: true, message: s.status === "scheduled" ? "The stage was cancelled." : "The stage ended." });
     }
     case "remind": {
       const s = await needStream(b.id);
@@ -306,6 +359,41 @@ export async function act(request, env) {
       await sql`UPDATE stream_episodes SET deleted_at = now() WHERE id = ${e.id}`;  // the file stays in storage until the Owner deletes it for good (so a removed episode can be restored)
       await changed();
       return json({ ok: true, message: "Episode removed." });
+    }
+    case "episode-edit": {   // { id, title, description, chapters (text: "3:20 Bedwars tips" per line) }
+      const [e] = await sql`SELECT * FROM stream_episodes WHERE id = ${Number(b.id) || 0} AND deleted_at IS NULL`;
+      if (!e) throw new HttpError(404, "That isn't there any more.");
+      if (!(isMod(user) || Number(e.created_by) === Number(user.id) || (await rightsFor(sql, user, e, m)).manage)) throw new HttpError(403, "Only the host can change this.");
+      const title = b.title !== undefined ? await clean(sql, b.title, 80) : e.title;
+      if (title.length < 3) throw new HttpError(400, "Give it a title (at least 3 characters).");
+      const description = b.description !== undefined ? (b.description ? await clean(sql, b.description, 300) : "") : e.description;
+      let chapters = e.chapters || [];
+      if (b.chapters !== undefined) {
+        chapters = parseChapters(b.chapters);
+        for (const c of chapters) c.title = await clean(sql, c.title, 60);
+      }
+      await sql`UPDATE stream_episodes SET title = ${title}, description = ${description}, chapters = ${JSON.stringify(chapters)}::jsonb WHERE id = ${e.id}`;
+      await changed();
+      return json({ ok: true, message: "Saved.", chapters });
+    }
+    case "comment": {   // { id, body }
+      const [e] = await sql`SELECT * FROM stream_episodes WHERE id = ${Number(b.id) || 0} AND deleted_at IS NULL AND status = 'ready'`;
+      if (!e || !visibleTo(m, user)(e)) throw new HttpError(404, "That isn't there any more.");
+      const body = await clean(sql, b.body, 300);
+      if (!body) throw new HttpError(400, "Write a comment first.");
+      const [{ n }] = await sql`SELECT count(*)::int AS n FROM episode_comments WHERE user_id = ${user.id} AND created_at > now() - interval '1 minute'`;
+      if (n >= 4) throw new HttpError(429, "Slow down a little.");
+      await sql`INSERT INTO episode_comments (episode_id, user_id, body) VALUES (${e.id}, ${user.id}, ${body})`;
+      if (Number(e.created_by) !== Number(user.id)) await notify(env, [Number(e.created_by)], "streams", { title: `${user.username} commented on "${e.title}"`, body: body.slice(0, 120), url: `/community#stages/ep-${e.id}`, tag: `epc-${e.id}` }, { exclude: [user.id] }).catch(() => {});
+      return json({ ok: true });
+    }
+    case "comment-delete": {
+      const [c] = await sql`SELECT c.*, e.created_by AS ep_by, e.host_user_id, e.team_id FROM episode_comments c JOIN stream_episodes e ON e.id = c.episode_id WHERE c.id = ${Number(b.id) || 0} AND c.deleted_at IS NULL`;
+      if (!c) throw new HttpError(404, "That comment is gone.");
+      const ok = Number(c.user_id) === Number(user.id) || isMod(user) || Number(c.ep_by) === Number(user.id) || (await rightsFor(sql, user, c, m)).manage;
+      if (!ok) throw new HttpError(403, "You can't delete that comment.");
+      await sql`UPDATE episode_comments SET deleted_at = now() WHERE id = ${c.id}`;
+      return json({ ok: true, message: "Comment deleted." });
     }
     case "episode-play": {
       await sql`UPDATE stream_episodes SET plays = plays + 1 WHERE id = ${Number(b.id) || 0} AND deleted_at IS NULL`;
@@ -423,5 +511,27 @@ export async function upcomingForEvents(sql) {
 
 // Every 5 minutes: scheduled streams that never started 3 hours after their time are closed.
 export async function tick(env) {
-  await getDb(env)`UPDATE streams SET status = 'ended', ended_by = 'expired' WHERE status = 'scheduled' AND scheduled_at < now() - interval '3 hours'`;
+  const sql = getDb(env);
+  await sql`UPDATE streams SET status = 'ended', ended_by = 'expired' WHERE status = 'scheduled' AND scheduled_at < now() - interval '3 hours'`;
+  // backstage for 2 hours without going live: closed
+  for (const s of await sql`SELECT id FROM streams WHERE status = 'backstage' AND created_at < now() - interval '2 hours'`) {
+    await roomStub(env, s.id).fetch("https://stream/internal/end", { method: "POST", body: JSON.stringify({ reason: "The stage never went live, so it closed.", by: "expired" }) }).catch(() => {});
+    await sql`UPDATE streams SET status = 'ended', ended_by = 'expired' WHERE id = ${s.id} AND status = 'backstage'`;
+  }
+  await import("./recordings.js").then((r) => r.finishStale(env, sql)).catch((e) => console.error("recordings tick", e));
+}
+
+// GET /api/episodes/:id/comments
+export async function comments(request, env, ctx, url, params) {
+  const user = await requireUser(request, env);
+  const sql = getDb(env);
+  const [e] = await sql`SELECT * FROM stream_episodes WHERE id = ${Number(params.id) || 0} AND deleted_at IS NULL`;
+  const m = await me(sql, user);
+  if (!e || !visibleTo(m, user)(e)) throw new HttpError(404, "That isn't there any more.");
+  const canMod = isMod(user) || Number(e.created_by) === Number(user.id) || (await rightsFor(sql, user, e, m)).manage;
+  const rows = await sql`SELECT c.id, c.body, c.created_at, c.user_id, u.username, p.xuid, p.head_at, p.gamerpic_at
+                           FROM episode_comments c JOIN users u ON u.id = c.user_id LEFT JOIN players p ON p.uuid = u.mc_uuid
+                          WHERE c.episode_id = ${e.id} AND c.deleted_at IS NULL ORDER BY c.created_at LIMIT 200`;
+  return json({ ok: true, comments: rows.map((c) => ({ id: Number(c.id), body: c.body, at: c.created_at, name: c.username, head: c.xuid ? headUrlFor(c) : null,
+    mine: Number(c.user_id) === Number(user.id), canDelete: canMod || Number(c.user_id) === Number(user.id) })) }, 200, { "Cache-Control": "no-store" });
 }

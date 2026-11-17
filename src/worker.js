@@ -251,6 +251,7 @@ const routes = [
   ["POST", "/api/episodes/:id/finish", (req, env, ctx, url, params) => import("./routes/recordings.js").then((m) => m.episodeFinish(req, env, ctx, url, params))],
   ["POST", "/api/episodes/:id/cancel", (req, env, ctx, url, params) => import("./routes/recordings.js").then((m) => m.episodeCancel(req, env, ctx, url, params))],
   ["GET", "/api/episodes/:id/audio", (req, env, ctx, url, params) => import("./routes/recordings.js").then((m) => m.episodeAudio(req, env, ctx, url, params))],
+  ["GET", "/api/episodes/:id/comments", (req, env, ctx, url, params) => import("./routes/streams.js").then((m) => m.comments(req, env, ctx, url, params))],
   ["POST", "/api/recordings/episodes/:id/purge", (req, env, ctx, url, params) => import("./routes/recordings.js").then((m) => m.purgeEpisode(req, env, ctx, url, params))],
   ["GET", "/api/recordings", (req, env) => import("./routes/recordings.js").then((m) => m.list(req, env))],
   ["PUT", "/api/recordings/:id/part", (req, env, ctx, url, params) => import("./routes/recordings.js").then((m) => m.part(req, env, ctx, url, params))],

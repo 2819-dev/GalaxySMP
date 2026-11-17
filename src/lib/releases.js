@@ -435,6 +435,22 @@ Also: when staff change the status of your suggestion, you now always get a noti
 
 **Covers:** every show gets its own colorful cover automatically.`,
   },
+  {
+    id: "2026-11-17-stages-types",
+    title: "Stages: Podcasts, Live Streams and More",
+    body: `#Stages now has three sections:
+
+- **Podcasts:** hosts and speakers talk, voice only. A live podcast is saved as an episode automatically when it ends, so anyone can listen later. Podcasts can also be uploaded or recorded on the website.
+- **Live:** live streams with screen sharing and cameras. They can only be watched while they're live, unless the host chooses **Save as a video**; saved streams appear under **Watch again**.
+- **More:** other videos and audio, such as a team's rules or a build tour. Teams can make a post visible to their members only.
+
+**A new setup before going live:** choose Podcast or Live Stream, add a title, description and category, set the rules (who can speak, live chat on or off, everyone or team members only), then check your microphone and camera. You start **backstage** with your speakers, where nobody else can join, and press **Go live** for a 3, 2, 1 countdown. Followers are notified at that moment.
+
+**Also new:**
+- **Playback speed** (1x to 2x) and **chapters**: hosts can add chapter times, and listeners tap a chapter to jump to it.
+- **Comments** on episodes and videos.
+- **Live polls:** hosts can ask a quick question during a stage and everyone sees the results live.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

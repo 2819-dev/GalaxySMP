@@ -24,6 +24,7 @@ export class StreamRoom extends DurableObject {
       this.info = (await ctx.storage.get("info")) || null;   // { id, title, kind, status }
       this.chat = (await ctx.storage.get("chat")) || [];
       this.idleSince = (await ctx.storage.get("idleSince")) || null;
+      this.poll = (await ctx.storage.get("poll")) || null;      // { id, q, options, votes: { userId: i }, open }
     });
   }
 
@@ -61,7 +62,15 @@ export class StreamRoom extends DurableObject {
       invited: all.filter((a) => a.invited).map((a) => a.id),
       hands: all.filter((a) => a.hand && !a.onStage).map((a) => ({ id: a.id, username: a.username, head: a.head })),
       recording: all.filter((a) => a.recording).map((a) => a.username),   // everyone sees a "Recording" sign
+      poll: this.pollOut(),
     };
+  }
+  pollOut() {
+    const p = this.poll;
+    if (!p) return null;
+    const counts = p.options.map(() => 0);
+    for (const i of Object.values(p.votes || {})) if (counts[i] !== undefined) counts[i] += 1;
+    return { id: p.id, q: p.q, options: p.options, counts, total: Object.keys(p.votes || {}).length, open: p.open };
   }
   sendState() { this.broadcast(this.state()); this.ctx.waitUntil(this.trackIdle()); }
 
@@ -91,7 +100,8 @@ export class StreamRoom extends DurableObject {
     this.info = { ...this.info, status: "ended" };
     await this.ctx.storage.put("info", this.info);
     await this.ctx.storage.delete("chat");
-    this.chat = [];
+    await this.ctx.storage.delete("poll");
+    this.chat = []; this.poll = null;
     const n = this.people().size;
     await getDb(this.env)`UPDATE streams SET status = 'ended', ended_at = now(), ended_by = ${String(by || "").slice(0, 40)},
                            peak_viewers = greatest(peak_viewers, ${n}) WHERE id = ${this.info.id} AND status <> 'ended'`.catch((e) => console.error("stream end", e));
@@ -111,7 +121,9 @@ export class StreamRoom extends DurableObject {
     const url = new URL(request.url);
     if (url.pathname === "/internal/start") {          // the stream went live (or its details changed)
       const info = await request.json();
-      this.info = { id: info.id, title: info.title, kind: info.kind, status: info.status };
+      const wasBackstage = this.info?.status === "backstage";
+      this.info = { id: info.id, title: info.title, kind: info.kind === "podcast" ? "podcast" : "live", status: info.status, speakMode: info.speakMode || "hand", chatOn: info.chatOn !== false };
+      if (wasBackstage && info.status === "live") this.broadcast({ type: "golive" });
       await this.ctx.storage.put("info", this.info);
       if (info.status === "live") {
         this.idleSince = this.idleSince || Date.now();   // until someone goes on stage
@@ -131,7 +143,8 @@ export class StreamRoom extends DurableObject {
     }
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected WebSocket", { status: 426 });
     const user = JSON.parse(request.headers.get("X-GSMP-User"));
-    if (!this.info || this.info.status !== "live") return new Response("This stage isn't live.", { status: 409 });
+    if (!this.info || (this.info.status !== "live" && this.info.status !== "backstage")) return new Response("This stage isn't live.", { status: 409 });
+    if (this.info.status === "backstage" && !user.manage && !user.stage && !user.mod) return new Response("This stage hasn't started yet.", { status: 409 });
     const people = this.people();
     if (!people.has(user.id) && people.size >= MAX_VIEWERS && !user.manage && !user.stage && !user.mod) {
       return new Response("This stage is full right now.", { status: 409 });
@@ -144,7 +157,7 @@ export class StreamRoom extends DurableObject {
     const [client, server] = Object.values(pair);
     this.ctx.acceptWebSocket(server, ["viewer", `user:${user.id}`]);
     server.serializeAttachment({ ...user, onStage: false, invited: false, guest: false, sessionId: null, tracks: [], mic: false, cam: false, screen: false, lastChat: 0 });
-    this.send(server, { type: "hello", you: user.id, rights: { manage: user.manage, stage: user.stage, mod: user.mod, record: Boolean(user.manage || user.owner) }, chat: this.chat, reactions: REACTIONS });
+    this.send(server, { type: "hello", you: user.id, rights: { manage: user.manage, stage: user.stage, mod: user.mod, record: Boolean(user.manage || user.owner) }, chat: this.chat, reactions: REACTIONS, myVote: this.poll?.votes?.[user.id] ?? null });
     this.sendState();
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -192,7 +205,7 @@ export class StreamRoom extends DurableObject {
         if (!a.pubSessionId) throw new Error("No stage connection.");
         const want = (Array.isArray(msg.tracks) ? msg.tracks : []).slice(0, 2)
           .map((t) => ({ mid: String(t.mid), kind: t.kind === "video" ? "video" : "audio" }))
-          ;
+          .filter((t) => t.kind === "audio" || this.info?.kind !== "podcast");   // podcasts are voice only
         if (!want.length) throw new Error("Nothing to send.");
         const tracks = want.map((t) => ({ ...t, name: `${t.kind[0]}${a.id}-${Date.now().toString(36)}` }));
         const data = await this.rtc("POST", `/sessions/${a.pubSessionId}/tracks/new`, {
@@ -272,6 +285,7 @@ export class StreamRoom extends DurableObject {
       }
       case "hand": {   // raise / lower your hand to ask to speak
         if (a.onStage) return reply({ ok: true });
+        if (msg.up && this.info?.speakMode === "invite") throw new Error("On this stage, the hosts invite people to speak.");
         this.update(ws, { hand: Boolean(msg.up) });
         this.sendState();
         if (msg.up) for (const { ws: w, a: x } of people.values()) if (x.manage) this.send(w, { type: "hand", username: a.username });
@@ -297,6 +311,7 @@ export class StreamRoom extends DurableObject {
 
       // --- chat and reactions ---
       case "chat": {
+        if (this.info?.chatOn === false && !a.manage && !a.mod) throw new Error("The hosts turned the chat off.");
         const now = Date.now();
         if (now - (a.lastChat || 0) < 1200) throw new Error("Slow down a little.");
         const sql = getDb(this.env);
@@ -337,6 +352,44 @@ export class StreamRoom extends DurableObject {
         this.update(ws, { lastReact: now });
         this.broadcast({ type: "react", emoji: msg.emoji });
         return;
+      }
+      case "countdown": {   // backstage: everyone backstage sees 3, 2, 1 before the stage goes live
+        if (!a.manage) throw new Error("Only the stage's hosts can do that.");
+        this.broadcast({ type: "countdown", by: a.username });
+        return reply({ ok: true });
+      }
+      case "poll.start": {   // { q, options: [2..4] }
+        if (!a.manage) throw new Error("Only the stage's hosts can ask a poll.");
+        const words = await this.captionWords();
+        const tidy = (t, max) => {
+          const c = checkMessage(String(t || ""), words, { allowLinks: false, maxLength: max });
+          if (!c.ok) throw new Error(c.message || "That isn't allowed.");
+          return c.text.replace(/\s+/g, " ").trim();
+        };
+        const q = tidy(msg.q, 120);
+        const options = (Array.isArray(msg.options) ? msg.options : []).map((o) => tidy(o, 40)).filter(Boolean).slice(0, 4);
+        if (!q || options.length < 2) throw new Error("Add a question and at least 2 answers.");
+        this.poll = { id: crypto.randomUUID().slice(0, 8), q, options, votes: {}, open: true };
+        await this.ctx.storage.put("poll", this.poll);
+        this.sendState();
+        return reply({ ok: true });
+      }
+      case "poll.vote": {
+        const p = this.poll;
+        if (!p || !p.open || String(msg.id) !== p.id) throw new Error("This poll is closed.");
+        const i = Number(msg.i);
+        if (!Number.isInteger(i) || i < 0 || i >= p.options.length) return reply({ ok: true });
+        p.votes[a.id] = i;
+        await this.ctx.storage.put("poll", p);
+        this.sendState();
+        return reply({ ok: true });
+      }
+      case "poll.end": {   // close it (results stay up) or remove it
+        if (!a.manage && !a.mod) throw new Error("Only the stage's hosts can do that.");
+        if (msg.remove || !this.poll) { this.poll = null; await this.ctx.storage.delete("poll"); }
+        else { this.poll.open = false; await this.ctx.storage.put("poll", this.poll); }
+        this.sendState();
+        return reply({ ok: true });
       }
       case "end": {
         if (!a.manage && !a.mod) throw new Error("Only the stage's hosts and staff can end it.");
