@@ -36,7 +36,8 @@ MIN_FREE_MB = 700    # don't start the bot unless the machine has at least this 
 STOP_FREE_MB = 350   # stop the bot if free memory drops below this (it starts again later when there's room)
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|\[[0-9;]*m")
 URL_RE = re.compile(r"https?://\S+")
-CODE_RE = re.compile(r"Enter the code:\s*([A-Z0-9-]{4,})", re.I)
+# "Enter the code: ABCD1234" (older bot) or "...open the page https://www.microsoft.com/link and enter the code K5DKY4JB to authenticate."
+CODE_RE = re.compile(r"enter the code:?\s+([A-Z0-9-]{6,12})\b", re.I)
 
 
 def free_mb():
@@ -109,10 +110,14 @@ class FriendBot:
 
     def report(self, force=False):
         payload = {"type": "friendbot", "state": self.state, "detail": self.detail[:300], "signin": self.signin,
-                   "enabled": self.enabled, "autoFriend": self.auto_friend, "lines": self.lines[-25:]}
+                   "enabled": self.enabled, "autoFriend": self.auto_friend, "lines": self.lines[-60:]}
         key = json.dumps({k: payload[k] for k in ("state", "detail", "signin", "enabled", "autoFriend")}, sort_keys=True)
+        # the status changed: send now; only new log lines: at most every 3 seconds (the Control Panel shows the log live)
+        lines_key = (len(self.lines), self.lines[-1] if self.lines else "")
         if not force and key == self.last_sent:
-            return
+            if lines_key == getattr(self, "last_lines", None) or time.time() - getattr(self, "last_lines_at", 0) < 3:
+                return
+        self.last_lines, self.last_lines_at = lines_key, time.time()
         voice = getattr(self.plugin, "_voice", None)
         if voice is not None and getattr(voice, "ws", None):
             voice.send_json(payload)
@@ -202,6 +207,12 @@ class FriendBot:
             pass
         return 19132
 
+    def max_players(self):
+        try:
+            return int(self.plugin.server.max_players) or 20
+        except Exception:
+            return 20
+
     def write_config(self):
         """Changes only our values in the bot's config.yml (it makes the file itself on its first run)."""
         path = self.folder / "config.yml"
@@ -215,6 +226,9 @@ class FriendBot:
             "host-name": '"GalaxySMP"',
             "world-name": '"GalaxySMP Survival"',
             "auto-friend": "true" if self.auto_friend else "false",
+            # if the bot can't read the server's info (it pings it), it still shows GalaxySMP with these values
+            "config-fallback": "true",
+            "max-players": str(self.max_players()),
         }
         new = text
         for key, value in want.items():
@@ -298,24 +312,32 @@ class FriendBot:
                 pending_url = url.group(0).rstrip(".,)")
             m = CODE_RE.search(line)
             if m:
-                self.signin = {"url": pending_url or "https://www.microsoft.com/link", "code": m.group(1)}
+                self.signin = {"url": pending_url or "https://www.microsoft.com/link", "code": m.group(1).upper()}
                 self.state, self.detail = "signin", "Sign in with the bot's Xbox account to finish."
+                self.last_logged = ("signin", self.detail)
+                self.log(f"SIGN-IN NEEDED: open {self.signin['url']} and enter the code {self.signin['code']} "
+                         "(sign in with the bot's Xbox account). It's also in Control Panel > Server control > Friend bot.")
                 self.report(force=True)
                 continue
             if "StackOverflowError" in line or "OutOfMemoryError" in line or "Metaspace" in line:
                 if not self.roomy:
                     self.roomy = True
                     self.log("The bot ran out of memory room; it will start again with more.")
-            if "Creating Xbox LIVE session" in line or "Got update session response" in line:
+            if "Creation of Xbox LIVE session was successful" in line or "Updated session" in line or "Got update session response" in line:
                 self.failures = 0
-                self.set_state("online", "GalaxySMP shows under Play > Friends for the bot's friends.")
+                if self.state != "online":
+                    self.set_state("online", "GalaxySMP shows under Play > Friends for the bot's friends.")
+            elif "Unable to create session handle" in line or "Unable to update session information" in line:
+                self.set_state("error", f"Xbox didn't accept the session: {line[:200]}")
             elif "age verification" in line.lower():
                 self.set_state("error", "The bot's Xbox account needs age verification: sign in to xbox.com with it and finish that.")
             elif "invalid_grant" in line or "Failed to get/refresh auth token" in line:
                 if self.state != "signin":
                     self.set_state("error", "Microsoft sign-in failed. Use Restart in the Control Panel to get a new code.")
-            elif self.state == "starting" and time.time() - started > 5:
-                self.report()
+            elif self.state == "signin" and "Creating Xbox LIVE session" in line:
+                self.set_state("starting", "Signed in. Creating the Xbox session...")
+            else:
+                self.report()   # new log lines, for the live log in the Control Panel
         code = self.proc.wait()
         try:
             self.proc.stdin.close()

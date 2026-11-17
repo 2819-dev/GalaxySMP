@@ -4583,3 +4583,6 @@ body.cx-app .notify-banner { bottom: calc(var(--tab-h) + 12px); }
   .messages.cx-fade, .qs, .qs-card, body.cx-app .inbox-card, body.cx-app .acct-card { animation: none; }
   .channel:active, .qs-row:active, .cx-tab:active { transform: none; }
 }
+.fb-logbox { margin-top: 10px; }
+.fb-logbox summary { cursor: pointer; font-weight: 600; font-size: .9rem; color: var(--text-2); padding: 4px 0; }
+.fb-logbox .fb-log { max-height: 280px; margin-top: 6px; }

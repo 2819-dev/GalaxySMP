@@ -497,6 +497,11 @@ export const OFFICIAL_SUGGESTIONS = [
     title: "Friend list joining is back",
     body: `Joining GalaxySMP from **Play > Friends** (for Xbox, PlayStation and Switch players) works again. It stopped working after the Xbox friend bot updated to a newer version; the server now gives it the room it needs, and recovers on its own if it happens again.`,
   },
+  {
+    id: "2026-11-17-friend-bot-signin",
+    title: "Friend list joining: setup improvements",
+    body: `The Xbox friend bot that lets Xbox, PlayStation and Switch players join from **Play > Friends** is now easier for staff to set up and keep running, and it still shows GalaxySMP correctly when the server's details can't be read.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

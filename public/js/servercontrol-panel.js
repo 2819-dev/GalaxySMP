@@ -127,8 +127,36 @@ export function setupServerControl({ loaders, toast }) {
   }
 
   // ---------- friend bot (GalaxySMP under Play > Friends) ----------
+  let fbTimer = null;
   function friendBotPanel(d) {
     const fb = d.friendbot;
+    // while the bot isn't online (starting, waiting for sign-in...), the card and its log refresh by themselves
+    clearTimeout(fbTimer);
+    const refresh = () => {
+      fbTimer = setTimeout(async () => {
+        const card = box.querySelector(".fb-card");
+        if (!card || !document.body.contains(card)) return;
+        if (document.visibilityState !== "visible") { refresh(); return; }
+        try {
+          const nd = await getJson("/api/panel/server-control");
+          const open = card.querySelector("details.fb-logbox")?.open;
+          const fresh = friendBotPanel(nd);
+          if (open != null) { const dd = fresh.querySelector("details.fb-logbox"); if (dd) dd.open = open; }
+          card.replaceWith(fresh);
+        } catch { refresh(); }
+      }, fb?.state === "online" ? 30_000 : 4000);
+    };
+    refresh();
+    // the sign-in code, even if the plugin didn't pick it out of the log itself
+    if (fb && !fb.signin && fb.state !== "online") {
+      const line = [...(fb.lines || [])].reverse().find((l) => /enter the code:?\s+[A-Z0-9-]{6,12}/i.test(l));
+      if (line) {
+        const code = line.match(/enter the code:?\s+([A-Z0-9-]{6,12})/i)[1].toUpperCase();
+        fb.signin = { code, url: "https://www.microsoft.com/link" };
+        fb.state = "signin";
+        fb.detail = "Sign in with the bot's Xbox account to finish.";
+      }
+    }
     const STATES = { online: ["done", "Online"], signin: ["pending", "Needs sign-in"], starting: ["pending", "Starting"], installing: ["pending", "Installing"],
       restarting: ["pending", "Restarting"], waiting: ["pending", "Waiting for memory"], error: ["declined", "Problem"], off: ["declined", "Off"] };
     const fresh = fb && Date.now() - new Date(fb.at).getTime() < 15 * 60e3;
@@ -146,7 +174,10 @@ export function setupServerControl({ loaders, toast }) {
           h("b", { text: "Sign in once with the bot's Xbox account (not your own)" }),
           h("span", { class: "text-2 small", text: "1. Open the link. 2. Type this code. 3. Sign in as the bot account." }),
           h("code", { class: "fb-code", text: fb.signin.code }),
-          h("a", { class: "btn btn-primary btn-sm", href: fb.signin.url, target: "_blank", rel: "noopener noreferrer", text: "Open Microsoft sign-in" })));
+          h("div", { class: "cx-row", style: "flex-wrap:wrap;gap:8px" },
+            h("a", { class: "btn btn-primary btn-sm", href: fb.signin.url, target: "_blank", rel: "noopener noreferrer", text: "Open Microsoft sign-in" }),
+            h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Copy code", onclick: () => navigator.clipboard?.writeText(fb.signin.code).then(() => toast("Code copied.")).catch(() => {}) })),
+          h("span", { class: "text-3 small", text: "The code works for about 15 minutes. When you've signed in, this card turns Online by itself. If the code expired, press Restart bot for a new one." })));
       }
       const auto = h("input", { type: "checkbox", id: "fb-auto" });
       auto.checked = Boolean(fb.autoFriend);
@@ -156,10 +187,17 @@ export function setupServerControl({ loaders, toast }) {
       parts.push(h("div", { class: "cx-row" },
         h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Restart bot", onclick: () => send({ restart: true }) }),
         h("button", { class: `btn btn-sm ${fb.enabled ? "btn-ghost" : "btn-primary"}`, type: "button", text: fb.enabled ? "Turn off" : "Turn on", onclick: () => send({ enabled: !fb.enabled }) }),
-        fb.lines?.length ? h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Show log", onclick: () => openDialog({
-          title: "Friend bot log", body: h("pre", { class: "fb-log", text: fb.lines.join("\n") }), actions: [{ label: "Close", kind: "primary" }] }) }) : null));
+        fb.lines?.length ? h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Copy log", onclick: () => navigator.clipboard?.writeText(fb.lines.join("\n")).then(() => toast("Log copied.")).catch(() => {}) }) : null));
+      // the bot's own log, live (open while it isn't online, so you can see what it's doing)
+      if (fb.lines?.length) {
+        const pre = h("pre", { class: "fb-log", text: fb.lines.join("\n") });
+        const det = h("details", { class: "fb-logbox", open: fb.state !== "online" },
+          h("summary", { text: `Bot log (${fresh ? "live" : "last seen " + new Date(fb.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })})` }), pre);
+        parts.push(det);
+        requestAnimationFrame(() => { pre.scrollTop = pre.scrollHeight; });
+      }
     }
-    return h("section", { class: "panel sc-card" }, ...parts);
+    return h("section", { class: "panel sc-card fb-card" }, ...parts);
   }
 
   // ---------- lock the whole website ----------
