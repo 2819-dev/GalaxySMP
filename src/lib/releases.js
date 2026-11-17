@@ -400,6 +400,11 @@ Post a plan like "Bedwars at 7 pm, who's in?" and others tap **I'm in**. You can
 
 Also: when staff change the status of your suggestion, you now always get a notification.`,
   },
+  {
+    id: "2026-11-17-recordings-privacy",
+    title: "Stage recordings and your privacy",
+    body: `When a stage host records a stage (you'll always see the red **Recording** sign), the recording may be kept on GalaxySMP so staff can review it. Only the server owner and staff can watch these recordings. Our privacy policy has the details.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

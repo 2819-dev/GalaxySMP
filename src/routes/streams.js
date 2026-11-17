@@ -71,6 +71,9 @@ async function rightsFor(sql, user, s, m) {
   return { manage: c?.role === "editor", stage: Boolean(c), mod };
 }
 
+// For other files (recordings): what this member may do on a stage.
+export async function rightsForUser(sql, user, s) { return rightsFor(sql, user, s, await me(sql, user)); }
+
 async function clean(sql, text, max) {
   const check = checkMessage(String(text || ""), compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`), { allowLinks: false, maxLength: max });
   if (!check.ok) throw new HttpError(400, check.message || "That isn't allowed.");

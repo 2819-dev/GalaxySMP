@@ -777,11 +777,48 @@ class Player {
     const stream = new MediaStream([...canvas.captureStream(24).getVideoTracks(), ...dest.stream.getAudioTracks()]);
     const type = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"].find((t) => MediaRecorder.isTypeSupported?.(t)) || "";
     let rec;
-    try { rec = new MediaRecorder(stream, { mimeType: type || undefined, videoBitsPerSecond: 2_500_000, audioBitsPerSecond: 128_000 }); }
+    try { rec = new MediaRecorder(stream, { mimeType: type || undefined, videoBitsPerSecond: 1_500_000, audioBitsPerSecond: 96_000 }); }
     catch { clearInterval(tick); ac.close(); this.toast("This browser can't record the stage."); return; }
     const chunks = [];
-    rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
     const started = Date.now();
+    // Upload to GalaxySMP while recording (equal-size pieces), so the Owner and staff can watch it later.
+    const up = { on: false, id: null, size: 0, n: 0, buf: [], bufBytes: 0, queue: Promise.resolve(), failed: false };
+    const sendPart = (blob) => {
+      const n = ++up.n;
+      up.queue = up.queue.then(async () => {
+        if (!up.on) return;
+        for (let tries = 0; tries < 3; tries++) {
+          try {
+            const res = await fetch(`/api/recordings/${up.id}/part?n=${n}`, { method: "PUT", body: blob, credentials: "same-origin", headers: { "Content-Type": "application/octet-stream" } });
+            if (res.status === 507) { up.on = false; this.toast("GalaxySMP's recording storage is full. The rest saves to your device only."); return; }
+            if (res.ok) return;
+          } catch { /* try again */ }
+          await new Promise((r) => setTimeout(r, 1500 * (tries + 1)));
+        }
+        up.on = false; up.failed = true;
+      });
+    };
+    const takeParts = (final) => {
+      if (!up.on) return;
+      while (up.bufBytes >= up.size || (final && up.bufBytes > 0)) {
+        const all = new Blob(up.buf);
+        const piece = all.slice(0, Math.min(up.size, all.size));
+        const rest = all.slice(piece.size);
+        up.buf = rest.size ? [rest] : []; up.bufBytes = rest.size;
+        sendPart(piece);
+      }
+    };
+    postJson("/api/recordings/start", { streamId: this.s.id, mime: rec.mimeType || type }).then((r) => {
+      up.id = r.id;
+      if (r.upload) { up.on = true; up.size = r.partBytes; takeParts(false); }
+      else if (r.reason) this.toast(r.reason);
+    }).catch(() => {});
+    rec.ondataavailable = (e) => {
+      if (!e.data.size) return;
+      chunks.push(e.data);
+      up.buf.push(e.data); up.bufBytes += e.data.size;
+      if (up.on) takeParts(false);
+    };
     rec.onstop = () => {
       clearInterval(tick); clearInterval(this.recClockTimer); canvas.remove();
       ac.close().catch(() => {});
@@ -792,7 +829,12 @@ class Player {
       a.href = URL.createObjectURL(blob); a.download = name;
       document.body.append(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
-      this.toast(`Recording saved: ${name}`);
+      // finish the upload (the last piece can be smaller)
+      takeParts(true);
+      const seconds = Math.round((Date.now() - started) / 1000);
+      up.queue.then(() => (up.id ? postJson(`/api/recordings/${up.id}/finish`, { seconds }) : null)).then((r) => {
+        this.toast(r?.uploaded ? `Recording saved to this device and uploaded to GalaxySMP.` : `Recording saved: ${name}`);
+      }).catch(() => this.toast(`Recording saved: ${name}`));
     };
     rec.start(1000);
     this.recorder = rec;
@@ -800,7 +842,7 @@ class Player {
     this.recClockTimer = setInterval(() => { const s = Math.floor((Date.now() - started) / 1000); this.recClock = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; this.drawRecBtn(); }, 1000);
     this.request("record", { on: true }).catch(() => {});
     this.drawRecBtn();
-    this.toast("Recording. Everyone on the stage can see that you're recording. The video saves to this device when you stop.");
+    this.toast("Recording. Everyone on the stage can see that you're recording.");
   }
   stopRecording() {
     const rec = this.recorder;

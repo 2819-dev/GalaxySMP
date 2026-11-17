@@ -30,6 +30,43 @@ export function setupStreamsMod({ loaders, toast }) {
     openDialog({ title: `Stop ${host.name} from hosting stages`, body: h("div", { class: "form" }, field("For how long", days), field("Reason", reason)),
       actions: [{ label: "Cancel" }, { label: "Stop hosting", kind: "danger", onClick: () => act({ action: "ban", userId: host.id, days: Number(days.value), reason: reason.value }) }] });
   }
+  // ---------- recordings and all episodes ----------
+  const recList = document.getElementById("rec-list");
+  const epAll = document.getElementById("ep-all");
+  const gb = (n) => (n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(2)} GB` : n >= 1024 ** 2 ? `${Math.round(n / 1024 ** 2)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+  const dur = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : "");
+  const STATUS = { done: "", uploading: "Uploading…", local: "Saved on the recorder's device only", failed: "Upload failed (saved on the recorder's device)" };
+  async function loadRecordings() {
+    let d;
+    try { d = await getJson("/api/recordings"); } catch (e) { recList.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
+    document.getElementById("rec-usage").textContent = d.storageOn
+      ? `Every stage recording, uploaded while it records. Only you and staff with "Moderate stages" can watch them. Storage used: ${gb(d.used)} of ${gb(d.cap)} (free).`
+      : "Uploading recordings isn't switched on yet (Cloudflare R2). Until then, recordings only save on the recorder's device; this list still shows every recording.";
+    recList.replaceChildren(...(d.recordings.length ? d.recordings.map((r) => {
+      const player = h("div", { class: "rec-player", hidden: true });
+      return h("div", { class: "member-row rec-row" },
+        h("div", { class: "info" }, h("strong", { text: r.title || "Stage" }),
+          h("span", { text: [r.by ? `Recorded by ${r.by}` : null, new Date(r.startedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }), dur(r.seconds), r.size ? gb(r.size) : null, STATUS[r.status]].filter(Boolean).join(" · ") })),
+        h("div", { class: "row-actions" },
+          r.status === "done" ? h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Watch", onclick: () => {
+            if (player.hidden) { const v = h("video", { controls: true, preload: "metadata", src: `/api/recordings/${r.id}/file` }); v.playsInline = true; player.replaceChildren(v); player.hidden = false; v.play().catch(() => {}); }
+            else { player.hidden = true; player.replaceChildren(); }
+          } }) : null,
+          r.status === "done" ? h("a", { class: "btn btn-ghost btn-sm", href: `/api/recordings/${r.id}/file?download=1`, text: "Download" }) : null,
+          h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": "Delete recording", onclick: () => openDialog({ title: "Delete this recording?", body: h("p", { class: "text-2", text: "It's removed from GalaxySMP for good (copies on people's devices aren't affected)." }),
+            actions: [{ label: "Cancel" }, { label: "Delete", kind: "danger", onClick: async () => { const x = await postJson(`/api/recordings/${r.id}/delete`, {}); toast(x.message); loadRecordings(); } }] }) }, "Delete")),
+        player);
+    }) : [h("div", { class: "panel empty", text: "No recordings yet." })]));
+    epAll.replaceChildren(...(d.episodes.length ? d.episodes.map((e) => h("div", { class: "member-row" },
+      h("div", { class: "info" }, h("strong", { text: e.title }),
+        h("span", { text: [e.host, e.by && e.by !== e.host ? `posted by ${e.by}` : null, new Date(e.createdAt).toLocaleDateString(), `${e.plays} plays`, e.removed ? "Removed" : null].filter(Boolean).join(" · ") })),
+      h("div", { class: "row-actions" },
+        h("a", { class: "btn btn-ghost btn-sm", href: `https://www.youtube.com/watch?v=${encodeURIComponent(e.youtubeId)}`, target: "_blank", rel: "noopener noreferrer", text: "Open on YouTube" }),
+        e.removed ? h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Restore", onclick: async () => { try { const x = await postJson(`/api/recordings/episodes/${e.id}/restore`, {}); toast(x.message); loadRecordings(); } catch (er) { toast(er.message); } } })
+          : h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: async () => { try { const x = await postJson("/api/streams", { action: "episode-delete", id: e.id }); toast(x.message); loadRecordings(); } catch (er) { toast(er.message); } } }))))
+      : [h("div", { class: "panel empty", text: "No episodes yet." })]));
+  }
+
   const prev = loaders.reports;
-  loaders.reports = async () => { await Promise.all([prev?.(), load()]); };
+  loaders.reports = async () => { await Promise.all([prev?.(), load(), loadRecordings()]); };
 }
