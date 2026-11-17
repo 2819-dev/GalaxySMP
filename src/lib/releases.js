@@ -492,6 +492,11 @@ export const OFFICIAL_SUGGESTIONS = [
 - **Quick switcher:** tap **Find a channel or person** above the channels (or press Ctrl+K, or Cmd+K on a Mac) to jump to any channel or start a message with anyone.
 - **Back and Forward** in your browser move between the channels you visited.`,
   },
+  {
+    id: "2026-11-17-friend-bot-fix",
+    title: "Friend list joining is back",
+    body: `Joining GalaxySMP from **Play > Friends** (for Xbox, PlayStation and Switch players) works again. It stopped working after the Xbox friend bot updated to a newer version; the server now gives it the room it needs, and recovers on its own if it happens again.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

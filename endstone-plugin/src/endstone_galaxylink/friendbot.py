@@ -26,8 +26,12 @@ JAR_URL = "https://github.com/MCXboxBroadcast/Broadcaster/releases/latest/downlo
 JRE_API = "https://api.adoptium.net/v3/binary/latest/21/ga/linux/{arch}/jre/hotspot/normal/eclipse"
 JRE_GITHUB = "https://api.github.com/repos/adoptium/temurin21-binaries/releases/latest"
 JAR_REFRESH_DAYS = 7
-JAVA_OPTS = ["-Xmx128m", "-Xss256k", "-XX:MaxMetaspaceSize=64m", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1",
-             "-XX:ReservedCodeCacheSize=24m", "-XX:CICompilerCount=1"]  # keep Java small: the Minecraft server comes first
+# Keep Java small (the Minecraft server comes first), but not too small: newer bot versions crash with a
+# StackOverflowError when the thread stack is limited (-Xss256k did that), so the stack keeps Java's normal size.
+JAVA_OPTS = ["-Xmx256m", "-XX:MaxMetaspaceSize=128m", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1",
+             "-XX:ReservedCodeCacheSize=48m", "-XX:CICompilerCount=1"]
+# If it still runs out of room (StackOverflowError / OutOfMemoryError), the next start gives it more.
+JAVA_OPTS_ROOMY = ["-Xmx512m", "-Xss2m", "-XX:+UseSerialGC"]
 MIN_FREE_MB = 700    # don't start the bot unless the machine has at least this much free memory
 STOP_FREE_MB = 350   # stop the bot if free memory drops below this (it starts again later when there's room)
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|\[[0-9;]*m")
@@ -58,7 +62,7 @@ def free_mb():
 class FriendBot:
     def __init__(self, plugin):
         self.plugin = plugin
-        self.folder = Path(plugin.data_folder) / "friendbot"
+        self.folder = (Path(plugin.data_folder) / "friendbot").resolve()
         self.folder.mkdir(parents=True, exist_ok=True)
         cfg = plugin.economy.get_config("friendbot") or {}
         self.enabled = cfg.get("enabled", True)
@@ -70,6 +74,8 @@ class FriendBot:
         self.signin = None          # {"url", "code"} while Microsoft sign-in is needed
         self.lines = []             # the last lines it printed (for the Control Panel)
         self.failures = 0
+        self.roomy = False          # after a StackOverflowError / OutOfMemoryError: start with more room
+        self.last_logged = None
         self.last_sent = None
         self.wake = threading.Event()
         self.thread = threading.Thread(target=self.run, name="friendbot", daemon=True)
@@ -96,6 +102,9 @@ class FriendBot:
         self.state, self.detail = state, detail
         if state != "signin":
             self.signin = None
+        if (state, detail) != self.last_logged and state not in ("starting",):
+            self.last_logged = (state, detail)
+            self.log(f"{state}: {detail}" if detail else state)
         self.report()
 
     def report(self, force=False):
@@ -256,7 +265,8 @@ class FriendBot:
     def start(self, java, jar, first=False):
         self.set_state("starting", "Starting the friend bot...")
         self.signin = None
-        self.proc = subprocess.Popen([java, *JAVA_OPTS, "-jar", str(jar)], cwd=str(self.folder), stdin=subprocess.PIPE,
+        opts = JAVA_OPTS_ROOMY if self.roomy else JAVA_OPTS
+        self.proc = subprocess.Popen([java, *opts, "-jar", str(jar)], cwd=str(self.folder), stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
         started = time.time()
         pending_url = None
@@ -292,6 +302,10 @@ class FriendBot:
                 self.state, self.detail = "signin", "Sign in with the bot's Xbox account to finish."
                 self.report(force=True)
                 continue
+            if "StackOverflowError" in line or "OutOfMemoryError" in line or "Metaspace" in line:
+                if not self.roomy:
+                    self.roomy = True
+                    self.log("The bot ran out of memory room; it will start again with more.")
             if "Creating Xbox LIVE session" in line or "Got update session response" in line:
                 self.failures = 0
                 self.set_state("online", "GalaxySMP shows under Play > Friends for the bot's friends.")
@@ -308,6 +322,10 @@ class FriendBot:
         except Exception:
             pass  # it already went away
         self.proc = None
+        if code and not self.stopping:   # it stopped with an error: put its last words in the server log
+            self.log(f"The bot stopped with code {code}. Its last lines:")
+            for line in self.lines[-8:]:
+                self.log(f"  | {line}")
         return code
 
     def kill(self):
