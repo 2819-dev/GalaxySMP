@@ -15,4 +15,4 @@
   calendar, "recently bought"/live tickers, vote page, Build of the Month, install-as-app, saved messages,
   "Remind me" on messages, share to DM, bounties, Party Time, weekly bingo, daily playtime chest, Galaxy Pet,
   Most Active this week, trivia nights, looking for group, weekly lottery, death chests (keep inventory is on),
-  duels, weekly quests, rules quiz, top messages of the week, community achievements in the Achievements list, clips (30-second moments from podcasts/videos). Add to this list whenever the owner says no.
+  duels, weekly quests, rules quiz, top messages of the week, community achievements in the Achievements list, clips (30-second moments from podcasts/videos), /inbox in game, item mail, economy overview in the Control Panel. Add to this list whenever the owner says no.
