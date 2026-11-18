@@ -91,6 +91,11 @@ class Plates:
             if plate is None or now - self.last.get((uid, key), 0) < COOLDOWN:
                 continue
             self.last[(uid, key)] = now
+            tp = getattr(self.plugin, "teleports", None)
+            if tp is not None:   # teleports from a plate skip the 3-second "don't move" wait
+                if not hasattr(tp, "plate_at"):
+                    tp.plate_at = {}
+                tp.plate_at[uid] = now
             try:
                 p.perform_command(plate["cmd"])
             except Exception as e:

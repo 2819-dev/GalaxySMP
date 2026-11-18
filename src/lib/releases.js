@@ -532,6 +532,11 @@ export const OFFICIAL_SUGGESTIONS = [
     title: "Pressure plates that do things",
     body: `Some pressure plates around the server now do something when you step on them, like opening the **Guide** or taking you to **spawn**. Just walk onto them.`,
   },
+  {
+    id: "2026-11-18-rtp",
+    title: "Random teleport: /rtp",
+    body: `Looking for fresh land? Type **/rtp** (or **/wild**) to be teleported to a random safe spot in the wild, between 500 and 5,000 blocks from spawn, never on someone's plot and never in water or lava. You can use it every 5 minutes, and **/back** takes you back. Some pressure plates around spawn do it too: just step on one.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

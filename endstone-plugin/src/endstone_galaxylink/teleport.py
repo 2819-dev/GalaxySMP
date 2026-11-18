@@ -1,5 +1,5 @@
 """Teleports: /tpa, /tpahere, /tpaccept, /tpdeny, /spawn, /setspawn, /home, /sethome,
-/delhome, /homes and /back.
+/delhome, /homes, /back and /rtp (random teleport into the wild).
 
 Teleports wait 3 seconds and are cancelled if the player moves (operators go instantly).
 """
@@ -11,6 +11,9 @@ import uuid
 
 REQUEST_SECONDS = 60
 WARMUP_TICKS = 60  # 3 seconds
+RTP_MIN, RTP_MAX = 500, 5000   # /rtp: this many blocks from spawn
+RTP_COOLDOWN = 300             # seconds between uses (operators: no wait)
+RTP_AVOID = 48                 # never land within this many blocks of a plot
 
 
 def where(player):
@@ -35,17 +38,19 @@ class Teleports:
         dim = self.plugin.server.level.get_dimension(spot["dim"])
         return Location(dim, spot["x"], spot["y"], spot["z"], spot.get("pitch", 0.0), spot.get("yaw", 0.0))
 
-    def go(self, player, get_spot, label):
+    def go(self, player, get_spot, label, run=None):
         """Teleport after a 3-second wait. get_spot is called at the end, so it follows moving players."""
-        if player.is_op:
-            return self._finish(player, get_spot, label)
+        # operators, and teleports from a command plate (people keep walking after stepping on one), go instantly
+        from_plate = time.time() - getattr(self, "plate_at", {}).get(str(player.unique_id), 0) < 1.5
+        if player.is_op or from_plate:
+            return self._finish(player, get_spot, label, run)
         token = time.monotonic()
         self.waiting[str(player.unique_id)] = (where(player), token)
         player.send_message(f"§eTeleporting to {label} in 3 seconds. Don't move!")
         uid = player.unique_id
-        self.plugin.server.scheduler.run_task(self.plugin, lambda: self._after_wait(uid, token, get_spot, label), delay=WARMUP_TICKS)
+        self.plugin.server.scheduler.run_task(self.plugin, lambda: self._after_wait(uid, token, get_spot, label, run), delay=WARMUP_TICKS)
 
-    def _after_wait(self, uid, token, get_spot, label):
+    def _after_wait(self, uid, token, get_spot, label, run=None):
         start, t = self.waiting.get(str(uid), (None, None))
         if t != token:
             return
@@ -57,9 +62,12 @@ class Teleports:
         if now["dim"] != start["dim"] or math.dist((now["x"], now["y"], now["z"]), (start["x"], start["y"], start["z"])) > 1.0:
             player.send_message("§cTeleport cancelled because you moved.")
             return
-        self._finish(player, get_spot, label)
+        self._finish(player, get_spot, label, run)
 
-    def _finish(self, player, get_spot, label):
+    def _finish(self, player, get_spot, label, run=None):
+        if run is not None:   # a teleport that isn't to a fixed spot (/rtp)
+            self.back[str(player.unique_id)] = where(player)
+            return run(player)
         spot = get_spot()
         if spot is None:
             player.send_message("§cThat place isn't available any more.")
@@ -67,6 +75,69 @@ class Teleports:
         self.back[str(player.unique_id)] = where(player)
         player.teleport(self.location(spot))
         player.send_message(f"§aTeleported to {label}.")
+
+    # ---------- /rtp: a random safe spot in the wild ----------
+    def rtp(self, player):
+        if player.dimension.name.lower() not in ("overworld", "minecraft:overworld"):
+            player.send_message("§cRandom teleport only works in the Overworld.")
+            return
+        key = str(player.unique_id)
+        last = getattr(self, "rtp_used", {}).get(key, 0)
+        wait = RTP_COOLDOWN - (time.time() - last)
+        if wait > 0 and not player.is_op:
+            player.send_message(f"§cYou can random teleport again in {math.ceil(wait / 60)} min.")
+            return
+        self.go(player, lambda: None, "a random spot in the wild", run=self._rtp_now)
+
+    def _rtp_pick(self):
+        import random
+        spawn = self.eco.get_config("spawn") or {"x": 0, "z": 0}
+        plots = getattr(self.plugin, "plots", None)
+        for _ in range(30):
+            angle = random.uniform(0, 2 * math.pi)
+            dist = random.uniform(RTP_MIN, RTP_MAX)
+            x, z = int(spawn["x"] + math.cos(angle) * dist), int(spawn["z"] + math.sin(angle) * dist)
+            near_plot = plots is not None and any(
+                plots.at(dim, x + dx, -64, z + dz)   # -64: the bottom of the world, so any plot height counts
+                for dim in ("Overworld", "overworld")
+                for dx in (-RTP_AVOID, 0, RTP_AVOID) for dz in (-RTP_AVOID, 0, RTP_AVOID))
+            if not near_plot:
+                return x, z
+        return None
+
+    def _rtp_now(self, player, tries=3):
+        pick = self._rtp_pick()
+        if pick is None:
+            player.send_message("§cCouldn't find a free spot. Try again.")
+            return
+        x, z = pick
+        name = player.name.replace('"', "")
+        server = self.plugin.server
+        # Minecraft's own /spreadplayers finds the ground (and loads the area), so nobody lands in the air or underground
+        ok = server.dispatch_command(server.command_sender, f'spreadplayers {x} {z} 0 1 "{name}"')
+        uid = player.unique_id
+
+        def check():
+            p = server.get_player(uid)
+            if p is None:
+                return
+            try:
+                l = p.location
+                below = str(p.dimension.get_block_at(math.floor(l.x), math.floor(l.y) - 1, math.floor(l.z)).type)
+                at = str(p.dimension.get_block_at(math.floor(l.x), math.floor(l.y), math.floor(l.z)).type)
+            except Exception:
+                below = at = ""
+            if any(w in below or w in at for w in ("water", "lava")) and tries > 1:
+                return self._rtp_now(p, tries - 1)   # landed in the sea or lava: somewhere else
+            if not hasattr(self, "rtp_used"):
+                self.rtp_used = {}
+            self.rtp_used[str(uid)] = time.time()
+            l = p.location
+            p.send_message(f"§aWhoosh! You're in the wild at §f{math.floor(l.x)} {math.floor(l.y)} {math.floor(l.z)}§a. §7Use /back to go back, /spawn to go home.")
+        if ok is False:
+            player.send_message("§cRandom teleport didn't work. Please tell staff.")
+            return
+        server.scheduler.run_task(self.plugin, check, delay=10)
 
     def on_death(self, player):
         self.back[str(player.unique_id)] = where(player)
