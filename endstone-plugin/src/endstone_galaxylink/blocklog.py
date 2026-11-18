@@ -265,7 +265,10 @@ class BlockLog:
     def start(self, player, xuid, name, changes, ids, span_label):
         if self.running:
             return player.send_message("§eA rollback is already running.")
-        self.running = {"todo": list(changes), "ids": ids, "done": 0, "failed": 0, "by": player, "name": name, "xuid": xuid, "span": span_label}
+        # keep who started it by id, not the player object: they might leave before it finishes
+        self.running = {"todo": list(changes), "ids": ids, "done": 0, "failed": 0, "by_uid": getattr(player, "unique_id", None),
+                        "by_name": getattr(player, "name", "Console"), "by_xuid": str(getattr(player, "xuid", "") or ""),
+                        "name": name, "xuid": xuid, "span": span_label}
         player.send_message(f"§eRolling back {len(changes)} blocks by {name}...")
         self._step()
 
@@ -296,15 +299,16 @@ class BlockLog:
         self.db.executemany("UPDATE block_log SET undone = 1 WHERE id = ?", [(i,) for i in r["ids"]])
         self.db.commit()
         self.running = None
-        by = r["by"]
+        by = self.plugin.server.get_player(r["by_uid"]) if r.get("by_uid") is not None else None
         msg = f"§aRollback done: {r['done']} blocks restored for {r['name']}."
         if r["failed"]:
             msg += f" §e{r['failed']} couldn't be changed (probably too far away, in unloaded chunks). Go closer and run it again."
-        try:
-            by.send_message(msg)
-        except Exception:
-            pass
+        if by is not None:
+            try:
+                by.send_message(msg)
+            except Exception:
+                pass
         mod = getattr(self.plugin, "moderation", None)
         if mod:
             mod.send("/api/plugin/punish", {"kind": "rollback", "name": r["name"], "xuid": r["xuid"], "blocks": r["done"], "span": r["span"],
-                                            "by": getattr(by, "name", "Console"), "byXuid": str(getattr(by, "xuid", "") or "")})
+                                            "by": r["by_name"], "byXuid": r["by_xuid"]})

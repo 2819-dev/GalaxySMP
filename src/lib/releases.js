@@ -517,6 +517,11 @@ export const OFFICIAL_SUGGESTIONS = [
     title: "Server stability fix",
     body: `Fixed a server crash that could happen when something exploded (a creeper or TNT) near a protected plot. Explosions that would damage a protected plot or the Build Contest area are now stopped completely, and explosions everywhere else work as before.`,
   },
+  {
+    id: "2026-11-18-stability",
+    title: "More server stability fixes",
+    body: `We went through the server's plugin looking for anything that could cause a crash, and made several situations safer: staff rollbacks when the staff member leaves partway through, newly placed signs and shop helpers, and updates that arrive from the website.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

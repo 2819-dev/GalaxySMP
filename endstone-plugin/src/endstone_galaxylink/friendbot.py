@@ -68,6 +68,10 @@ class FriendBot:
         cfg = plugin.economy.get_config("friendbot") or {}
         self.enabled = cfg.get("enabled", True)
         self.auto_friend = cfg.get("auto_friend", False)
+        try:
+            self._max_players = int(plugin.server.max_players) or 20
+        except Exception:
+            self._max_players = 20
         self.proc = None
         self.stopping = False
         self.state = "off"
@@ -91,7 +95,8 @@ class FriendBot:
         if "autoFriend" in msg and bool(msg["autoFriend"]) != self.auto_friend:
             self.auto_friend = bool(msg["autoFriend"])
             changed = True
-        self.plugin.economy.set_config("friendbot", {"enabled": self.enabled, "auto_friend": self.auto_friend})
+        saved = {"enabled": self.enabled, "auto_friend": self.auto_friend}
+        self.plugin.server.scheduler.run_task(self.plugin, lambda: self.plugin.economy.set_config("friendbot", saved))  # the database is used on the main thread
         if changed or msg.get("restart"):
             self.failures = 0
             self.kill()
@@ -208,10 +213,7 @@ class FriendBot:
         return 19132
 
     def max_players(self):
-        try:
-            return int(self.plugin.server.max_players) or 20
-        except Exception:
-            return 20
+        return self._max_players   # read once on the main thread (this runs on the bot's own thread)
 
     def write_config(self):
         """Changes only our values in the bot's config.yml (it makes the file itself on its first run)."""

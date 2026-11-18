@@ -110,7 +110,7 @@ class FloatingTexts:
             return
         self.expecting = None
         text = lab["text"]
-        self.plugin.server.scheduler.run_task(self.plugin, lambda: self._name(actor, text), delay=1)
+        self.plugin.server.scheduler.run_task(self.plugin, lambda: self._name(actor, text) if getattr(actor, "is_valid", True) else None, delay=1)
 
     def near(self, lab):
         for p in self.plugin.server.online_players:

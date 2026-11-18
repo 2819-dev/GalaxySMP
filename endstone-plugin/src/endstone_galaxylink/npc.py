@@ -132,6 +132,8 @@ class NpcManager:
         if rec is None:
             return
         try:
+            if not actor.is_valid:   # it disappeared in that tick (its area unloaded): never touch it
+                return
             actor.add_scoreboard_tag(TAG)
             actor.add_scoreboard_tag(f"{TAG}_{nid}")
             actor.name_tag = rec["name"]
