@@ -12,7 +12,6 @@ import uuid
 REQUEST_SECONDS = 60
 WARMUP_TICKS = 60  # 3 seconds
 RTP_MIN, RTP_MAX = 500, 5000   # /rtp: this many blocks from spawn
-RTP_COOLDOWN = 300             # seconds between uses (operators: no wait)
 RTP_AVOID = 48                 # never land within this many blocks of a plot
 
 
@@ -81,12 +80,6 @@ class Teleports:
         if player.dimension.name.lower() not in ("overworld", "minecraft:overworld"):
             player.send_message("§cRandom teleport only works in the Overworld.")
             return
-        key = str(player.unique_id)
-        last = getattr(self, "rtp_used", {}).get(key, 0)
-        wait = RTP_COOLDOWN - (time.time() - last)
-        if wait > 0 and not player.is_op:
-            player.send_message(f"§cYou can random teleport again in {math.ceil(wait / 60)} min.")
-            return
         self.go(player, lambda: None, "a random spot in the wild", run=self._rtp_now)
 
     def rtp_command(self, sender, args):
@@ -127,12 +120,13 @@ class Teleports:
                 return x, z
         return None
 
-    def _rtp_now(self, player, tries=3):
+    def _rtp_now(self, player, tries=4):
         pick = self._rtp_pick()
         if pick is None:
             player.send_message("§cCouldn't find a free spot. Try again.")
             return
         x, z = pick
+        start = where(player)
         name = player.name.replace('"', "")
         server = self.plugin.server
         # Minecraft's own /spreadplayers finds the ground (and loads the area), so nobody lands in the air or underground
@@ -149,6 +143,12 @@ class Teleports:
                 at = str(p.dimension.get_block_at(math.floor(l.x), math.floor(l.y), math.floor(l.z)).type)
             except Exception:
                 below = at = ""
+            moved = math.dist((p.location.x, p.location.z), (start["x"], start["z"])) > 50
+            if not moved:   # Minecraft didn't move them (e.g. no ground found there): another spot
+                if tries > 1:
+                    return self._rtp_now(p, tries - 1)
+                p.send_message("§cCouldn't find a safe spot this time. Please try /rtp again.")
+                return
             if any(w in below or w in at for w in ("water", "lava")) and tries > 1:
                 return self._rtp_now(p, tries - 1)   # landed in the sea or lava: somewhere else
             if not hasattr(self, "rtp_used"):

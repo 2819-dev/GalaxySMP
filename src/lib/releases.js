@@ -542,6 +542,11 @@ export const OFFICIAL_SUGGESTIONS = [
     title: "Random teleport plates fixed",
     body: `Random teleport pressure plates now work. Staff can also use **rtp @p** and **guide @p** in command blocks.`,
   },
+  {
+    id: "2026-11-18-rtp-no-wait",
+    title: "/rtp: no more waiting",
+    body: `**/rtp** now works every time, with no wait between uses. If the first spot isn't safe, it finds another one by itself.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).
