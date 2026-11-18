@@ -465,7 +465,7 @@ Server logs are kept for 3 days and error reports for 30 days. See the Privacy P
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
-// Only add to this when the owner asks for a suggestion to be posted in #Suggestions (usually they just want to be told).
+// Old list, kept for reference only. Posting in #Suggestions is switched off: the owner said never to post there.
 export const OFFICIAL_SUGGESTIONS = [
   {
     id: "ah-price-alerts",
@@ -587,6 +587,7 @@ async function officialAuthor(env, sql) {
 }
 
 async function postOfficialSuggestions(sql, author) {
+  return;  // switched off: never post in #Suggestions
   if (!author) return;
   for (const s of OFFICIAL_SUGGESTIONS) {
     const claimed = await sql`INSERT INTO economy_config (key, value, updated_by) VALUES (${`suggestion:${s.id}`}, ${JSON.stringify(new Date().toISOString())}::jsonb, 'server')

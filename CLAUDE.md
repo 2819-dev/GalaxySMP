@@ -7,8 +7,8 @@
 - Never use the word "Webshop" on the site; it's the "Store".
 - Never clutter the navigation, sidebar, drawer, footer or Community channel list with new pages. Put new features
   inside existing pages (a tab, a section, a dialog or a button on a related page) unless the owner asks for a page.
-- Suggestions: just tell the owner in chat. Only post them in #Suggestions (OFFICIAL_SUGGESTIONS in
-  `src/lib/releases.js`) when the owner asks for that.
+- NEVER post anything in #Suggestions, and never change anything there (no new posts, no status changes, no
+  replies). Suggestions for the owner go in chat only. The automatic #Suggestions posting is switched off.
 - Never re-suggest ideas the owner said no to or skipped. So far: scheduled staff posts, per-channel notification
   settings, weekend boosts, treasure hunts, Bedwars Quick Buy, Bedwars tournaments, map heatmap, player-made guides,
   gifting reminders, birthdays, profile/plot guestbooks, Hall of Fame, item price guide, bug report board, advent
