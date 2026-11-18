@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.57.0"
+VERSION = "2.58.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -135,6 +135,7 @@ class GalaxyLink(Plugin):
         "afk": _cmd("Mark yourself as away (AFK), or back.", "/afk", "galaxylink.command.afk"),
         "tpd": _cmd("Teleport where you've been sent (e.g. to the staff member who accepted your minigame).", "/tpd", "galaxylink.command.tpd"),
         "plotaxe": _cmd("Get the Plot Axe to make plots and protected areas.", "/plotaxe", "galaxylink.command.plotaxe"),
+        "plate": _cmd("Make the pressure plate you're standing on run a command (e.g. /plate guide).", "/plate [command: message]", "galaxylink.command.plate"),
     }
     permissions = {
         "galaxylink.command.link": _perm("Allows players to use /link.", True),
@@ -164,6 +165,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.plan": _perm("Allows /plan.", True),
         "galaxylink.command.plot": _perm("Allows /plot.", True),
         "galaxylink.command.plotaxe": _perm("Allows /plotaxe (server operators).", "op"),
+        "galaxylink.command.plate": _perm("Allows /plate: command pressure plates (server operators).", "op"),
         "galaxylink.command.minigames": _perm("Allows /minigames.", True),
         "galaxylink.command.bedwars": _perm("Allows /bedwars and /leave.", True),
         "galaxylink.command.trade": _perm("Allows /trade.", True),
@@ -216,6 +218,8 @@ class GalaxyLink(Plugin):
         self.help = HelpMenu(self)
         self.teleports = Teleports(self)
         self.plots = Plots(self)
+        from endstone_galaxylink.plates import Plates
+        self.plates = Plates(self)  # pressure plates that run a command (/plate guide)
         self.minigames = Minigames(self)
         self._remove_old_friendbot()  # the friend bot was removed (BisectHosting's own Xbox Broadcast is used instead)
         from endstone_galaxylink.teams import Teams
@@ -277,6 +281,7 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self.ranks.refresh_pictures, delay=40)  # plan tags, even before ranks arrive
         self.server.scheduler.run_task(self, self.elevators.tick, delay=2, period=2)
         self.server.scheduler.run_task(self, self._watched("checking AFK players", self.afk.tick), delay=100, period=100)
+        self.server.scheduler.run_task(self, self._watched("checking command plates", self.plates.tick), delay=40, period=4)
         self.server.scheduler.run_task(self, self.elevators.check_tools, delay=1200, period=1200)
         self.server.scheduler.run_task(self, self.jobs.tick, delay=100, period=100)
         self.server.scheduler.run_task(self, self.servercontrol.tick, delay=20, period=20)
@@ -427,6 +432,7 @@ class GalaxyLink(Plugin):
     @event_handler
     def on_player_quit(self, event: PlayerQuitEvent):
         self.ranks.forget(event.player)
+        self.plates.on_quit(event.player)
         self.teleports.on_quit(event.player)
         self.progress.on_quit(event.player)
         self.bedwars.on_quit(event.player)
@@ -480,6 +486,7 @@ class GalaxyLink(Plugin):
     def on_block_break(self, event: BlockBreakEvent):
         if self.blocklog.on_break(event):  # block inspector
             return
+        self.plates.on_break(event)  # a command plate that's broken stops being one
         if self.bedwars.on_break(event):  # beds and the arena
             return
         if self.buildcontest.on_block(event, False):  # the Build Contest arena (no job money for Creative building)
@@ -677,7 +684,7 @@ class GalaxyLink(Plugin):
     def on_command(self, sender: CommandSender, command: Command, args: list[str]) -> bool:
         name = command.name
         player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "guide", "tpa", "tpahere", "tpaccept",
-                       "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd",
+                       "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd", "plate",
                        "report", "mod", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates", "elevator",
                        "shift", "whois", "warp", "setwarp", "delwarp", "goal", "votecomputer"}
         if name in player_only and not isinstance(sender, Player):
@@ -721,6 +728,7 @@ class GalaxyLink(Plugin):
             "plan": lambda: sender.send_message(self.plans.describe(sender)),
             "plot": lambda: self.plots.command(sender, args),
             "plotaxe": lambda: self.plots.give_axe(sender),
+            "plate": lambda: self.plates.command(sender, args),
             "minigames": lambda: self.minigames.open(sender),
             "bedwars": lambda: self.bedwars.command(sender, args),
             "leave": lambda: self.buildcontest.leave(sender) or self.bedwars.leave(sender),

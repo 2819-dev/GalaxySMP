@@ -527,6 +527,11 @@ export const OFFICIAL_SUGGESTIONS = [
     title: "Friend list joining now runs on our host",
     body: `Joining GalaxySMP from **Play > Friends** (for Xbox, PlayStation and Switch players) is now handled by our server host's built-in Xbox Broadcast instead of a bot inside our plugin. This keeps the server lighter and simpler. Joining works the same way as before.`,
   },
+  {
+    id: "2026-11-18-command-plates",
+    title: "Pressure plates that do things",
+    body: `Some pressure plates around the server now do something when you step on them, like opening the **Guide** or taking you to **spawn**. Just walk onto them.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).
