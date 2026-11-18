@@ -537,6 +537,11 @@ export const OFFICIAL_SUGGESTIONS = [
     title: "Random teleport: /rtp",
     body: `Looking for fresh land? Type **/rtp** (or **/wild**) to be teleported to a random safe spot in the wild, between 500 and 5,000 blocks from spawn, never on someone's plot and never in water or lava. You can use it every 5 minutes, and **/back** takes you back. Some pressure plates around spawn do it too: just step on one.`,
   },
+  {
+    id: "2026-11-18-rtp-command-blocks",
+    title: "Random teleport plates fixed",
+    body: `Random teleport pressure plates now work. Staff can also use **rtp @p** and **guide @p** in command blocks.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

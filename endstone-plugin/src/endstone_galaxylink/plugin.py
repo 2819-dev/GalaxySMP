@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.59.0"
+VERSION = "2.60.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -86,7 +86,7 @@ class GalaxyLink(Plugin):
         "takemoney": _cmd("Take money from a player.", "/takemoney <player: player> <amount: message>",
                           "galaxylink.command.takemoney"),
         "shopnpc": _cmd("Summon a shop NPC where you stand (tap it to edit it). /shopnpc fix puts back missing NPCs near you.", "/shopnpc [action: message]", "galaxylink.command.shopnpc"),
-        "guide": _cmd("Help: server info, rules and commands.", "/guide", "galaxylink.command.guide", ["menu"]),
+        "guide": _cmd("Help: server info, rules and commands. Command blocks: guide @p", "/guide [player: player]", "galaxylink.command.guide", ["menu"]),
         "tpa": _cmd("Ask to teleport to a player.", "/tpa <player: player>", "galaxylink.command.tpa"),
         "tpahere": _cmd("Ask a player to teleport to you.", "/tpahere <player: player>", "galaxylink.command.tpahere"),
         "tpaccept": _cmd("Accept a teleport request.", "/tpaccept [player: message]", "galaxylink.command.tpaccept", ["tpyes"]),
@@ -135,7 +135,7 @@ class GalaxyLink(Plugin):
         "afk": _cmd("Mark yourself as away (AFK), or back.", "/afk", "galaxylink.command.afk"),
         "tpd": _cmd("Teleport where you've been sent (e.g. to the staff member who accepted your minigame).", "/tpd", "galaxylink.command.tpd"),
         "plotaxe": _cmd("Get the Plot Axe to make plots and protected areas.", "/plotaxe", "galaxylink.command.plotaxe"),
-        "rtp": _cmd("Random teleport: go to a random spot in the wild.", "/rtp", "galaxylink.command.rtp", ["wild"]),
+        "rtp": _cmd("Random teleport: go to a random spot in the wild. Command blocks: rtp @p", "/rtp [player: player]", "galaxylink.command.rtp", ["wild"]),
         "plate": _cmd("Make the pressure plate you're standing on run a command (e.g. /plate guide).", "/plate [command: message]", "galaxylink.command.plate"),
     }
     permissions = {
@@ -621,6 +621,20 @@ class GalaxyLink(Plugin):
                     diag.timed(what, (time.perf_counter() - t0) * 1000)
         return run
 
+    def _guide(self, sender, args):
+        """/guide for yourself, or /guide <player> from a command block / the console (e.g. guide @p under a pressure plate)."""
+        name = " ".join(args).strip().strip('"')
+        if name and (not isinstance(sender, Player) or sender.is_op):
+            target = self.server.get_player(name)
+            if target is None:
+                sender.send_message(f"No online player called {name}.")
+                return
+            return self.help.open(target)
+        if not isinstance(sender, Player):
+            sender.send_message("Usage from a command block or the console: guide <player>  (e.g. guide @p)")
+            return
+        self.help.open(sender)
+
     def _remove_old_friendbot(self):
         """Older versions ran an Xbox friend bot and downloaded Java and the bot into the plugin folder (about
         60 MB). It was removed: delete those files once, in the background, so the space comes back."""
@@ -685,8 +699,8 @@ class GalaxyLink(Plugin):
     # ---------- /link ----------
     def on_command(self, sender: CommandSender, command: Command, args: list[str]) -> bool:
         name = command.name
-        player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "guide", "tpa", "tpahere", "tpaccept",
-                       "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd", "plate", "rtp",
+        player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "tpa", "tpahere", "tpaccept",
+                       "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd", "plate",
                        "report", "mod", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates", "elevator",
                        "shift", "whois", "warp", "setwarp", "delwarp", "goal", "votecomputer"}
         if name in player_only and not isinstance(sender, Player):
@@ -715,7 +729,7 @@ class GalaxyLink(Plugin):
             return True
         tp = self.teleports
         simple = {
-            "guide": lambda: self.help.open(sender),
+            "guide": lambda: self._guide(sender, args),
             "tpa": lambda: tp.request(sender, args, "to"),
             "tpahere": lambda: tp.request(sender, args, "here"),
             "tpaccept": lambda: tp.accept(sender, args),
@@ -731,7 +745,7 @@ class GalaxyLink(Plugin):
             "plot": lambda: self.plots.command(sender, args),
             "plotaxe": lambda: self.plots.give_axe(sender),
             "plate": lambda: self.plates.command(sender, args),
-            "rtp": lambda: self.teleports.rtp(sender),
+            "rtp": lambda: self.teleports.rtp_command(sender, args),
             "minigames": lambda: self.minigames.open(sender),
             "bedwars": lambda: self.bedwars.command(sender, args),
             "leave": lambda: self.buildcontest.leave(sender) or self.bedwars.leave(sender),

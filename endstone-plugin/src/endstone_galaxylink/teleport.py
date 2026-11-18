@@ -89,6 +89,28 @@ class Teleports:
             return
         self.go(player, lambda: None, "a random spot in the wild", run=self._rtp_now)
 
+    def rtp_command(self, sender, args):
+        """/rtp for yourself, or /rtp <player> from a command block, the console or an operator
+        (e.g. a command block under a pressure plate: rtp @p). Those go instantly, without the countdown."""
+        from endstone import Player
+        name = " ".join(args).strip().strip('"')
+        if not name:
+            if not isinstance(sender, Player):
+                sender.send_message("Usage from a command block or the console: rtp <player>  (e.g. rtp @p)")
+                return
+            return self.rtp(sender)
+        if isinstance(sender, Player) and not sender.is_op:
+            sender.send_message("§cYou can only random teleport yourself: just type /rtp.")
+            return
+        target = self.plugin.server.get_player(name)
+        if target is None:
+            sender.send_message(f"No online player called {name}.")
+            return
+        if not hasattr(self, "plate_at"):
+            self.plate_at = {}
+        self.plate_at[str(target.unique_id)] = time.time()   # sent by a block/staff: no "don't move" countdown
+        self.rtp(target)
+
     def _rtp_pick(self):
         import random
         spawn = self.eco.get_config("spawn") or {"x": 0, "z": 0}
