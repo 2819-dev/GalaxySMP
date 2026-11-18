@@ -522,6 +522,11 @@ export const OFFICIAL_SUGGESTIONS = [
     title: "More server stability fixes",
     body: `We went through the server's plugin looking for anything that could cause a crash, and made several situations safer: staff rollbacks when the staff member leaves partway through, newly placed signs and shop helpers, and updates that arrive from the website.`,
   },
+  {
+    id: "2026-11-18-xbox-broadcast",
+    title: "Friend list joining now runs on our host",
+    body: `Joining GalaxySMP from **Play > Friends** (for Xbox, PlayStation and Switch players) is now handled by our server host's built-in Xbox Broadcast instead of a bot inside our plugin. This keeps the server lighter and simpler. Joining works the same way as before.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

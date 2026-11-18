@@ -36,7 +36,7 @@ def _num(path):
 
 
 def memory():
-    """Memory in MB: the server process, the friend bot (Java) if running, the machine, and the host's limit."""
+    """Memory in MB: the server process, any Java program in the container (e.g. the host's Xbox Broadcast), the machine, and the host's limit."""
     mb = lambda kb: round(kb / 1024) if kb else None
     out = {"server": mb(_kb("/proc/self/status", "VmRSS")), "machineFree": mb(_kb("/proc/meminfo", "MemAvailable")),
            "machineTotal": mb(_kb("/proc/meminfo", "MemTotal"))}

@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.56.0"
+VERSION = "2.57.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -217,8 +217,7 @@ class GalaxyLink(Plugin):
         self.teleports = Teleports(self)
         self.plots = Plots(self)
         self.minigames = Minigames(self)
-        from endstone_galaxylink.friendbot import FriendBot
-        self.friendbot = FriendBot(self)  # GalaxySMP under Play > Friends (runs MCXboxBroadcast next to the server)
+        self._remove_old_friendbot()  # the friend bot was removed (BisectHosting's own Xbox Broadcast is used instead)
         from endstone_galaxylink.teams import Teams
         self.teams = Teams(self)  # teams from the website: gray [TAG] in chat, /tc, shared plots
         from endstone_galaxylink.buildcontest import BuildContest
@@ -613,6 +612,16 @@ class GalaxyLink(Plugin):
                     diag.timed(what, (time.perf_counter() - t0) * 1000)
         return run
 
+    def _remove_old_friendbot(self):
+        """Older versions ran an Xbox friend bot and downloaded Java and the bot into the plugin folder (about
+        60 MB). It was removed: delete those files once, in the background, so the space comes back."""
+        import shutil
+        from pathlib import Path
+        folder = Path(self.data_folder) / "friendbot"
+        if folder.is_dir():
+            threading.Thread(target=lambda: shutil.rmtree(folder, ignore_errors=True), name="remove-friendbot", daemon=True).start()
+            self.logger.info("Removed the old friend bot files (BisectHosting's Xbox Broadcast is used instead).")
+
     def on_disable(self) -> None:
         if getattr(self, "blocklog", None):
             self.blocklog.flush()
@@ -628,8 +637,6 @@ class GalaxyLink(Plugin):
             self._voice.stop()
         if getattr(self, "economy", None):
             self.economy.db.close()
-        if getattr(self, "friendbot", None):
-            self.friendbot.shutdown()
         if getattr(self, "crashwatch", None):
             self.crashwatch.stopped()
 
