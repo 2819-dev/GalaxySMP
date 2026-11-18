@@ -123,14 +123,14 @@ class AuctionHouse:
     def payload(self):
         self.expire()
         rows = self.db.execute(
-            "SELECT id, seller_name, item, label, item_id, amount, price, expires FROM ah WHERE status = 'active' "
+            "SELECT id, seller, seller_name, item, label, item_id, amount, price, expires FROM ah WHERE status = 'active' "
             "ORDER BY created DESC LIMIT 300").fetchall()
         out = []
-        for lid, seller_name, item, label, item_id, amount, price, expires in rows:
+        for lid, seller, seller_name, item, label, item_id, amount, price, expires in rows:
             meta = (json.loads(item).get("meta") or {})
             out.append({
                 "id": lid, "label": label, "item": item_id, "amount": amount, "price": price,
-                "seller": seller_name, "expires": int(expires),
+                "seller": seller_name, "sellerXuid": str(seller), "expires": int(expires),
                 "enchants": [f"{money.pretty_id(k)} {v}" for k, v in (meta.get("enchants") or {}).items()],
             })
         return out
@@ -188,6 +188,7 @@ class AuctionHouse:
         form.add_button("§lSearch§r\n§8Find an item", icon="textures/ui/magnifyingGlass", on_click=self.search)
         form.add_button("§lMy listings§r\n§8Cancel or collect items", icon="textures/ui/inventory_icon", on_click=self.open_mine)
         form.add_button("§lSell item in hand§r\n§8Set a price", icon="textures/ui/MCoin", on_click=self.sell_form)
+        form.add_button("§lPrice alerts§r\n§8Get told when it's cheap", icon="textures/ui/timer", on_click=self.alerts_menu)
         for lid, seller, seller_name, label, item_id, amount, price, expires in rows:
             form.add_button(f"{amount}x {label} §2{money.fmt(price)}\n§8{seller_name} · {left(expires - time.time())} left",
                             on_click=lambda p, lid=lid: self.open_listing(p, lid, search, page))
@@ -218,6 +219,8 @@ class AuctionHouse:
             form.add_button("§cCancel listing", on_click=lambda p: (self.cancel(p, lid), self.open_mine(p)))
         else:
             form.add_button(f"§2§lBuy for {money.fmt(price)}", on_click=lambda p: self.buy(p, lid))
+            form.add_button("§lPrice alert§r\n§8Tell me when it's cheaper", icon="textures/ui/timer",
+                            on_click=lambda p: self.alert_form(p, item_id, label, price // max(1, amount)))
         form.add_button("§l< Back", on_click=lambda p: self.open(p, search, page))
         player.send_form(form)
 
@@ -277,3 +280,69 @@ class AuctionHouse:
             self.open(player, " ".join(parts[1:]))
         else:
             self.open(player)
+
+    # ---------- price alerts (kept on the website, so they also work on galaxymc.us) ----------
+    def _alerts(self, player, body, done):
+        body = dict(body, xuid=str(player.xuid))
+
+        def after(ok, data):
+            if not ok:
+                return player.send_message("§c" + (data.get("error") or "Couldn't reach the website. Try again in a minute."))
+            done(data)
+        self.plugin.moderation.web("/api/plugin/ah-alerts", body, after)
+
+    def alerts_menu(self, player):
+        def show(data):
+            alerts = data.get("alerts") or []
+            text = ("Get a message when someone lists an item at or below your price (each). It works on galaxymc.us too.\n\n"
+                    + ("\n".join(f"§f{a['label']}§7: {money.fmt(a['maxEach'])} each or less" for a in alerts) if alerts
+                       else "§7No price alerts yet.") + f"\n\n§8Up to {data.get('max', 10)} alerts. Tap one to remove it.")
+            form = ActionForm(title="§lPrice alerts", content=text)
+            form.add_button("§lItem in my hand§r\n§8Add an alert for it", icon="textures/ui/color_plus", on_click=self.alert_from_hand)
+            for a in alerts:
+                form.add_button(f"{a['label']} §2{money.fmt(a['maxEach'])}\n§8Tap to remove",
+                                on_click=lambda p, a=a: self._alerts(p, {"action": "remove", "id": a["id"]},
+                                                                     lambda d: (p.send_message(f"§7Removed the alert for §f{a['label']}§7."), self.alerts_menu(p))))
+            form.add_button("§l< Back", on_click=self.open)
+            player.send_form(form)
+        self._alerts(player, {"action": "list"}, show)
+
+    def alert_from_hand(self, player):
+        stack = player.inventory.item_in_main_hand
+        if stack is None or not stack.amount:
+            return player.send_message("§cHold the item you want an alert for, then try again.")
+        snap = money.snapshot(stack)
+        self.alert_form(player, snap["id"], money.item_label(stack), None)
+
+    def alert_form(self, player, item_id, label, each):
+        def submit(p, data):
+            try:
+                cents = money.parse(json.loads(data)[0])
+            except (ValueError, IndexError, TypeError):
+                return
+            if cents is None or cents < 1:
+                return p.send_message("§cEnter a price like 500, 2.5k or 1m.")
+
+            def saved(d):
+                extra = f" §e{d['forSale']} already for sale at that price§a: look in /ah." if d.get("forSale") else ""
+                p.send_message(f"§aPrice alert set: §f{label}§a at §e{money.fmt(cents)}§a each or less.{extra}")
+            self._alerts(p, {"action": "add", "item": item_id, "label": label, "maxEach": cents}, saved)
+        player.send_form(ModalForm(
+            title="Price alert",
+            controls=[TextInput(f"The most you'd pay for each {label} (like 500, 2.5k or 1m). We'll tell you when one is listed at or below it.",
+                                "e.g. 500", f"{each / 100:g}" if each else "")],
+            submit_button="Save alert", on_submit=submit))
+
+    def alert_hits(self, alerts):
+        """From the website: new listings matched someone's price alert."""
+        for a in alerts or []:
+            p = next((x for x in self.plugin.server.online_players if str(x.xuid) == str(a.get("xuid"))), None)
+            if p is None:
+                continue
+            text = str(a.get("text") or "")[:200].replace("§", "")
+            p.send_message(f"§6[Price alert] §f{text}§7. Open §e/ah§7 to buy it.")
+            try:
+                p.send_toast("§6Price alert", text[:80])
+                p.play_sound(p.location, "note.pling", 1.0, 1.6)
+            except Exception:
+                pass

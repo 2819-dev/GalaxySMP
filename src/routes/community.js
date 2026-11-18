@@ -258,3 +258,125 @@ export async function suggestionAction(request, env, ctx, url, params) {
   }
   throw new HttpError(400, "Unknown action.");
 }
+
+// ---------- Auction House price alerts ----------
+// A player picks an item and the most they'd pay (each). When the server sends listings, any new listing at or below
+// that price notifies them once: on the website (bell + phone) and in game. Alerts belong to the Minecraft player
+// (xuid), so they can be made in game (/ah > Price alerts) or on the website.
+const MAX_ALERTS = 10;
+const usd = (c) => `$${(Number(c) / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+const eachOf = (l) => Number(l.price) / Math.max(1, Number(l.amount) || 1);
+const alertOut = (a) => ({ id: Number(a.id), item: a.item_id, label: a.label, maxEach: Number(a.max_each) });
+
+export async function listAhAlerts(sql, xuid) {
+  return (await sql`SELECT * FROM ah_alerts WHERE xuid = ${xuid} ORDER BY created_at`).map(alertOut);
+}
+
+// Add or change an alert. Listings already for sale at that price are counted (and won't notify later).
+export async function saveAhAlert(env, sql, xuid, b) {
+  const item = String(b.item || "").trim().toLowerCase().slice(0, 80);
+  const label = String(b.label || "").replace(/§./g, "").trim().slice(0, 80) || item.replace(/^minecraft:/, "").replace(/_/g, " ");
+  const maxEach = Math.round(Number(b.maxEach));
+  if (!/^[a-z0-9_.:-]+$/.test(item)) throw new HttpError(400, "Choose an item.");
+  if (!Number.isFinite(maxEach) || maxEach < 1 || maxEach > 1e13) throw new HttpError(400, "Enter the most you'd pay for each one.");
+  const [{ n }] = await sql`SELECT count(*)::int AS n FROM ah_alerts WHERE xuid = ${xuid} AND item_id <> ${item}`;
+  if (n >= MAX_ALERTS) throw new HttpError(400, `You can have up to ${MAX_ALERTS} price alerts. Remove one first.`);
+  const [a] = await sql`INSERT INTO ah_alerts (xuid, item_id, label, max_each) VALUES (${xuid}, ${item}, ${label}, ${maxEach})
+                        ON CONFLICT (xuid, item_id) DO UPDATE SET max_each = EXCLUDED.max_each, label = EXCLUDED.label RETURNING *`;
+  const data = await voiceStub(env).fetch("https://voice/internal/ah").then((r) => r.json()).catch(() => ({}));
+  const now = Date.now() / 1000;
+  const already = (data.listings || []).filter((l) => String(l.item) === item && eachOf(l) <= maxEach && (!l.expires || l.expires > now)
+    && String(l.sellerXuid || "") !== xuid);
+  if (already.length) {
+    await sql`INSERT INTO ah_alert_hits (alert_id, listing_id) SELECT ${a.id}, unnest(${already.map((l) => Number(l.id))}::bigint[]) ON CONFLICT DO NOTHING`;
+  }
+  return { alert: alertOut(a), forSale: already.length };
+}
+
+export async function removeAhAlert(sql, xuid, id) {
+  await sql`DELETE FROM ah_alerts WHERE xuid = ${xuid} AND id = ${Number(id) || 0}`;
+}
+
+// Called by the voice hub whenever the server sends its listings. Returns [{ xuid, text }] for players online in game.
+export async function checkAhAlerts(env, listings) {
+  const items = [...new Set(listings.map((l) => String(l.item)))];
+  if (!items.length) return [];
+  const sql = getDb(env);
+  if (Math.random() < 0.02) await sql`DELETE FROM ah_alert_hits WHERE at < now() - interval '4 days'`.catch(() => {});
+  const alerts = await sql`SELECT * FROM ah_alerts WHERE item_id = ANY(${items})`;
+  if (!alerts.length) return [];
+  const pairs = [];
+  for (const a of alerts) {
+    for (const l of listings) {
+      if (String(l.item) === a.item_id && eachOf(l) <= Number(a.max_each) && String(l.sellerXuid || "") !== a.xuid) pairs.push([a, l]);
+    }
+  }
+  if (!pairs.length) return [];
+  const fresh = await sql`INSERT INTO ah_alert_hits (alert_id, listing_id)
+                          SELECT * FROM unnest(${pairs.map(([a]) => Number(a.id))}::bigint[], ${pairs.map(([, l]) => Number(l.id))}::bigint[])
+                          ON CONFLICT DO NOTHING RETURNING alert_id, listing_id`;
+  const isNew = new Set(fresh.map((r) => `${r.alert_id}:${r.listing_id}`));
+  const hits = pairs.filter(([a, l]) => isNew.has(`${a.id}:${l.id}`));
+  if (!hits.length) return [];
+  const xuids = [...new Set(hits.map(([a]) => a.xuid))];
+  const users = await sql`SELECT u.id, p.xuid FROM players p JOIN users u ON u.mc_uuid = p.uuid WHERE p.xuid = ANY(${xuids}) AND NOT u.banned`;
+  const userOf = new Map(users.map((u) => [u.xuid, Number(u.id)]));
+  const { notify } = await import("./notify.js");
+  const out = [];
+  for (const [a, l] of hits) {
+    const text = `${l.amount}x ${l.label} is for sale for ${usd(l.price)}${l.amount > 1 ? ` (${usd(eachOf(l))} each)` : ""} by ${l.seller}`;
+    out.push({ xuid: a.xuid, text });
+    const uid = userOf.get(a.xuid);
+    if (uid) await notify(env, [uid], "auction", { title: `Price alert: ${a.label}`, body: text, url: "/community#auction-house", tag: `ah-${l.id}` }).catch(() => {});
+  }
+  return out;
+}
+
+async function myXuid(sql, user) {
+  const [p] = await sql`SELECT p.xuid FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${user.id}`;
+  if (!p) throw new HttpError(400, "Join the server once first, so we know which Minecraft player you are.");
+  return String(p.xuid);
+}
+
+// GET /api/community/auction/alerts : your alerts, plus items you can pick (sold or listed lately)
+export async function auctionAlerts(request, env) {
+  const user = await requireUser(request, env);
+  const sql = getDb(env);
+  const [p] = await sql`SELECT p.xuid FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${user.id}`;
+  const items = await sql`SELECT item_id AS item, max(label) AS label FROM ah_sales WHERE sold_at > now() - interval '90 days' GROUP BY item_id ORDER BY count(*) DESC LIMIT 300`;
+  return json({ ok: true, linked: Boolean(p), max: MAX_ALERTS, alerts: p ? await listAhAlerts(sql, String(p.xuid)) : [], items });
+}
+
+// POST /api/community/auction/alerts { item, label, maxEach } or { remove: id }
+export async function auctionAlertSave(request, env) {
+  const user = await requireUser(request, env);
+  await rateLimit(env, "POLL_LIMITER", `ahalert:${user.id}`);
+  const b = await readJson(request);
+  const sql = getDb(env);
+  const xuid = await myXuid(sql, user);
+  if (b.remove != null) {
+    await removeAhAlert(sql, xuid, b.remove);
+    return json({ ok: true, alerts: await listAhAlerts(sql, xuid) });
+  }
+  const r = await saveAhAlert(env, sql, xuid, b);
+  return json({ ok: true, ...r, alerts: await listAhAlerts(sql, xuid) });
+}
+
+// POST /api/plugin/ah-alerts { xuid, action: "list" | "add" | "remove", item, label, maxEach, id } (from /ah in game)
+export async function pluginAhAlerts(request, env) {
+  const { checkPlugin } = await import("./ranks.js");
+  await checkPlugin(request, env);
+  const b = await readJson(request);
+  const xuid = String(b.xuid || "");
+  if (!/^\d{1,20}$/.test(xuid)) throw new HttpError(400, "Unknown player.");
+  const sql = getDb(env);
+  try {
+    if (b.action === "remove") await removeAhAlert(sql, xuid, b.id);
+    let forSale = 0;
+    if (b.action === "add") forSale = (await saveAhAlert(env, sql, xuid, b)).forSale;
+    return json({ ok: true, forSale, max: MAX_ALERTS, alerts: await listAhAlerts(sql, xuid) });
+  } catch (e) {
+    if (e instanceof HttpError) return json({ ok: false, error: e.message });
+    throw e;
+  }
+}

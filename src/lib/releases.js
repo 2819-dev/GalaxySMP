@@ -555,6 +555,16 @@ export const OFFICIAL_SUGGESTIONS = [
 
 **/map** — Get the server map as a map item. Hold it to see the area around you, with other players and spawn marked. It's the same map as the Map page on the website. Type **/map** again to zoom in or out.`,
   },
+  {
+    id: "2026-11-18-ah-price-alerts",
+    title: "Auction House price alerts",
+    body: `You voted for it, so it's here. Pick an item and the most you'd pay for each one, and we'll let you know as soon as someone lists it at or below that price.
+
+- **On the website:** open **#Auction House** and tap **Price alerts**, or **Alert me** on any listing.
+- **In game:** open **/ah** and tap **Price alerts**.
+
+You get the alert in game if you're playing, and as a notification on the website. You can set up to 10 alerts.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

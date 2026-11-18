@@ -158,7 +158,7 @@ function actingBanner(me) {
 }
 
 // ---------- the notification inbox (bell) ----------
-const KIND_ICON = { dms: "chat", mentions: "at", friends: "users", jobs: "briefcase", trades: "handshake", wishlist: "heart",
+const KIND_ICON = { dms: "chat", mentions: "at", friends: "users", jobs: "briefcase", trades: "handshake", wishlist: "heart", auction: "bell",
   community: "sparkles", events: "calendar", news: "megaphone", updates: "megaphone", announcements: "megaphone" };
 const agoText = (d) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 60000));

@@ -3207,6 +3207,9 @@ html[data-theme="light"] .ap-art.tone-plan-plus { color: #1aa3c9; } html[data-th
 .ah-deal.fair { background: var(--surface-2); color: var(--text-2); }
 .ah-deal.high { background: rgba(240,86,111,.14); color: var(--bad); }
 .ah-hist { margin-left: auto; background: none; border: 0; padding: 0; color: var(--accent-text); font: 600 .8rem var(--font); cursor: pointer; }
+.ah-hist + .ah-hist { margin-left: 12px; }
+.ah-alerts { display: flex; flex-direction: column; gap: 6px; }
+.ah-alert { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); }
 .ah-hist-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
 .ah-hist-stats div { display: flex; flex-direction: column; padding: 10px; border-radius: 12px; background: var(--surface-2); }
 .ah-hist-stats span { font-size: .72rem; color: var(--text-3); }

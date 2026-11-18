@@ -20,6 +20,7 @@ export const KINDS = {
   streams: { name: "Stages", hint: "When people and teams you follow go live on stage, and stages you asked to be reminded about", default: true },
   bedwars: { name: "Bedwars games", hint: "When players are waiting for a Bedwars game, so you can join", default: false },
   wishlist: { name: "Wishlist sales", hint: "When something on your Store wishlist is on sale", default: true },
+  auction: { name: "Auction House price alerts", hint: "When an item you're watching is listed at or below your price", default: true },
   trades: { name: "Trades", hint: "Trade offers to you, and answers to your offers", default: true },
   community: { name: "Suggestions & builds", hint: "Replies to your suggestions, and Build of the Week", default: true },
   summary: { name: "Daily summary", hint: "Each evening: who played today, your money and streak", default: true },

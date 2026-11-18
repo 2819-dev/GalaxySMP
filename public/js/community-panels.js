@@ -128,8 +128,59 @@ function marketLine(l) {
     const tag = r <= 0.9 ? ["good", "Good price"] : r >= 1.15 ? ["high", "Above average"] : ["fair", "Fair price"];
     row.append(h("span", { class: `ah-deal ${tag[0]}`, text: tag[1] }), h("span", { class: "text-3 small", text: `Avg ${money(l.market.unit)} each` }));
   } else row.append(h("span", { class: "text-3 small", text: "No recent sales" }));
-  row.append(h("button", { class: "ah-hist", type: "button", text: "Price history", onclick: () => historyDialog(l) }));
+  row.append(h("button", { class: "ah-hist", type: "button", text: "Price history", onclick: () => historyDialog(l) }),
+    h("button", { class: "ah-hist", type: "button", text: "Alert me", onclick: () => alertsDialog(l) }));
   return row;
+}
+
+// Price alerts: get a notification (website + in game) when an item is listed at or below your price (each).
+const toCents = (v) => Math.round(Number(String(v).replace(/[$,\s]/g, "").replace(/k$/i, "e3").replace(/m$/i, "e6")) * 100);
+async function alertsDialog(prefill = null) {
+  let d;
+  try { d = await getJson("/api/community/auction/alerts"); } catch (e) { ctx?.toast?.(e.message); return; }
+  const list = h("div", { class: "ah-alerts" });
+  const drawList = (alerts) => {
+    list.replaceChildren(...(alerts.length ? alerts.map((a) => h("div", { class: "ah-alert" },
+      h("div", {}, h("b", { text: a.label }), h("span", { class: "text-3 small", text: ` · ${money(a.maxEach)} each or less` })),
+      h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: async () => {
+        try { drawList((await postJson("/api/community/auction/alerts", { remove: a.id })).alerts); } catch (e) { ctx.toast(e.message); }
+      } })))
+      : [h("p", { class: "text-3 small", style: "margin:0", text: "No price alerts yet." })]));
+  };
+  drawList(d.alerts);
+  if (!d.linked) {
+    openDialog({ title: "Price alerts", body: h("p", { class: "text-2", style: "margin:0", text: "Join the server once first, so we know which Minecraft player you are." }), actions: [{ label: "Close" }] });
+    return;
+  }
+  const known = new Map(d.items.map((x) => [x.item, x.label]));
+  if (prefill) known.set(prefill.item, prefill.label);
+  const options = h("datalist", { id: "ah-alert-items" }, [...known].map(([item, label]) => h("option", { value: label })));
+  const item = h("input", { class: "input", id: "ah-alert-item", list: "ah-alert-items", maxlength: 80, placeholder: "e.g. Diamond Sword", value: prefill?.label || "" });
+  const price = h("input", { class: "input", id: "ah-alert-price", inputmode: "decimal", maxlength: 14, placeholder: "e.g. 500 or 2.5k",
+    value: prefill ? String(Math.floor(prefill.price / Math.max(1, prefill.amount)) / 100) : "" });
+  openDialog({
+    title: "Price alerts",
+    body: h("div", { class: "form" },
+      h("p", { class: "text-2", style: "margin:0", text: "Pick an item and the most you'd pay for each one. When someone lists it at or below that price, you get a notification here and in game." }),
+      list, options,
+      field("Item", item), field("Most you'd pay (each)", price, `Up to ${d.max} alerts. Setting an item again changes its price.`)),
+    actions: [{ label: "Close" }, {
+      label: "Add alert", kind: "primary",
+      onClick: async () => {
+        const name = item.value.trim().toLowerCase();
+        const hit = [...known].find(([id, label]) => label.toLowerCase() === name || id === name || id === `minecraft:${name.replace(/ /g, "_")}`);
+        const id = hit ? hit[0] : `minecraft:${name.replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}`;
+        const cents = toCents(price.value);
+        if (!name) throw new Error("Choose an item.");
+        if (!(cents > 0)) throw new Error("Enter the most you'd pay for each one, like 500 or 2.5k.");
+        const r = await postJson("/api/community/auction/alerts", { item: id, label: hit ? hit[1] : item.value.trim(), maxEach: cents });
+        drawList(r.alerts);
+        ctx.toast(r.forSale ? `Alert saved. ${r.forSale} already for sale at that price: look in the list.` : "Alert saved. We'll let you know.");
+        item.value = ""; price.value = "";
+        return false;
+      },
+    }],
+  });
 }
 async function historyDialog(l) {
   let d;
@@ -160,7 +211,8 @@ function renderAuction(p) {
     h("section", { class: "panel", style: "padding:16px" },
       h("p", { class: "text-2", style: "margin:0 0 12px" }, "Buy items from the in-game Auction House with your game money. ",
         h("strong", { text: "You must be online in Minecraft:" }), " the item goes straight into your inventory. Sell items in game with ", h("code", { text: "/ah sell <price>" }), "."),
-      h("div", { class: "cp-toolbar" }, search, h("div", { class: "tabs-mini" }, sortNew, sortCheap)), status),
+      h("div", { class: "cp-toolbar" }, search, h("div", { class: "tabs-mini" }, sortNew, sortCheap),
+        h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => alertsDialog() }, iconEl("bell"), "Price alerts")), status),
     grid);
   p.append(wrap);
 

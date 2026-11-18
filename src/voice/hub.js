@@ -515,7 +515,11 @@ export class VoiceHub extends DurableObject {
     }
     if (msg.type === "ah") {
       const listings = (Array.isArray(msg.listings) ? msg.listings : []).slice(0, 300);
-      return this.ctx.storage.put("ah", { listings, at: Date.now() });
+      // price alerts: tell players about new listings at or below their price
+      return this.ctx.storage.put("ah", { listings, at: Date.now() }).then(() => import("../routes/community.js")).then((m) => m.checkAhAlerts(this.env, listings)).then((hits) => {
+        const plugin = this.pluginSocket();
+        if (plugin && hits.length) this.send(plugin, { type: "ah_alert", alerts: hits.slice(0, 50) });
+      }).catch((e) => console.error("ah alerts failed", e));
     }
     if (msg.type === "seen") {
       // friends first (it needs to know who was already online), then the usual player update

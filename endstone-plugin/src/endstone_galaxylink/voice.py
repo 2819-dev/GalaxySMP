@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.62.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.63.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -247,6 +247,8 @@ class VoiceLink:
                     if str(p.xuid) in wanted:
                         p.send_message(f"§d● LIVE §f{text}")
             self._on_main(tell_live)
+        elif msg.get("type") == "ah_alert":  # Auction House price alerts matched new listings
+            self._on_main(lambda: self.plugin.auction.alert_hits(msg.get("alerts")))
         elif msg.get("type") == "voice_invite":
             def tell():
                 p = next((x for x in self.plugin.server.online_players if str(x.xuid) == str(msg.get("toXuid"))), None)
