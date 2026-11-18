@@ -281,13 +281,19 @@ class Plots:
         return any(k in t for k in ("bucket", "flint_and_steel", "fire_charge", "bone_meal", "spawn_egg", "boat", "minecart", "armor_stand", "end_crystal"))
 
     def on_explode(self, event):
-        keep = []
-        for b in event.block_list:
-            plot = self.at_block(b)
-            if plot is None or (plot["kind"] == "area" and (plot.get("flags") or {}).get("explosions")):
-                keep.append(b)
-        if len(keep) != len(event.block_list):
-            event.block_list = keep
+        # An explosion that would break blocks inside a protected plot or area is cancelled as a whole (no blocks
+        # break, nobody is hurt by it). Changing event.block_list to keep only some blocks crashed the whole
+        # server (a native "Segmentation fault" in Endstone), so the plugin never changes that list.
+        try:
+            if event.is_cancelled:
+                return
+            for b in event.block_list:
+                plot = self.at_block(b)
+                if plot is not None and not (plot["kind"] == "area" and (plot.get("flags") or {}).get("explosions")):
+                    event.is_cancelled = True
+                    return
+        except Exception:
+            pass
 
     def on_damage(self, event):
         try:

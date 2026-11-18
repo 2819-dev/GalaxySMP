@@ -512,6 +512,11 @@ export const OFFICIAL_SUGGESTIONS = [
     title: "Message headings are for Admins",
     body: `Big headings (**#**, **##**, **###**) and small text (**-#**) in Community messages and DMs now only format for Admins, so announcements stand out and chats stay easy to read. For everyone else, those lines show as normal text. Bold, italics, lists, quotes and code still work for everyone.`,
   },
+  {
+    id: "2026-11-18-explosion-crash-fix",
+    title: "Server stability fix",
+    body: `Fixed a server crash that could happen when something exploded (a creeper or TNT) near a protected plot. Explosions that would damage a protected plot or the Build Contest area are now stopped completely, and explosions everywhere else work as before.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

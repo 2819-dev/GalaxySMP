@@ -664,10 +664,13 @@ class BuildContest:
         return True
 
     def on_explode(self, event):
+        # An explosion that would break blocks in the contest arena is cancelled as a whole. (Changing
+        # event.block_list instead crashed the server: a native "Segmentation fault" in Endstone.)
         try:
-            keep = [b for b in event.block_list if not self.in_arena(b.dimension.name, b.x, b.y, b.z)]
-            if len(keep) != len(event.block_list):
-                event.block_list = keep
+            if event.is_cancelled:
+                return
+            if any(self.in_arena(b.dimension.name, b.x, b.y, b.z) for b in event.block_list):
+                event.is_cancelled = True
         except Exception:
             pass
 
