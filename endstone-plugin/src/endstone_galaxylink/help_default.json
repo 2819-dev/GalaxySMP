@@ -242,6 +242,16 @@
    "example": "/report Steve123"
   },
   {
+   "command": "/support",
+   "description": "Need help? Write what you need and it goes straight to the staff team.",
+   "example": "/support"
+  },
+  {
+   "command": "/map",
+   "description": "Get the server map. Hold it to see the area around you, other players and spawn. /map again to zoom.",
+   "example": "/map"
+  },
+  {
    "command": "/setspawn",
    "description": "Set the spawn point to where you're standing.",
    "example": "/setspawn",

@@ -91,3 +91,44 @@ export async function mapHeights(request, env, ctx, url, params) {
   }
   return new Response(out, { headers: { "Content-Type": "application/octet-stream", "Cache-Control": url.searchParams.get("v") ? "private, max-age=86400" : "no-store" } });
 }
+
+// POST /api/plugin/map-image { x, z, zoom } (from the plugin, for the /map item): 128 x 128 RGB centered on (x, z),
+// zoom = blocks per pixel (1, 2 or 4). Land nobody has explored yet is plain map paper.
+const PAPER = [214, 190, 150];
+export async function pluginMapImage(request, env) {
+  const { checkPlugin } = await import("./ranks.js");
+  await checkPlugin(request, env);
+  const { readJson } = await import("../lib/http.js");
+  const b = await readJson(request);
+  const zoom = [1, 2, 4].includes(Number(b.zoom)) ? Number(b.zoom) : 2;
+  const x = Math.round(Number(b.x)), z = Math.round(Number(b.z));
+  if (!Number.isFinite(x) || !Number.isFinite(z) || Math.abs(x) > 3e7 || Math.abs(z) > 3e7) return json({ ok: false, error: "Bad position." });
+  const sql = getDb(env);
+  const [on] = await sql`SELECT value FROM economy_config WHERE key = 'map_enabled'`;
+  if (on?.value !== true) return json({ ok: false, error: "The map isn't open yet." });
+  const size = 128;
+  const x0 = Math.floor((x - (size / 2) * zoom) / zoom) * zoom, z0 = Math.floor((z - (size / 2) * zoom) / zoom) * zoom;
+  const span = size * zoom;
+  const cx0 = Math.floor(x0 / 16), cz0 = Math.floor(z0 / 16);
+  const cx1 = Math.floor((x0 + span - 1) / 16), cz1 = Math.floor((z0 + span - 1) / 16);
+  const rows = await sql`
+    SELECT cx, cz, encode(rgb, 'base64') AS b64 FROM map_chunks
+     WHERE dim = 'overworld' AND cx BETWEEN ${cx0} AND ${cx1} AND cz BETWEEN ${cz0} AND ${cz1}`;
+  const chunks = new Map(rows.map((r) => [`${r.cx},${r.cz}`, Buffer.from(r.b64, "base64")]));
+  const out = new Uint8Array(size * size * 3);
+  for (let pz = 0; pz < size; pz++) {
+    const bz = z0 + pz * zoom, cz = Math.floor(bz / 16), j = bz - cz * 16;
+    for (let px = 0; px < size; px++) {
+      const bx = x0 + px * zoom, cx = Math.floor(bx / 16), i = bx - cx * 16;
+      const rgb = chunks.get(`${cx},${cz}`);
+      const d = (pz * size + px) * 3;
+      const s = (j * 16 + i) * 3;
+      if (rgb && rgb.length === 768 && (rgb[s] || rgb[s + 1] || rgb[s + 2])) {
+        out[d] = rgb[s]; out[d + 1] = rgb[s + 1]; out[d + 2] = rgb[s + 2];
+      } else {
+        out[d] = PAPER[0]; out[d + 1] = PAPER[1]; out[d + 2] = PAPER[2];
+      }
+    }
+  }
+  return json({ ok: true, x0, z0, zoom, chunks: rows.length, rgb: Buffer.from(out).toString("base64") });
+}

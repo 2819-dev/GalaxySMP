@@ -428,7 +428,7 @@ export class CommunityHub extends DurableObject {
     const staff = new Set(await staffMemberIds(this.env, sql));
     const lower = text.toLowerCase();
     let ids;
-    if (/@(everyone|here)\b/.test(lower) && hubCan(user, "mention_everyone")) {
+    if ((/@(everyone|here)\b/.test(lower) && hubCan(user, "mention_everyone")) || /@staff\b/.test(lower)) {
       ids = [...staff];
       if (/@here\b/.test(lower)) { const on = new Set(this.onlineUserIds().map(Number)); ids = ids.filter((id) => on.has(id)); }
     } else {

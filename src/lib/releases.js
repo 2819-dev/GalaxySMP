@@ -547,6 +547,13 @@ export const OFFICIAL_SUGGESTIONS = [
     title: "/rtp: no more waiting",
     body: `**/rtp** now works every time, with no wait between uses. If the first spot isn't safe, it finds another one by itself.`,
   },
+  {
+    id: "2026-11-18-support-and-map",
+    title: "New in game: /support and /map",
+    body: `**/support** — Need help? Type **/support**, write what you need, and it goes straight to the staff team. Staff online in game see it right away, and the rest get a notification.
+
+**/map** — Get the server map as a map item. Hold it to see the area around you, with other players and spawn marked. It's the same map as the Map page on the website. Type **/map** again to zoom in or out.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

@@ -283,6 +283,8 @@ const routes = [
   ["POST", "/api/mod/ranks/:action", ranks.websiteAction],
   ["POST", "/api/plugin/ranks", (req, env) => ranks.pluginAction(req, env)],
   ["POST", "/api/plugin/report", (req, env) => gamemod.pluginReport(req, env)],
+  ["POST", "/api/plugin/support", (req, env) => gamemod.pluginSupport(req, env)],
+  ["POST", "/api/plugin/map-image", (req, env) => livemap.pluginMapImage(req, env)],
   ["GET", "/api/plugin/reports", (req, env) => gamemod.pluginReports(req, env)],
   ["POST", "/api/plugin/reports/resolve", (req, env) => gamemod.pluginResolveReport(req, env)],
   ["POST", "/api/plugin/punish", (req, env) => gamemod.pluginPunish(req, env)],

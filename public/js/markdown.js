@@ -185,7 +185,7 @@ function channelChip(m, ctx) {
 // The member whose name follows the "@" at position at (longest name wins, case-insensitive).
 function mentionAt(text, at, ctx) {
   const rest = text.slice(at + 1).toLowerCase();
-  for (const word of ["everyone", "here"]) {
+  for (const word of ["everyone", "here", "staff"]) {
     if (rest.startsWith(word) && !/[a-z0-9_]/i.test(rest[word.length] || "")) return { special: word, length: word.length + 1 };
   }
   let best = null;
@@ -212,7 +212,7 @@ export function inline(text, ctx = {}) {
       const hit = mentionAt(rest, m.index, ctx);
       if (!hit) { frag.append("@"); rest = rest.slice(m.index + 1); continue; }
       const pill = el("span", "mention");
-      if (hit.special) pill.textContent = `@${hit.special}`;
+      if (hit.special) pill.textContent = hit.special === "staff" ? "@Staff" : `@${hit.special}`;
       else {
         pill.textContent = `@${hit.member.username}`;
         if (ctx.meName && hit.member.username.toLowerCase() === ctx.meName.toLowerCase()) pill.classList.add("me");

@@ -61,6 +61,30 @@ export async function pluginReport(request, env) {
   return json({ ok: true, id: Number(row.id) });
 }
 
+// /support in game: "@Staff, <player> requests assistance." with their message, posted in #Staff Chat as GalaxySMP.
+export async function pluginSupport(request, env) {
+  await checkPlugin(request, env);
+  const b = await readJson(request);
+  const name = text(b.name, 32), message = text(b.message, 500);
+  if (!name || !message) throw new HttpError(400, "Missing the player or the message.");
+  const sql = getDb(env);
+  const [ch] = await sql`SELECT id, slug, name FROM channels WHERE slug = 'staff-chat'`;
+  if (!ch) return json({ ok: true, posted: false });
+  const where = intOr(b.x) != null ? `\n*In game at ${intOr(b.x)}, ${intOr(b.y)}, ${intOr(b.z)} (${text(b.world, 32) || "Overworld"})*` : "";
+  const quoted = message.split("\n").map((l) => `> ${l}`).join("\n");
+  const { botPost } = await import("../chat/engage.js");
+  const m = await botPost(sql, { channelId: ch.id, kind: "post", meta: { support: { name, xuid: xuidOf(b.xuid) } },
+    content: `@Staff, **${name}** requests assistance.\n${quoted}${where}` });
+  if (m) await hubBroadcast(env, { type: "message", message: m });
+  try {
+    const { staffMemberIds } = await import("./staffroom.js");
+    const { notify } = await import("./notify.js");
+    await notify(env, await staffMemberIds(env, sql), "mentions",
+      { title: `${name} requests assistance`, body: message.slice(0, 140), url: `/community#${ch.slug}`, tag: `support-${name}` });
+  } catch { /* the post is what matters */ }
+  return json({ ok: true, posted: Boolean(m) });
+}
+
 export async function pluginReports(request, env) {
   await checkPlugin(request, env);
   const sql = getDb(env);
