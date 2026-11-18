@@ -465,6 +465,7 @@ Server logs are kept for 3 days and error reports for 30 days. See the Privacy P
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
+// Only add to this when the owner asks for a suggestion to be posted in #Suggestions (usually they just want to be told).
 export const OFFICIAL_SUGGESTIONS = [
   {
     id: "ah-price-alerts",
