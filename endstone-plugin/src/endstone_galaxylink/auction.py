@@ -63,26 +63,33 @@ class AuctionHouse:
         if stack is None or not stack.amount:
             player.send_message("§cHold the item you want to sell, then try again.")
             return
+        def clear():
+            player.inventory.item_in_main_hand = None
+        self.list_stack(player, stack, cents, clear)
+
+    def list_stack(self, player, stack, cents, clear):
+        """Lists a stack (from the hand, or a slot picked on the website). Returns (ok, message)."""
         self.expire()
         count = self.db.execute("SELECT count(*) FROM ah WHERE seller = ? AND status = 'active'", (str(player.xuid),)).fetchone()[0]
         plans = getattr(self.plugin, "plans", None)
         limit = plans.plan_for(player)["ahSlots"] if plans else 10
         if count >= limit and not player.is_op:
-            player.send_message(f"§cYou can have up to {limit} items listed at once."
-                                + ("" if limit >= 30 else " §7More slots come with Galaxy+ and Pro+ (galaxymc.us/store)."))
-            return
+            text = f"You can have up to {limit} items listed at once." + ("" if limit >= 30 else " More slots come with Galaxy+ and Pro+ (galaxymc.us/store).")
+            player.send_message("§c" + text)
+            return False, text
         snap = money.snapshot(stack)
         label = money.item_label(stack)
-        player.inventory.item_in_main_hand = None
+        clear()
         now = time.time()
         self.db.execute(
             "INSERT INTO ah (seller, seller_name, item, label, item_id, amount, price, created, expires, status) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')",
-            (str(player.xuid), player.name, json.dumps(snap), label, snap["id"], stack.amount, cents, now, now + DURATION))
+            (str(player.xuid), player.name, json.dumps(snap), label, snap["id"], snap["amount"], cents, now, now + DURATION))
         self.db.commit()
         self.push()
-        player.send_message(f"§aListed §f{stack.amount}x {label}§a for §e{money.exact(cents)}§a on the Auction House "
+        player.send_message(f"§aListed §f{snap['amount']}x {label}§a for §e{money.exact(cents)}§a on the Auction House "
                             f"for 48 hours. §7({FEE_PERCENT}% fee when it sells)")
+        return True, f"Listed {snap['amount']}x {label} for {money.exact(cents)} for 48 hours ({FEE_PERCENT}% fee when it sells)."
 
     def buy(self, player, lid, from_website=False):
         """Returns (ok, message). The player always gets the message in game too."""
@@ -165,6 +172,9 @@ class AuctionHouse:
         """Every 30 seconds: tell the website when listings expire."""
         if self.expire():
             self.push()
+        market = getattr(self.plugin, "market", None)
+        if market is not None:
+            market.expire()
 
     def collect(self, player, lid):
         row = self.get(lid)
@@ -189,6 +199,7 @@ class AuctionHouse:
         form.add_button("§lMy listings§r\n§8Cancel or collect items", icon="textures/ui/inventory_icon", on_click=self.open_mine)
         form.add_button("§lSell item in hand§r\n§8Set a price", icon="textures/ui/MCoin", on_click=self.sell_form)
         form.add_button("§lPrice alerts§r\n§8Get told when it's cheap", icon="textures/ui/timer", on_click=self.alerts_menu)
+        form.add_button("§lBuy orders§r\n§8Sell to players who want items", icon="textures/ui/gift_square", on_click=lambda p: self.plugin.market.menu(p))
         for lid, seller, seller_name, label, item_id, amount, price, expires in rows:
             form.add_button(f"{amount}x {label} §2{money.fmt(price)}\n§8{seller_name} · {left(expires - time.time())} left",
                             on_click=lambda p, lid=lid: self.open_listing(p, lid, search, page))
@@ -340,7 +351,8 @@ class AuctionHouse:
             if p is None:
                 continue
             text = str(a.get("text") or "")[:200].replace("§", "")
-            p.send_message(f"§6[Price alert] §f{text}§7. Open §e/ah§7 to buy it.")
+            how = "Buy it in the Shop District or on galaxymc.us (Marketplace)" if a.get("where") == "Shops" else "Open §e/ah§7 to buy it"
+            p.send_message(f"§6[Price alert] §f{text}§7. {how}.")
             try:
                 p.send_toast("§6Price alert", text[:80])
                 p.play_sound(p.location, "note.pling", 1.0, 1.6)

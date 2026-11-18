@@ -336,3 +336,42 @@ export async function socialProfile(request, env, ctx, url, params) {
     },
   }, 200, { "Cache-Control": "no-store" });
 }
+
+// ---------- Parkour (Leaderboards > Parkour) ----------
+export async function parkourFromGame(env, msg) {
+  const sql = getDb(env);
+  const clean = (v, n) => String(v ?? "").replace(/[\u0000-\u001f§]/g, "").trim().slice(0, n);
+  if (msg.type === "parkour_courses") {
+    const courses = (Array.isArray(msg.courses) ? msg.courses : []).slice(0, 100).map((c) => ({
+      name: clean(c.name, 24), checkpoints: Math.max(0, Math.round(Number(c.checkpoints) || 0)), reward: Math.max(0, Math.round(Number(c.reward) || 0)) }))
+      .filter((c) => c.name);
+    const names = courses.map((c) => c.name);
+    await sql.transaction([
+      sql`DELETE FROM parkour_courses WHERE NOT (name = ANY(${names}::text[]))`,
+      ...courses.map((c) => sql`INSERT INTO parkour_courses (name, checkpoints, reward) VALUES (${c.name}, ${c.checkpoints}, ${c.reward})
+                                ON CONFLICT (name) DO UPDATE SET checkpoints = EXCLUDED.checkpoints, reward = EXCLUDED.reward, updated_at = now()`),
+    ]);
+    return;
+  }
+  const course = clean(msg.course, 24), name = clean(msg.name, 32), xuid = String(msg.xuid || "");
+  const ms = Math.round(Number(msg.ms));
+  if (!course || !name || !/^\d{1,20}$/.test(xuid) || !(ms > 0 && ms < 36e5)) return;
+  await sql`INSERT INTO parkour_times (course, xuid, name, best_ms) VALUES (${course}, ${xuid}, ${name}, ${ms})
+            ON CONFLICT (course, xuid) DO UPDATE SET best_ms = LEAST(parkour_times.best_ms, EXCLUDED.best_ms), name = EXCLUDED.name,
+              finishes = parkour_times.finishes + 1, updated_at = now()`;
+}
+
+// GET /api/leaderboards/parkour : every course with its top 25 times (names only for signed-in members)
+export async function parkourBoards(request, env) {
+  const signedIn = Boolean(await getUser(request, env));
+  const sql = getDb(env);
+  const courses = await sql`SELECT name, checkpoints, reward FROM parkour_courses ORDER BY name`;
+  const times = courses.length ? await sql`
+    SELECT course, name, best_ms, finishes FROM (
+      SELECT *, row_number() OVER (PARTITION BY course ORDER BY best_ms, updated_at) AS n FROM parkour_times WHERE course = ANY(${courses.map((c) => c.name)}::text[])
+    ) t WHERE n <= 25 ORDER BY course, best_ms` : [];
+  return json({ ok: true, signedIn, courses: courses.map((c) => ({
+    name: c.name, checkpoints: c.checkpoints, reward: Number(c.reward),
+    top: times.filter((t) => t.course === c.name).map((t, i) => ({ name: signedIn ? t.name : `Player ${i + 1}`, ms: t.best_ms, finishes: t.finishes })),
+  })) });
+}

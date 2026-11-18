@@ -25,7 +25,11 @@ const GROUPS = [
   { key: "survival", name: "Survival", boards: ["mined", "placed"] },
   { key: "activity", name: "Activity", boards: ["playtime", "streak", "achievements"] },
   { key: "bedwars", name: "Bedwars", boards: ["bw_wins", "bw_finals", "bw_beds"] },
+  { key: "parkour", name: "Parkour", boards: ["parkour"] },
 ];
+SHORT.parkour = "Parkour";
+let course = new URLSearchParams(location.search).get("course") || null;   // Parkour: which course
+const pkClock = (ms) => { const s = ms / 1000; return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`; };
 const groupOf = (key) => GROUPS.find((g) => g.boards.includes(key)) || GROUPS[0];
 export const profileUrl = (name) => `/player/${encodeURIComponent(name)}`;
 
@@ -110,7 +114,46 @@ async function bwLive(show) {
   liveTimer = setTimeout(() => bwLive(true), 10_000);
 }
 
+// ---------- Parkour: best times per course ----------
+async function loadParkour() {
+  const list = $("lb-list");
+  tabs();
+  $("lb-players").closest("section").hidden = true;   // server totals don't belong to a parkour course
+  let d;
+  try { d = await (await fetch("/api/leaderboards/parkour")).json(); } catch { d = null; }
+  const sub = $("lb-subtabs");
+  if (!d?.ok) { list.innerHTML = '<li class="empty">The parkour times couldn\'t be loaded. Please try again later.</li>'; return; }
+  if (!d.courses.length) {
+    sub.hidden = true;
+    list.innerHTML = '<li class="empty">No parkour courses yet. Staff build them in game with /parkour create.</li>';
+    $("lb-updated").textContent = "Parkour: best time on each course. Play with /parkour in game.";
+    return;
+  }
+  if (!d.courses.some((c) => c.name === course)) course = d.courses[0].name;
+  sub.hidden = d.courses.length < 2;
+  tabRow(sub, d.courses.map((c) => [c.name, c.name]), course, (k) => { course = k; history.replaceState(null, "", `/leaderboard?board=parkour&course=${encodeURIComponent(k)}`); loadParkour(); });
+  const c = d.courses.find((x) => x.name === course);
+  list.replaceChildren();
+  if (!c.top.length) {
+    const li = document.createElement("li"); li.className = "empty"; li.textContent = "Nobody has finished this course yet. Be the first!"; list.append(li);
+  }
+  c.top.forEach((p, i) => {
+    const li = document.createElement("li");
+    if (i < 3) li.dataset.top = String(i + 1);
+    const rank = document.createElement("span"); rank.className = "lb-rank"; rank.textContent = `#${i + 1}`;
+    const name = document.createElement(d.signedIn ? "a" : "span"); name.className = "lb-name"; name.textContent = p.name;
+    if (d.signedIn) name.href = profileUrl(p.name);
+    const val = document.createElement("span"); val.className = "lb-money"; val.textContent = pkClock(p.ms);
+    val.title = `${p.finishes} finish${p.finishes === 1 ? "" : "es"}`;
+    li.append(rank, name, val);
+    list.append(li);
+  });
+  $("lb-updated").textContent = `${c.name}: ${c.checkpoints} checkpoint${c.checkpoints === 1 ? "" : "s"}${c.reward ? ` · first finish pays ${money(c.reward)}` : ""}. Best time per player. Play with /parkour in game.`;
+}
+
 async function load() {
+  if (board === "parkour") return loadParkour();
+  $("lb-players").closest("section").hidden = false;
   const list = $("lb-list");
   try {
     const res = await fetch(`/api/leaderboards?board=${encodeURIComponent(board)}`);

@@ -299,7 +299,25 @@ export async function removeAhAlert(sql, xuid, id) {
 
 // Called by the voice hub whenever the server sends its listings. Returns [{ xuid, text }] for players online in game.
 export async function checkAhAlerts(env, listings) {
-  const items = [...new Set(listings.map((l) => String(l.item)))];
+  return matchAlerts(env, listings.map((l) => ({ key: Number(l.id), item: String(l.item), label: l.label, amount: l.amount, price: l.price,
+    sellerXuid: String(l.sellerXuid || ""), by: `by ${l.seller}`, where: "Auction House", url: "/community#marketplace/auction" })));
+}
+
+// Same for player shop chests (Galaxy+ / Pro+ shops listed in the Marketplace). Keys are negative so they never clash
+// with Auction House listing ids; an empty shop never alerts.
+export async function checkShopAlerts(env, shops) {
+  const sql = getDb(env);
+  const owners = [...new Set(shops.map((s) => String(s.owner)))];
+  if (!owners.length) return [];
+  const paid = new Set((await sql`SELECT xuid FROM subscriptions WHERE xuid = ANY(${owners}::text[]) AND plan IN ('plus', 'pro')
+                                   AND (expires_at IS NULL OR expires_at > now())`).map((r) => r.xuid));
+  return matchAlerts(env, shops.filter((s) => paid.has(String(s.owner)) && Number(s.stock) >= Number(s.amount) && Number(s.id) > 0)
+    .map((s) => ({ key: -Number(s.id), item: String(s.item), label: s.name, amount: Number(s.amount), price: Number(s.price),
+      sellerXuid: String(s.owner), by: `in ${s.shop} (${s.ownerName}'s shop)`, where: "Shops", url: "/community#marketplace/shops" })));
+}
+
+async function matchAlerts(env, offers) {
+  const items = [...new Set(offers.map((o) => o.item))];
   if (!items.length) return [];
   const sql = getDb(env);
   if (Math.random() < 0.02) await sql`DELETE FROM ah_alert_hits WHERE at < now() - interval '4 days'`.catch(() => {});
@@ -307,27 +325,27 @@ export async function checkAhAlerts(env, listings) {
   if (!alerts.length) return [];
   const pairs = [];
   for (const a of alerts) {
-    for (const l of listings) {
-      if (String(l.item) === a.item_id && eachOf(l) <= Number(a.max_each) && String(l.sellerXuid || "") !== a.xuid) pairs.push([a, l]);
+    for (const o of offers) {
+      if (o.item === a.item_id && eachOf(o) <= Number(a.max_each) && o.sellerXuid !== a.xuid) pairs.push([a, o]);
     }
   }
   if (!pairs.length) return [];
   const fresh = await sql`INSERT INTO ah_alert_hits (alert_id, listing_id)
-                          SELECT * FROM unnest(${pairs.map(([a]) => Number(a.id))}::bigint[], ${pairs.map(([, l]) => Number(l.id))}::bigint[])
+                          SELECT * FROM unnest(${pairs.map(([a]) => Number(a.id))}::bigint[], ${pairs.map(([, o]) => o.key)}::bigint[])
                           ON CONFLICT DO NOTHING RETURNING alert_id, listing_id`;
   const isNew = new Set(fresh.map((r) => `${r.alert_id}:${r.listing_id}`));
-  const hits = pairs.filter(([a, l]) => isNew.has(`${a.id}:${l.id}`));
+  const hits = pairs.filter(([a, o]) => isNew.has(`${a.id}:${o.key}`));
   if (!hits.length) return [];
   const xuids = [...new Set(hits.map(([a]) => a.xuid))];
   const users = await sql`SELECT u.id, p.xuid FROM players p JOIN users u ON u.mc_uuid = p.uuid WHERE p.xuid = ANY(${xuids}) AND NOT u.banned`;
   const userOf = new Map(users.map((u) => [u.xuid, Number(u.id)]));
   const { notify } = await import("./notify.js");
   const out = [];
-  for (const [a, l] of hits) {
-    const text = `${l.amount}x ${l.label} is for sale for ${usd(l.price)}${l.amount > 1 ? ` (${usd(eachOf(l))} each)` : ""} by ${l.seller}`;
-    out.push({ xuid: a.xuid, text });
+  for (const [a, o] of hits) {
+    const text = `${o.amount}x ${o.label} is for sale for ${usd(o.price)}${o.amount > 1 ? ` (${usd(eachOf(o))} each)` : ""} ${o.by}`;
+    out.push({ xuid: a.xuid, text, where: o.where });
     const uid = userOf.get(a.xuid);
-    if (uid) await notify(env, [uid], "auction", { title: `Price alert: ${a.label}`, body: text, url: "/community#marketplace/auction", tag: `ah-${l.id}` }).catch(() => {});
+    if (uid) await notify(env, [uid], "auction", { title: `Price alert: ${a.label}`, body: text, url: o.url, tag: `alert-${o.key}` }).catch(() => {});
   }
   return out;
 }
@@ -379,4 +397,65 @@ export async function pluginAhAlerts(request, env) {
     if (e instanceof HttpError) return json({ ok: false, error: e.message });
     throw e;
   }
+}
+
+// ---------- Marketplace: sell from the website, and buy orders (the plugin does the work; you must be online in game) ----------
+const askMarket = (env, msg) => voiceStub(env).fetch("https://voice/internal/ask", { method: "POST", body: JSON.stringify({ type: "market", ...msg }) })
+  .then((r) => r.json()).catch(() => ({ ok: false, message: "The server didn't answer. Try again in a minute." }));
+async function marketPlayer(request, env) {
+  const user = await requireUser(request, env);
+  if (user.banned) throw new HttpError(403, "Your account has been banned.");
+  const sql = getDb(env);
+  const [p] = await sql`SELECT p.xuid, p.gamertag FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${user.id}`;
+  if (!p) throw new HttpError(400, "Link your Minecraft account first (Account > Link), so we know which player you are.");
+  return { user, xuid: String(p.xuid), name: p.gamertag };
+}
+const answer = (a) => { if (!a.ok) throw new HttpError(409, a.message || "That didn't work."); return json({ ok: true, ...a }); };
+
+// GET /api/market/inventory : your live inventory, with what the server Shop pays for each item
+export async function marketInventory(request, env) {
+  const who = await marketPlayer(request, env);
+  await rateLimit(env, "POLL_LIMITER", `minv:${who.user.id}`);
+  return answer(await askMarket(env, { op: "inventory", xuid: who.xuid }));
+}
+
+// POST /api/market/sell { mode: "ah" | "shop", slot, expectId, expectAmount, price }
+export async function marketSell(request, env) {
+  const who = await marketPlayer(request, env);
+  await rateLimit(env, "AUTH_LIMITER", `msell:${who.user.id}`);
+  const b = await readJson(request);
+  const base = { xuid: who.xuid, slot: Number(b.slot), expectId: String(b.expectId || "").slice(0, 80), expectAmount: Number(b.expectAmount) };
+  if (!Number.isInteger(base.slot) || !base.expectId || !Number.isInteger(base.expectAmount)) throw new HttpError(400, "Pick an item first.");
+  if (b.mode === "shop") return answer(await askMarket(env, { op: "shop_sell", ...base }));
+  const price = Math.round(Number(b.price));
+  if (!Number.isFinite(price) || price < 100 || price > 1e13) throw new HttpError(400, "Enter a price of at least $1.");
+  return answer(await askMarket(env, { op: "ah_list", ...base, price }));
+}
+
+// GET /api/market/orders : open buy orders
+export async function marketOrders(request, env) {
+  const user = await requireUser(request, env);
+  const sql = getDb(env);
+  const [p] = await sql`SELECT p.xuid FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${user.id}`;
+  const data = await voiceStub(env).fetch("https://voice/internal/orders").then((r) => r.json()).catch(() => ({ orders: [] }));
+  const mine = p ? String(p.xuid) : null;
+  const now = Date.now() / 1000;
+  return json({ ok: true, updated: data.at, orders: (data.orders || []).filter((o) => o.expires > now && o.filled < o.want)
+    .map(({ buyerXuid, ...o }) => ({ ...o, mine: Boolean(mine && buyerXuid === mine) })) });
+}
+
+// POST /api/market/orders { action: "create", item, label, want, each } | { action: "fill" | "cancel", id }
+export async function marketOrderAction(request, env) {
+  const who = await marketPlayer(request, env);
+  await rateLimit(env, "AUTH_LIMITER", `morder:${who.user.id}`);
+  const b = await readJson(request);
+  if (b.action === "create") {
+    const item = String(b.item || "").trim().toLowerCase().slice(0, 80);
+    if (!/^[a-z0-9_.:-]+$/.test(item)) throw new HttpError(400, "Choose an item.");
+    return answer(await askMarket(env, { op: "order_create", xuid: who.xuid, name: who.name, item,
+      label: String(b.label || "").replace(/§./g, "").slice(0, 80), want: Math.round(Number(b.want)), each: Math.round(Number(b.each)) }));
+  }
+  if (b.action === "fill") return answer(await askMarket(env, { op: "order_fill", xuid: who.xuid, id: Number(b.id) }));
+  if (b.action === "cancel") return answer(await askMarket(env, { op: "order_cancel", xuid: who.xuid, id: Number(b.id) }));
+  throw new HttpError(400, "Unknown action.");
 }

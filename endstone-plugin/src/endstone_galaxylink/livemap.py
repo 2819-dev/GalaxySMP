@@ -15,12 +15,14 @@ a chunk that isn't loaded can crash the server.
 """
 
 import base64
+import json
 import time
+from importlib import resources
 
 RADIUS = 5              # chunks around each player
 PER_RUN = 3             # chunks drawn per run (every 2 seconds)
 REDRAW_SECONDS = 600
-STYLE = 3               # map look version (2 = Minecraft map item, 3 = with heights for the 3D view)
+STYLE = 4               # map look version (3 = with heights for the 3D view, 4 = every block has its own colour)
 LIVE_EVERY = 5          # seconds between live player updates
 MARKERS_EVERY = 60
 
@@ -77,15 +79,29 @@ KEYWORDS = [
     ("dirt", "dirt"), ("mud", "t_cyan"), ("rail", "metal"), ("torch", "wood"), ("door", "wood"), ("sign", "wood"),
 ]
 UNKNOWN = MC["stone"]
+MC["white"] = MC["snow"]   # white concrete, carpet, glass... (before this they fell back to stone grey)
 _cache = {}
+unknown_seen = set()       # block ids not in the table (a newer Minecraft version): logged once each
+
+# Every Bedrock block's map colour (made by tools/genmap.py from Minecraft's own block list and textures).
+# "below" = Minecraft maps don't draw it (glass, rails, torches...): show the block under it. null = invisible (air, barrier).
+try:
+    TABLE = {k: (tuple(v) if isinstance(v, list) else v) for k, v in
+             json.loads(resources.files("endstone_galaxylink").joinpath("mapcolors.json").read_text("utf-8")).items()}
+except Exception:
+    TABLE = {}
+BELOW = "below"
 
 
 def color_of(block_id):
-    """The Minecraft map colour of a block."""
-    c = _cache.get(block_id)
-    if c is not None:
-        return c
+    """The Minecraft map colour of a block: (r, g, b), "below" (look at the block underneath) or None (invisible)."""
+    if block_id in _cache:
+        return _cache[block_id]
     name = block_id.split(":", 1)[-1]
+    if name in TABLE:
+        _cache[block_id] = TABLE[name]
+        return TABLE[name]
+    unknown_seen.add(name)
     key = BLOCKS.get(name)
     if key is None and any(w in name for w in ("_log", "_wood", "_planks", "_slab", "_stairs", "_fence", "_stem", "_hyphae", "_trapdoor")):
         for wood in sorted(WOODS, key=len, reverse=True):
@@ -267,12 +283,24 @@ class LiveMap:
                     y, kind = None, None
                     errors.append(e)
                 heights[(i, j)] = y
-                if y is None or kind in (None, "minecraft:air"):
+                c = None
+                if y is not None and kind not in (None, "minecraft:air"):
+                    c = color_of(str(kind))
+                    # glass, rails, torches, barriers...: Minecraft maps show the block underneath
+                    down = 0
+                    while (c is None or c == BELOW) and down < 24:
+                        down += 1
+                        try:
+                            c = color_of(str(dim.get_block_at(x0 + i, y - down, z0 + j).type))
+                        except Exception:
+                            c = None
+                            break
+                    if c == BELOW:
+                        c = None
+                if c is None:
                     c = (0, 0, 0)
                     blank += 1
                 else:
-                    name = str(kind)
-                    c = color_of(name)
                     if c == MC["water"]:
                         # deep water is darker, with Minecraft's checkered look in between
                         depth = 1
@@ -320,6 +348,10 @@ class LiveMap:
         voice.send_json({"type": "map_live", "players": players})
 
     def send_markers(self, voice):
+        new = unknown_seen - getattr(self, "logged_unknown", set())
+        if new:   # blocks newer than the colour table: tell the owner once (they get a close match meanwhile)
+            self.logged_unknown = getattr(self, "logged_unknown", set()) | new
+            self.plugin.logger.info("Live map: blocks without a map colour yet (drawn with a close match): " + ", ".join(sorted(new)[:20]))
         markers = []
         spawn = self.plugin.economy.get_config("spawn")
         if spawn and str(spawn.get("dim", "")).lower() == "overworld":

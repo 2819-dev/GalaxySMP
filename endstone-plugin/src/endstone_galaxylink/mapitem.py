@@ -19,6 +19,8 @@ SIZE = 128                  # map pixels per side
 ZOOMS = [1, 2, 4]           # blocks per pixel (128, 256 or 512 blocks across)
 REFRESH = 90                # seconds before the picture is fetched again
 MARK = "§0§8galaxy-map"     # hidden lore line that marks our map item
+# Plot outlines, like the website map: yours, public plots and free plots (other private plots aren't shown)
+MINE, PUBLIC, FREE = (79, 235, 253), (176, 120, 255), (63, 191, 127)
 
 try:
     import numpy as np
@@ -164,10 +166,39 @@ class GalaxyMap:
                 self.fetch(uid, st, int(l.x), int(l.z), zoom)
         st["calls"] += 1
         if st["img"] is not None and (st["drawn"] != st["ver"] or st["calls"] % 40 == 0):
-            canvas.draw_image(0, 0, st["img"])
+            canvas.draw_image(0, 0, self.with_plots(st, str(player.xuid)))
             st["drawn"] = st["ver"]
         if st["img"] is not None and st["calls"] % 4 == 0:
             canvas.cursors = self.cursors(player, st)
+
+    def with_plots(self, st, xuid):
+        """The map picture with plot outlines drawn on it (a copy: the picture itself stays clean)."""
+        img = st["img"]
+        plots = getattr(getattr(self.plugin, "plots", None), "plots", None) or {}
+        x0, z0, zoom = st["x0"], st["z0"], st["zoom"]
+        out = None
+        for p in list(plots.values()):
+            try:
+                if str(p.get("dim", "")).lower() != "overworld" or p.get("status") not in (None, "ready") or p.get("kind") == "area":
+                    continue
+                owner = p.get("owner")
+                color = MINE if owner and str(owner) == xuid else PUBLIC if owner and p.get("public") else FREE if not owner and not p.get("shop") else None
+                if color is None:
+                    continue
+                a, b = int((p["x1"] - x0) // zoom), int((p["x2"] - x0) // zoom)
+                c, d = int((p["z1"] - z0) // zoom), int((p["z2"] - z0) // zoom)
+                if b < 0 or d < 0 or a >= SIZE or c >= SIZE:
+                    continue
+                if out is None:
+                    out = img.copy()
+                ca, cb, cc, cd = max(a, 0), min(b, SIZE - 1), max(c, 0), min(d, SIZE - 1)
+                if 0 <= c < SIZE: out[c, ca:cb + 1] = color
+                if 0 <= d < SIZE: out[d, ca:cb + 1] = color
+                if 0 <= a < SIZE: out[cc:cd + 1, a] = color
+                if 0 <= b < SIZE: out[cc:cd + 1, b] = color
+            except Exception:
+                continue
+        return img if out is None else out
 
     def cursors(self, me, st):
         def spot(x, z):

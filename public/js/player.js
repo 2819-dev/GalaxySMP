@@ -19,6 +19,7 @@ const ACH_ICONS = {
   quests_10: "scroll", quests_100: "trophy2", quests_500: "trophy2", seller: "coins", seller_10k: "scale",
   landowner: "home", landlord: "homes", rich_1k: "wallet", rich_10k: "coins", rich_100k: "crown", rich_1m: "crown",
   crate_1: "dice", crate_50: "gift2", shopkeeper: "store", shop_tycoon: "store", customer: "bag2", auctioneer: "gavel",
+  parkour_1: "flame", parkour_5: "trophy2", parkour_record: "comet",
   generous: "handshake", job_10: "wrench", job_21: "medal", traveler: "portal", engineer: "elevator",
   bw_first_game: "sword", bw_first_win: "trophy2", bw_wins_10: "crown", bw_beds_10: "pickaxe", bw_finals_25: "skull",
 };

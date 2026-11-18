@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.63.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.64.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -225,6 +225,8 @@ class VoiceLink:
             self._on_main(lambda: self.plugin.shopchests.from_website(msg))
         elif msg.get("type") == "ah_buy":
             self._on_main(lambda: self.plugin.auction.from_website(msg))
+        elif msg.get("type") == "market":  # Marketplace on the website: sell from your inventory, buy orders
+            self._on_main(lambda: self.plugin.market.from_website(msg))
         elif msg.get("type") == "goal":  # the server-wide goal and its progress (website, every few minutes)
             self._on_main(lambda: self.plugin.goals.from_website(msg))
         elif msg.get("type") == "plot_public":  # the owner made their plot public/private on the website map
@@ -247,6 +249,8 @@ class VoiceLink:
                     if str(p.xuid) in wanted:
                         p.send_message(f"§d● LIVE §f{text}")
             self._on_main(tell_live)
+        elif msg.get("type") == "support_reply":  # staff answered a /support request on the website
+            self._on_main(lambda: self.plugin.support.deliver(msg.get("xuid"), msg.get("text")))
         elif msg.get("type") == "ah_alert":  # Auction House price alerts matched new listings
             self._on_main(lambda: self.plugin.auction.alert_hits(msg.get("alerts")))
         elif msg.get("type") == "voice_invite":
@@ -452,6 +456,10 @@ class VoiceLink:
             self.plugin.logger.warning(f"Couldn't send crate odds to the website: {e}")
         try:
             self.plugin.auction.push()
+            if getattr(self.plugin, "market", None):
+                self.plugin.market.push()
+            if getattr(self.plugin, "parkour", None):
+                self.plugin.parkour.push()
         except Exception as e:
             self.plugin.logger.warning(f"Couldn't send Auction House listings to the website: {e}")
         self.plugin.shopchests.push()

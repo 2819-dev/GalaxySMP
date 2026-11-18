@@ -37,6 +37,7 @@ messageBodyHooks.push((m, body) => {
     body.append(h("div", { class: "welcome-foot" }, btn,
       h("span", { class: "text-3 small", text: waves.length ? `${waves.length} ${waves.length === 1 ? "person" : "people"} waved` : "Be the first to say hi" })));
   }
+  if (m.kind === "support" && m.meta?.support) supportCard(m, body);
   if (!m.bot && m.thanks?.length) {
     const mine = m.thanks.includes(me());
     body.append(h("button", { class: `thanks-chip${mine ? " mine" : ""}`, type: "button", title: mine ? "You thanked this message (tap to undo)" : "Thank this message",
@@ -97,3 +98,38 @@ export async function showAway() {
 // shown shortly after Community opens (once the chat has loaded)
 setTimeout(() => { if (state.me) showAway(); }, 2500);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && state.me) showAway(); });
+
+// ---------- /support requests in #Staff Chat: "I'm on it" and Reply (the player sees both in game) ----------
+function supportCard(m, body) {
+  const sup = m.meta.support;
+  body.classList.add("support-card");
+  const act = async (payload, btn) => {
+    if (btn) btn.disabled = true;
+    try {
+      const r = await postJson(`/api/chat/messages/${m.id}/support`, payload);
+      toast(r.message || "Done.");
+    } catch (err) { toast(err.message); if (btn) btn.disabled = false; }
+  };
+  const mine = sup.claimedBy && sup.claimedBy === state.me?.username;
+  const status = h("span", { class: `support-status${sup.claimedBy ? " on" : ""}`,
+    text: sup.claimedBy ? (mine ? "You're on it" : `${sup.claimedBy} is on it`) : "Waiting for staff" });
+  const claim = h("button", { class: "btn btn-primary btn-sm", type: "button", hidden: Boolean(sup.claimedBy), text: "I'm on it",
+    onclick: (e) => { e.stopPropagation(); act({ action: "claim" }, claim); } });
+  const reply = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Reply in game",
+    onclick: (e) => {
+      e.stopPropagation();
+      const input = h("textarea", { class: "input", id: "support-reply", rows: 3, maxlength: 300, placeholder: "e.g. I'm teleporting to you now" });
+      openDialog({
+        title: `Reply to ${sup.name}`,
+        body: h("div", { class: "form" }, h("p", { class: "text-2", style: "margin:0", text: `${sup.name} sees this in game (or the next time they join).` }), input),
+        actions: [{ label: "Cancel" }, { label: "Send", kind: "primary", onClick: async () => {
+          if (!input.value.trim()) throw new Error("Write a reply first.");
+          const r = await postJson(`/api/chat/messages/${m.id}/support`, { action: "reply", text: input.value.trim() });
+          toast(r.message || "Sent.");
+        } }],
+      });
+      setTimeout(() => input.focus(), 50);
+    } });
+  const replies = (sup.replies || []).map((r) => h("div", { class: "support-reply" }, h("b", { text: `${r.by}: ` }), r.text));
+  body.append(h("div", { class: "support-foot" }, h("div", { class: "support-actions" }, status, claim, reply), replies.length ? h("div", { class: "support-replies" }, replies) : null));
+}

@@ -264,6 +264,9 @@ export class VoiceHub extends DurableObject {
     if (url.pathname === "/internal/shopchests") {
       return Response.json((await this.ctx.storage.get("shopchests")) || { shops: [], at: null });
     }
+    if (url.pathname === "/internal/orders") {
+      return Response.json((await this.ctx.storage.get("buy_orders")) || { orders: [], at: null });
+    }
     if (url.pathname === "/internal/ah") {
       return Response.json((await this.ctx.storage.get("ah")) || { listings: [], at: null });
     }
@@ -511,7 +514,21 @@ export class VoiceHub extends DurableObject {
         item: String(x.item || "").slice(0, 80), name: String(x.name || "").slice(0, 60), amount: Number(x.amount) || 1,
         price: Number(x.price) || 0, stock: Number(x.stock) || 0, shop: String(x.shop || "").slice(0, 40),
         dim: String(x.dim || "").slice(0, 20), x: Number(x.x) || 0, y: Number(x.y) || 0, z: Number(x.z) || 0 }));
-      return this.ctx.storage.put("shopchests", { shops, at: Date.now() });
+      // price alerts also look at player shops
+      return this.ctx.storage.put("shopchests", { shops, at: Date.now() }).then(() => import("../routes/community.js")).then((m) => m.checkShopAlerts(this.env, shops)).then((hits) => {
+        const plugin = this.pluginSocket();
+        if (plugin && hits.length) this.send(plugin, { type: "ah_alert", alerts: hits.slice(0, 50) });
+      }).catch((e) => console.error("shop alerts failed", e));
+    }
+    if (msg.type === "parkour_courses" || msg.type === "parkour_time") {  // parkour courses and best times (Leaderboards > Parkour)
+      return import("../routes/progress.js").then((m) => m.parkourFromGame(this.env, msg)).catch((e) => console.error("parkour failed", e));
+    }
+    if (msg.type === "buy_orders") {  // Marketplace buy orders (kept by the plugin, shown on the website)
+      const orders = (Array.isArray(msg.orders) ? msg.orders : []).slice(0, 300).map((o) => ({
+        id: Number(o.id) || 0, buyer: String(o.buyer || "").slice(0, 32), buyerXuid: String(o.buyerXuid || "").slice(0, 20),
+        item: String(o.item || "").slice(0, 80), label: String(o.label || "").slice(0, 80), want: Number(o.want) || 0,
+        filled: Number(o.filled) || 0, each: Number(o.each) || 0, expires: Number(o.expires) || 0 }));
+      return this.ctx.storage.put("buy_orders", { orders, at: Date.now() });
     }
     if (msg.type === "ah") {
       const listings = (Array.isArray(msg.listings) ? msg.listings : []).slice(0, 300);

@@ -32,12 +32,102 @@ function tile(id, label, big) {
 const pill = (text, onClick, disabled) => h("button", { class: "mk-pill", type: "button", text, disabled, onclick: (e) => { e.stopPropagation(); onClick(); } });
 
 // ---------- the data (loaded once, refreshed every 30 seconds) ----------
-const data = { ah: null, shops: null, jobs: null, trades: null, alerts: null };
+const data = { ah: null, shops: null, jobs: null, trades: null, alerts: null, orders: null };
 async function loadAll() {
-  const [ah, shops, jobs, trades] = await Promise.all([
+  const [ah, shops, jobs, trades, orders] = await Promise.all([
     getJson("/api/community/auction").catch(() => null), getJson("/api/shops").catch(() => null),
-    getJson("/api/jobs").catch(() => null), getJson("/api/trades").catch(() => null)]);
-  Object.assign(data, { ah, shops, jobs, trades });
+    getJson("/api/jobs").catch(() => null), getJson("/api/trades").catch(() => null), getJson("/api/market/orders").catch(() => null)]);
+  Object.assign(data, { ah, shops, jobs, trades, orders });
+}
+
+// ---------- Sell from the website: pick an item from your (live) inventory, then sell it to the Shop or list it ----------
+async function sellSheet(refresh) {
+  const body = h("div", { class: "form mk-sell" });
+  const status = h("p", { class: "text-3 small", style: "margin:0", text: "Loading your inventory from the server…" });
+  const grid = h("div", { class: "tr-inv" });
+  const choice = h("div", { class: "mk-sell-choice", hidden: true });
+  body.append(h("p", { class: "text-2", style: "margin:0", text: "Sell straight from your inventory. You need to be online in Minecraft: the item comes out of your inventory." }), status, grid, choice);
+  const dlg = openDialog({ title: "Sell an item", body, actions: [{ label: "Close" }] });
+  let inv;
+  try { inv = await getJson("/api/market/inventory"); } catch (e) { status.textContent = e.message; return; }
+  status.textContent = inv.items.length ? "Tap the item you want to sell." : "Your inventory is empty.";
+  const pick = (it, btn) => {
+    grid.querySelectorAll(".tr-slot").forEach((x) => x.setAttribute("aria-pressed", String(x === btn)));
+    const market = (data.ah?.listings || []).find((l) => l.item === it.id && l.market?.unit)?.market;
+    const price = h("input", { class: "input", id: "mk-sell-price", inputmode: "decimal", maxlength: 14, placeholder: "e.g. 500, 2.5k or 1m",
+      value: market ? String(Math.round(market.unit * it.amount) / 100) : "" });
+    const busy = (b) => { choice.querySelectorAll("button").forEach((x) => { x.disabled = b; }); };
+    const go = async (payload) => {
+      busy(true);
+      try { const r = await postJson("/api/market/sell", { slot: it.slot, expectId: it.id, expectAmount: it.amount, ...payload }); toast(r.message || "Done."); dlg?.close?.(); refresh(); }
+      catch (e) { toast(e.message); busy(false); }
+    };
+    choice.replaceChildren(
+      h("h3", { class: "mk-sell-title", text: `${it.amount}x ${it.label}` }),
+      it.shopEach ? h("div", { class: "mk-sell-opt" },
+        h("div", {}, h("b", { text: "Sell to the Shop now" }), h("span", { text: `${money(it.shopEach)} each · paid instantly` })),
+        h("button", { class: "btn btn-primary btn-sm", type: "button", text: `Sell for ${money(it.shopEach * it.amount)}`, onclick: () => go({ mode: "shop" }) }))
+        : h("p", { class: "text-3 small", style: "margin:0", text: "The server Shop doesn't buy this item, but you can list it on the Auction House." }),
+      h("div", { class: "mk-sell-opt col" },
+        h("div", {}, h("b", { text: "List on the Auction House" }), h("span", { text: market ? `Usually sells for ${money(market.unit)} each. 5% fee when it sells.` : "Listed for 48 hours. 5% fee when it sells." })),
+        h("div", { class: "mk-sell-row" }, price, h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "List it",
+          onclick: () => { const c = toCents(price.value); if (!(c >= 100)) return toast("Enter a price of at least $1, like 500 or 2.5k."); go({ mode: "ah", price: c }); } }))));
+    choice.hidden = false;
+    choice.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  };
+  grid.replaceChildren(...inv.items.map((it) => {
+    const b = h("button", { type: "button", class: "tr-slot", "aria-pressed": "false" },
+      h("span", { class: "tr-slot-n", text: `${it.amount}x` }), h("b", { text: it.label }),
+      h("span", { class: "text-3 small", text: it.enchants.length ? it.enchants.join(", ") : it.shopEach ? `Shop pays ${money(it.shopEach)} each` : "Auction House only" }));
+    b.addEventListener("click", () => pick(it, b));
+    return b;
+  }));
+}
+
+// ---------- Buy orders ----------
+function orderDialog(refresh, prefill = null) {
+  const known = new Map();
+  for (const l of data.ah?.listings || []) known.set(l.item, l.label);
+  for (const s of data.shops?.shops || []) known.set(s.item, s.name);
+  if (prefill) known.set(prefill.item, prefill.label);
+  const options = h("datalist", { id: "mk-order-items" }, [...known].map(([, label]) => h("option", { value: label })));
+  const item = h("input", { class: "input", id: "mk-order-item", list: "mk-order-items", maxlength: 80, placeholder: "e.g. Diamond", value: prefill?.label || "" });
+  const want = h("input", { class: "input", id: "mk-order-want", type: "number", min: 1, max: 10000, value: 64, inputmode: "numeric" });
+  const each = h("input", { class: "input", id: "mk-order-each", inputmode: "decimal", maxlength: 14, placeholder: "e.g. 90 or 2.5k" });
+  const total = h("p", { class: "text-2 small", style: "margin:0" });
+  const update = () => { const c = toCents(each.value), n = Math.floor(Number(want.value)); total.textContent = c > 0 && n > 0 ? `${money(c * n)} is held from your balance until the order is filled or cancelled.` : ""; };
+  want.addEventListener("input", update); each.addEventListener("input", update);
+  openDialog({
+    title: "Post a buy order",
+    body: h("div", { class: "form" },
+      h("p", { class: "text-2", style: "margin:0", text: "Say what you want and what you'll pay for each one. Players sell to your order in game or here, and the items go into your inventory." }),
+      options, field("Item", item), field("How many?", want), field("Price for each one", each), total),
+    actions: [{ label: "Cancel" }, { label: "Post order", kind: "primary", onClick: async () => {
+      const name = item.value.trim().toLowerCase();
+      if (!name) throw new Error("Choose an item.");
+      const hit = [...known].find(([id, label]) => label.toLowerCase() === name || id === name || id === `minecraft:${name.replace(/ /g, "_")}`);
+      const id = hit ? hit[0] : `minecraft:${name.replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}`;
+      const c = toCents(each.value);
+      if (!(c > 0)) throw new Error("Enter a price for each one, like 90 or 2.5k.");
+      const r = await postJson("/api/market/orders", { action: "create", item: id, label: hit ? hit[1] : item.value.trim(), want: Math.floor(Number(want.value)), each: c });
+      toast(r.message || "Buy order posted."); refresh();
+    } }],
+  });
+}
+function orderRow(o, refresh) {
+  const left = o.want - o.filled;
+  const act = async (action) => {
+    try { const r = await postJson("/api/market/orders", { action, id: o.id }); toast(r.message || "Done."); refresh(); } catch (e) { toast(e.message); }
+  };
+  const open = () => (o.mine
+    ? openDialog({ title: "Cancel this buy order?", body: h("p", { class: "text-2", style: "margin:0", text: `You get back ${money(left * o.each)} for the ${left.toLocaleString()} not filled yet.` }),
+      actions: [{ label: "Keep it" }, { label: "Cancel order", kind: "primary", onClick: () => act("cancel") }] })
+    : openDialog({ title: `Sell ${o.label} to ${o.buyer}?`, body: h("p", { class: "text-2", style: "margin:0",
+      text: `They want ${left.toLocaleString()} more at ${money(o.each)} each. Plain ${o.label} from your inventory is sold to them (up to ${left.toLocaleString()}), and you're paid right away. You need to be online in Minecraft.` }),
+      actions: [{ label: "Cancel" }, { label: "Sell mine", kind: "primary", onClick: () => act("fill") }] }));
+  return row({ id: o.item, label: o.label, title: o.label, sub: `${o.mine ? "Your order" : o.buyer} · wants ${left.toLocaleString()} more`,
+    meta: h("span", { class: "mk-stock", text: `${o.filled.toLocaleString()} of ${o.want.toLocaleString()} filled` }),
+    price: `${money(o.each)} each`, buyText: o.mine ? "Cancel" : "Sell", onOpen: open });
 }
 
 // ---------- item pages (sheets) ----------
@@ -196,7 +286,7 @@ function row({ id, label, title, sub, meta, price, onOpen, buyText = "Buy", off 
 // ---------- the Marketplace ----------
 export function renderMarketplace(root, helpers) {
   toast = helpers.toast;
-  const st = { tab: TABS.some(([k]) => k === helpers.sub) ? helpers.sub : "discover", q: "", ahSort: "new", shopSort: "name" };
+  const st = { tab: TABS.some(([k]) => k === helpers.sub) ? helpers.sub : "discover", q: "", ahSort: "new", shopSort: "name", ahView: "listings" };
   const balance = h("span", { class: "mk-balance" });
   const search = h("input", { class: "input mk-search", type: "search", placeholder: "Search items, shops and players", "aria-label": "Search the Marketplace", maxlength: 60 });
   const seg = h("div", { class: "mk-seg", role: "tablist", "aria-label": "Marketplace" });
@@ -271,6 +361,7 @@ export function renderMarketplace(root, helpers) {
     const chips = [
       waiting ? h("button", { class: "mk-chip hot", type: "button", onclick: () => go("trades") }, iconEl("handshake"), `${waiting} trade offer${waiting === 1 ? "" : "s"} for you`) : null,
       myJobs ? h("button", { class: "mk-chip hot", type: "button", onclick: () => go("jobs") }, iconEl("briefcase"), `${myJobs} job${myJobs === 1 ? "" : "s"} to check`) : null,
+      h("button", { class: "mk-chip", type: "button", onclick: () => sellSheet(refresh) }, iconEl("plus"), "Sell an item"),
       h("button", { class: "mk-chip", type: "button", onclick: () => alertsDialog() }, iconEl("bell"), "Price alerts"),
       h("button", { class: "mk-chip", type: "button", onclick: () => { helpers.tradeTab = "new"; go("trades"); } }, iconEl("handshake"), "Offer a trade"),
     ].filter(Boolean);
@@ -288,6 +379,9 @@ export function renderMarketplace(root, helpers) {
         shelf("New in the Auction House", `${listings.length} item${listings.length === 1 ? "" : "s"} for sale`, listings.slice(0, 12).map(ahCard), () => go("auction")),
         shelf("From player shops", "Buy from shop chests without walking to the Shop District.", shopItems.map((s) => card({ id: s.item, label: s.name, title: s.name,
           sub: `${s.amount} · ${s.owner}`, price: moneyExact(s.price), onOpen: () => shopSheet(s, refresh), onBuy: () => shopSheet(s, refresh) })), () => go("shops")),
+        shelf("Players are buying", "Sell to a buy order and get paid right away.", (data.orders?.orders || []).filter((o) => !o.mine).slice(0, 12).map((o) => card({
+          id: o.item, label: o.label, title: o.label, sub: `${o.buyer} wants ${(o.want - o.filled).toLocaleString()}`, price: `${money(o.each)} each`,
+          onOpen: () => { st.ahView = "orders"; go("auction"); }, onBuy: () => orderRow(o, refresh).click(), buyText: "Sell" })), () => { st.ahView = "orders"; go("auction"); }),
         shelf("Jobs you can take", "Help another player and get paid.", openJobs.map((j) => card({ id: `job${j.id}`, label: j.title, title: j.title,
           sub: `Posted by ${j.poster}`, price: moneyExact(j.reward), onOpen: () => go("jobs"), onBuy: () => go("jobs"), buyText: "View" })), () => go("jobs"))].filter(Boolean),
       h("section", { class: "mk-hero", onclick: () => { helpers.tradeTab = "new"; go("trades"); } },
@@ -306,11 +400,25 @@ export function renderMarketplace(root, helpers) {
     const sortSeg = h("div", { class: "seg mk-subseg", role: "group", "aria-label": "Sort" },
       sorts.map(([k, label]) => h("button", { type: "button", "aria-pressed": String(st.ahSort === k), text: label, onclick: () => { st.ahSort = k; draw(true); } })));
     const alerts = h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => alertsDialog() }, iconEl("bell"), "Price alerts");
+    const sell = h("button", { class: "btn btn-primary btn-sm", type: "button", onclick: () => sellSheet(refresh) }, iconEl("plus"), "Sell");
+    const nOrders = (data.orders?.orders || []).length;
+    const view = h("div", { class: "seg mk-subseg", role: "group", "aria-label": "Auction House" },
+      [["listings", "For sale"], ["orders", `Buy orders${nOrders ? ` (${nOrders})` : ""}`]].map(([k, label]) =>
+        h("button", { type: "button", "aria-pressed": String(st.ahView === k), text: label, onclick: () => { st.ahView = k; draw(true); } })));
+    box.append(h("div", { class: "mk-toolbar" }, view, h("div", { class: "mk-actions" }, alerts, sell)));
     const q = st.q.toLowerCase();
+    if (st.ahView === "orders") {
+      const orders = (data.orders?.orders || []).filter((o) => !q || `${o.label} ${o.item} ${o.buyer}`.toLowerCase().includes(q));
+      box.append(h("div", { class: "mk-toolbar" }, h("p", { class: "text-3 small mk-lead", text: "Players who want to buy. Sell yours to an order and you're paid right away." }),
+        h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => orderDialog(refresh) }, iconEl("plus"), "Post a buy order")),
+        orders.length ? h("div", { class: "mk-list" }, orders.map((o) => orderRow(o, refresh)))
+          : h("div", { class: "panel empty", text: q ? "No buy orders match that." : "No buy orders yet. Post one and players can sell to you." }));
+      return box;
+    }
     let list = (data.ah?.listings || []).filter((l) => !q || `${l.label} ${l.item} ${l.seller}`.toLowerCase().includes(q));
     if (st.ahSort === "cheap") list = [...list].sort((a, b) => a.price - b.price);
     if (st.ahSort === "deals") list = [...list].sort((a, b) => (a.market?.unit ? eachOf(a) / a.market.unit : 9) - (b.market?.unit ? eachOf(b) / b.market.unit : 9));
-    box.append(h("div", { class: "mk-toolbar" }, sortSeg, alerts),
+    box.append(h("div", { class: "mk-toolbar" }, sortSeg),
       h("p", { class: "text-3 small mk-lead", text: data.ah?.updated ? `${list.length} item${list.length === 1 ? "" : "s"} · sell yours in game with /ah sell <price>` : "Waiting for the Minecraft server to send its listings." }),
       list.length ? h("div", { class: "mk-list" }, list.map(ahRow)) : h("div", { class: "panel empty", text: q ? "Nothing matches that." : "Nothing is for sale right now." }));
     return box;
@@ -326,7 +434,8 @@ export function renderMarketplace(root, helpers) {
     let list = data.shops.shops.filter((s) => !q || `${s.name} ${s.item} ${s.owner} ${s.shop}`.toLowerCase().includes(q));
     if (st.shopSort === "cheap") list = [...list].sort((a, b) => a.price / a.amount - b.price / b.amount);
     if (st.shopSort === "stock") list = [...list].sort((a, b) => b.stock - a.stock);
-    box.append(h("div", { class: "mk-toolbar" }, sortSeg),
+    box.append(h("div", { class: "mk-toolbar" }, sortSeg,
+        h("button", { class: "btn btn-primary btn-sm", type: "button", onclick: () => sellSheet(refresh) }, iconEl("plus"), "Sell to the Shop")),
       h("p", { class: "text-3 small mk-lead", text: "Shop chests from Galaxy+ and Galaxy Pro+ members. Every one is still open in game in the Shop District." }),
       list.length ? h("div", { class: "mk-list" }, list.map(shopRow))
         : h("div", { class: "panel empty", text: data.shops.shops.length ? "No shops match that." : "No shops are listed right now. Check back soon, or visit the Shop District in game." }));

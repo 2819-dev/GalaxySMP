@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.63.0"
+VERSION = "2.64.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -137,6 +137,7 @@ class GalaxyLink(Plugin):
         "plotaxe": _cmd("Get the Plot Axe to make plots and protected areas.", "/plotaxe", "galaxylink.command.plotaxe"),
         "rtp": _cmd("Random teleport: go to a random spot in the wild. Command blocks: rtp @p", "/rtp [player: player]", "galaxylink.command.rtp", ["wild"]),
         "support": _cmd("Ask staff for help: your message goes to the staff team.", "/support [message: message]", "galaxylink.command.support", ["helpme"]),
+        "parkour": _cmd("Parkour courses: best times and records. Staff: /parkour create <name> on a pressure plate.", "/parkour [action: message]", "galaxylink.command.parkour", ["pk"]),
         "map": _cmd("Get the server map item (the same map as galaxymc.us/map).", "/map [zoom: message]", "galaxylink.command.map"),
         "plate": _cmd("Make the pressure plate you're standing on run a command (e.g. /plate guide).", "/plate [command: message]", "galaxylink.command.plate"),
     }
@@ -170,6 +171,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.plotaxe": _perm("Allows /plotaxe (server operators).", "op"),
         "galaxylink.command.rtp": _perm("Allows /rtp (random teleport into the wild).", True),
         "galaxylink.command.support": _perm("Allows /support (ask staff for help).", True),
+        "galaxylink.command.parkour": _perm("Allows /parkour (setting up courses needs operator).", True),
         "galaxylink.command.map": _perm("Allows /map (the server map item).", True),
         "galaxylink.command.plate": _perm("Allows /plate: command pressure plates (server operators).", "op"),
         "galaxylink.command.minigames": _perm("Allows /minigames.", True),
@@ -218,6 +220,8 @@ class GalaxyLink(Plugin):
         self.plans = Plans(self)
         self.shop = Shop(self)
         self.auction = AuctionHouse(self)
+        from endstone_galaxylink.market import Market
+        self.market = Market(self)  # Marketplace: sell from the website, buy orders
         from endstone_galaxylink.trades import Trades
         self.trades = Trades(self)
         self.npcs = NpcManager(self)
@@ -230,6 +234,8 @@ class GalaxyLink(Plugin):
         self.support = Support(self)  # /support: ask staff for help (posts in #Staff Chat)
         from endstone_galaxylink.mapitem import GalaxyMap
         self.galaxymap = GalaxyMap(self)  # /map: the server map as a map item
+        from endstone_galaxylink.parkour import Parkour
+        self.parkour = Parkour(self)  # parkour courses with best times
         self.minigames = Minigames(self)
         self._remove_old_friendbot()  # the friend bot was removed (BisectHosting's own Xbox Broadcast is used instead)
         from endstone_galaxylink.teams import Teams
@@ -293,6 +299,7 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self._watched("checking AFK players", self.afk.tick), delay=100, period=100)
         self.server.scheduler.run_task(self, self._watched("checking command plates", self.plates.tick), delay=40, period=4)
         self.server.scheduler.run_task(self, self._watched("setting up the map item", self.galaxymap.setup), delay=200)
+        self.server.scheduler.run_task(self, self._watched("checking parkour plates", self.parkour.tick), delay=40, period=4)
         self.server.scheduler.run_task(self, self.elevators.check_tools, delay=1200, period=1200)
         self.server.scheduler.run_task(self, self.jobs.tick, delay=100, period=100)
         self.server.scheduler.run_task(self, self.servercontrol.tick, delay=20, period=20)
@@ -406,6 +413,8 @@ class GalaxyLink(Plugin):
             player.kick(self.servercontrol.kick_text())
             return
         brand_new = self.progress.load(player.xuid) is None
+        self.server.scheduler.run_task(self, lambda: self.support.on_join(player) if player.is_valid else None, delay=60)  # staff answers to /support
+        self.server.scheduler.run_task(self, lambda: self.market.on_join(player) if player.is_valid else None, delay=80)  # items from buy orders
         pending = self._pending_ops()
         if str(player.xuid) in pending:
             try:
@@ -445,6 +454,7 @@ class GalaxyLink(Plugin):
         self.ranks.forget(event.player)
         self.plates.on_quit(event.player)
         self.galaxymap.on_quit(event.player)
+        self.parkour.on_quit(event.player)
         self.teleports.on_quit(event.player)
         self.progress.on_quit(event.player)
         self.bedwars.on_quit(event.player)
@@ -499,6 +509,7 @@ class GalaxyLink(Plugin):
         if self.blocklog.on_break(event):  # block inspector
             return
         self.plates.on_break(event)  # a command plate that's broken stops being one
+        self.parkour.on_break(event)  # ...and a parkour plate leaves its course
         if self.bedwars.on_break(event):  # beds and the arena
             return
         if self.buildcontest.on_block(event, False):  # the Build Contest arena (no job money for Creative building)
@@ -712,7 +723,7 @@ class GalaxyLink(Plugin):
         player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "tpa", "tpahere", "tpaccept",
                        "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd", "plate",
                        "report", "mod", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates", "elevator",
-                       "shift", "whois", "support", "map", "warp", "setwarp", "delwarp", "goal", "votecomputer"}
+                       "shift", "whois", "support", "map", "parkour", "warp", "setwarp", "delwarp", "goal", "votecomputer"}
         if name in player_only and not isinstance(sender, Player):
             sender.send_message(f"/{name} can only be used in game.")
             return True
@@ -758,6 +769,7 @@ class GalaxyLink(Plugin):
             "rtp": lambda: self.teleports.rtp_command(sender, args),
             "support": lambda: self.support.command(sender, args),
             "map": lambda: self.galaxymap.command(sender, args),
+            "parkour": lambda: self.parkour.command(sender, args),
             "minigames": lambda: self.minigames.open(sender),
             "bedwars": lambda: self.bedwars.command(sender, args),
             "leave": lambda: self.buildcontest.leave(sender) or self.bedwars.leave(sender),

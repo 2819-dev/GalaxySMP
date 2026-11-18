@@ -247,6 +247,11 @@
    "example": "/support"
   },
   {
+   "command": "/parkour",
+   "description": "Parkour courses: see the record times and your best, and teleport to a course's start. Step on the start plate to begin.",
+   "example": "/parkour"
+  },
+  {
    "command": "/map",
    "description": "Get the server map. Hold it to see the area around you, other players and spawn. /map again to zoom.",
    "example": "/map"

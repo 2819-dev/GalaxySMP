@@ -73,7 +73,7 @@ export async function pluginSupport(request, env) {
   const where = intOr(b.x) != null ? `\n*In game at ${intOr(b.x)}, ${intOr(b.y)}, ${intOr(b.z)} (${text(b.world, 32) || "Overworld"})*` : "";
   const quoted = message.split("\n").map((l) => `> ${l}`).join("\n");
   const { botPost } = await import("../chat/engage.js");
-  const m = await botPost(sql, { channelId: ch.id, kind: "post", meta: { support: { name, xuid: xuidOf(b.xuid) } },
+  const m = await botPost(sql, { channelId: ch.id, kind: "support", meta: { support: { name, xuid: xuidOf(b.xuid), claimedBy: null, replies: [] } },
     content: `@Staff, **${name}** requests assistance.\n${quoted}${where}` });
   if (m) await hubBroadcast(env, { type: "message", message: m });
   try {
@@ -84,6 +84,40 @@ export async function pluginSupport(request, env) {
   } catch { /* the post is what matters */ }
   return json({ ok: true, posted: Boolean(m) });
 }
+
+// POST /api/chat/messages/:id/support { action: "claim" | "reply", text } (staff, on a /support post in #Staff Chat)
+// "I'm on it" tells the player in game a staff member is coming; Reply sends them a message in game (delivered when they
+// next join if they're offline). Both show on the post for the rest of the staff.
+export async function supportAction(request, env, ctx, url, params) {
+  const user = await requireUser(request, env);
+  if (!can(user, "staff_chat")) throw new HttpError(403, "Only staff can answer support requests.");
+  const b = await readJson(request);
+  const sql = getDb(env);
+  const [row] = await sql`SELECT id, meta FROM messages WHERE id = ${Number(params.id) || 0} AND kind = 'support' AND deleted_at IS NULL`;
+  if (!row?.meta?.support) throw new HttpError(404, "That support request is gone.");
+  const sup = row.meta.support;
+  let tell;
+  if (b.action === "claim") {
+    if (sup.claimedBy && sup.claimedBy !== user.username) throw new HttpError(409, `${sup.claimedBy} is already on it.`);
+    sup.claimedBy = user.username;
+    sup.claimedAt = new Date().toISOString();
+    tell = `${user.username} (staff) is on it and will help you soon.`;
+  } else if (b.action === "reply") {
+    const text = text_(b.text, 300);
+    if (!text) throw new HttpError(400, "Write a reply first.");
+    sup.claimedBy ||= user.username;
+    sup.replies = [...(sup.replies || []), { by: user.username, text, at: new Date().toISOString() }].slice(-8);
+    tell = `${user.username} (staff): ${text}`;
+  } else throw new HttpError(400, "Unknown action.");
+  await sql`UPDATE messages SET meta = ${JSON.stringify({ ...row.meta, support: sup })}::jsonb WHERE id = ${row.id}`;
+  const { toPlugin } = await import("./economy.js");
+  const delivered = sup.xuid ? await toPlugin(env, { type: "support_reply", xuid: sup.xuid, text: tell }).catch(() => false) : false;
+  const { loadMessage } = await import("../chat/messages.js");
+  const message = await loadMessage(sql, row.id);
+  if (message) await hubBroadcast(env, { type: "message_updated", message });
+  return json({ ok: true, delivered, message: delivered ? `${sup.name} got your message in game.` : `Saved. ${sup.name} gets it when the server is reachable.` });
+}
+const text_ = (v, max) => text(v, max);
 
 export async function pluginReports(request, env) {
   await checkPlugin(request, env);

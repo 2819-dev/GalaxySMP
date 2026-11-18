@@ -576,6 +576,19 @@ You get the alert in game if you're playing, and as a notification on the websit
 
 Player Shops, Trades and #Jobs have moved here, and your old links still work.`,
   },
+  {
+    id: "2026-11-18-sell-orders-parkour",
+    title: "Sell from the website, buy orders, parkour and a sharper map",
+    body: `**Sell from the website.** In #Marketplace, tap **Sell**, pick an item from your inventory, then sell it to the Shop or list it on the Auction House. You need to be online in Minecraft.
+
+**Buy orders.** Post "I'll buy 64 diamonds at $90 each" and the money is held. Anyone can sell to your order in game (**/ah > Buy orders**) or in the Marketplace, and they're paid right away. The items go into your inventory.
+
+**Price alerts** now check player shops too, not just the Auction House.
+
+**Parkour courses.** Type **/parkour** to see the courses, record times and your best. Step on the start plate to begin, hit every checkpoint, and reach the finish. Your first finish pays a reward, best times appear on **Leaderboards > Parkour**, and there are three new achievements to earn.
+
+**The map** now has the right colour for every block in the game. Glass, rails, torches and buttons show the ground underneath, just like a real Minecraft map. Your plots and public plots are also outlined on the **/map** item.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).
