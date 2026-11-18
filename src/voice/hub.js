@@ -497,8 +497,9 @@ export class VoiceHub extends DurableObject {
       return this.ctx.storage.put("map_live", { players, at: Date.now() });
     }
     if (msg.type === "map_markers") {
-      const markers = (Array.isArray(msg.markers) ? msg.markers : []).slice(0, 50).map((m) => ({
-        kind: String(m.kind || "").slice(0, 12), label: String(m.label || "").slice(0, 40), x: Number(m.x) || 0, z: Number(m.z) || 0 }));
+      const markers = (Array.isArray(msg.markers) ? msg.markers : []).slice(0, 250).map((m) => ({
+        kind: String(m.kind || "").slice(0, 12), label: String(m.label || "").slice(0, 40), owner: String(m.owner || "").slice(0, 32) || undefined,
+        x: Number(m.x) || 0, z: Number(m.z) || 0 }));
       const plots = (Array.isArray(msg.plots) ? msg.plots : []).slice(0, 2000).map((p) => ({
         kind: String(p.kind || "plot").slice(0, 8), label: String(p.label || "").slice(0, 40), owner: String(p.owner || "").slice(0, 32),
         id: p.id != null ? String(p.id).slice(0, 20) : null, ownerXuid: p.owner_xuid ? String(p.owner_xuid).slice(0, 20) : null, public: Boolean(p.public),
@@ -522,6 +523,12 @@ export class VoiceHub extends DurableObject {
     }
     if (msg.type === "parkour_courses" || msg.type === "parkour_time") {  // parkour courses and best times (Leaderboards > Parkour)
       return import("../routes/progress.js").then((m) => m.parkourFromGame(this.env, msg)).catch((e) => console.error("parkour failed", e));
+    }
+    if (msg.type === "collection") {  // new item types a player collected (Collection book on profiles)
+      return import("../routes/progress.js").then((m) => m.collectionFromGame(this.env, msg)).catch((e) => console.error("collection save failed", e));
+    }
+    if (msg.type === "market_sale") {  // a Marketplace sale: the buyer can rate the seller
+      return import("../routes/community.js").then((m) => m.recordPurchase(this.env, msg)).catch((e) => console.error("purchase save failed", e));
     }
     if (msg.type === "buy_orders") {  // Marketplace buy orders (kept by the plugin, shown on the website)
       const orders = (Array.isArray(msg.orders) ? msg.orders : []).slice(0, 300).map((o) => ({

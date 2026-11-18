@@ -34,6 +34,7 @@ export async function openPlot(id, onChange) {
       d.mine ? h("span", { class: `mp-state ${d.visibility === "public" ? "on" : ""}`, text: VIS[d.visibility] || "Hidden" }) : like),
     d.caption ? h("p", { class: "text-2", style: "margin:0", text: d.caption } ) : null);
   const actions = [{ label: "Close" }];
+  if (d.visibility === "public" || (!d.mine && d.x != null)) actions.splice(1, 0, { label: "Visit in game", kind: "primary", onClick: () => visit("plot", id) });
   if (d.mine) {
     actions.unshift({ label: "Who can see it", onClick: () => { pickVisibility(id, d, onChange); } }, { label: "Edit photos", onClick: () => { editPhotos(id, d, onChange); } });
   }
@@ -77,5 +78,33 @@ function editPhotos(id, d, onChange) {
       const r = await postJson(`/api/map/plots/${encodeURIComponent(id)}`, { action: "photos", images, caption: caption.value });
       toast(r.message); onChange?.();
     } }],
+  });
+}
+
+// Visit: teleports you there in game (right away if you're online, otherwise the next time you join)
+export async function visit(kind, ref) {
+  try {
+    const r = await postJson("/api/map/visit", { kind, ref: String(ref) });
+    toast(r.message);
+  } catch (e) { toast(e.message); return false; }
+}
+
+// A warp's card (warps are public places Galaxy Pro+ members set with /setwarp)
+export function warpCard(m) {
+  openDialog({
+    title: m.label,
+    body: h("div", { class: "form" },
+      h("p", { class: "text-2", style: "margin:0", text: `A warp by ${m.owner || "a player"} at X ${m.x}, Z ${m.z}.` }),
+      h("p", { class: "text-3 small", style: "margin:0", text: `In game: /warp ${m.label}` })),
+    actions: [{ label: "Close" }, { label: "Visit in game", kind: "primary", onClick: () => visit("warp", m.label) }],
+  });
+}
+
+// Shops and protected areas: name and a Visit button
+export function placeCard(p) {
+  openDialog({
+    title: p.label || (p.kind === "shop" ? "Shop" : "Area"),
+    body: h("p", { class: "text-2", style: "margin:0", text: p.kind === "shop" ? `A shop${p.owner ? ` by ${p.owner}` : ""}.` : "A protected area." }),
+    actions: [{ label: "Close" }, { label: "Visit in game", kind: "primary", onClick: () => visit("plot", p.id) }],
   });
 }

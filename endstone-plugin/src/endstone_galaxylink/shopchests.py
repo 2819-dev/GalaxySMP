@@ -107,6 +107,7 @@ class ShopChests:
         self.save(sid)
         self.eco.add(s["owner"], s["owner_name"], cost)
         self.plugin.progress.bump(s["owner"], "shop_earned", cost, name=s["owner_name"])
+        self._sale(s, sid, xuid, buyer.name if buyer is not None else msg.get("name"), n, cost)
         if buyer is not None:
             self.plugin.progress.add(buyer, "shop_buys")
             dropped = money.give(buyer, money.make_stacks(s["item"], n))
@@ -393,6 +394,11 @@ class ShopChests:
             TextInput(f"Number of trades ({s['amount']} items for {money.exact(s['price'])} each)", "1", "1")],
             submit_button="OK", on_submit=submit))
 
+    def _sale(self, s, sid, buyer_xuid, buyer_name, n, cost):
+        market = getattr(self.plugin, "market", None)
+        if market is not None:
+            market.record_sale("shop", f"{sid}-{int(__import__('time').time())}", s["owner"], s["owner_name"], buyer_xuid, buyer_name, self.item_name(s), n, cost)
+
     def buy(self, player, sid, times):
         s = self.shops.get(sid)
         if not s:
@@ -409,6 +415,7 @@ class ShopChests:
         self.eco.add(s["owner"], s["owner_name"], cost)
         self.plugin.progress.add(player, "shop_buys")
         self.plugin.progress.bump(s["owner"], "shop_earned", cost, name=s["owner_name"])
+        self._sale(s, sid, player.xuid, player.name, n, cost)
         dropped = money.give(player, money.make_stacks(s["item"], n))
         player.send_message(f"§aBought {n}x {self.item_name(s)} for {money.exact(cost)}." + (" §7Some dropped at your feet." if dropped else ""))
         self.tell_owner(s, f"§a{player.name} bought {n}x {self.item_name(s)} from your shop for {money.exact(cost)}.")

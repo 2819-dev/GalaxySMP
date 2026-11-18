@@ -6,6 +6,7 @@ import "/js/chat-pictures.js";
 import "/js/chat-threads.js";
 import "/js/chat-voice.js";
 import "/js/chat-engage.js";
+import "/js/staff-todo.js";  // the to-do list in #Ideas & To-Do (staff)
 import { maybeAskForNotifications, refreshSubscription, openPreferences } from "/js/notify.js";
 
 const $ = (id) => document.getElementById(id);

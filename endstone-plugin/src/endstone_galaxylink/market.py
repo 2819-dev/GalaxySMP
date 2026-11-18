@@ -35,6 +35,15 @@ class Market:
         """)
         self.db.commit()
 
+    def record_sale(self, kind, ref, seller_xuid, seller_name, buyer_xuid, buyer_name, label, amount, price):
+        """Tells the website about a sale, so the buyer can rate the seller (Marketplace seller ratings)."""
+        if str(seller_xuid) == str(buyer_xuid):
+            return
+        voice = getattr(self.plugin, "_voice", None)
+        if voice is not None and getattr(voice, "ws", None):
+            voice.send_json({"type": "market_sale", "kind": kind, "ref": str(ref), "sellerXuid": str(seller_xuid), "sellerName": seller_name,
+                             "buyerXuid": str(buyer_xuid), "buyerName": buyer_name, "label": str(label)[:80], "amount": int(amount), "price": int(price)})
+
     def online(self, xuid):
         return next((p for p in self.plugin.server.online_players if str(p.xuid) == str(xuid)), None)
 
@@ -189,6 +198,7 @@ class Market:
         if b is not None:
             b.send_message(f"§a{p.name} filled §f{taken}x {label}§a of your buy order ({filled:,}/{want:,}).")
         p.send_message(f"§aYou sold §f{taken}x {label}§a to {buyer_name}'s buy order for §e{money.exact(pay)}§a.")
+        self.record_sale("order", f"{oid}-{int(time.time())}", p.xuid, p.name, buyer, buyer_name, label, taken, pay)
         self.push()
         return True, f"You sold {taken}x {label} for {money.exact(pay)}."
 

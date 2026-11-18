@@ -32,13 +32,68 @@ function tile(id, label, big) {
 const pill = (text, onClick, disabled) => h("button", { class: "mk-pill", type: "button", text, disabled, onclick: (e) => { e.stopPropagation(); onClick(); } });
 
 // ---------- the data (loaded once, refreshed every 30 seconds) ----------
-const data = { ah: null, shops: null, jobs: null, trades: null, alerts: null, orders: null };
+const data = { ah: null, shops: null, jobs: null, trades: null, alerts: null, orders: null, ratings: null };
 async function loadAll() {
   const [ah, shops, jobs, trades, orders] = await Promise.all([
     getJson("/api/community/auction").catch(() => null), getJson("/api/shops").catch(() => null),
     getJson("/api/jobs").catch(() => null), getJson("/api/trades").catch(() => null), getJson("/api/market/orders").catch(() => null)]);
-  Object.assign(data, { ah, shops, jobs, trades, orders });
+  const ratings = await getJson("/api/market/ratings").catch(() => null);
+  Object.assign(data, { ah, shops, jobs, trades, orders, ratings });
 }
+
+// ---------- Seller ratings (only buyers rate, once per purchase) and storefronts ----------
+const ratingOf = (name) => data.ratings?.sellers?.[String(name || "").toLowerCase()] || null;
+function ratingText(name) {
+  const r = ratingOf(name);
+  if (!r || r.up + r.down === 0) return "";
+  return `👍 ${Math.round((r.up / (r.up + r.down)) * 100)}% (${r.up + r.down})`;
+}
+const withRating = (name) => { const t = ratingText(name); return t ? `${name} · ${t}` : name; };
+
+function rateDialog(refresh) {
+  const list = h("div", { class: "mk-list" });
+  const draw = () => {
+    const items = data.ratings?.toRate || [];
+    list.replaceChildren(...(items.length ? items.map((p) => {
+      const vote = async (good) => {
+        try {
+          const r = await postJson("/api/market/rate", { id: p.id, good });
+          toast(r.message);
+          data.ratings.toRate = data.ratings.toRate.filter((x) => x.id !== p.id);
+          draw(); refresh();
+        } catch (e) { toast(e.message); }
+      };
+      return h("div", { class: "mk-item" }, tile(p.label, p.label),
+        h("div", { class: "mk-item-main" }, h("b", { text: `${p.amount}x ${p.label}` }),
+          h("span", { text: `${p.seller || "A player"} · ${money(p.price)} · ${{ ah: "Auction House", shop: "Shop", order: "Buy order" }[p.kind] || ""}` })),
+        h("div", { class: "mk-rate" },
+          h("button", { class: "mk-pill", type: "button", "aria-label": "Good seller", text: "👍", onclick: () => vote(true) }),
+          h("button", { class: "mk-pill", type: "button", "aria-label": "Bad experience", text: "👎", onclick: () => vote(false) })));
+    }) : [h("p", { class: "text-3", style: "margin:12px", text: "All done. Thanks for helping other players find good sellers!" })]));
+  };
+  draw();
+  openDialog({ title: "Rate your purchases",
+    body: h("div", { class: "form" }, h("p", { class: "text-2", style: "margin:0", text: "How was buying from each seller? Ratings show next to their name in the Marketplace." }), list),
+    actions: [{ label: "Done" }] });
+}
+
+function storefront(name, refresh) {
+  const ah = (data.ah?.listings || []).filter((l) => l.seller === name);
+  const sh = (data.shops?.shops || []).filter((s) => s.owner === name);
+  const r = ratingOf(name);
+  const head = h("div", { class: "mk-sheet-top" }, tile(name, name, true),
+    h("div", {}, h("b", { text: name }), h("span", { class: "text-3 small", text: r && r.up + r.down ? `👍 ${r.up}  ·  👎 ${r.down} from buyers` : "No ratings yet" })));
+  const section = (title, rows) => (rows.length ? [h("h3", { class: "mk-sell-title", text: title }), h("div", { class: "mk-list" }, rows)] : []);
+  const ahRows = ah.map((l) => row({ id: l.item, label: l.label, title: `${l.amount}x ${l.label}`, sub: timeLeft(l.expires), price: money(l.price), onOpen: () => ahSheet(l, refresh) }));
+  const shRows = sh.map((s) => row({ id: s.item, label: s.name, title: s.name, sub: `${s.amount} for ${moneyExact(s.price)} · ${s.shop}`, price: money(s.price),
+    off: s.stock < s.amount || s.mine, buyText: s.mine ? "Yours" : s.stock < s.amount ? "Sold out" : "Buy", onOpen: () => (s.stock < s.amount || s.mine ? null : shopSheet(s, refresh)) }));
+  openDialog({ title: `${name}'s store`,
+    body: h("div", { class: "form mk-sheet" }, head, ...section("Auction House", ahRows), ...section("Shop chests", shRows),
+      !ahRows.length && !shRows.length ? h("p", { class: "text-3", style: "margin:0", text: "Nothing for sale right now." }) : null,
+      h("a", { class: "ah-hist", href: `/player/${encodeURIComponent(name)}`, text: "View profile" })),
+    actions: [{ label: "Close" }] });
+}
+const sellerLink = (name, refresh) => h("button", { class: "ah-hist", type: "button", text: `See ${name}'s store${ratingText(name) ? ` · ${ratingText(name)}` : ""}`, onclick: () => storefront(name, refresh) });
 
 // ---------- Sell from the website: pick an item from your (live) inventory, then sell it to the Shop or list it ----------
 async function sellSheet(refresh) {
@@ -149,6 +204,7 @@ function ahSheet(l, refresh) {
       h("div", { class: "mk-links" },
         h("button", { class: "ah-hist", type: "button", text: "Price history", onclick: () => historyDialog(l) }),
         h("button", { class: "ah-hist", type: "button", text: "Alert me when cheaper", onclick: () => alertsDialog(l) })),
+      sellerLink(l.seller, refresh),
       h("p", { class: "note small", style: "margin:0", text: "Paid with your in-game money. It goes straight into your inventory, so you must be online in Minecraft." })),
     actions: [{ label: "Close" }, {
       label: `Buy for ${money(l.price)}`, kind: "primary",
@@ -177,6 +233,7 @@ function shopSheet(s, refresh) {
       h("div", { class: "mk-sheet-top" }, tile(s.item, s.name, true), h("div", {}, h("b", { text: s.name }), h("span", { class: "text-3 small", text: `${s.shop} by ${s.owner}` }))),
       h("div", { class: "mk-facts" }, fact("Price", moneyExact(s.price)), fact("You get", `${s.amount}`), fact("In stock", s.stock.toLocaleString()),
         fact("Where", `${dimName(s.where.dim)} ${s.where.x}, ${s.where.z}`)),
+      sellerLink(s.owner, refresh),
       field(`How many times? (up to ${max})`, times), total,
       h("p", { class: "text-3 small", style: "margin:0", text: "Paid from your in-game balance. The items go into your inventory (if you're offline, the next time you join)." })),
     actions: [{ label: "Close" }, {
@@ -342,12 +399,12 @@ export function renderMarketplace(root, helpers) {
     if (sh.length) box.append(h("h2", { class: "mk-h2", text: "Shops" }), h("div", { class: "mk-list" }, sh.map(shopRow)));
     return box;
   }
-  const ahRow = (l) => row({ id: l.item, label: l.label, title: `${l.amount}x ${l.label}`, sub: `${l.seller} · ${timeLeft(l.expires)}`,
+  const ahRow = (l) => row({ id: l.item, label: l.label, title: `${l.amount}x ${l.label}`, sub: `${withRating(l.seller)} · ${timeLeft(l.expires)}`,
     meta: isDeal(l) ? h("span", { class: "ah-deal good", text: "Good price" }) : l.enchants?.length ? h("span", { class: "mk-ench", text: l.enchants.join(", ") }) : null,
     price: money(l.price), onOpen: () => ahSheet(l, refresh) });
   const shopRow = (s) => {
     const out = s.stock < s.amount;
-    return row({ id: s.item, label: s.name, title: s.name, sub: `${s.amount} for ${moneyExact(s.price)} · ${s.shop} by ${s.owner}`,
+    return row({ id: s.item, label: s.name, title: s.name, sub: `${s.amount} for ${moneyExact(s.price)} · ${s.shop} by ${withRating(s.owner)}`,
       meta: h("span", { class: `mk-stock${out ? " none" : ""}`, text: out ? "Out of stock" : `${s.stock.toLocaleString()} in stock` }),
       price: money(s.price), buyText: s.mine ? "Yours" : out ? "Sold out" : "Buy", off: out || s.mine, onOpen: () => (out || s.mine ? null : shopSheet(s, refresh)) });
   };
@@ -360,6 +417,8 @@ export function renderMarketplace(root, helpers) {
     const myJobs = (data.jobs?.jobs || []).filter((j) => j.posterId === data.jobs.userId && j.status === "submitted").length;
     const chips = [
       waiting ? h("button", { class: "mk-chip hot", type: "button", onclick: () => go("trades") }, iconEl("handshake"), `${waiting} trade offer${waiting === 1 ? "" : "s"} for you`) : null,
+      data.ratings?.toRate?.length ? h("button", { class: "mk-chip hot", type: "button", onclick: () => rateDialog(refresh) }, iconEl("star"),
+        `Rate ${data.ratings.toRate.length} purchase${data.ratings.toRate.length === 1 ? "" : "s"}`) : null,
       myJobs ? h("button", { class: "mk-chip hot", type: "button", onclick: () => go("jobs") }, iconEl("briefcase"), `${myJobs} job${myJobs === 1 ? "" : "s"} to check`) : null,
       h("button", { class: "mk-chip", type: "button", onclick: () => sellSheet(refresh) }, iconEl("plus"), "Sell an item"),
       h("button", { class: "mk-chip", type: "button", onclick: () => alertsDialog() }, iconEl("bell"), "Price alerts"),
@@ -369,7 +428,7 @@ export function renderMarketplace(root, helpers) {
 
     const listings = data.ah?.listings || [];
     const deals = listings.filter(isDeal).sort((a, b) => eachOf(a) / a.market.unit - eachOf(b) / b.market.unit).slice(0, 12);
-    const ahCard = (l) => card({ id: l.item, label: l.label, title: `${l.amount}x ${l.label}`, sub: l.seller, price: money(l.price),
+    const ahCard = (l) => card({ id: l.item, label: l.label, title: `${l.amount}x ${l.label}`, sub: withRating(l.seller), price: money(l.price),
       badge: isDeal(l) ? ["good", `${Math.round((1 - eachOf(l) / l.market.unit) * 100)}% off`] : null, onOpen: () => ahSheet(l, refresh), onBuy: () => ahSheet(l, refresh) });
     const shopItems = (data.shops?.shops || []).filter((s) => s.stock >= s.amount && !s.mine).slice(0, 12);
     const openJobs = (data.jobs?.jobs || []).filter((j) => j.status === "open" && j.posterId !== data.jobs.userId).slice(0, 10);

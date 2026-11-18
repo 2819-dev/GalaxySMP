@@ -112,6 +112,9 @@ class AuctionHouse:
         voice = getattr(self.plugin, "_voice", None)
         if voice is not None:  # for the price history on galaxymc.us
             voice.send_json({"type": "ah_sale", "item": item_id, "label": label, "amount": amount, "price": price})
+        market = getattr(self.plugin, "market", None)
+        if market is not None:   # so the buyer can rate the seller
+            market.record_sale("ah", lid, seller, seller_name, player.xuid, player.name, label, amount, price)
         dropped = money.give(player, money.rebuild(json.loads(item)))
         where = " (your inventory was full, so it dropped at your feet)" if dropped else ""
         seller_p = next((p for p in self.plugin.server.online_players if str(p.xuid) == seller), None)

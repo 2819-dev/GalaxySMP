@@ -4706,3 +4706,33 @@ html[data-theme="light"] .mk-balance { color: rgb(160,110,8); }
 .mk-sell-opt > div:first-child span { color: var(--text-3); font-size: .84rem; }
 .mk-sell-row { display: flex; gap: 8px; }
 .mk-sell-row .input { flex: 1; min-width: 0; }
+
+/* Map: following a player */
+.map-follow { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 10px;
+  padding: 6px 6px 6px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.3); font-weight: 600; font-size: .9rem; }
+.map-follow[hidden] { display: none; }
+.map-follow button { border: 0; border-radius: 999px; padding: 5px 12px; background: var(--accent); color: #fff; font: 700 .8rem var(--font); cursor: pointer; }
+
+.mk-rate { display: flex; gap: 6px; flex: none; }
+.mk-rate .mk-pill { min-width: 44px; padding: 0 10px; font-size: 1rem; text-transform: none; }
+
+/* Profile: collection book */
+.pp-coll-tools { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+.pp-coll-tools .input { flex: 1 1 160px; }
+.pp-coll { display: flex; flex-wrap: wrap; gap: 6px; max-height: 260px; overflow: auto; }
+.pp-coll-item { font-size: .8rem; padding: 4px 9px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); }
+.pp-coll-item.missing { opacity: .55; border: 1px dashed var(--border); background: transparent; }
+
+/* Staff to-do list (#Ideas & To-Do) */
+.todo-btn { position: relative; }
+.todo-btn .todo-n:not(:empty) { position: absolute; top: 2px; right: 0; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--accent); color: #fff; font: 700 .65rem/16px var(--font); }
+.todo-list { display: flex; flex-direction: column; gap: 6px; max-height: 55vh; overflow: auto; }
+.todo-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+.todo-item.done .todo-main b { text-decoration: line-through; color: var(--text-3); }
+.todo-check { flex: none; width: 24px; height: 24px; margin-top: 1px; border-radius: 7px; border: 2px solid var(--border-strong, var(--border)); background: var(--surface); display: grid; place-items: center; cursor: pointer; color: #fff; padding: 0; }
+.todo-check.on { background: #3fbf7f; border-color: #3fbf7f; }
+.todo-check svg { width: 14px; height: 14px; }
+.todo-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+.todo-main b { overflow-wrap: anywhere; }
+.todo-notes { color: var(--text-2); font-size: .86rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.todo-meta { color: var(--text-3); font-size: .78rem; }

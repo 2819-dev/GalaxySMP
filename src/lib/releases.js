@@ -589,6 +589,19 @@ Player Shops, Trades and #Jobs have moved here, and your old links still work.`,
 
 **The map** now has the right colour for every block in the game. Glass, rails, torches and buttons show the ground underneath, just like a real Minecraft map. Your plots and public plots are also outlined on the **/map** item.`,
   },
+  {
+    id: "2026-11-18-ratings-visit-collection",
+    title: "Seller ratings, Visit from the map, and your Collection book",
+    body: `**Seller ratings.** After you buy something in the Marketplace (Auction House, a shop chest or a buy order), you can rate the seller with 👍 or 👎. Ratings show next to sellers' names. Tap a seller to see their store: everything they're selling in one place.
+
+**Visit from the map.** Public plots, shops and warps now have a **Visit in game** button on the Map page. If you're online you're teleported right away, and if not, it happens the next time you join. **Warps** now show on the map too.
+
+**Follow a player.** Tap a player's head on the map, or pick them from the Players list, and the map follows them. It keeps following in 3D.
+
+**Teleport from the Friends list.** When a friend is in game, tap **Teleport** to send them a teleport request without typing a command.
+
+**Collection book.** Your profile now shows every kind of item you've had in your inventory, out of every item in the game, with a list of what's still missing. There are new achievements at 100, 250 and 500 items.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

@@ -356,6 +356,11 @@ class LiveMap:
         spawn = self.plugin.economy.get_config("spawn")
         if spawn and str(spawn.get("dim", "")).lower() == "overworld":
             markers.append({"kind": "spawn", "label": "Spawn", "x": round(spawn["x"]), "z": round(spawn["z"])})
+        warps = getattr(self.plugin, "warps", None)
+        for w in (warps.all() if warps else [])[:200]:   # public warps (Galaxy Pro+), with a Visit button on the website
+            spot = w.get("spot") or {}
+            if str(spot.get("dim", "")).lower() == "overworld":
+                markers.append({"kind": "warp", "label": w["name"], "owner": w["ownerName"], "x": round(spot["x"]), "z": round(spot["z"])})
         plots = []
         for p in self.plugin.plots.plots.values():
             if str(p.get("dim", "")).lower() != "overworld" or p.get("status") == "saving":

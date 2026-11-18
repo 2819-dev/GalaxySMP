@@ -132,3 +132,21 @@ export async function pluginMapImage(request, env) {
   }
   return json({ ok: true, x0, z0, zoom, chunks: rows.length, rgb: Buffer.from(out).toString("base64") });
 }
+
+// POST /api/map/visit { kind: "plot" | "warp", ref }: teleports you there in game (now if you're online, or the next time you join)
+export async function mapVisit(request, env) {
+  const { readJson, HttpError } = await import("../lib/http.js");
+  const { limit } = await import("../lib/ratelimit.js");
+  const user = await requireUser(request, env);
+  if (user.banned) throw new HttpError(403, "Your account has been banned.");
+  await limit(env, "AUTH_LIMITER", `visit:${user.id}`);
+  const b = await readJson(request);
+  if (!["plot", "warp"].includes(b.kind) || !String(b.ref ?? "").trim()) throw new HttpError(400, "Pick a place to visit.");
+  const [p] = await getDb(env)`SELECT p.xuid FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${user.id}`;
+  if (!p) throw new HttpError(400, "Link your Minecraft account first (Account > Link), so we know which player to teleport.");
+  const a = await voiceStub(env).fetch("https://voice/internal/ask", { method: "POST",
+    body: JSON.stringify({ type: "visit", xuid: String(p.xuid), kind: b.kind, ref: String(b.ref).slice(0, 40) }) })
+    .then((r) => r.json()).catch(() => ({ ok: false, message: "The server is offline right now. Try again when it's up." }));
+  if (!a.ok) throw new HttpError(409, a.message || "That didn't work.");
+  return json({ ok: true, now: Boolean(a.now), message: a.message });
+}

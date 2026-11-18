@@ -19,7 +19,7 @@ const ACH_ICONS = {
   quests_10: "scroll", quests_100: "trophy2", quests_500: "trophy2", seller: "coins", seller_10k: "scale",
   landowner: "home", landlord: "homes", rich_1k: "wallet", rich_10k: "coins", rich_100k: "crown", rich_1m: "crown",
   crate_1: "dice", crate_50: "gift2", shopkeeper: "store", shop_tycoon: "store", customer: "bag2", auctioneer: "gavel",
-  parkour_1: "flame", parkour_5: "trophy2", parkour_record: "comet",
+  parkour_1: "flame", parkour_5: "trophy2", parkour_record: "comet", collect_100: "gift2", collect_250: "castle", collect_500: "gem",
   generous: "handshake", job_10: "wrench", job_21: "medal", traveler: "portal", engineer: "elevator",
   bw_first_game: "sword", bw_first_win: "trophy2", bw_wins_10: "crown", bw_beds_10: "pickaxe", bw_finals_25: "skull",
 };
@@ -200,6 +200,8 @@ async function load() {
   // ---- activity over time (charts) ----
   const charts = section("Activity", h("p", { class: "text-3 small", style: "margin:0", text: "Loading…" }));
   loadCharts(p.name, charts);
+  const collection = section("Collection book", h("p", { class: "text-3 small", style: "margin:0", text: "Loading…" }));
+  loadCollection(p.name, collection, social?.isMe);
 
   // ---- achievements (earned in game) ----
   const total = p.achievements.length;
@@ -254,7 +256,34 @@ async function load() {
       social.isMe ? h("p", { class: "text-3 small", style: "margin:10px 0 0", text: social.wishlistHidden ? "Only you can see your wishlist. Change this in Account settings." : "Everyone signed in can see this. You can hide it in Account settings." }) : null);
   }
 
-  box.replaceChildren(...[hero, showcase].filter(Boolean), h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, streakBox, stats, bedwars, charts), h("div", { class: "pp-col" }, wishlist, achievements)));
+  box.replaceChildren(...[hero, showcase].filter(Boolean), h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, streakBox, stats, bedwars, charts), h("div", { class: "pp-col" }, wishlist, achievements, collection)));
+}
+
+// Every kind of item they've had in their inventory, out of all the items in the game
+async function loadCollection(name, box, isMe) {
+  let d;
+  try { d = await (await fetch(`/api/players/${encodeURIComponent(name)}/collection`)).json(); } catch { d = null; }
+  if (!d?.ok) { box.remove(); return; }
+  const pct = d.total ? Math.round((d.count / d.total) * 1000) / 10 : 0;
+  const q = h("input", { class: "input", type: "search", placeholder: "Find an item", "aria-label": "Find an item in the collection", maxlength: 40 });
+  let showMissing = false;
+  const grid = h("div", { class: "pp-coll" });
+  const toggle = h("button", { class: "btn btn-ghost btn-sm", type: "button" });
+  const draw = () => {
+    const s = q.value.trim().toLowerCase();
+    const list = (showMissing ? d.missing.map((n) => ({ name: n, missing: true })) : d.items).filter((i) => !s || i.name.toLowerCase().includes(s));
+    toggle.textContent = showMissing ? `Show collected (${d.count})` : `Show missing (${d.total - d.count})`;
+    grid.replaceChildren(...(list.length ? list.slice(0, 400).map((i) => h("span", { class: `pp-coll-item${i.missing ? " missing" : ""}`, text: i.name, title: i.at ? `First collected ${new Date(i.at).toLocaleDateString()}` : "" }))
+      : [h("p", { class: "text-3 small", style: "margin:0", text: s ? "No items match that." : showMissing ? "Every item collected!" : "Nothing collected yet. Items count once they're in the inventory." })]));
+  };
+  toggle.addEventListener("click", () => { showMissing = !showMissing; draw(); });
+  q.addEventListener("input", draw);
+  box.replaceChildren(h("h2", { class: "pp-h2", text: "Collection book" }),
+    h("div", { class: "pp-progress" }, h("div", { class: "pp-progress-bar" }, h("span", { style: `width:${pct}%` })),
+      h("span", { class: "text-3 small", text: `${d.count.toLocaleString()} of ${d.total.toLocaleString()} items (${pct}%)` })),
+    h("div", { class: "pp-coll-tools" }, q, toggle), grid,
+    h("p", { class: "text-3 small", style: "margin:10px 0 0", text: isMe ? "Every kind of item you've had in your inventory counts (checked every minute while you play). Achievements at 100, 250 and 500." : "Every kind of item they've had in their inventory." }));
+  draw();
 }
 
 // Playtime per day (bars) and money over the last 30 days (line), from the daily history.

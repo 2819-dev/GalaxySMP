@@ -128,12 +128,12 @@ function draw() {
     const text = p.kind === "plot" ? (p.public ? p.label || `${p.owner}'s plot` : p.mine ? "Your plot (private)" : "") : p.label;
     if (text && view.scale >= 1.5 && bx - ax > 60 * dpr) label(text, (ax + bx) / 2, az + 14 * dpr, 11);
   }
-  // spawn and other markers
+  // spawn, warps and other markers
   for (const m of info.markers) {
     const [x, y] = toScreen(m.x, m.z);
     g.fillStyle = "#fff";
     g.beginPath(); g.arc(x, y, 7 * dpr, 0, Math.PI * 2); g.fill();
-    g.fillStyle = "#8a5cff";
+    g.fillStyle = m.kind === "warp" ? "#22c3e6" : "#8a5cff";
     g.beginPath(); g.arc(x, y, 4.5 * dpr, 0, Math.PI * 2); g.fill();
     label(m.label, x, y - 14 * dpr, 12);
   }
@@ -164,7 +164,11 @@ function label(text, x, y, px) {
 function loop() {
   if (follow) {
     const p = info.players.find((q) => q.name === follow);
-    if (p && (Math.abs(p.x - view.x) > 0.5 || Math.abs(p.z - view.z) > 0.5)) { view.x += (p.x - view.x) * 0.2; view.z += (p.z - view.z) * 0.2; dirty = true; }
+    if (!p) setFollow(null);   // they went offline (or to another dimension)
+    else if (in3d) {
+      const t = m3d.target;
+      if (Math.abs(p.x - t.x) > 0.5 || Math.abs(p.z - t.z) > 0.5) m3d.goTo(t.x + (p.x - t.x) * 0.15, t.z + (p.z - t.z) * 0.15);
+    } else if (Math.abs(p.x - view.x) > 0.5 || Math.abs(p.z - view.z) > 0.5) { view.x += (p.x - view.x) * 0.2; view.z += (p.z - view.z) * 0.2; dirty = true; }
   }
   if (dirty) draw();
   requestAnimationFrame(loop);
@@ -193,7 +197,6 @@ async function toggle3d() {
       if (!m3d) { btn.hidden = true; return; }  // no WebGL on this device
     }
     in3d = true;
-    follow = null;
     canvas.hidden = true;
     $("map-tip").hidden = true;
     $("map-coords").textContent = "";
@@ -245,20 +248,21 @@ function renderSide() {
     img.className = "map-face"; img.alt = ""; img.width = 24; img.height = 24;
     img.src = p.xuid ? `/api/head/${p.xuid}` : faceSvg(p.name);
     img.onerror = () => { img.onerror = null; img.src = faceSvg(p.name); };
-    const b = sideButton(p.name, follow === p.name ? "Following · tap to stop" : `${Math.round(p.x)}, ${Math.round(p.z)}`, () => {
-      follow = follow === p.name ? null : p.name;
-      if (follow) goTo(p.x, p.z, Math.max(view.scale, 3));
-      renderSide();
+    const b = sideButton(p.name, follow === p.name ? "Following · tap to stop" : `${Math.round(p.x)}, ${Math.round(p.z)} · tap to follow`, () => {
+      setFollow(follow === p.name ? null : p.name);
       closeSide();
     }, img);
     if (follow === p.name) b.classList.add("on");
     return b;
   }) : [Object.assign(document.createElement("p"), { className: "text-3 small", textContent: "Nobody is online in the Overworld." })]));
   const places = [
-    ...info.markers.map((m) => ({ name: m.label, sub: "Spawn", x: m.x, z: m.z })),
+    ...info.markers.map((m) => ({ name: m.label, sub: m.kind === "warp" ? `Warp · ${m.owner || ""} · tap to visit` : "Spawn", x: m.x, z: m.z, marker: m })),
     ...info.plots.filter((p) => drawable(p) && (p.kind !== "plot" || p.public) && (p.label || p.public)).map((p) => ({ ...p, label: p.label || `${p.owner}'s plot` })).map((p) => ({ name: p.label, sub: p.kind === "shop" ? `Shop${p.owner ? ` · ${p.owner}` : ""}` : p.kind === "area" ? "Area" : `Plot · ${p.owner}`, x: (p.x1 + p.x2) / 2, z: (p.z1 + p.z2) / 2 })),
   ];
-  $("map-places").replaceChildren(...(places.length ? places.slice(0, 60).map((p) => sideButton(p.name, p.sub, () => { follow = null; goTo(p.x, p.z, Math.max(view.scale, 2.5)); closeSide(); })) :
+  $("map-places").replaceChildren(...(places.length ? places.slice(0, 60).map((p) => sideButton(p.name, p.sub, () => {
+    setFollow(null); goTo(p.x, p.z, Math.max(view.scale, 2.5)); closeSide();
+    if (p.marker?.kind === "warp") warpCard(p.marker);
+  })) :
     [Object.assign(document.createElement("p"), { className: "text-3 small", textContent: "No places yet." })]));
   const at = info.playersAt ? new Date(info.playersAt) : null;
   $("map-sub").textContent = info.regions.length ? `${info.regions.reduce((n, r) => n + r.chunks, 0).toLocaleString()} chunks mapped${at ? ` · live` : ""}. The world fills in as players explore.` : "The world fills in as players explore.";
@@ -333,7 +337,7 @@ canvas.addEventListener("pointermove", (e) => {
   }
   const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  if (dx || dy) { follow = null; view.x -= dx / view.scale; view.z -= dy / view.scale; dirty = true; }
+  if (dx || dy) { if (follow) setFollow(null); view.x -= dx / view.scale; view.z -= dy / view.scale; dirty = true; }
 });
 let downAt = null;
 canvas.addEventListener("pointerdown", (e) => { downAt = { x: e.clientX, y: e.clientY }; });
@@ -343,8 +347,14 @@ const up = (e) => {
   if (e.type === "pointerup" && downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 6) {
     const r = canvas.getBoundingClientRect();
     const [wx, wz] = toWorld(e.clientX - r.left, e.clientY - r.top);
-    const plot = plotAt(wx, wz);
-    if (plot && plot.kind === "plot" && (plot.public || plot.mine)) import("/js/map-plot.js").then((m) => m.openPlot(plot.id, () => refresh()));
+    const near = (q) => Math.abs(q.x - wx) * view.scale < 14 && Math.abs(q.z - wz) * view.scale < 14;
+    const player = info.players.find(near);
+    const warp = !player && info.markers.find((m) => m.kind === "warp" && near(m));
+    const plot = !player && !warp && plotAt(wx, wz);
+    if (player) setFollow(follow === player.name ? null : player.name);
+    else if (warp) warpCard(warp);
+    else if (plot && plot.kind === "plot" && (plot.public || plot.mine)) import("/js/map-plot.js").then((m) => m.openPlot(plot.id, () => refresh()));
+    else if (plot && (plot.kind === "shop" || plot.kind === "area")) import("/js/map-plot.js").then((m) => m.placeCard(plot));
   }
   downAt = null;
 };
@@ -359,17 +369,46 @@ canvas.addEventListener("wheel", (e) => {
 canvas.addEventListener("keydown", (e) => {
   const step = 60 / view.scale;
   const keys = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
-  if (keys[e.key]) { follow = null; view.x += keys[e.key][0]; view.z += keys[e.key][1]; dirty = true; e.preventDefault(); }
+  if (keys[e.key]) { if (follow) setFollow(null); view.x += keys[e.key][0]; view.z += keys[e.key][1]; dirty = true; e.preventDefault(); }
   else if (e.key === "+" || e.key === "=") { zoom(1.4); e.preventDefault(); }
   else if (e.key === "-" || e.key === "_") { zoom(1 / 1.4); e.preventDefault(); }
 });
+
+// Following a player: the map keeps them in the middle (2D and 3D) until you stop or drag the map.
+function setFollow(name) {
+  follow = name;
+  let chip = document.getElementById("map-follow");
+  if (!chip) {
+    chip = document.createElement("div");
+    chip.id = "map-follow";
+    chip.className = "map-follow";
+    canvas.parentElement.append(chip);
+  }
+  chip.hidden = !name;
+  if (name) {
+    const p = info.players.find((q) => q.name === name);
+    if (p && !in3d) goTo(p.x, p.z, Math.max(view.scale, 3));
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = "Stop";
+    b.addEventListener("click", () => setFollow(null));
+    const t = document.createElement("span"); t.textContent = `Following ${name}`;
+    chip.replaceChildren(t, b);
+  }
+  renderSide();
+}
+
+function warpCard(m) {
+  import("/js/map-plot.js").then((mod) => mod.warpCard(m));
+}
 
 // Hover: who owns the plot under the pointer.
 function hover(sx, sy, wx, wz) {
   const tip = $("map-tip");
   const p = info.players.find((q) => Math.abs(q.x - wx) * view.scale < 14 && Math.abs(q.z - wz) * view.scale < 14);
-  const plot = !p && plotAt(wx, wz);
-  const lines = p ? [p.name, "Online now"]
+  const warp = !p && info.markers.find((m) => m.kind === "warp" && Math.abs(m.x - wx) * view.scale < 14 && Math.abs(m.z - wz) * view.scale < 14);
+  const plot = !p && !warp && plotAt(wx, wz);
+  const lines = p ? [p.name, follow === p.name ? "Following · tap to stop" : "Online now · tap to follow"]
+    : warp ? [warp.label, `Warp by ${warp.owner || "a player"} · tap to visit`]
     : !plot ? null
       : plot.kind === "shop" ? [plot.label || "Shop", `Shop${plot.owner ? ` · ${plot.owner}` : ""}`]
         : plot.kind === "area" ? [plot.label || "Area", "Protected area"]
@@ -399,7 +438,7 @@ if (location.hash === "#showcase") setTimeout(() => { if (!closeShowcase && $("m
 $("map-zoom-in").addEventListener("click", () => zoom(1.5));
 $("map-zoom-out").addEventListener("click", () => zoom(1 / 1.5));
 $("map-home").addEventListener("click", () => {
-  follow = null;
+  setFollow(null);
   const s = info.markers.find((m) => m.kind === "spawn");
   goTo(s ? s.x : 0, s ? s.z : 0, 2);
 });

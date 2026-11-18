@@ -146,3 +146,24 @@ export async function recordContest(env, msg) {
     icon: "trophy2", dedupe: `contest:${row.id}`,
   });
 }
+
+// POST /api/friends/tpa { userId, here }: a teleport request to a friend, sent in game (both of you must be online)
+export async function tpa(request, env) {
+  const me = await requireUser(request, env);
+  if (me.banned) throw new HttpError(403, "Your account has been banned.");
+  await rateLimit(env, "AUTH_LIMITER", `tpa:${me.id}`);
+  const body = await readJson(request);
+  const sql = getDb(env);
+  const other = Number(body.userId) || 0;
+  const [f] = await sql`SELECT 1 FROM friends WHERE status = 'accepted' AND ((a = ${me.id} AND b = ${other}) OR (a = ${other} AND b = ${me.id}))`;
+  if (!f) throw new HttpError(403, "You can only send teleport requests to friends.");
+  const rows = await sql`SELECT u.id, p.xuid FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ANY(${[Number(me.id), other]}::bigint[])`;
+  const from = rows.find((r) => Number(r.id) === Number(me.id))?.xuid, to = rows.find((r) => Number(r.id) === other)?.xuid;
+  if (!from) throw new HttpError(400, "Link your Minecraft account first (Account > Link).");
+  if (!to) throw new HttpError(400, "They haven't linked a Minecraft account yet.");
+  const { voiceStub } = await import("./voice.js");
+  const a = await voiceStub(env).fetch("https://voice/internal/ask", { method: "POST", body: JSON.stringify({ type: "web_tpa", from: String(from), to: String(to), here: Boolean(body.here) }) })
+    .then((r) => r.json()).catch(() => ({ ok: false, message: "The server is offline right now." }));
+  if (!a.ok) throw new HttpError(409, a.message || "That didn't work.");
+  return json({ ok: true, message: a.message });
+}

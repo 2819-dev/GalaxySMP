@@ -459,3 +459,46 @@ export async function marketOrderAction(request, env) {
   if (b.action === "cancel") return answer(await askMarket(env, { op: "order_cancel", xuid: who.xuid, id: Number(b.id) }));
   throw new HttpError(400, "Unknown action.");
 }
+
+// ---------- Seller ratings: buyers rate the seller once per purchase (👍 / 👎) ----------
+export async function recordPurchase(env, msg) {
+  const x = (v) => (/^\d{1,20}$/.test(String(v ?? "")) ? String(v) : null);
+  const seller = x(msg.sellerXuid), buyer = x(msg.buyerXuid);
+  const kind = ["ah", "shop", "order"].includes(msg.kind) ? msg.kind : null;
+  if (!seller || !buyer || !kind || seller === buyer) return;
+  await getDb(env)`INSERT INTO market_purchases (kind, ref, seller_xuid, seller_name, buyer_xuid, label, amount, price)
+    VALUES (${kind}, ${String(msg.ref || "").slice(0, 60)}, ${seller}, ${String(msg.sellerName || "").slice(0, 32) || null}, ${buyer},
+            ${String(msg.label || "").slice(0, 80)}, ${Math.round(Number(msg.amount) || 0)}, ${Math.round(Number(msg.price) || 0)})
+    ON CONFLICT (kind, ref) DO NOTHING`;
+}
+
+// GET /api/market/ratings : every seller's 👍/👎 (by name), plus your purchases you haven't rated yet (last 30 days)
+export async function marketRatings(request, env) {
+  const user = await requireUser(request, env);
+  const sql = getDb(env);
+  const [p] = await sql`SELECT p.xuid FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${user.id}`;
+  const sellers = await sql`
+    SELECT coalesce(pl.gamertag, max(m.seller_name)) AS name, count(*) FILTER (WHERE m.rating > 0)::int AS up, count(*) FILTER (WHERE m.rating < 0)::int AS down
+      FROM market_purchases m LEFT JOIN players pl ON pl.xuid = m.seller_xuid
+     WHERE m.rating IS NOT NULL GROUP BY m.seller_xuid, pl.gamertag`;
+  const toRate = p ? await sql`
+    SELECT id, kind, label, amount, price, seller_name, created_at FROM market_purchases
+     WHERE buyer_xuid = ${String(p.xuid)} AND rating IS NULL AND created_at > now() - interval '30 days' ORDER BY created_at DESC LIMIT 20` : [];
+  return json({ ok: true,
+    sellers: Object.fromEntries(sellers.filter((s) => s.name).map((s) => [s.name.toLowerCase(), { up: s.up, down: s.down }])),
+    toRate: toRate.map((r) => ({ id: Number(r.id), kind: r.kind, label: r.label, amount: r.amount, price: Number(r.price), seller: r.seller_name, at: r.created_at })) });
+}
+
+// POST /api/market/rate { id, good }
+export async function marketRate(request, env) {
+  const user = await requireUser(request, env);
+  await rateLimit(env, "POLL_LIMITER", `mrate:${user.id}`);
+  const b = await readJson(request);
+  const sql = getDb(env);
+  const [p] = await sql`SELECT p.xuid FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${user.id}`;
+  if (!p) throw new HttpError(400, "Link your Minecraft account first.");
+  const [row] = await sql`UPDATE market_purchases SET rating = ${b.good ? 1 : -1}, rated_at = now()
+                           WHERE id = ${Number(b.id) || 0} AND buyer_xuid = ${String(p.xuid)} AND rating IS NULL RETURNING seller_name`;
+  if (!row) throw new HttpError(409, "You can only rate your own purchases, once each.");
+  return json({ ok: true, message: `Thanks! Your rating for ${row.seller_name || "the seller"} is saved.` });
+}

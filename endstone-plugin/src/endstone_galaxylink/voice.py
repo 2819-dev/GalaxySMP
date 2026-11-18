@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.64.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.65.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -225,6 +225,10 @@ class VoiceLink:
             self._on_main(lambda: self.plugin.shopchests.from_website(msg))
         elif msg.get("type") == "ah_buy":
             self._on_main(lambda: self.plugin.auction.from_website(msg))
+        elif msg.get("type") == "visit":  # Visit on galaxymc.us/map (a public plot or a warp)
+            self._on_main(lambda: self.plugin.visits.from_website(msg))
+        elif msg.get("type") == "web_tpa":  # Teleport request from the Friends list on the website
+            self._on_main(lambda: self.plugin.visits.web_tpa(msg))
         elif msg.get("type") == "market":  # Marketplace on the website: sell from your inventory, buy orders
             self._on_main(lambda: self.plugin.market.from_website(msg))
         elif msg.get("type") == "goal":  # the server-wide goal and its progress (website, every few minutes)
@@ -460,6 +464,8 @@ class VoiceLink:
                 self.plugin.market.push()
             if getattr(self.plugin, "parkour", None):
                 self.plugin.parkour.push()
+            if getattr(self.plugin, "collection", None):
+                self.plugin.collection.resend(self)
         except Exception as e:
             self.plugin.logger.warning(f"Couldn't send Auction House listings to the website: {e}")
         self.plugin.shopchests.push()

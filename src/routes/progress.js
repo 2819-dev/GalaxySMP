@@ -375,3 +375,26 @@ export async function parkourBoards(request, env) {
     top: times.filter((t) => t.course === c.name).map((t, i) => ({ name: signedIn ? t.name : `Player ${i + 1}`, ms: t.best_ms, finishes: t.finishes })),
   })) });
 }
+
+// ---------- Item collection book ----------
+import ITEMS from "../lib/items.json";
+const ITEM_NAMES = new Map(ITEMS.map((i) => [i.id, i.name]));
+
+export async function collectionFromGame(env, msg) {
+  const xuid = String(msg.xuid || "");
+  const items = (Array.isArray(msg.items) ? msg.items : []).map((i) => String(i).slice(0, 80)).filter((i) => /^[a-z0-9_.:-]+$/.test(i)).slice(0, 200);
+  if (!/^\d{1,20}$/.test(xuid) || !items.length) return;
+  await getDb(env)`INSERT INTO player_items (xuid, item_id) SELECT ${xuid}, unnest(${items}::text[]) ON CONFLICT DO NOTHING`;
+}
+
+// GET /api/players/:name/collection : the items they've collected out of every item in the game
+export async function playerCollection(request, env, ctx, url, params) {
+  await requireUser(request, env);
+  const rows = await getDb(env)`
+    SELECT i.item_id, i.first_at FROM player_items i JOIN players p ON p.xuid = i.xuid
+     WHERE lower(p.gamertag) = lower(${String(params.name).replace(/^\./, "").slice(0, 32)}) ORDER BY i.first_at DESC`;
+  const have = rows.filter((r) => ITEM_NAMES.has(r.item_id));
+  return json({ ok: true, total: ITEMS.length, count: have.length,
+    items: have.map((r) => ({ id: r.item_id, name: ITEM_NAMES.get(r.item_id), at: r.first_at })),
+    missing: ((got) => ITEMS.filter((i) => !got.has(i.id)).map((i) => i.name))(new Set(have.map((r) => r.item_id))) });
+}

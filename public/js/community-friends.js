@@ -82,6 +82,16 @@ function renderFriendsList(root, { toast, setTimer, openDM }) {
       h("span", { class: "fr-name" }, h("b", { text: f.gamertag || f.username }), h("small", { class: f.inGame ? "fr-on" : "text-3", text: sub }))),
     h("span", { class: "fr-btns" }, ...buttons));
   const btn = (text, cls, onclick, icon) => h("button", { class: `btn btn-sm ${cls}`, type: "button", onclick }, icon ? iconEl(icon) : null, text);
+  // Teleport request (like /tpa in game): you both need to be online in Minecraft; they accept with /tpaccept
+  const tpaDialog = (f) => {
+    const name = f.gamertag || f.username;
+    const send = async (here) => { const r = await postJson("/api/friends/tpa", { userId: f.id, here }); toast(r.message); };
+    openDialog({
+      title: `Teleport with ${name}`,
+      body: h("p", { class: "text-2", style: "margin:0", text: `This sends a teleport request in game. You both need to be online in Minecraft, and ${name} accepts with /tpaccept.` }),
+      actions: [{ label: "Cancel" }, { label: `Bring ${name} to me`, onClick: () => send(true) }, { label: `Go to ${name}`, kind: "primary", onClick: () => send(false) }],
+    });
+  };
 
   async function load() {
     let d;
@@ -99,6 +109,7 @@ function renderFriendsList(root, { toast, setTimer, openDM }) {
       h("h3", { class: "fr-h", text: d.friends.length ? `Your friends · ${online} in game` : "Your friends" }),
       ...(d.friends.length ? d.friends.map((f) => person(f, (f.inGame ? "In game now" : ago(f.lastSeen)) + (f.streak?.status === "active" && f.streak.length ? ` · 🔥 ${f.streak.length}` : ""),
         btn("Message", "btn-secondary", () => (openDM ? openDM(f.id) : (location.href = `/community#dm-${f.id}`)), "message"),
+        f.inGame ? btn("Teleport", "btn-secondary", () => tpaDialog(f), "portal") : null,
         btn("", "btn-ghost fr-more", () => openDialog({
           title: `Remove ${f.gamertag || f.username}?`,
           body: h("p", { text: "You'll stop seeing each other in your Friends lists." }),

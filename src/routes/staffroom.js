@@ -40,3 +40,73 @@ export async function staffLogs(request, env, ctx, url) {
     more: rows.length === 40,
   });
 }
+
+// ---------- Staff to-do list (in #Ideas & To-Do) ----------
+// GET  /api/staff/todos                      open and recently finished tasks, plus the staff you can assign
+// POST /api/staff/todos { action, ... }      create { title, notes, assigneeId, sourceMessage } | update { id, title, notes, assigneeId }
+//                                            | toggle { id } | delete { id }
+async function todoStaff(request, env) {
+  const { requireUser } = await import("../lib/auth.js");
+  const { can } = await import("../lib/perms.js");
+  const { HttpError } = await import("../lib/http.js");
+  const user = await requireUser(request, env);
+  if (!can(user, "staff_chat")) throw new HttpError(403, "The to-do list is for staff.");
+  return user;
+}
+const todoOut = (t) => ({ id: Number(t.id), title: t.title, notes: t.notes || "", done: t.done, assigneeId: t.assignee_id ? Number(t.assignee_id) : null,
+  assignee: t.assignee || null, by: t.by || null, doneBy: t.done_by_name || null, doneAt: t.done_at, at: t.created_at, sourceMessage: t.source_message ? Number(t.source_message) : null });
+
+export async function todos(request, env) {
+  await todoStaff(request, env);
+  const { json } = await import("../lib/http.js");
+  const sql = getDb(env);
+  const rows = await sql`
+    SELECT t.*, a.username AS assignee, c.username AS by, d.username AS done_by_name FROM staff_todos t
+      LEFT JOIN users a ON a.id = t.assignee_id LEFT JOIN users c ON c.id = t.created_by LEFT JOIN users d ON d.id = t.done_by
+     WHERE NOT t.done OR t.done_at > now() - interval '14 days' ORDER BY t.done, t.created_at DESC LIMIT 200`;
+  const ids = await staffMemberIds(env, sql);
+  const staff = ids.length ? await sql`SELECT id, username FROM users WHERE id = ANY(${ids}::bigint[]) ORDER BY lower(username)` : [];
+  return json({ ok: true, todos: rows.map(todoOut), staff: staff.map((s) => ({ id: Number(s.id), username: s.username })) });
+}
+
+export async function todoAction(request, env) {
+  const user = await todoStaff(request, env);
+  const { json, readJson, HttpError } = await import("../lib/http.js");
+  const b = await readJson(request);
+  const sql = getDb(env);
+  const clean = (v, n) => String(v ?? "").replace(/[\u0000-\u0008\u000b-\u001f]/g, "").trim().slice(0, n);
+  const staffIds = new Set(await staffMemberIds(env, sql));
+  const assignee = b.assigneeId ? Number(b.assigneeId) : null;
+  if (assignee && !staffIds.has(assignee)) throw new HttpError(400, "Tasks can only be assigned to staff.");
+  const tell = async (id, title) => {
+    if (!id || id === Number(user.id)) return;
+    const { notify } = await import("./notify.js");
+    await notify(env, [id], "mentions", { title: `${user.username} gave you a task`, body: title, url: "/community#ideas-todo", tag: `todo-${title.slice(0, 20)}` }).catch(() => {});
+  };
+  if (b.action === "create") {
+    const title = clean(b.title, 200);
+    if (!title) throw new HttpError(400, "Write what needs doing.");
+    await sql`INSERT INTO staff_todos (title, notes, assignee_id, created_by, source_message) VALUES (${title}, ${clean(b.notes, 1000) || null}, ${assignee}, ${user.id}, ${Number(b.sourceMessage) || null})`;
+    await tell(assignee, title);
+    return json({ ok: true, message: "Task added." });
+  }
+  const id = Number(b.id) || 0;
+  const [t] = await sql`SELECT * FROM staff_todos WHERE id = ${id}`;
+  if (!t) throw new HttpError(404, "That task is gone.");
+  if (b.action === "update") {
+    const title = clean(b.title, 200) || t.title;
+    await sql`UPDATE staff_todos SET title = ${title}, notes = ${clean(b.notes, 1000) || null}, assignee_id = ${assignee} WHERE id = ${id}`;
+    if (assignee && assignee !== Number(t.assignee_id)) await tell(assignee, title);
+    return json({ ok: true, message: "Saved." });
+  }
+  if (b.action === "toggle") {
+    await sql`UPDATE staff_todos SET done = NOT done, done_by = CASE WHEN done THEN NULL ELSE ${user.id}::bigint END,
+                done_at = CASE WHEN done THEN NULL ELSE now() END WHERE id = ${id}`;
+    return json({ ok: true, message: t.done ? "Moved back to the list." : "Done! Nice work." });
+  }
+  if (b.action === "delete") {
+    await sql`DELETE FROM staff_todos WHERE id = ${id}`;
+    return json({ ok: true, message: "Task removed." });
+  }
+  throw new HttpError(400, "Unknown action.");
+}
