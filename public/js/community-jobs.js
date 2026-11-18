@@ -175,7 +175,7 @@ export function renderJobs(root, { toast, setTimer }) {
           : h("p", { class: "text-3 small", text: "Type /link in game to post or do jobs." })),
       seg,
       shown.length ? h("div", { class: "jb-list" }, ...shown.map(card)) : h("p", { class: "jb-empty text-3", text: empty }),
-      h("p", { class: "text-3 small", text: "Hand over items in game (or use galaxymc.us/trades). Problems with a job? Open a ticket in #Support and staff will settle it." }));
+      h("p", { class: "text-3 small", text: "Hand over items in game (or use Trades in the Marketplace). Problems with a job? Open a ticket in #Support and staff will settle it." }));
   }
 
   async function load() {

@@ -459,6 +459,9 @@ export default {
     if (url.hostname.startsWith("cube.") && !url.pathname.startsWith("/api/")) {
       return Response.redirect(`https://galaxymc.us/cube${url.search}`, 302);
     }
+    // Player Shops and Trades moved into #Marketplace in Community: old links (and the in-game text) still work
+    if (url.pathname === "/shops" || url.pathname === "/shops.html") return Response.redirect(`${url.origin}/community#marketplace/shops`, 302);
+    if (url.pathname === "/trades" || url.pathname === "/trades.html") return Response.redirect(`${url.origin}/community${url.search}#marketplace/trades`, 302);
     // Website lockdown (Control Panel): everyone but the owners sees the lock screen
     const locked = await lockdownGate(request, env, url);
     if (locked) return locked;

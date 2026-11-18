@@ -1,6 +1,5 @@
 // Special community channels: Information, Events, News, Polls, Builds, Auction House, Suggestions and Voice Chat.
 // All text goes in with textContent, never as HTML.
-import { money } from "/js/money.js";
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 import { ticketChat, newTicketDialog, onTicketEvent, chip, when, LABELS } from "/js/tickets.js";
 import { iconEl } from "/js/site.js";
@@ -51,12 +50,14 @@ export function showPanel(channel, context) {
   p.scrollTop = 0;
   const helpers = { toast: (m) => ctx.toast(m), setTimer: (t) => { refreshTimer = t; }, setCleanup: (fn) => { cleanup = fn; }, sub: ctx.sub, me: ctx.me };
   const render = {
-    info: renderInfo, auction: renderAuction, suggestions: renderSuggestions, support: renderSupport, dms: renderDMs,
+    info: renderInfo, suggestions: renderSuggestions, support: renderSupport, dms: renderDMs,
     events: (el) => extra.renderEvents(el, helpers), news: (el) => extra.renderNews(el, helpers),
     polls: (el) => extra.renderPolls(el, helpers), builds: (el) => extra.renderBuilds(el, helpers),
     timeline: (el) => renderTimeline(el, helpers), team: (el) => renderTeam(el, helpers), applications: (el) => renderApplications(el, helpers),
     stafflogs: (el) => renderStaffLogs(el, helpers), reports: (el) => renderReports(el, helpers), shifts: (el) => renderShifts(el, helpers),
     jobs: (el) => renderJobs(el, helpers),
+    marketplace: (el) => import("/js/marketplace.js").then((m) => m.renderMarketplace(el, helpers)),
+    auction: (el) => import("/js/marketplace.js").then((m) => m.renderMarketplace(el, helpers)),
     streams: (el) => import("/js/streams.js").then((m) => m.renderStreams(el, helpers)),
     friends: (el) => renderFriends(el, { ...helpers, openDM: ctx.openDM }),
   }[channel.kind];
@@ -107,173 +108,6 @@ async function renderInfo(p) {
   }
   rules.append(h("p", { class: "text-3 small", style: "margin:12px 0 0" }, "Full rules: ", h("a", { href: "/rules", text: "galaxymc.us/rules" })));
   wrap.append(info, rules);
-}
-
-// ---------- Auction House ----------
-
-const timeLeft = (exp) => {
-  const s = Math.max(0, exp - Date.now() / 1000);
-  const hrs = Math.floor(s / 3600);
-  return hrs ? `${hrs}h ${Math.floor((s % 3600) / 60)}m left` : `${Math.floor(s / 60)}m left`;
-};
-const TILE_COLORS = ["#2457eb", "#8a4fd8", "#16a36b", "#d4532f", "#c48a12", "#1d8fb3", "#b8336a"];
-const tileColor = (id) => TILE_COLORS[[...id].reduce((a, c) => a + c.charCodeAt(0), 0) % TILE_COLORS.length];
-
-// Price history: the average price (each) of an item over the last 30 days, and how this listing compares
-function marketLine(l) {
-  const each = l.price / Math.max(1, l.amount);
-  const row = h("div", { class: "ah-market" });
-  if (l.market?.unit) {
-    const r = each / l.market.unit;
-    const tag = r <= 0.9 ? ["good", "Good price"] : r >= 1.15 ? ["high", "Above average"] : ["fair", "Fair price"];
-    row.append(h("span", { class: `ah-deal ${tag[0]}`, text: tag[1] }), h("span", { class: "text-3 small", text: `Avg ${money(l.market.unit)} each` }));
-  } else row.append(h("span", { class: "text-3 small", text: "No recent sales" }));
-  row.append(h("button", { class: "ah-hist", type: "button", text: "Price history", onclick: () => historyDialog(l) }),
-    h("button", { class: "ah-hist", type: "button", text: "Alert me", onclick: () => alertsDialog(l) }));
-  return row;
-}
-
-// Price alerts: get a notification (website + in game) when an item is listed at or below your price (each).
-const toCents = (v) => Math.round(Number(String(v).replace(/[$,\s]/g, "").replace(/k$/i, "e3").replace(/m$/i, "e6")) * 100);
-async function alertsDialog(prefill = null) {
-  let d;
-  try { d = await getJson("/api/community/auction/alerts"); } catch (e) { ctx?.toast?.(e.message); return; }
-  const list = h("div", { class: "ah-alerts" });
-  const drawList = (alerts) => {
-    list.replaceChildren(...(alerts.length ? alerts.map((a) => h("div", { class: "ah-alert" },
-      h("div", {}, h("b", { text: a.label }), h("span", { class: "text-3 small", text: ` · ${money(a.maxEach)} each or less` })),
-      h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: async () => {
-        try { drawList((await postJson("/api/community/auction/alerts", { remove: a.id })).alerts); } catch (e) { ctx.toast(e.message); }
-      } })))
-      : [h("p", { class: "text-3 small", style: "margin:0", text: "No price alerts yet." })]));
-  };
-  drawList(d.alerts);
-  if (!d.linked) {
-    openDialog({ title: "Price alerts", body: h("p", { class: "text-2", style: "margin:0", text: "Join the server once first, so we know which Minecraft player you are." }), actions: [{ label: "Close" }] });
-    return;
-  }
-  const known = new Map(d.items.map((x) => [x.item, x.label]));
-  if (prefill) known.set(prefill.item, prefill.label);
-  const options = h("datalist", { id: "ah-alert-items" }, [...known].map(([item, label]) => h("option", { value: label })));
-  const item = h("input", { class: "input", id: "ah-alert-item", list: "ah-alert-items", maxlength: 80, placeholder: "e.g. Diamond Sword", value: prefill?.label || "" });
-  const price = h("input", { class: "input", id: "ah-alert-price", inputmode: "decimal", maxlength: 14, placeholder: "e.g. 500 or 2.5k",
-    value: prefill ? String(Math.floor(prefill.price / Math.max(1, prefill.amount)) / 100) : "" });
-  openDialog({
-    title: "Price alerts",
-    body: h("div", { class: "form" },
-      h("p", { class: "text-2", style: "margin:0", text: "Pick an item and the most you'd pay for each one. When someone lists it at or below that price, you get a notification here and in game." }),
-      list, options,
-      field("Item", item), field("Most you'd pay (each)", price, `Up to ${d.max} alerts. Setting an item again changes its price.`)),
-    actions: [{ label: "Close" }, {
-      label: "Add alert", kind: "primary",
-      onClick: async () => {
-        const name = item.value.trim().toLowerCase();
-        const hit = [...known].find(([id, label]) => label.toLowerCase() === name || id === name || id === `minecraft:${name.replace(/ /g, "_")}`);
-        const id = hit ? hit[0] : `minecraft:${name.replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}`;
-        const cents = toCents(price.value);
-        if (!name) throw new Error("Choose an item.");
-        if (!(cents > 0)) throw new Error("Enter the most you'd pay for each one, like 500 or 2.5k.");
-        const r = await postJson("/api/community/auction/alerts", { item: id, label: hit ? hit[1] : item.value.trim(), maxEach: cents });
-        drawList(r.alerts);
-        ctx.toast(r.forSale ? `Alert saved. ${r.forSale} already for sale at that price: look in the list.` : "Alert saved. We'll let you know.");
-        item.value = ""; price.value = "";
-        return false;
-      },
-    }],
-  });
-}
-async function historyDialog(l) {
-  let d;
-  try { d = await getJson(`/api/community/auction/history?item=${encodeURIComponent(l.item)}`); } catch (e) { ctx?.toast?.(e.message); return; }
-  const { lineChart } = await import("/js/charts.js");
-  const body = h("div", { class: "ah-history" });
-  if (!d.summary) body.append(h("p", { class: "text-2", style: "margin:0", text: "This item hasn't sold in the last 30 days, so there's no price history yet." }));
-  else {
-    body.append(h("div", { class: "ah-hist-stats" },
-      h("div", {}, h("span", { text: "Average" }), h("b", { text: money(d.summary.avg) })),
-      h("div", {}, h("span", { text: "Lowest" }), h("b", { text: money(d.summary.low) })),
-      h("div", {}, h("span", { text: "Highest" }), h("b", { text: money(d.summary.high) })),
-      h("div", {}, h("span", { text: "Sales" }), h("b", { text: String(d.summary.sales) }))));
-    if (d.days.length > 1) body.append(lineChart({ title: "Average price each, last 30 days", points: d.days.map((x) => ({ label: x.day.slice(5), value: x.unit / 100, tip: [x.day, `${money(x.unit)} each · ${x.sales} sale${x.sales === 1 ? "" : "s"}`] })), format: (v) => `$${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}` }));
-    body.append(h("p", { class: "text-3 small", style: "margin:8px 0 0", text: `This listing: ${money(l.price / Math.max(1, l.amount))} each.` }));
-  }
-  openDialog({ title: `${l.label}: price history`, body, actions: [{ label: "Close" }] });
-}
-
-function renderAuction(p) {
-  const state = { q: "", sort: "new", data: null };
-  const search = h("input", { class: "input", type: "search", placeholder: "Search items", "aria-label": "Search items" });
-  const sortNew = h("button", { type: "button", "aria-pressed": "true", text: "Newest" });
-  const sortCheap = h("button", { type: "button", "aria-pressed": "false", text: "Cheapest" });
-  const status = h("p", { class: "text-3 small", style: "margin:0" });
-  const grid = h("div", { class: "ah-grid" });
-  const wrap = h("div", { class: "cp-wrap" },
-    h("section", { class: "panel", style: "padding:16px" },
-      h("p", { class: "text-2", style: "margin:0 0 12px" }, "Buy items from the in-game Auction House with your game money. ",
-        h("strong", { text: "You must be online in Minecraft:" }), " the item goes straight into your inventory. Sell items in game with ", h("code", { text: "/ah sell <price>" }), "."),
-      h("div", { class: "cp-toolbar" }, search, h("div", { class: "tabs-mini" }, sortNew, sortCheap),
-        h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => alertsDialog() }, iconEl("bell"), "Price alerts")), status),
-    grid);
-  p.append(wrap);
-
-  const draw = () => {
-    grid.replaceChildren();
-    if (!state.data) return;
-    const q = state.q.toLowerCase();
-    let list = state.data.listings.filter((l) => !q || l.label.toLowerCase().includes(q) || l.item.toLowerCase().includes(q));
-    if (state.sort === "cheap") list = [...list].sort((a, b) => a.price - b.price);
-    if (!list.length) grid.append(h("div", { class: "panel empty", text: q ? "Nothing matches that." : "Nothing is for sale right now." }));
-    for (const l of list) {
-      const tile = h("span", { class: "ah-tile", text: l.label.trim().charAt(0).toUpperCase() || "?" });
-      tile.style.background = tileColor(l.item);
-      const buy = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Buy" });
-      buy.addEventListener("click", () => confirmBuy(l, refresh));
-      grid.append(h("article", { class: "panel ah-card" },
-        h("div", { class: "ah-top" }, tile, h("div", {}, h("div", { class: "ah-name", text: `${l.amount}x ${l.label}` }),
-          h("div", { class: "ah-meta", text: `${l.seller} · ${timeLeft(l.expires)}` }))),
-        l.enchants?.length ? h("div", { class: "ah-ench" }, l.enchants.map((e) => h("span", { text: e }))) : null,
-        marketLine(l),
-        h("div", { class: "ah-buy" }, h("span", { class: "ah-price", text: money(l.price) }), buy)));
-    }
-  };
-  const refresh = async () => {
-    try {
-      state.data = await getJson("/api/community/auction");
-      status.textContent = state.data.updated
-        ? `${state.data.listings.length} item${state.data.listings.length === 1 ? "" : "s"} for sale · updated ${new Date(state.data.updated).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-        : "Waiting for the Minecraft server to send its listings.";
-      draw();
-    } catch (e) { status.textContent = e.message; }
-  };
-  search.addEventListener("input", () => { state.q = search.value.trim(); draw(); });
-  for (const [btn, sort] of [[sortNew, "new"], [sortCheap, "cheap"]]) {
-    btn.addEventListener("click", () => {
-      state.sort = sort;
-      sortNew.setAttribute("aria-pressed", String(sort === "new"));
-      sortCheap.setAttribute("aria-pressed", String(sort === "cheap"));
-      draw();
-    });
-  }
-  refresh();
-  refreshTimer = setInterval(refresh, 20000);
-}
-
-function confirmBuy(l, done) {
-  openDialog({
-    title: `Buy ${l.amount}x ${l.label}?`,
-    body: h("div", { class: "form" },
-      h("p", { class: "text-2", style: "margin:0" }, "Price: ", h("strong", { text: money(l.price) }), ` · sold by ${l.seller}`),
-      l.enchants?.length ? h("p", { class: "text-3 small", style: "margin:0", text: `Enchantments: ${l.enchants.join(", ")}` }) : null,
-      h("p", { class: "note small", style: "margin:0", text: "It's paid with your in-game money and goes straight into your inventory, so you must be online in Minecraft." })),
-    actions: [{ label: "Cancel" }, {
-      label: `Buy for ${money(l.price)}`, kind: "primary",
-      onClick: async () => {
-        const res = await postJson(`/api/community/auction/${l.id}/buy`, {});
-        ctx.toast(res.message || "Purchase complete.");
-        done();
-      },
-    }],
-  });
 }
 
 // ---------- Suggestions ----------

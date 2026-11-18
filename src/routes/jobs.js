@@ -151,7 +151,7 @@ async function settle(env, sql, j, outcome, by, note = "") {
   return row;
 }
 
-const push = (env, ids, title, body, jobId) => notify(env, ids.filter(Boolean), "jobs", { title, body, url: "/community#jobs", tag: `job-${jobId}` }).catch(() => {});
+const push = (env, ids, title, body, jobId) => notify(env, ids.filter(Boolean), "jobs", { title, body, url: "/community#marketplace/jobs", tag: `job-${jobId}` }).catch(() => {});
 
 // POST /api/jobs/:id { action, userId?, note? }
 export async function action(request, env, ctx, url, params) {

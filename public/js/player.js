@@ -95,7 +95,7 @@ async function load() {
 
   const actions = h("div", { class: "pp-actions" });
   if (social && !social.isMe) actions.append(h("a", { class: "btn btn-primary btn-sm", href: `/community#dm-${social.id}` }, iconEl("message"), "Message"));
-  if (social && !social.isMe) actions.append(h("a", { class: "btn btn-secondary btn-sm", href: `/trades?to=${encodeURIComponent(p.name)}` }, iconEl("handshake"), "Trade"));
+  if (social && !social.isMe) actions.append(h("a", { class: "btn btn-secondary btn-sm", href: `/community?to=${encodeURIComponent(p.name)}#marketplace/trades` }, iconEl("handshake"), "Trade"));
   if (p.userId && p.friend && p.friend !== "self") actions.append(friendButton(p));
   actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => compareDialog(p) }, iconEl("scale"), "Compare"));
   if (social?.isMe) actions.append(h("a", { class: "btn btn-primary btn-sm", href: "/account" }, iconEl("pencil"), "Edit profile"));

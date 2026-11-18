@@ -167,7 +167,6 @@ const NAV = [
   ["/status", "Status", "activity"],
   ["/leaderboard", "Leaderboard", "trophy"],
   ["/map", "Map", "map"],
-  ["/shops", "Shops", "store"],
   ["/store", "Store", "bag"],
   ["/voice", "Voice", "mic"],
 ];
@@ -242,7 +241,7 @@ function renderFooter() {
           <a class="brand" href="/" aria-label="${config.serverName} home"><img src="/img/wordmark.png" alt="${config.serverName}" width="150" height="26"></a>
           <p>A family-friendly Minecraft Bedrock server.</p>
         </div>
-        <div><h4>Play</h4><ul><li><a href="/join">How to Join</a></li><li><a href="/status">Server Status</a></li><li><a href="/leaderboard">Leaderboards</a></li><li><a href="/season">Season Pass</a></li><li><a href="/wrapped">Galaxy Wrapped</a></li><li><a href="/map">Server Map</a></li><li><a href="/shops">Player Shops</a></li><li><a href="/store">Store</a></li><li><a href="/crates">Crate Odds</a></li><li><a href="/store#donate">Donate</a></li></ul></div>
+        <div><h4>Play</h4><ul><li><a href="/join">How to Join</a></li><li><a href="/status">Server Status</a></li><li><a href="/leaderboard">Leaderboards</a></li><li><a href="/season">Season Pass</a></li><li><a href="/wrapped">Galaxy Wrapped</a></li><li><a href="/map">Server Map</a></li><li><a href="/community#marketplace">Marketplace</a></li><li><a href="/store">Store</a></li><li><a href="/crates">Crate Odds</a></li><li><a href="/store#donate">Donate</a></li></ul></div>
         <div><h4>Community</h4><ul><li><a href="/community">Community Chat</a></li><li><a href="/voice">Voice Chat</a></li><li><a href="/rules">Rules</a></li><li><a href="/appeal">Ban appeals</a></li></ul></div>
         <div><h4>Account</h4><ul><li><a href="/account">Account settings</a></li><li><a href="/account#notifications">Notifications</a></li><li><a href="/privacy">Privacy Policy</a></li></ul></div>
       </div>

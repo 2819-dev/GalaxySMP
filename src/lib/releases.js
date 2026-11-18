@@ -565,6 +565,17 @@ export const OFFICIAL_SUGGESTIONS = [
 
 You get the alert in game if you're playing, and as a notification on the website. You can set up to 10 alerts.`,
   },
+  {
+    id: "2026-11-18-marketplace",
+    title: "Introducing the Marketplace",
+    body: `**#Auction House** is now **#Marketplace**: one place to buy, sell, trade and find work.
+
+- **Discover:** great deals, the newest Auction House items, player shops and open jobs, in rows you can swipe through.
+- **Auction House**, **Shops**, **Trades** and **Jobs** each have their own tab.
+- **One search** finds items and shops at once. Tap any item to see its details, price history and a **Buy** button.
+
+Player Shops, Trades and #Jobs have moved here, and your old links still work.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

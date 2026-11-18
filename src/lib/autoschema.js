@@ -322,6 +322,13 @@ const PENDING = [
     "CREATE TABLE IF NOT EXISTS ah_alert_hits (alert_id bigint NOT NULL REFERENCES ah_alerts(id) ON DELETE CASCADE, listing_id bigint NOT NULL, at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (alert_id, listing_id))",
     "INSERT INTO schema_migrations (version) VALUES ('0080_ah_alerts') ON CONFLICT DO NOTHING",
   ]],
+  ["0081_marketplace", [
+    "ALTER TABLE channels DROP CONSTRAINT IF EXISTS channels_kind_check",
+    "ALTER TABLE channels ADD CONSTRAINT channels_kind_check CHECK (kind IN ('text', 'info', 'events', 'auction', 'suggestions', 'voice', 'support', 'news', 'polls', 'builds', 'team', 'timeline', 'applications', 'stafflogs', 'reports', 'shifts', 'jobs', 'streams', 'marketplace'))",
+    "UPDATE channels SET slug = 'marketplace', name = 'Marketplace', kind = 'marketplace', topic = 'Buy, sell, trade and find work.' WHERE slug = 'auction-house'",
+    "UPDATE channels SET hidden = true WHERE slug = 'jobs' AND kind = 'jobs'",
+    "INSERT INTO schema_migrations (version) VALUES ('0081_marketplace') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

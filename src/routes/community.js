@@ -327,7 +327,7 @@ export async function checkAhAlerts(env, listings) {
     const text = `${l.amount}x ${l.label} is for sale for ${usd(l.price)}${l.amount > 1 ? ` (${usd(eachOf(l))} each)` : ""} by ${l.seller}`;
     out.push({ xuid: a.xuid, text });
     const uid = userOf.get(a.xuid);
-    if (uid) await notify(env, [uid], "auction", { title: `Price alert: ${a.label}`, body: text, url: "/community#auction-house", tag: `ah-${l.id}` }).catch(() => {});
+    if (uid) await notify(env, [uid], "auction", { title: `Price alert: ${a.label}`, body: text, url: "/community#marketplace/auction", tag: `ah-${l.id}` }).catch(() => {});
   }
   return out;
 }

@@ -77,7 +77,7 @@ export async function createTrade(request, env) {
   await sql`UPDATE trades SET status = 'pending', label = ${String(a.label || "item").slice(0, 80)}, enchants = ${Array.isArray(body.enchants) ? body.enchants.map((e) => String(e).slice(0, 40)).slice(0, 10) : []} WHERE id = ${t.id}`;
   const buyerUser = await sql`SELECT u.id FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE p.xuid = ${buyer.xuid}`;
   if (buyerUser.length) {
-    await notify(env, [buyerUser[0].id], "trades", { title: `${who.name} offers you a trade`, body: `${body.expectAmount}x ${a.label} for $${(price / 100).toLocaleString("en-US")}`, url: "/trades", tag: `trade-${t.id}` });
+    await notify(env, [buyerUser[0].id], "trades", { title: `${who.name} offers you a trade`, body: `${body.expectAmount}x ${a.label} for $${(price / 100).toLocaleString("en-US")}`, url: "/community#marketplace/trades", tag: `trade-${t.id}` });
   }
   return json({ ok: true, id: Number(t.id) });
 }
@@ -97,7 +97,7 @@ async function closeTrade(env, sql, t, status, byName) {
     cancelled: ["A trade offer was cancelled", `${byName} cancelled the offer of ${what}.`],
     expired: ["A trade offer expired", `The offer of ${what} wasn't answered in 24 hours.`],
   }[status];
-  if (msg && status !== "expired") await notify(env, [u.id], "trades", { title: msg[0], body: msg[1], url: "/trades", tag: `trade-${t.id}` });
+  if (msg && status !== "expired") await notify(env, [u.id], "trades", { title: msg[0], body: msg[1], url: "/community#marketplace/trades", tag: `trade-${t.id}` });
 }
 
 // POST /api/trades/:id/:action  (accept / decline: the buyer; cancel: the seller)

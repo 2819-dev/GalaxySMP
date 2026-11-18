@@ -1,9 +1,9 @@
-// Trades page: offers to you, your offers, and making a new offer from your (live) inventory.
-import { toast } from "/js/site.js";
+// Trades (a tab in #Marketplace): offers to you, your offers, and making a new offer from your (live) inventory.
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 import { money, moneyExact } from "/js/money.js";
 
-const $ = (id) => document.getElementById(id);
+let toast = () => {};
+let els = null;   // this tab's elements (it's built by mountTrades)
 const STATUS = { pending: ["Waiting", "planned"], accepted: ["Accepted", "done"], declined: ["Declined", "declined"], cancelled: ["Cancelled", "open"], expired: ["Expired", "open"] };
 
 // "5k", "1.5m", "2,500" -> cents
@@ -21,6 +21,7 @@ function left(iso) {
 }
 
 let data = null;
+const $ = (id) => els[id];
 
 function tradeCard(t) {
   const [label, cls] = STATUS[t.status] || ["", "open"];
@@ -138,18 +139,25 @@ function renderNew() {
 }
 
 function selectTab(name) {
-  document.querySelectorAll("#tr-tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.t === name)));
+  els.tabs.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.t === name)));
   for (const k of ["incoming", "outgoing", "new"]) $(`tr-${k}`).hidden = k !== name;
 }
 
-(async () => {
-  let user = null;
-  try { user = (await getJson("/api/me")).user; } catch { /* signed out */ }
-  if (!user) { $("tr-signin").hidden = false; return; }
-  $("tr-app").hidden = false;
-  document.querySelectorAll("#tr-tabs button").forEach((b) => b.addEventListener("click", () => selectTab(b.dataset.t)));
+// Builds the Trades tab inside root. Returns a refresh function (the Marketplace calls it every 30 seconds).
+export function mountTrades(root, opts = {}) {
+  toast = opts.toast || toast;
+  const count = h("span", { class: "count-badge", id: "tr-in-count" });
+  const tabs = h("div", { class: "seg mk-subseg", role: "group", "aria-label": "Trades" },
+    h("button", { type: "button", "data-t": "incoming", "aria-pressed": "true" }, "Offers to you ", count),
+    h("button", { type: "button", "data-t": "outgoing", "aria-pressed": "false", text: "Your offers" }),
+    h("button", { type: "button", "data-t": "new", "aria-pressed": "false", text: "New offer" }));
+  els = { tabs, "tr-in-count": count, "tr-incoming": h("section", { class: "stack", style: "gap:10px" }),
+    "tr-outgoing": h("section", { class: "stack", style: "gap:10px", hidden: true }), "tr-new": h("section", { hidden: true }) };
+  root.append(h("p", { class: "text-2 mk-lead", text: "Offer an item from your inventory to another player for in-game money. It's held safely until they accept, decline, or 24 hours pass." }),
+    tabs, els["tr-incoming"], els["tr-outgoing"], els["tr-new"]);
+  tabs.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => selectTab(b.dataset.t)));
   renderNew();
-  await load();
-  if (new URLSearchParams(location.search).get("to")) selectTab("new");
-  setInterval(load, 30000);
-})();
+  load();
+  if (opts.start || new URLSearchParams(location.search).get("to")) selectTab(opts.start || "new");
+  return load;
+}

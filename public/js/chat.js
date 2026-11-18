@@ -406,6 +406,12 @@ function setScreen(screen) {
   }
   renderTabs();
 }
+// Old channel links still work: they open the right tab of #Marketplace.
+const HASH_ALIASES = { "auction-house": "marketplace/auction", jobs: "marketplace/jobs", trades: "marketplace/trades", shops: "marketplace/shops" };
+function route(hash) {
+  const [slug, ...rest] = String(hash || "").split("/");
+  return (HASH_ALIASES[slug] ? [HASH_ALIASES[slug], ...rest].join("/") : hash).split("/");
+}
 function onPop() {
   state.popAt = Date.now();
   if (closeOverlays()) return;
@@ -418,7 +424,7 @@ function onPop() {
   }
   const dm = /^dm-(\d+)$/.exec(hash);
   if (dm) { state.dmWith = Number(dm[1]); setScreen("channel"); selectChannel(DM_CHANNEL); return; }
-  const [slug, sub] = hash.split("/");
+  const [slug, sub] = route(hash);
   const ch = state.channels.find((c) => c.slug === slug);
   if (!ch) return;
   setScreen("channel");
@@ -1615,7 +1621,7 @@ export async function startChat({ onSignedOut }) {
   // Links like /community#suggestions switch channels, even while the page is open.
   window.addEventListener("hashchange", () => {
     if (Date.now() - (state.popAt || 0) < 400) return;      // Back/Forward: already handled
-    const [slug, sub] = location.hash.slice(1).split("/");  // e.g. #streams/12 opens stream 12
+    const [slug, sub] = route(location.hash.slice(1));  // e.g. #streams/12 opens stream 12
     const ch = state.channels.find((c) => c.slug === slug);
     if (ch && (ch.id !== state.channelId || sub || state.screen !== "channel")) { state.sub = sub || null; setScreen("channel"); selectChannel(ch.id); }
   });
@@ -1635,7 +1641,7 @@ export async function startChat({ onSignedOut }) {
     state.dmWith = Number(dmWith[1]); // "Message" on a full profile
     await selectChannel(DM_CHANNEL);
   } else {
-    const [slug, sub] = wanted.split("/");
+    const [slug, sub] = route(wanted);
     state.sub = sub || null;
     const first = state.channels.find((c) => c.slug === slug) || state.channels.find((c) => c.slug === "chat") || state.channels[0];
     await selectChannel(first.id);
