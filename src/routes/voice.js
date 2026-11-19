@@ -32,6 +32,7 @@ async function voiceHeaders(env, request, user) {
   const extra = rows[0];
   const power = Number(user.role_power);
   const headers = new Headers(request.headers);
+  headers.delete("X-GSMP-Plugin");   // only /api/voice/server (with the plugin secret) may mark a connection as the plugin
   headers.set("X-GSMP-User", JSON.stringify({
     id: Number(user.id),
     username: user.username,
@@ -73,6 +74,7 @@ export async function voiceServer(request, env) {
   if (!env.PLUGIN_SECRET || !given || !(await safeEqual(given, env.PLUGIN_SECRET))) throw new HttpError(401, "Wrong plugin secret.");
   const headers = new Headers(request.headers);
   headers.delete("Authorization");
+  headers.delete("X-GSMP-User");
   headers.set("X-GSMP-Plugin", "1");
   return voiceStub(env).fetch(new Request(request.url, { headers }));
 }

@@ -301,7 +301,7 @@ export class VoiceHub extends DurableObject {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
-    if (request.headers.get("X-GSMP-Plugin") === "1") {
+    if (request.headers.get("X-GSMP-Plugin") === "1" && !request.headers.get("X-GSMP-User")) {
       for (const old of this.ctx.getWebSockets("plugin")) {
         try { old.serializeAttachment({ ...(old.deserializeAttachment() || {}), kind: "plugin", gone: true }); } catch { /* gone */ }
         try { old.close(1000, "replaced"); } catch { /* gone */ }
