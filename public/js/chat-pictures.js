@@ -83,6 +83,7 @@ plus?.addEventListener("click", (e) => {
       { icon: "poll", label: "Poll", onClick: () => document.getElementById("composer-poll")?.click() },
       { icon: "smile", label: "Emojis", onClick: () => emojiMenu(plus, document.getElementById("composer-input")) },
       { icon: "gift", label: "Gift", onClick: () => giftDialog() },
+      { icon: "slash", label: "Commands", onClick: () => import("/js/chat-commands.js").then((m) => m.openCommands()) },
     ],
     photo: () => btn?.click(),
   });

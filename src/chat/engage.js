@@ -1,6 +1,6 @@
 // Things that make Community livelier:
 //   - Chat levels: chatting earns XP (once a minute, capped per day so spam doesn't pay). Level-ups are announced
-//     in #Bot Commands, where players can also type !level, !rank, !top and !help.
+//     in #Bot Commands. Commands like /level and /top are in routes/commands.js.
 //   - @GalaxySMP posts: the Question of the Day (6:30 AM New York time, answered in a thread), welcome cards for
 //     new players (with a Wave button) and level-ups. They're normal messages with no author and a "kind".
 //   - Website activity for Friend Streaks: 15 minutes with Community open + at least 1 message in a day counts
@@ -47,8 +47,12 @@ export async function botPost(sql, { slug, channelId, content, kind, meta = null
 export async function afterMessage(env, sql, user, channelId, message, broadcast) {
   const [ch] = await sql`SELECT slug FROM channels WHERE id = ${channelId}`;
   await countActivity(env, sql, user.id, { message: true });
-  if (ch?.slug === BOT_CHANNEL && /^![a-z]/i.test(message.content || "")) {
-    await command(sql, user, channelId, message, broadcast);
+  if (/^!(level|lvl|rank|top|leaderboard|help|commands)\b/i.test(message.content || "")) {
+    // commands start with / now: answer once, pointing to the new way
+    const m = await botPost(sql, { channelId, kind: "bot", replyTo: message.id,
+      content: "Commands start with **/** now: type `/" + message.content.trim().slice(1).split(/\s+/)[0].toLowerCase().replace("lvl", "level").replace("rank", "level").replace("leaderboard", "top").replace("commands", "help") +
+        "`, or tap **+** › **Commands** next to the message box." });
+    if (m) await broadcast(m);
     return;  // commands don't earn XP
   }
   await giveXp(sql, user, broadcast);
@@ -81,38 +85,6 @@ export async function levelInfo(sql, userId) {
   const xp = Number(row?.xp || 0);
   const [{ n }] = await sql`SELECT count(*)::int AS n FROM chat_xp WHERE xp > ${xp}`;
   return { xp, rank: n + 1, ...levelFor(xp) };
-}
-
-async function command(sql, user, channelId, message, broadcast) {
-  const [cmd, ...args] = message.content.trim().slice(1).split(/\s+/);
-  const reply = async (content) => {
-    const m = await botPost(sql, { channelId, content, kind: "bot", replyTo: message.id });
-    if (m) await broadcast(m);
-  };
-  const c = cmd.toLowerCase();
-  if (c === "level" || c === "rank" || c === "lvl") {
-    let who = { id: user.id, username: user.username };
-    if (args[0]) {
-      const name = args.join(" ").replace(/^@/, "").toLowerCase();
-      const [u] = await sql`SELECT u.id, u.username FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid
-                             WHERE (u.username_lower = ${name} OR lower(p.gamertag) = ${name}) AND NOT u.banned LIMIT 1`;
-      if (!u) return reply(`I couldn't find a member called "${args.join(" ").slice(0, 32)}".`);
-      who = u;
-    }
-    const i = await levelInfo(sql, who.id);
-    const bar = "▰".repeat(Math.round((i.into / i.next) * 10)).padEnd(10, "▱");
-    return reply(`**${who.username}** is chat level **${i.level}** (#${i.rank} on the server)\n${bar} ${i.into.toLocaleString("en-US")} / ${i.next.toLocaleString("en-US")} XP to level ${i.level + 1}`);
-  }
-  if (c === "top" || c === "leaderboard") {
-    const rows = await sql`SELECT u.username, x.xp FROM chat_xp x JOIN users u ON u.id = x.user_id WHERE NOT u.banned ORDER BY x.xp DESC LIMIT 10`;
-    if (!rows.length) return reply("Nobody has any chat XP yet. Start chatting!");
-    const medal = ["🥇", "🥈", "🥉"];
-    return reply("**Top chatters**\n" + rows.map((r, i) => `${medal[i] || `${i + 1}.`} ${r.username}: level ${levelFor(Number(r.xp)).level} (${Number(r.xp).toLocaleString("en-US")} XP)`).join("\n"));
-  }
-  if (c === "help" || c === "commands") {
-    return reply("**Commands**\n`!level` your chat level\n`!level name` someone else's level\n`!top` the top 10 chatters\n\nYou earn chat XP for chatting in any channel (once a minute).");
-  }
-  return reply(`I don't know \`!${c.slice(0, 20)}\`. Type \`!help\` to see what I can do.`);
 }
 
 // ---------- website activity (Friend Streaks) ----------

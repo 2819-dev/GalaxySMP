@@ -3,6 +3,7 @@ import { startChat, stopChat } from "/js/chat.js";
 import "/js/mod.js";
 import "/js/chat-polls.js";
 import "/js/chat-pictures.js";
+import "/js/chat-commands.js";
 import "/js/chat-threads.js";
 import "/js/chat-voice.js";
 import "/js/chat-engage.js";

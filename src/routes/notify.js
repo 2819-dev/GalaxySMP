@@ -23,6 +23,7 @@ export const KINDS = {
   auction: { name: "Auction House price alerts", hint: "When an item you're watching is listed at or below your price", default: true },
   trades: { name: "Trades", hint: "Trade offers to you, and answers to your offers", default: true },
   community: { name: "Suggestions & builds", hint: "Replies to your suggestions, and Build of the Week", default: true },
+  giveaways: { name: "Giveaways", hint: "New giveaways, and when you win one", default: true },
   summary: { name: "Daily summary", hint: "Each evening: who played today, your money and streak", default: true },
 };
 // How long the bell keeps notifications

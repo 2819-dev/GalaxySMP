@@ -778,7 +778,8 @@ function startEdit(m) {
   save.addEventListener("click", commit);
   cancel.addEventListener("click", close);
   box.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !matchMedia("(pointer: coarse)").matches) { e.preventDefault(); commit(); }
+    // Enter sends (on phones Enter is a new line, except for /commands, which are one line)
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing && (!matchMedia("(pointer: coarse)").matches || input.value.trimStart().startsWith("/"))) { e.preventDefault(); commit(); }
     if (e.key === "Escape") { e.preventDefault(); close(); $("composer-input").focus(); }
   });
   box.focus();
@@ -933,6 +934,7 @@ export const messageActionHooks = [];
 export const messageHeadHooks = [];  // e.g. the chat level next to a name, the BOT tag
 export const messageBodyHooks = [];  // e.g. polls draw themselves inside their message
 export const composerHooks = [];     // e.g. the Poll button, when the channel changes
+export const submitHooks = [];       // return true to take over what was typed (e.g. "/level" commands)
 
 function actionBtn(name, label, onClick) {
   const b = el("button", "icon-btn" + (name === "trash" ? " danger" : ""));
@@ -1175,7 +1177,7 @@ function renderComposer() {
   const muted = state.me.mutedUntil && new Date(state.me.mutedUntil) > new Date();
   if (!ch.canPost) {
     form.hidden = true;
-    note("Only staff can post in this channel. You can still react to messages.", true);
+    note(ch.slug === "giveaways" ? "Tap Enter on a giveaway to join it. Winners are picked at random when it ends." : "Only staff can post in this channel. You can still react to messages.", true);
   } else if (muted) {
     form.hidden = true;
     note(`You are muted until ${new Date(state.me.mutedUntil).toLocaleString()}.`, true);
@@ -1211,6 +1213,12 @@ function submit() {
   const text = input.value.trim();
   const picture = state.pendingImage;  // a picture added with the picture button (already uploaded)
   if (!text && !picture && !state.pendingAudio) return;
+  // "/level", "/roll 20"...: a command, not a message (chat-commands.js runs it)
+  if (text.startsWith("/") && !picture && !state.pendingAudio && submitHooks.some((hook) => hook(text))) {
+    input.value = "";
+    autosize();
+    return;
+  }
   if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
     note("You're offline. Your message will be ready to send when you reconnect.");
     return;
@@ -1545,7 +1553,8 @@ function wireUi() {
   setupMentions(input, () => [...state.members.values()].filter((m) => m.id !== state.me?.id).map((m) => ({ id: m.id, username: m.username, head: m.head, online: state.online.has(m.id) })),
     () => (state.me?.role?.power || 0) >= 50);
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !matchMedia("(pointer: coarse)").matches) {
+    // Enter sends (on phones Enter is a new line, except for /commands, which are one line)
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing && (!matchMedia("(pointer: coarse)").matches || input.value.trimStart().startsWith("/"))) {
       e.preventDefault();
       submit();
     }

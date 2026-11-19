@@ -353,6 +353,15 @@ const PENDING = [
     "CREATE INDEX IF NOT EXISTS dm_messages_audio_idx ON dm_messages (audio_id) WHERE audio_id IS NOT NULL",
     "INSERT INTO schema_migrations (version) VALUES ('0085_cleanup_indexes') ON CONFLICT DO NOTHING",
   ]],
+  ["0086_giveaways", [
+    "UPDATE channels SET position = position + 1 WHERE category_id = 1 AND position >= 4",
+    "INSERT INTO channels (slug, name, kind, topic, position, min_post_power, category_id) SELECT 'giveaways', 'Giveaways', 'text', 'Free prizes from the GalaxySMP team. Tap Enter to join a giveaway.', 4, 100, 1 WHERE NOT EXISTS (SELECT 1 FROM channels WHERE slug = 'giveaways')",
+    "CREATE TABLE IF NOT EXISTS giveaways (id bigserial PRIMARY KEY, title text NOT NULL, description text, prize_kind text NOT NULL CHECK (prize_kind IN ('money', 'keys', 'credits', 'item', 'text')), prize jsonb NOT NULL DEFAULT '{}', winners integer NOT NULL DEFAULT 1, needs_link boolean NOT NULL DEFAULT true, ends_at timestamptz NOT NULL, status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'ended', 'cancelled')), message_id bigint, created_by bigint REFERENCES users(id) ON DELETE SET NULL, created_at timestamptz NOT NULL DEFAULT now(), ended_at timestamptz)",
+    "CREATE INDEX IF NOT EXISTS giveaways_open_idx ON giveaways (ends_at) WHERE status = 'open'",
+    "CREATE TABLE IF NOT EXISTS giveaway_entries (giveaway_id bigint NOT NULL REFERENCES giveaways(id) ON DELETE CASCADE, user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at timestamptz NOT NULL DEFAULT now(), won boolean NOT NULL DEFAULT false, delivered boolean NOT NULL DEFAULT false, PRIMARY KEY (giveaway_id, user_id))",
+    "CREATE INDEX IF NOT EXISTS giveaway_entries_undelivered_idx ON giveaway_entries (giveaway_id) WHERE won AND NOT delivered",
+    "INSERT INTO schema_migrations (version) VALUES ('0086_giveaways') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

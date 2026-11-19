@@ -9,6 +9,7 @@ export const PERMS = [
   { key: "mention_everyone", group: "Community", label: "Mention @everyone and @here" },
   { key: "post_links", group: "Community", label: "Post links" },
   { key: "long_messages", group: "Community", label: "Longer messages (2,000 characters)" },
+  { key: "run_giveaways", group: "Community", label: "Run giveaways", hint: "Start giveaways in #Giveaways with /giveaway" },
   { key: "chat_polls", group: "Community", label: "Make polls in chat", hint: "Galaxy+ and Galaxy Pro+ can always" },
   { key: "chat_pictures", group: "Community", label: "Send pictures in chat", hint: "Galaxy+ and Galaxy Pro+ can always" },
   { key: "voice_rooms", group: "Community", label: "Create voice rooms" },

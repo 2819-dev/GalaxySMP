@@ -2337,8 +2337,8 @@ html[data-theme="light"] .dialog, html[data-theme="light"] dialog { background: 
 .composer-plus { flex: none; align-self: flex-end; }
 .composer-plus svg { width: 22px; height: 22px; }
 .composer-legacy { display: none !important; }
-.plus-menu { position: fixed; z-index: 70; width: 260px; padding: 10px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border-strong); box-shadow: 0 16px 40px rgba(0,0,0,.4); display: flex; flex-direction: column; gap: 10px; animation: pc-in .12s ease-out; }
-.plus-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.plus-menu { position: fixed; z-index: 70; width: 300px; max-width: calc(100vw - 16px); padding: 10px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border-strong); box-shadow: 0 16px 40px rgba(0,0,0,.4); display: flex; flex-direction: column; gap: 10px; animation: pc-in .12s ease-out; }
+.plus-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .plus-item { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px; border: 0; border-radius: 12px; background: none; color: var(--text); font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; }
 .plus-item:hover { background: var(--surface-2); }
 .plus-ic { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--surface-2); color: var(--accent-text); }
@@ -4745,3 +4745,38 @@ html[data-theme="light"] .mk-balance { color: rgb(160,110,8); }
 .pp-ls-item.locked { opacity: .45; border-left-color: var(--border); }
 .pp-ls-badge { margin: 8px 0 0; display: inline-block; padding: 5px 12px; border-radius: 999px; font-weight: 700; font-size: .85rem;
   background: linear-gradient(90deg, #58e1ff33, #d14dff33); }
+
+/* ---------- chat commands (+ › Commands, typing "/") ---------- */
+.cmd-private { display: flex; flex-direction: column; gap: 6px; padding: 0 12px; }
+.cmd-private:empty { display: none; }
+.cmd-card { border: 1px dashed var(--border-strong); border-radius: 12px; background: var(--surface-2); padding: 8px 10px; font-size: .92rem; }
+.cmd-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.cmd-card-head .btn { margin-left: auto; padding: 2px 8px; }
+.cmd-only { font-size: .75rem; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; }
+.cmd-card-body p { margin: 0 0 4px; }
+.cmd-suggest { margin: 0 12px 6px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); box-shadow: 0 10px 30px rgba(0,0,0,.3); overflow: hidden; }
+.cmd-suggest-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; width: 100%; padding: 8px 12px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.cmd-suggest-item:hover, .cmd-suggest-item:focus-visible { background: var(--surface-2); }
+.cmd-desc { flex-basis: 100%; font-size: .85rem; }
+.cmd-list { display: flex; flex-direction: column; gap: 10px; }
+.cmd-group-title { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); margin: 4px 0; }
+.cmd-group { display: flex; flex-direction: column; gap: 4px; }
+.cmd-item { display: grid; grid-template-columns: auto 1fr; gap: 0 10px; align-items: baseline; padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.cmd-item:hover { border-color: var(--accent, #6d8bff); }
+.cmd-item .cmd-who { grid-column: 2; }
+.cmd-used { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
+.cmd-used svg { width: 14px; height: 14px; }
+.cmd-used code { font-size: .8rem; }
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ---------- giveaways ---------- */
+.gw-card { border-radius: 14px; padding: 12px 14px; margin-top: 2px; background: linear-gradient(135deg, rgba(79,235,253,.12), rgba(138,92,255,.12)); border: 1px solid rgba(120,140,255,.4); }
+.gw-top { display: flex; align-items: center; gap: 8px; }
+.gw-badge { font-size: .75rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--accent-text); }
+.gw-status { margin-left: auto; font-size: .8rem; color: var(--text-3); }
+.gw-status.live { color: #3dd68c; font-weight: 700; }
+.gw-title { font-size: 1.15rem; font-weight: 800; margin: 4px 0 2px; }
+.gw-prize { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.gw-desc { margin-top: 6px; color: var(--text-2); }
+.gw-winners { margin-top: 8px; }
+.gw-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }

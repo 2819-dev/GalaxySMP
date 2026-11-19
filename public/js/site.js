@@ -99,6 +99,7 @@ const ICONS = {
   book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>',
   activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
   poll: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  slash: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M14 8l-4 8"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
   contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>',

@@ -628,6 +628,17 @@ On Jewish holidays, New Year and the first day of each season, a holiday block s
 
 Thanks for playing on GalaxySMP. If you ever find a bug, please report it to staff instead of using it.`,
   },
+  {
+    id: "2026-11-19-giveaways-commands",
+    title: "New: #Giveaways and chat commands",
+    body: `**#Giveaways.** The GalaxySMP team now runs giveaways in the new #Giveaways channel. Tap **Enter** on a giveaway to join. When it ends, winners are picked at random and get their prize automatically: in-game money, crate keys, Galaxy Credits or Store items. You'll get a notification if you win.
+
+**Chat commands.** Commands now start with **/** and work in any chat:
+- Tap **+** next to the message box, then **Commands**, to pick one from a list. No typing needed.
+- Or type **/** in the message box to see suggestions.
+
+Try **/level**, **/top**, **/stats**, **/online**, **/status**, **/coinflip**, **/roll** and **/8ball**. Some answers are just for you, like **/balance**. Type **/help** to see everything you can use.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).
