@@ -398,3 +398,28 @@ export async function playerCollection(request, env, ctx, url, params) {
     items: have.map((r) => ({ id: r.item_id, name: ITEM_NAMES.get(r.item_id), at: r.first_at })),
     missing: ((got) => ITEMS.filter((i) => !got.has(i.id)).map((i) => i.name))(new Set(have.map((r) => r.item_id))) });
 }
+
+// ---------- Loading screens collection ----------
+export const LOADING_SCREENS = ["grass", "diamond", "gold", "emerald", "netherite", "amethyst", "lava", "ice", "galaxy", "ender", "rainbow",
+  "rosh", "sukkot", "chanukah", "tubishvat", "purim", "pesach", "lagbaomer", "shavuot", "newyear", "spring", "summer", "autumn", "winter"];
+
+// POST /api/me/loading-screens { screen } (sent by the loading animation; signed-out visitors are ignored)
+export async function sawLoadingScreen(request, env) {
+  const user = await getUser(request, env);
+  if (!user) return json({ ok: true });
+  const { readJson } = await import("../lib/http.js");
+  const b = await readJson(request).catch(() => ({}));
+  if (!LOADING_SCREENS.includes(b.screen)) return json({ ok: true });
+  await getDb(env)`INSERT INTO user_loading_screens (user_id, screen) VALUES (${user.id}, ${b.screen}) ON CONFLICT DO NOTHING`;
+  return json({ ok: true });
+}
+
+// GET /api/players/:name/loading-screens
+export async function playerLoadingScreens(request, env, ctx, url, params) {
+  await requireUser(request, env);
+  const rows = await getDb(env)`
+    SELECT s.screen, s.first_at FROM user_loading_screens s JOIN users u ON u.id = s.user_id
+      LEFT JOIN players p ON p.uuid = u.mc_uuid
+     WHERE lower(coalesce(p.gamertag, u.username)) = lower(${String(params.name).replace(/^\./, "").slice(0, 32)}) OR lower(u.username) = lower(${String(params.name).slice(0, 32)})`;
+  return json({ ok: true, seen: Object.fromEntries(rows.map((r) => [r.screen, r.first_at])) });
+}

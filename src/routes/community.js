@@ -464,7 +464,7 @@ export async function marketOrderAction(request, env) {
 export async function recordPurchase(env, msg) {
   const x = (v) => (/^\d{1,20}$/.test(String(v ?? "")) ? String(v) : null);
   const seller = x(msg.sellerXuid), buyer = x(msg.buyerXuid);
-  const kind = ["ah", "shop", "order"].includes(msg.kind) ? msg.kind : null;
+  const kind = ["ah", "shop", "order", "plot"].includes(msg.kind) ? msg.kind : null;
   if (!seller || !buyer || !kind || seller === buyer) return;
   await getDb(env)`INSERT INTO market_purchases (kind, ref, seller_xuid, seller_name, buyer_xuid, label, amount, price)
     VALUES (${kind}, ${String(msg.ref || "").slice(0, 60)}, ${seller}, ${String(msg.sellerName || "").slice(0, 32) || null}, ${buyer},
@@ -501,4 +501,26 @@ export async function marketRate(request, env) {
                            WHERE id = ${Number(b.id) || 0} AND buyer_xuid = ${String(p.xuid)} AND rating IS NULL RETURNING seller_name`;
   if (!row) throw new HttpError(409, "You can only rate your own purchases, once each.");
   return json({ ok: true, message: `Thanks! Your rating for ${row.seller_name || "the seller"} is saved.` });
+}
+
+// ---------- Plots for sale or rent (Marketplace > Plots) ----------
+export async function marketPlots(request, env) {
+  const user = await requireUser(request, env);
+  const sql = getDb(env);
+  const [p] = await sql`SELECT p.xuid FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${user.id}`;
+  const data = await voiceStub(env).fetch("https://voice/internal/plots").then((r) => r.json()).catch(() => ({ plots: [] }));
+  const mine = p ? String(p.xuid) : null;
+  return json({ ok: true, updated: data.at, plots: (data.plots || []).map(({ ownerXuid, ...x }) => ({ ...x, mine: Boolean(mine && ownerXuid === mine) })) });
+}
+
+// POST /api/market/plots { op: "buy" | "rent", id, days }
+export async function marketPlotAction(request, env) {
+  const who = await marketPlayer(request, env);
+  await rateLimit(env, "AUTH_LIMITER", `mplot:${who.user.id}`);
+  const b = await readJson(request);
+  if (!["buy", "rent"].includes(b.op)) throw new HttpError(400, "Unknown action.");
+  const a = await voiceStub(env).fetch("https://voice/internal/ask", { method: "POST",
+    body: JSON.stringify({ type: "plots_market", op: b.op, id: Number(b.id) || 0, days: Math.max(1, Math.min(30, Math.round(Number(b.days) || 1))), xuid: who.xuid }) })
+    .then((r) => r.json()).catch(() => ({ ok: false, message: "The server is offline right now." }));
+  return answer(a);
 }

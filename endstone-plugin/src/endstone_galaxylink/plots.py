@@ -455,9 +455,20 @@ class Plots:
         return server.dispatch_command(server.command_sender, f"execute in {dim_cmd(plot['dim'])} run {line}")
 
     def tiles(self, plot):
-        for x in range(plot["x1"], plot["x2"] + 1, TILE):
-            for z in range(plot["z1"], plot["z2"] + 1, TILE):
-                yield f"gsmp_plot_{plot['id']}_{x - plot['x1']}_{z - plot['z1']}", x, z, min(x + TILE - 1, plot["x2"]), min(z + TILE - 1, plot["z2"])
+        """The saved pieces of the plot's starting land. Upgraded plots keep their original pieces (named from the
+        original corner) plus the strips added by each upgrade (in plot["extra_tiles"])."""
+        o = plot.get("orig") or plot
+        for x in range(o["x1"], o["x2"] + 1, TILE):
+            for z in range(o["z1"], o["z2"] + 1, TILE):
+                yield f"gsmp_plot_{plot['id']}_{x - o['x1']}_{z - o['z1']}", x, z, min(x + TILE - 1, o["x2"]), min(z + TILE - 1, o["z2"])
+
+    def capture_edges(self, plot):
+        """Remembers the blocks on the plot's edge (they're painted white while it's free, and put back when claimed)."""
+        edges = []
+        for b in self.edge_blocks(plot):
+            d = b.data
+            edges.append((d.type, dict(d.block_states)))
+        plot["edges"] = edges
 
     def _keep_loaded(self, plot, on):
         name = f"gsmp_plot_{plot['id']}"
@@ -518,7 +529,11 @@ class Plots:
         yield 60
         for name, ax, az, bx, bz in self.tiles(plot):
             self.cmd(f"structure load {name} {ax} {plot['bottom']} {az} 0_degrees none false true", plot)
+        for t in plot.get("extra_tiles") or []:   # strips added by plot upgrades
+            self.cmd(f"structure load {t['name']} {t['x']} {t['y']} {t['z']} 0_degrees none false true", plot)
         yield 10
+        if plot.get("orig"):
+            self.capture_edges(plot)   # the edge moved when the plot was upgraded
         if then_paint and plot["kind"] == "plot":
             self.paint_edge(plot)
         plot["status"] = "ready"
@@ -530,6 +545,14 @@ class Plots:
         plot = self.plots[pid]
         self._keep_loaded(plot, True)
         yield 60
+        if plot.get("orig"):   # upgraded: the whole plot as it is now becomes the new starting land
+            for t in plot.get("extra_tiles") or []:
+                self.cmd(f"structure delete {t['name']}", plot)
+            for name, *_ in self.tiles(plot):
+                self.cmd(f"structure delete {name}", plot)
+            plot.pop("orig", None)
+            plot["extra_tiles"] = []
+            self.capture_edges(plot)
         if plot["kind"] == "plot":
             self.paint_edge(plot)
         yield 2
@@ -551,6 +574,8 @@ class Plots:
             self.restore_edge(plot)
         for name, *_ in self.tiles(plot):
             self.cmd(f"structure delete {name}", plot)
+        for t in plot.get("extra_tiles") or []:
+            self.cmd(f"structure delete {t['name']}", plot)
         self._keep_loaded(plot, False)
         self.plots.pop(pid, None)
         self.db.execute("DELETE FROM plots WHERE id = ?", (pid,))
@@ -655,6 +680,10 @@ class Plots:
         if plot.get("shop"):
             form.add_button("§6§lShop name and sign§r\n§8Name your shop, put its sign where you stand", icon="textures/ui/store_home_icon",
                             on_click=lambda p: self.shop_sign_form(p, pid))
+        pp = getattr(self.plugin, "plotplus", None)
+        if pp is not None:
+            form.add_button("§lUpgrade plot§r\n§8Make it wider, longer or taller", icon="textures/ui/up_arrow", on_click=lambda p: pp.upgrade_menu(p, pid))
+            form.add_button("§lSell or rent§r\n§8List it in the Marketplace", icon="textures/ui/MCoin", on_click=lambda p: pp.listing_menu(p, pid))
         form.add_button("§c§lUnclaim plot§r\n§8Deletes everything and frees the plot", icon="textures/ui/trash",
                         on_click=lambda p: self.confirm_unclaim(p, pid))
         player.send_form(form)
@@ -787,8 +816,11 @@ class Plots:
             plot.pop("shop_name", None)
             plot.pop("sign", None)
         # "resetting" right away, so nobody can claim it before the reset (or the new snapshot) has finished.
-        plot.update({"owner": None, "owner_name": None, "members": {}, "status": "resetting", "public": False})
+        plot.update({"owner": None, "owner_name": None, "members": {}, "status": "resetting", "public": False, "listing": None, "rental": None})
         self.save(pid)
+        pp = getattr(self.plugin, "plotplus", None)
+        if pp is not None:
+            pp.push()
         if keep:
             self.run(self._job_keep(pid, player.unique_id))
             player.send_message(f"§a{self.label(plot)} unclaimed. §7The builds stay and it will be available to claim in a moment.")
@@ -973,6 +1005,8 @@ class Plots:
                 player.send_message("§aHere's your Plot Manager.")
         elif what in ("public", "private", "hidden", "nolocation", "hidelocation", "unlisted"):
             self.set_public_cmd(player, "public" if what == "public" else "hidden" if what in ("private", "hidden") else "location")
+        elif first in ("upgrade", "sell", "rent", "unlist", "upgradeprice") and getattr(self.plugin, "plotplus", None):
+            self.plugin.plotplus.command(player, first, rest)
         elif what == "list" and player.is_op:
             lines = [f"§f#{p['id']} {self.label(p)} §7{p['kind']} ({p['x1']},{p['z1']})-({p['x2']},{p['z2']}) "
                      f"{p.get('owner_name') or 'unclaimed'}" for p in self.plots.values()]

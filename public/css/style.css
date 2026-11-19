@@ -4736,3 +4736,12 @@ html[data-theme="light"] .mk-balance { color: rgb(160,110,8); }
 .todo-main b { overflow-wrap: anywhere; }
 .todo-notes { color: var(--text-2); font-size: .86rem; overflow-wrap: anywhere; white-space: pre-wrap; }
 .todo-meta { color: var(--text-3); font-size: .78rem; }
+
+/* Profile: loading screens */
+.pp-ls { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; margin-top: 10px; }
+.pp-ls-item { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 12px; background: var(--surface-2); border-left: 3px solid var(--c); }
+.pp-ls-item b { font-size: .86rem; }
+.pp-ls-item span { font-size: .72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.pp-ls-item.locked { opacity: .45; border-left-color: var(--border); }
+.pp-ls-badge { margin: 8px 0 0; display: inline-block; padding: 5px 12px; border-radius: 999px; font-weight: 700; font-size: .85rem;
+  background: linear-gradient(90deg, #58e1ff33, #d14dff33); }

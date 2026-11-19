@@ -27,8 +27,8 @@ class Visits:
                 p = self.plugin.plots.plots.get(int(ref))
             except (TypeError, ValueError):
                 p = None
-        if p is None or p.get("status") not in (None, "ready") or not (p.get("public") or p.get("shop") or p.get("kind") == "area"):
-            return None   # only places the map shows everyone: public plots, shops and areas
+        if p is None or p.get("status") not in (None, "ready") or not (p.get("public") or p.get("shop") or p.get("kind") == "area" or p.get("listing")):
+            return None   # public plots, shops, areas, and plots for sale or rent
         return (self.plugin.plots.label(p), None, p)
 
     def go(self, player, kind, ref):

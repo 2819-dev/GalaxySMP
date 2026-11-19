@@ -247,6 +247,11 @@
    "example": "/support"
   },
   {
+   "command": "/plot upgrade · /plot sell · /plot rent",
+   "description": "Stand in your plot (or use the Plot Manager). Upgrade it (wider, longer or taller), sell it, or rent it out per day. Listings show in the Marketplace on galaxymc.us.",
+   "example": "/plot rent 2k 7"
+  },
+  {
    "command": "/parkour",
    "description": "Parkour courses: see the record times and your best, and teleport to a course's start. Step on the start plate to begin.",
    "example": "/parkour"

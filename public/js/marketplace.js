@@ -10,7 +10,7 @@ import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 import { money, moneyExact } from "/js/money.js";
 import { iconEl } from "/js/site.js";
 
-const TABS = [["discover", "Discover"], ["auction", "Auction House"], ["shops", "Shops"], ["trades", "Trades"], ["jobs", "Jobs"]];
+const TABS = [["discover", "Discover"], ["auction", "Auction House"], ["shops", "Shops"], ["plots", "Plots"], ["trades", "Trades"], ["jobs", "Jobs"]];
 const TILE_COLORS = ["#2457eb", "#8a4fd8", "#16a36b", "#d4532f", "#c48a12", "#1d8fb3", "#b8336a"];
 const tileColor = (id) => TILE_COLORS[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % TILE_COLORS.length];
 const eachOf = (l) => l.price / Math.max(1, l.amount);
@@ -32,13 +32,13 @@ function tile(id, label, big) {
 const pill = (text, onClick, disabled) => h("button", { class: "mk-pill", type: "button", text, disabled, onclick: (e) => { e.stopPropagation(); onClick(); } });
 
 // ---------- the data (loaded once, refreshed every 30 seconds) ----------
-const data = { ah: null, shops: null, jobs: null, trades: null, alerts: null, orders: null, ratings: null };
+const data = { ah: null, shops: null, jobs: null, trades: null, alerts: null, orders: null, ratings: null, plots: null };
 async function loadAll() {
   const [ah, shops, jobs, trades, orders] = await Promise.all([
     getJson("/api/community/auction").catch(() => null), getJson("/api/shops").catch(() => null),
     getJson("/api/jobs").catch(() => null), getJson("/api/trades").catch(() => null), getJson("/api/market/orders").catch(() => null)]);
-  const ratings = await getJson("/api/market/ratings").catch(() => null);
-  Object.assign(data, { ah, shops, jobs, trades, orders, ratings });
+  const [ratings, plots] = await Promise.all([getJson("/api/market/ratings").catch(() => null), getJson("/api/market/plots").catch(() => null)]);
+  Object.assign(data, { ah, shops, jobs, trades, orders, ratings, plots });
 }
 
 // ---------- Seller ratings (only buyers rate, once per purchase) and storefronts ----------
@@ -385,7 +385,7 @@ export function renderMarketplace(root, helpers) {
     } else if (st.tab === "jobs") {
       import("/js/community-jobs.js").then((m) => m.renderJobs(body, { toast, setTimer: (t) => { jobsTimer = t; } }));
     } else if (st.q && st.tab === "discover") body.append(results());
-    else body.append(({ discover, auction: auctionTab, shops: shopsTab })[st.tab]());
+    else body.append(({ discover, auction: auctionTab, shops: shopsTab, plots: plotsTab })[st.tab]());
   }
 
   // Search results across the Auction House and the shops
@@ -480,6 +480,52 @@ export function renderMarketplace(root, helpers) {
     box.append(h("div", { class: "mk-toolbar" }, sortSeg),
       h("p", { class: "text-3 small mk-lead", text: data.ah?.updated ? `${list.length} item${list.length === 1 ? "" : "s"} · sell yours in game with /ah sell <price>` : "Waiting for the Minecraft server to send its listings." }),
       list.length ? h("div", { class: "mk-list" }, list.map(ahRow)) : h("div", { class: "panel empty", text: q ? "Nothing matches that." : "Nothing is for sale right now." }));
+    return box;
+  }
+
+  // ---------- Plots for sale or rent ----------
+  function plotSheet(pl) {
+    const rent = pl.type === "rent";
+    const days = h("input", { class: "input", id: "mk-plot-days", type: "number", min: 1, max: pl.maxDays, value: Math.min(7, pl.maxDays), inputmode: "numeric" });
+    const total = h("p", { class: "sh-total" });
+    const upd = () => { const n = Math.max(1, Math.min(pl.maxDays, Math.floor(Number(days.value) || 1))); total.textContent = `${n} day${n === 1 ? "" : "s"}: ${moneyExact(n * pl.price)}`; };
+    days.addEventListener("input", upd); upd();
+    const busy = pl.rentedUntil && pl.rentedUntil * 1000 > Date.now();
+    openDialog({
+      title: pl.label,
+      body: h("div", { class: "form mk-sheet" },
+        h("div", { class: "mk-sheet-top" }, tile(`plot${pl.id}`, pl.label, true), h("div", {}, h("b", { text: pl.label }),
+          h("span", { class: "text-3 small", text: `${pl.shop ? "Shop plot" : "Plot"} by ${pl.owner}` }))),
+        h("div", { class: "mk-facts" }, fact(rent ? "Per day" : "Price", money(pl.price)), fact("Size", `${pl.w} x ${pl.l}`), fact("Height", `${pl.h}`),
+          fact("Where", `${pl.dim} ${pl.x}, ${pl.z}`)),
+        rent ? (busy ? h("p", { class: "note small", style: "margin:0", text: `Someone is renting it until ${new Date(pl.rentedUntil * 1000).toLocaleString()}.` })
+          : h("div", {}, field(`How many days? (up to ${pl.maxDays})`, days), total)) : null,
+        h("p", { class: "text-3 small", style: "margin:0", text: rent
+          ? "You can build there as a Builder until your days run out. Then it goes back to the owner, builds and all. You need to be online in Minecraft."
+          : "It becomes yours: you get the Plot Manager and the owner's members are removed. You need to be online in Minecraft, with room for another plot." }),
+        h("button", { class: "ah-hist", type: "button", text: "Visit in game", onclick: () => import("/js/map-plot.js").then((m) => m.visit("plot", pl.id)) })),
+      actions: [{ label: "Close" }, ...(pl.mine || busy ? [] : [{
+        label: rent ? "Rent it" : `Buy for ${money(pl.price)}`, kind: "primary",
+        onClick: async () => {
+          const r = await postJson("/api/market/plots", { op: rent ? "rent" : "buy", id: pl.id, days: Number(days.value) || 1 });
+          toast(r.message || "Done."); refresh();
+        },
+      }])],
+    });
+  }
+  function plotsTab() {
+    const box = h("div", { class: "mk-tab" });
+    const q = st.q.toLowerCase();
+    const list = (data.plots?.plots || []).filter((p) => !q || `${p.label} ${p.owner}`.toLowerCase().includes(q));
+    box.append(h("p", { class: "text-3 small mk-lead", text: "Plots players are selling or renting out. List your own from the Plot Manager in game (Sell or rent), or with /plot sell <price> and /plot rent <price per day>." }),
+      list.length ? h("div", { class: "mk-list" }, list.map((p) => {
+        const busy = p.rentedUntil && p.rentedUntil * 1000 > Date.now();
+        return row({ id: `plot${p.id}`, label: p.label, title: p.label,
+          sub: `${p.shop ? "Shop plot" : "Plot"} · ${p.w} x ${p.l} · ${withRating(p.owner)}`,
+          meta: h("span", { class: `mk-stock${busy ? " none" : ""}`, text: p.type === "rent" ? (busy ? "Rented right now" : `For rent · up to ${p.maxDays} days`) : "For sale" }),
+          price: p.type === "rent" ? `${money(p.price)}/day` : money(p.price), buyText: p.mine ? "Yours" : p.type === "rent" ? "Rent" : "Buy",
+          off: p.mine || busy, onOpen: () => plotSheet(p) });
+      })) : h("div", { class: "panel empty", text: q ? "No plots match that." : "No plots are for sale or rent right now." }));
     return box;
   }
 

@@ -264,6 +264,9 @@ export class VoiceHub extends DurableObject {
     if (url.pathname === "/internal/shopchests") {
       return Response.json((await this.ctx.storage.get("shopchests")) || { shops: [], at: null });
     }
+    if (url.pathname === "/internal/plots") {
+      return Response.json((await this.ctx.storage.get("plot_listings")) || { plots: [], at: null });
+    }
     if (url.pathname === "/internal/orders") {
       return Response.json((await this.ctx.storage.get("buy_orders")) || { orders: [], at: null });
     }
@@ -523,6 +526,13 @@ export class VoiceHub extends DurableObject {
     }
     if (msg.type === "parkour_courses" || msg.type === "parkour_time") {  // parkour courses and best times (Leaderboards > Parkour)
       return import("../routes/progress.js").then((m) => m.parkourFromGame(this.env, msg)).catch((e) => console.error("parkour failed", e));
+    }
+    if (msg.type === "plot_listings") {  // plots for sale or rent (Marketplace > Plots)
+      const plots = (Array.isArray(msg.plots) ? msg.plots : []).slice(0, 300).map((p) => ({
+        id: Number(p.id) || 0, label: String(p.label || "").slice(0, 40), owner: String(p.owner || "").slice(0, 32), ownerXuid: String(p.ownerXuid || "").slice(0, 20),
+        shop: Boolean(p.shop), dim: String(p.dim || "").slice(0, 20), x: Number(p.x) || 0, z: Number(p.z) || 0, w: Number(p.w) || 0, l: Number(p.l) || 0, h: Number(p.h) || 0,
+        type: p.type === "rent" ? "rent" : "sell", price: Number(p.price) || 0, maxDays: Number(p.maxDays) || 1, rentedUntil: Number(p.rentedUntil) || null }));
+      return this.ctx.storage.put("plot_listings", { plots, at: Date.now() });
     }
     if (msg.type === "collection") {  // new item types a player collected (Collection book on profiles)
       return import("../routes/progress.js").then((m) => m.collectionFromGame(this.env, msg)).catch((e) => console.error("collection save failed", e));

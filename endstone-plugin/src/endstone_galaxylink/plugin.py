@@ -47,7 +47,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.65.0"
+VERSION = "2.66.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -234,6 +234,8 @@ class GalaxyLink(Plugin):
         self.support = Support(self)  # /support: ask staff for help (posts in #Staff Chat)
         from endstone_galaxylink.mapitem import GalaxyMap
         self.galaxymap = GalaxyMap(self)  # /map: the server map as a map item
+        from endstone_galaxylink.plotplus import PlotPlus
+        self.plotplus = PlotPlus(self)  # sell, rent and upgrade plots
         from endstone_galaxylink.visits import Visits
         self.visits = Visits(self)  # Visit buttons on galaxymc.us/map, teleport requests from the Friends list
         from endstone_galaxylink.collection import Collection
@@ -305,6 +307,7 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self._watched("setting up the map item", self.galaxymap.setup), delay=200)
         self.server.scheduler.run_task(self, self._watched("checking parkour plates", self.parkour.tick), delay=40, period=4)
         self.server.scheduler.run_task(self, self._watched("item collection", self.collection.scan), delay=600, period=1200)
+        self.server.scheduler.run_task(self, self._watched("plot rentals", self.plotplus.tick), delay=1200, period=1200)
         self.server.scheduler.run_task(self, self.elevators.check_tools, delay=1200, period=1200)
         self.server.scheduler.run_task(self, self.jobs.tick, delay=100, period=100)
         self.server.scheduler.run_task(self, self.servercontrol.tick, delay=20, period=20)

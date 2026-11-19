@@ -158,7 +158,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.65.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.66.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -225,6 +225,8 @@ class VoiceLink:
             self._on_main(lambda: self.plugin.shopchests.from_website(msg))
         elif msg.get("type") == "ah_buy":
             self._on_main(lambda: self.plugin.auction.from_website(msg))
+        elif msg.get("type") == "plots_market":  # buy or rent a plot in the Marketplace
+            self._on_main(lambda: self.plugin.plotplus.from_website(msg))
         elif msg.get("type") == "visit":  # Visit on galaxymc.us/map (a public plot or a warp)
             self._on_main(lambda: self.plugin.visits.from_website(msg))
         elif msg.get("type") == "web_tpa":  # Teleport request from the Friends list on the website
@@ -466,6 +468,8 @@ class VoiceLink:
                 self.plugin.parkour.push()
             if getattr(self.plugin, "collection", None):
                 self.plugin.collection.resend(self)
+            if getattr(self.plugin, "plotplus", None):
+                self.plugin.plotplus.push()
         except Exception as e:
             self.plugin.logger.warning(f"Couldn't send Auction House listings to the website: {e}")
         self.plugin.shopchests.push()

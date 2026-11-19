@@ -602,6 +602,20 @@ Player Shops, Trades and #Jobs have moved here, and your old links still work.`,
 
 **Collection book.** Your profile now shows every kind of item you've had in your inventory, out of every item in the game, with a list of what's still missing. There are new achievements at 100, 250 and 500 items.`,
   },
+  {
+    id: "2026-11-19-loading-screens-plots",
+    title: "New loading screens, and sell, rent or upgrade your plot",
+    body: `**More loading screens.** The block that breaks into the GalaxySMP logo has new looks to find:
+- **Rare** (about 1 in 333 each): Diamond, Gold, Emerald, Netherite, Amethyst, Lava, Ice
+- **Super rare** (about 1 in 667 each): Galaxy, Ender
+- **Mythic** (1 in 1,000): Rainbow
+
+On Jewish holidays, New Year and the first day of each season, a holiday block shows up instead. Every screen you see is saved to your profile under **Loading screens**.
+
+**Sell or rent your plot.** In the Plot Manager tap **Sell or rent**, or type **/plot sell <price>** or **/plot rent <price per day> <days>**. Listings appear in the new **Plots** tab of #Marketplace. Renters can build until their days run out, then the plot is all yours again.
+
+**Upgrade your plot.** In the Plot Manager tap **Upgrade plot** to make it 8 blocks wider, 8 blocks longer or 16 blocks taller. The first upgrade costs $5,000 and each one after that costs double.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

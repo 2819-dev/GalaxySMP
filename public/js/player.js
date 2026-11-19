@@ -202,6 +202,8 @@ async function load() {
   loadCharts(p.name, charts);
   const collection = section("Collection book", h("p", { class: "text-3 small", style: "margin:0", text: "Loading…" }));
   loadCollection(p.name, collection, social?.isMe);
+  const screens = section("Loading screens", h("p", { class: "text-3 small", style: "margin:0", text: "Loading…" }));
+  loadScreens(p.name, screens, social?.isMe);
 
   // ---- achievements (earned in game) ----
   const total = p.achievements.length;
@@ -256,7 +258,7 @@ async function load() {
       social.isMe ? h("p", { class: "text-3 small", style: "margin:10px 0 0", text: social.wishlistHidden ? "Only you can see your wishlist. Change this in Account settings." : "Everyone signed in can see this. You can hide it in Account settings." }) : null);
   }
 
-  box.replaceChildren(...[hero, showcase].filter(Boolean), h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, streakBox, stats, bedwars, charts), h("div", { class: "pp-col" }, wishlist, achievements, collection)));
+  box.replaceChildren(...[hero, showcase].filter(Boolean), h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, streakBox, stats, bedwars, charts), h("div", { class: "pp-col" }, wishlist, achievements, collection, screens)));
 }
 
 // Every kind of item they've had in their inventory, out of all the items in the game
@@ -583,4 +585,34 @@ async function bwRecap(id) {
       m.feed?.length ? h("ul", { class: "bw-feed" }, ...m.feed.map((f) => h("li", { text: `${mmss(f.t)}  ${f.text}` }))) : null),
     actions: [{ label: "Close", kind: "primary" }],
   });
+}
+
+// ---------- Loading screens they've seen (the block that breaks into the logo when the site loads) ----------
+const SCREENS = [
+  ["grass", "Grass", "Common", "#6cbf43"],
+  ["diamond", "Diamond", "Rare", "#7ef3ff"], ["gold", "Gold", "Rare", "#ffd34d"], ["emerald", "Emerald", "Rare", "#4dff8a"],
+  ["netherite", "Netherite", "Rare", "#c77dff"], ["amethyst", "Amethyst", "Rare", "#d49cff"], ["lava", "Lava", "Rare", "#ff8a3d"], ["ice", "Ice", "Rare", "#a9e6ff"],
+  ["galaxy", "Galaxy", "Super rare", "#d9a8ff"], ["ender", "Ender", "Super rare", "#5df5c9"],
+  ["rainbow", "Rainbow", "Mythic", "#ffffff"],
+  ["rosh", "Rosh Hashanah", "Holiday", "#ff6b6b"], ["sukkot", "Sukkot", "Holiday", "#a6e36b"], ["chanukah", "Chanukah", "Holiday", "#7fb8ff"],
+  ["tubishvat", "Tu BiShvat", "Holiday", "#ffb3d1"], ["purim", "Purim", "Holiday", "#ff7ad9"], ["pesach", "Pesach", "Holiday", "#ffd9a0"],
+  ["lagbaomer", "Lag BaOmer", "Holiday", "#ffa04d"], ["shavuot", "Shavuot", "Holiday", "#f5d76b"], ["newyear", "New Year", "Holiday", "#ffe066"],
+  ["spring", "Spring", "Season", "#ff9cc4"], ["summer", "Summer", "Season", "#ffd23f"], ["autumn", "Autumn", "Season", "#ff9a3d"], ["winter", "Winter", "Season", "#cfeaff"],
+];
+const ODDS = { Common: "Most of the time", Rare: "1 in 333", "Super rare": "1 in 667", Mythic: "1 in 1,000", Holiday: "On that holiday", Season: "First day of the season" };
+async function loadScreens(name, box, isMe) {
+  let d;
+  try { d = await (await fetch(`/api/players/${encodeURIComponent(name)}/loading-screens`)).json(); } catch { d = null; }
+  if (!d?.ok) { box.remove(); return; }
+  const seen = d.seen || {};
+  const n = SCREENS.filter(([k]) => seen[k]).length;
+  const spotter = ["galaxy", "ender", "rainbow"].filter((k) => seen[k]);
+  box.replaceChildren(h("h2", { class: "pp-h2", text: "Loading screens" }),
+    h("div", { class: "pp-progress" }, h("div", { class: "pp-progress-bar" }, h("span", { style: `width:${Math.round((n / SCREENS.length) * 100)}%` })),
+      h("span", { class: "text-3 small", text: `${n} of ${SCREENS.length} seen` })),
+    spotter.length ? h("p", { class: "pp-ls-badge", text: seen.rainbow ? "🌈 Mythic Spotter: saw the Rainbow screen" : "✨ Super Rare Spotter" }) : null,
+    h("div", { class: "pp-ls" }, SCREENS.map(([k, label, tier, color]) => h("div", { class: `pp-ls-item${seen[k] ? "" : " locked"}`, style: `--c:${color}`,
+      title: seen[k] ? `First seen ${new Date(seen[k]).toLocaleDateString()} · ${ODDS[tier]}` : ODDS[tier] },
+      h("b", { text: seen[k] || tier === "Common" || tier === "Holiday" || tier === "Season" ? label : "???" }), h("span", { text: tier })))),
+    h("p", { class: "text-3 small", style: "margin:10px 0 0", text: isMe ? "A random block breaks into the GalaxySMP logo when the site loads. Rare ones are… rare. Each one you see is saved here." : "The loading screens they've seen on the website." }));
 }
