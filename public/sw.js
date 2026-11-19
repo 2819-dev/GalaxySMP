@@ -26,7 +26,8 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  let url = new URL(event.notification.data?.url || "/", self.location.origin);
+  url = url.origin === self.location.origin ? url.href : self.location.origin + "/";   // only ever open this site
   event.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const w of wins) {

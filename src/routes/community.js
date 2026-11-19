@@ -520,7 +520,8 @@ export async function marketPlotAction(request, env) {
   const b = await readJson(request);
   if (!["buy", "rent"].includes(b.op)) throw new HttpError(400, "Unknown action.");
   const a = await voiceStub(env).fetch("https://voice/internal/ask", { method: "POST",
-    body: JSON.stringify({ type: "plots_market", op: b.op, id: Number(b.id) || 0, days: Math.max(1, Math.min(30, Math.round(Number(b.days) || 1))), xuid: who.xuid }) })
+    body: JSON.stringify({ type: "plots_market", op: b.op, id: Number(b.id) || 0, days: Math.max(1, Math.min(30, Math.round(Number(b.days) || 1))), xuid: who.xuid,
+      price: Number.isInteger(Number(b.price)) ? Number(b.price) : null }) })
     .then((r) => r.json()).catch(() => ({ ok: false, message: "The server is offline right now." }));
   return answer(a);
 }

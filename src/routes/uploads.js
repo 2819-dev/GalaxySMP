@@ -50,7 +50,7 @@ export async function uploadRights(sql, user) {
 function serve(row, cache = "private, max-age=604800, immutable") {
   if (!row) return new Response("Not found", { status: 404 });
   const bytes = Uint8Array.from(atob(row.b64.replace(/\s+/g, "")), (c) => c.charCodeAt(0));
-  return new Response(bytes, { headers: { "Content-Type": row.mime, "Cache-Control": cache, "X-Content-Type-Options": "nosniff" } });
+  return new Response(bytes, { headers: { "Content-Type": row.mime, "Cache-Control": cache, "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox", "Cross-Origin-Resource-Policy": "same-origin" } });
 }
 
 // GET /api/uploads/rights

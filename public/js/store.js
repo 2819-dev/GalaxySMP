@@ -50,13 +50,18 @@ const priceAfter = (p, price) => {
 
 // Coming from "Gift" in the community (+ menu): the Store opens with that member picked as the gift receiver.
 const giftParams = new URLSearchParams(location.search);
-const presetGift = giftParams.get("gift") && giftParams.get("giftName") ? { id: Number(giftParams.get("gift")), username: giftParams.get("giftName") } : null;
-if (presetGift) {
+let presetGift = giftParams.get("gift") && giftParams.get("giftName") ? { id: Number(giftParams.get("gift")), username: giftParams.get("giftName") } : null;
+// The name in a gift link is only shown once the website confirms it belongs to that member (a link can't fake who gets it)
+const giftChecked = presetGift ? fetch(`/api/store/members?q=${encodeURIComponent(presetGift.username.slice(0, 32))}`, { credentials: "same-origin" })
+  .then((r) => r.json()).then((d) => { const m = (d.members || []).find((x) => x.id === presetGift.id); presetGift = m ? { ...presetGift, username: m.username } : null; })
+  .catch(() => { presetGift = null; }) : Promise.resolve();
+if (presetGift) giftChecked.then(() => {
+  if (!presetGift) return;
   setTimeout(() => {
     const note = h("div", { class: "panel gift-note" }, iconEl("gift"), h("span", {}, "Pick something to gift to ", h("b", { text: presetGift.username }), ". It goes to their Minecraft account."));
     (document.getElementById("shop") || document.querySelector("main .container"))?.prepend(note);
   }, 0);
-}
+});
 
 // ---------- Checkout window ----------
 function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
@@ -108,7 +113,7 @@ function checkout({ id, option, name, price, icon, cat, tags, isPlan }) {
   });
   giftBox.append(giftSearch, giftPicked, giftList, h("p", { class: "text-3 small", style: "margin:4px 0 0", text: "They get it on their Minecraft account. You pay." }));
   giftToggle.addEventListener("change", () => { giftBox.hidden = !giftToggle.checked; if (!giftToggle.checked) giftTo = null; else giftSearch.focus(); });
-  if (presetGift) { giftToggle.checked = true; giftBox.hidden = false; pickGift(presetGift); }
+  giftChecked.then(() => { if (presetGift && !giftTo) { giftToggle.checked = true; giftBox.hidden = false; pickGift(presetGift); } });
 
   const draw = () => {
     const final = applied ? applied.final : price;

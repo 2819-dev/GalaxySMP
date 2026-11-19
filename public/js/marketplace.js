@@ -507,7 +507,7 @@ export function renderMarketplace(root, helpers) {
       actions: [{ label: "Close" }, ...(pl.mine || busy ? [] : [{
         label: rent ? "Rent it" : `Buy for ${money(pl.price)}`, kind: "primary",
         onClick: async () => {
-          const r = await postJson("/api/market/plots", { op: rent ? "rent" : "buy", id: pl.id, days: Number(days.value) || 1 });
+          const r = await postJson("/api/market/plots", { op: rent ? "rent" : "buy", id: pl.id, days: Number(days.value) || 1, price: pl.price });
           toast(r.message || "Done."); refresh();
         },
       }])],

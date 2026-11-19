@@ -106,9 +106,14 @@ export async function plotAction(request, env, ctx, url, params) {
 
 // GET /api/map/plot-photo/:id
 export async function plotPhoto(request, env, ctx, url, params) {
-  await requireUser(request, env);
-  const [img] = await getDb(env)`SELECT mime, encode(data, 'base64') AS b64 FROM plot_photos WHERE id = ${Number(params.id) || 0}`;
+  const user = await requireUser(request, env);
+  const sql = getDb(env);
+  const [img] = await sql`SELECT plot_id, mime, encode(data, 'base64') AS b64 FROM plot_photos WHERE id = ${Number(params.id) || 0}`;
   if (!img) return new Response("Not found", { status: 404 });
+  // photos of a hidden plot are only for its owner
+  const p = await plotById(env, img.plot_id);
+  const vis = p?.visibility || (p?.public ? "public" : "hidden");
+  if (!p || (vis === "hidden" && p.ownerXuid !== await viewerXuid(sql, user))) return new Response("Not found", { status: 404 });
   return new Response(Buffer.from(img.b64.replace(/\s+/g, ""), "base64"), { headers: { "Content-Type": img.mime, "Cache-Control": "private, max-age=86400" } });
 }
 

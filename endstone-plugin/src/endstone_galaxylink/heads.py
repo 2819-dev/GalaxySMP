@@ -64,7 +64,8 @@ def send_head(plugin, player, tries=0):
     voice = getattr(plugin, "_voice", None)
     if not voice or not voice.ws:  # not connected to the website yet: try again in 30 seconds (5 times)
         if tries < 5:
-            plugin.server.scheduler.run_task(plugin, lambda: _retry(plugin, player, tries + 1), delay=600)
+            uid = player.unique_id
+            plugin.server.scheduler.run_task(plugin, lambda: _retry(plugin, uid, tries + 1), delay=600)
         return
     info = {}
     try:
@@ -99,10 +100,9 @@ def send_head(plugin, player, tries=0):
         plugin.logger.warning(f"No community head for {player.name}: {why}.")
 
 
-def _retry(plugin, player, tries):
-    try:
-        if not any(p.unique_id == player.unique_id for p in plugin.server.online_players):
-            return  # they left
-    except Exception:
-        return
+def _retry(plugin, uid, tries):
+    from endstone_galaxylink.safety import alive
+    player = alive(plugin, uid)
+    if player is None:
+        return  # they left
     send_head(plugin, player, tries)

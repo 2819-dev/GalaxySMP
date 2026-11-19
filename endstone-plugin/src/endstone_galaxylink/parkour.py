@@ -203,6 +203,7 @@ class Parkour:
         run = self.runs.get(str(p.unique_id))
         if not run:
             return p.send_message("§7You're not doing a parkour course.")
+        run["last"] = None   # this jump is allowed
         self.teleport(p, run["back"])
         p.send_message("§7Back to your last checkpoint. §8(the timer keeps going)")
 
@@ -225,6 +226,14 @@ class Parkour:
                     p.send_message("§7Parkour run stopped (over 30 minutes).")
                     run = None
                 else:
+                    # a sudden jump (teleport, /tpa, ender pearl) ends the run: courses must be done on foot
+                    last = run.get("last")
+                    run["last"] = (dim, x, z)
+                    if last is not None and (last[0] != dim or math.hypot(x - last[1], z - last[2]) > 10):
+                        self.runs.pop(uid, None)
+                        p.send_message("§cParkour run stopped because you teleported.")
+                        run = None
+                if run:
                     try:
                         p.send_tip(f"§b{run['course']} §f{clock(now - run['t0'])} §7· {run['next']}/{run['cps']} checkpoints")
                     except Exception:
@@ -242,7 +251,7 @@ class Parkour:
                 continue
             spot = (dim, x + 0.5, y, z + 0.5, p.location.yaw)
             if kind == "start":
-                self.runs[uid] = {"course": name, "t0": now, "next": 0, "cps": len(c.get("checkpoints") or []), "back": spot}
+                self.runs[uid] = {"course": name, "t0": now, "next": 0, "cps": len(c.get("checkpoints") or []), "back": spot, "last": (dim, x, z)}
                 p.send_message(f"§bGo! §f{name}§7: {len(c.get('checkpoints') or [])} checkpoints. §8(/parkour back · /parkour leave)")
                 self.sound(p, 1.6)
             elif run and run["course"] == name and kind == "cp":
@@ -321,6 +330,9 @@ class Parkour:
         except Exception:
             return
         hit = self.index.get(key)
+        if hit and not event.player.is_op:
+            event.is_cancelled = True
+            return
         if not hit:
             return
         name, kind, i = hit

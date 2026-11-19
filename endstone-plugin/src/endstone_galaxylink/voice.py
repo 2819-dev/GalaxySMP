@@ -10,6 +10,7 @@ import os
 import socket
 import ssl
 import struct
+import queue
 import threading
 import time
 import urllib.parse
@@ -30,6 +31,15 @@ ICONS = {
 
 POSITION_TICKS = 6  # 20 ticks = 1 second, so about 3 updates per second
 STATUS_EVERY = 50   # x POSITION_TICKS = every 15 seconds: player count for the website status page
+
+
+def _xor(data, mask):
+    """WebSocket masking, done on whole numbers at once (much faster than byte by byte)."""
+    n = len(data)
+    if not n:
+        return b""
+    m = (mask * (n // 4 + 1))[:n]
+    return (int.from_bytes(data, "big") ^ int.from_bytes(m, "big")).to_bytes(n, "big")
 
 
 class _Socket:
@@ -64,7 +74,33 @@ class _Socket:
         if " 101 " not in status:
             raise ConnectionError(f"voice server refused: {status}")
         self.buffer = head.split(b"\r\n\r\n", 1)[1]
-        self.sock.settimeout(None)
+        # the website answers our ping every 25 seconds, so 90 seconds of silence means the connection is dead
+        self.sock.settimeout(90)
+        # one sending thread with a queue (instead of a new thread for every message)
+        self.queue = queue.Queue(maxsize=1000)
+        self.dropped = 0
+        threading.Thread(target=self._sender, daemon=True).start()
+
+    def post(self, text):
+        """Queues a text message to send (never blocks the game). Drops it if the queue is full."""
+        try:
+            self.queue.put_nowait(text)
+        except queue.Full:
+            self.dropped += 1
+
+    def _sender(self):
+        while True:
+            text = self.queue.get()
+            if text is None:
+                return
+            try:
+                self.send_text(text)
+            except Exception:
+                try:
+                    self.sock.close()   # the reader notices and reconnects
+                except Exception:
+                    pass
+                return
 
     def _read(self, n):
         while len(self.buffer) < n:
@@ -85,7 +121,7 @@ class _Socket:
         else:
             header += bytes([0x80 | 127]) + struct.pack("!Q", n)
         mask = os.urandom(4)
-        masked = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+        masked = _xor(payload, mask)
         with self.lock:
             self.sock.sendall(header + mask + masked)
 
@@ -105,7 +141,7 @@ class _Socket:
             mask = self._read(4) if b2 & 0x80 else None
             payload = self._read(n)
             if mask:
-                payload = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+                payload = _xor(payload, mask)
             if opcode == 0x8:
                 raise ConnectionError("closed by server")
             if opcode == 0x9:
@@ -118,6 +154,10 @@ class _Socket:
                 return message.decode("utf-8", errors="replace")
 
     def close(self):
+        try:
+            self.queue.put_nowait(None)
+        except Exception:
+            pass
         try:
             self.send_frame(0x8, struct.pack("!H", 1000))
         except Exception:
@@ -143,7 +183,8 @@ class VoiceLink:
     # ---------- lifecycle ----------
     def start(self):
         threading.Thread(target=self._run, daemon=True).start()
-        self.task = self.plugin.server.scheduler.run_task(self.plugin, self._tick, delay=POSITION_TICKS, period=POSITION_TICKS)
+        tick = self.plugin._safe("voice chat positions", self._tick) if hasattr(self.plugin, "_safe") else self._tick
+        self.task = self.plugin.server.scheduler.run_task(self.plugin, tick, delay=POSITION_TICKS, period=POSITION_TICKS)
 
     def stop(self):
         self.stopped = True
@@ -158,7 +199,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.66.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.67.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -388,7 +429,7 @@ class VoiceLink:
                 continue
         ws = self.ws
         payload = json.dumps({"type": "positions", "players": players})
-        threading.Thread(target=self._safe_send, args=(ws, payload), daemon=True).start()
+        self._safe_send(ws, payload)
 
     def _send_status(self, ws):
         server = self.plugin.server
@@ -411,7 +452,7 @@ class VoiceLink:
                 pass
         except Exception:
             return
-        threading.Thread(target=self._safe_send, args=(ws, json.dumps(info)), daemon=True).start()
+        self._safe_send(ws, json.dumps(info))
 
     def doing(self, p):
         """What a player is up to, in a few words (for "who's online" on the home page)."""
@@ -492,7 +533,7 @@ class VoiceLink:
     def send_json(self, obj):
         ws = self.ws
         if ws:
-            threading.Thread(target=self._safe_send, args=(ws, json.dumps(obj)), daemon=True).start()
+            self._safe_send(ws, json.dumps(obj))
 
     def send_seen(self, players):
         ws = self.ws
@@ -500,11 +541,12 @@ class VoiceLink:
             return
         payload = json.dumps({"type": "seen", "players": [
             {"xuid": str(p.xuid), "uuid": str(p.unique_id), "name": p.name} for p in players]})
-        threading.Thread(target=self._safe_send, args=(ws, payload), daemon=True).start()
+        self._safe_send(ws, payload)
 
     def _safe_send(self, ws, payload):
         try:
-            ws.send_text(payload)
+            if ws is not None:
+                ws.post(payload)
         except Exception:
             pass
 

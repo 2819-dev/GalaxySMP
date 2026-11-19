@@ -7,7 +7,7 @@ import { postTimeline } from "./feed.js";
 import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser, getUser } from "../lib/auth.js";
-import { product, checkPromo, memberPromos, publicPromo, MIN_CHARGE } from "../store/promos.js";
+import { product, checkPromo, memberPromos, publicPromo, MIN_CHARGE, reservePromo, promoUsed, promoCancel } from "../store/promos.js";
 import { SHOP_ITEMS } from "../store/shop.js";
 import { PACKS, PACK, GIFT_MIN, GIFT_DAILY_MAX, change, balance, history } from "../store/credits.js";
 import { createCheckout, verifyWebhook, stripe } from "../lib/stripe.js";
@@ -143,10 +143,11 @@ export async function checkout(request, env) {
   };
   const giftNote = (m) => (giftTo ? `You gifted ${prod.name} to ${giftTo.username}!` : m);
 
-  if (final === 0) { // free with a promo code: give it now
-    const result = await deliver(env, sql, player, prod, by, "promo");
-    await sql`INSERT INTO promo_redemptions (promo_id, user_id, item, option, price_cents, final_cents, status)
-              VALUES (${promo.id}, ${user.id}, ${prod.key}, ${prod.option}, ${prod.price}, 0, 'used')`;
+  if (final === 0) { // free with a promo code: take the code's use first (atomically), then give it
+    const rid = await reservePromo(sql, promo, user.id, { item: prod.key, option: prod.option, price: prod.price, final: 0 });
+    let result;
+    try { result = await deliver(env, sql, player, prod, by, "promo"); } catch (e) { await promoCancel(sql, rid); throw e; }
+    await promoUsed(sql, rid);
     await gifted(false, null);
     return json({ ok: true, done: true, message: giftNote(doneMessage(prod, result.sent)) });
   }
@@ -157,17 +158,19 @@ export async function checkout(request, env) {
     return json({ ok: true, done: true, message: giftNote(doneMessage(prod, result.sent)) });
   }
   if (body.method === "credits") {
+    const rid = promo ? await reservePromo(sql, promo, user.id, { item: prod.key, option: prod.option, price: prod.price, final }) : null;
     const left = await change(sql, user.id, -final, "purchase", prod.name, prod.key);
+    if (left === null && rid) await promoCancel(sql, rid);
     if (left === null) throw new HttpError(409, `You need ${usd(final)} of credits but have ${usd(await balance(sql, user.id))}. Top up, or pay with a card.`);
     try {
       const result = await deliver(env, sql, player, prod, { id: user.id, username: user.username }, "credits");
       await sql`UPDATE shop_orders SET price_cents = ${final} WHERE id = (SELECT max(id) FROM shop_orders WHERE xuid = ${player.xuid} AND item = ${prod.isPlan ? "plan:" + prod.key : prod.key})`;
-      if (promo) await sql`INSERT INTO promo_redemptions (promo_id, user_id, item, option, price_cents, final_cents, status)
-                           VALUES (${promo.id}, ${user.id}, ${prod.key}, ${prod.option}, ${prod.price}, ${final}, 'used')`;
+      if (rid) await promoUsed(sql, rid);
       await gifted(true, null);
       return json({ ok: true, done: true, credits: left / 100, message: giftNote(doneMessage(prod, result.sent)) });
     } catch (e) {
       await change(sql, user.id, final, "refund", `${prod.name} (couldn't be given)`, prod.key); // give the credit back
+      if (rid) await promoCancel(sql, rid);
       throw e;
     }
   }
@@ -177,14 +180,19 @@ export async function checkout(request, env) {
   const amount = Math.max(MIN_CHARGE, final);
   const [pay] = await sql`INSERT INTO payments (user_id, kind, item, option, promo_id, amount_cents, gift_to)
                           VALUES (${user.id}, 'item', ${prod.key}, ${prod.option}, ${promo?.id || null}, ${amount}, ${giftTo?.id || null}) RETURNING id`;
-  if (promo) await sql`INSERT INTO promo_redemptions (promo_id, user_id, item, option, price_cents, final_cents, status, payment_id)
-                       VALUES (${promo.id}, ${user.id}, ${prod.key}, ${prod.option}, ${prod.price}, ${amount}, 'pending', ${pay.id})`;
+  const rid = promo ? await reservePromo(sql, promo, user.id, { item: prod.key, option: prod.option, price: prod.price, final: amount, paymentId: pay.id }) : null;
   const origin = new URL(request.url).origin;
-  const session = await createCheckout(env, {
-    paymentId: pay.id, userId: user.id, name: `GalaxySMP: ${prod.name}`,
-    description: `${giftTo ? "A gift for" : "For"} ${player.gamertag} on GalaxySMP${promo ? ` (promo ${promo.code})` : ""}`,
-    amountCents: amount, origin, successPath: "/store?paid=item", cancelPath: "/store#shop",
-  });
+  let session;
+  try {
+    session = await createCheckout(env, {
+      paymentId: pay.id, userId: user.id, name: `GalaxySMP: ${prod.name}`,
+      description: `${giftTo ? "A gift for" : "For"} ${player.gamertag} on GalaxySMP${promo ? ` (promo ${promo.code})` : ""}`,
+      amountCents: amount, origin, successPath: "/store?paid=item", cancelPath: "/store#shop",
+    });
+  } catch (e) {
+    if (rid) await promoCancel(sql, rid);   // the code isn't used if the payment page couldn't open
+    throw e;
+  }
   await sql`UPDATE payments SET stripe_session = ${session.id} WHERE id = ${pay.id}`;
   return json({ ok: true, url: session.url });
 }
@@ -247,18 +255,31 @@ export async function gift(request, env) {
     } catch { /* best effort */ }
     return json({ ok: true, message: `Sent ${usd(cents)} of credits to ${to.username}.` });
   }
-  const [{ sent }] = await sql`SELECT coalesce(-sum(delta_cents), 0)::bigint AS sent FROM credit_ledger
-                                WHERE user_id = ${user.id} AND reason = 'gift_out' AND created_at > now() - interval '1 day'`;
-  if (Number(sent) + cents > GIFT_DAILY_MAX) throw new HttpError(429, `You can gift up to ${usd(GIFT_DAILY_MAX)} a day. You have ${usd(Math.max(0, GIFT_DAILY_MAX - Number(sent)))} left today.`);
-  const left = await change(sql, user.id, -cents, "gift_out", `To ${to.username}`, String(to.id));
-  if (left === null) throw new HttpError(409, `You only have ${usd(await balance(sql, user.id))} of credits.`);
+  // One transaction: the daily limit check and taking the credits happen together, so two gifts sent at the same
+  // moment can't both get past the limit.
+  const [, [{ sent }], taken] = await sql.transaction([
+    sql`SELECT pg_advisory_xact_lock(${780000000 + Number(user.id)})`,
+    sql`SELECT coalesce(-sum(delta_cents), 0)::bigint AS sent FROM credit_ledger
+         WHERE user_id = ${user.id} AND reason = 'gift_out' AND created_at > now() - interval '1 day'`,
+    sql`WITH lim AS (SELECT coalesce(-sum(delta_cents), 0)::bigint AS sent FROM credit_ledger
+                      WHERE user_id = ${user.id} AND reason = 'gift_out' AND created_at > now() - interval '1 day'),
+             u AS (UPDATE users SET credit_cents = credit_cents - ${cents}
+                    WHERE id = ${user.id} AND credit_cents >= ${cents} AND (SELECT sent FROM lim) + ${cents} <= ${GIFT_DAILY_MAX}
+                RETURNING credit_cents)
+        INSERT INTO credit_ledger (user_id, delta_cents, reason, detail, ref)
+        SELECT ${user.id}, ${-cents}, 'gift_out', ${`To ${to.username}`}, ${String(to.id)} FROM u RETURNING id`,
+  ]);
+  if (!taken.length) {
+    if (Number(sent) + cents > GIFT_DAILY_MAX) throw new HttpError(429, `You can gift up to ${usd(GIFT_DAILY_MAX)} a day. You have ${usd(Math.max(0, GIFT_DAILY_MAX - Number(sent)))} left today.`);
+    throw new HttpError(409, `You only have ${usd(await balance(sql, user.id))} of credits.`);
+  }
   await change(sql, to.id, cents, "gift_in", `From ${user.username}`, String(user.id));
   await audit(sql, user.id, "credits.gift", { to: to.username, cents });
   await recordGift(env, sql, { giverId: user.id, receiverId: to.id, kind: "credits", cents, paid: true });
   try {
     await pushNotify(env, [to.id], "dms", { title: `${user.username} sent you ${usd(cents)} of credits!`, body: "Spend them in the GalaxySMP Store.", url: "/store", tag: `gift-${user.id}` });
   } catch { /* best effort */ }
-  return json({ ok: true, credits: left / 100, message: `Sent ${usd(cents)} of credits to ${to.username}.` });
+  return json({ ok: true, credits: (await balance(sql, user.id)) / 100, message: `Sent ${usd(cents)} of credits to ${to.username}.` });
 }
 
 // ---------- Stripe webhook ----------

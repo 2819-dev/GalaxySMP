@@ -84,6 +84,8 @@ class Trades:
             return False, "You need to be online in Minecraft to offer an item: it's taken from your inventory."
         if self.row(tid):
             return False, "That trade already exists."
+        if int(price) < 100:
+            return False, "The price must be at least $1."
         bc = getattr(self.plugin, "buildcontest", None)
         if bc is not None and bc.building(p):
             return False, "You can't offer items while you're in a Build Contest."

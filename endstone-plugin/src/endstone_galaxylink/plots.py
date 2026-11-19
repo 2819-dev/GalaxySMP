@@ -75,6 +75,7 @@ class Plots:
 
     # ---------- storage ----------
     def save(self, pid):
+        self._index = None   # its size may have changed (upgrades)
         self.db.execute("UPDATE plots SET data = ? WHERE id = ?", (json.dumps(self.plots[pid]), pid))
         self.db.commit()
 
@@ -130,11 +131,30 @@ class Plots:
         return every
 
     # ---------- where things are ----------
+    def _build_index(self):
+        """Plots by 16x16 column, so finding the plot at a spot is quick (water flow, pistons and explosions ask a lot)."""
+        idx, big = {}, []
+        for n, p in enumerate(self.plots.values()):
+            cx1, cx2, cz1, cz2 = int(p["x1"]) >> 4, int(p["x2"]) >> 4, int(p["z1"]) >> 4, int(p["z2"]) >> 4
+            if (cx2 - cx1 + 1) * (cz2 - cz1 + 1) > 4096:
+                big.append((n, p))   # huge areas are checked one by one
+                continue
+            for cx in range(cx1, cx2 + 1):
+                for cz in range(cz1, cz2 + 1):
+                    idx.setdefault((p["dim"], cx, cz), []).append((n, p))
+        self._index, self._big, self._index_n = idx, big, len(self.plots)
+
     def at(self, dim, x, y, z):
-        for pid, p in self.plots.items():
-            if p["dim"] == dim and p["x1"] <= x <= p["x2"] and p["z1"] <= z <= p["z2"] and y <= p["top"]:
-                return p
-        return None
+        if getattr(self, "_index", None) is None or self._index_n != len(self.plots):
+            self._build_index()
+        best = None
+        near = self._index.get((dim, int(x) >> 4, int(z) >> 4), [])
+        if self._big:
+            near = near + [q for q in self._big if q[1]["dim"] == dim]
+        for n, p in near:
+            if p["x1"] <= x <= p["x2"] and p["z1"] <= z <= p["z2"] and y <= p["top"] and (best is None or n < best[0]):
+                best = (n, p)
+        return best[1] if best else None
 
     def at_block(self, block):
         return self.at(block.dimension.name, block.x, block.y, block.z)
@@ -264,6 +284,16 @@ class Plots:
             return
         if action == PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK and event.has_block:
             plot = self.at_block(event.block)
+            if plot is None and not p.is_op and event.has_item and self._places_something(event.item):
+                # clicking a block just outside a plot: a bucket would put the water or lava on the plot side
+                try:
+                    side = self.at_block(event.block.get_relative(event.block_face))
+                except Exception:
+                    side = None
+                if side is not None and not self.may_build(p, side):
+                    event.is_cancelled = True
+                    self.deny(p, side)
+                return
             if plot is None or p.is_op:
                 return
             if self.may_use(p, plot, event.block.type):
@@ -295,11 +325,42 @@ class Plots:
         except Exception:
             pass
 
+    def _actor_plot(self, actor):
+        l = actor.location
+        return self.at(actor.dimension.name, math.floor(l.x), math.floor(l.y), math.floor(l.z))
+
+    def on_interact_actor(self, event):
+        """Animals, armor stands, chest minecarts and boats in a player's plot are only for its builders."""
+        try:
+            p, a = event.player, event.actor
+            if p.is_op or hasattr(a, "xuid"):
+                return False
+            plot = self._actor_plot(a)
+            if plot is None or plot["kind"] != "plot" or not plot.get("owner") or self.may_build(p, plot):
+                return False
+            event.is_cancelled = True
+            self.deny(p, plot)
+            return True
+        except Exception:
+            return False
+
     def on_damage(self, event):
         try:
             victim = event.actor
             attacker = event.damage_source.actor
         except Exception:
+            return
+        if attacker is not None and hasattr(attacker, "xuid") and not hasattr(victim, "xuid"):
+            # a player hurting an animal, armor stand... in someone else's plot (monsters are fair game)
+            try:
+                from endstone_galaxylink.progress import HOSTILE, short as short_id
+                if short_id(victim.type) in HOSTILE or attacker.is_op:
+                    return
+                plot = self._actor_plot(victim)
+                if plot is not None and plot["kind"] == "plot" and plot.get("owner") and not self.may_build(attacker, plot):
+                    event.is_cancelled = True
+            except Exception:
+                pass
             return
         if not (hasattr(victim, "xuid") and attacker is not None and hasattr(attacker, "xuid")):
             return
@@ -307,6 +368,25 @@ class Plots:
         plot = self.at(victim.dimension.name, math.floor(l.x), math.floor(l.y), math.floor(l.z))
         if plot and plot["kind"] == "area" and not (plot.get("flags") or {}).get("pvp"):
             event.is_cancelled = True
+
+    STEP = {"DOWN": (0, -1, 0), "UP": (0, 1, 0), "NORTH": (0, 0, -1), "SOUTH": (0, 0, 1), "WEST": (-1, 0, 0), "EAST": (1, 0, 0)}
+
+    def on_piston(self, event):
+        """Pistons can't push or pull blocks (chests with their items, too) across a plot's border."""
+        try:
+            b = event.block
+            d = self.STEP.get(str(getattr(event.direction, "name", event.direction)).split(".")[-1].upper())
+            if d is None:
+                return
+            dim = b.dimension.name
+            home = self.at(dim, b.x, b.y, b.z)
+            for sign in (1, -1):   # both ways: a pulling piston's direction isn't the same in every version
+                for i in range(1, 14):
+                    if self.at(dim, b.x + d[0] * i * sign, b.y + d[1] * i * sign, b.z + d[2] * i * sign) is not home:
+                        event.is_cancelled = True
+                        return
+        except Exception:
+            pass
 
     def on_flow(self, event):
         """Water and lava can't flow into a plot from outside it."""
@@ -462,8 +542,24 @@ class Plots:
             for z in range(o["z1"], o["z2"] + 1, TILE):
                 yield f"gsmp_plot_{plot['id']}_{x - o['x1']}_{z - o['z1']}", x, z, min(x + TILE - 1, o["x2"]), min(z + TILE - 1, o["z2"])
 
+    def edges_loaded(self, plot):
+        from endstone_galaxylink.safety import area_loaded
+        try:
+            return area_loaded(self.plugin.server.level.get_dimension(plot["dim"]), plot["x1"], plot["z1"], plot["x2"], plot["z2"], max_age=0)
+        except Exception:
+            return False
+
+    def _wait_loaded(self, plot, tries=30):
+        """(job helper) Waits up to tries x 1 second for the plot's chunks to load. Yields tick counts."""
+        for _ in range(tries):
+            if self.edges_loaded(plot):
+                return
+            yield 20
+
     def capture_edges(self, plot):
         """Remembers the blocks on the plot's edge (they're painted white while it's free, and put back when claimed)."""
+        if plot.get("kind") == "area" or not self.edges_loaded(plot):
+            return   # areas have no white edge; never read unloaded chunks
         edges = []
         for b in self.edge_blocks(plot):
             d = b.data
@@ -472,24 +568,41 @@ class Plots:
 
     def _keep_loaded(self, plot, on):
         name = f"gsmp_plot_{plot['id']}"
-        if on:
-            self.cmd(f"tickingarea add {plot['x1']} 0 {plot['z1']} {plot['x2']} 0 {plot['z2']} {name} true", plot)
-        else:
-            self.cmd(f"tickingarea remove {name}", plot)
+        try:
+            if on:
+                ok = self.cmd(f"tickingarea add {plot['x1']} 0 {plot['z1']} {plot['x2']} 0 {plot['z2']} {name} true", plot)
+                if not ok:
+                    self.plugin.logger.warning(f"Couldn't keep {self.label(plot)} loaded (too big for a ticking area?). Only loaded parts are changed.")
+            else:
+                self.cmd(f"tickingarea remove {name}", plot)
+        except Exception:
+            pass
 
     def edge_blocks(self, plot):
+        """The blocks on the plot's edge (only the edge, in the same order as always: saved edges depend on it)."""
         dim = self.plugin.server.level.get_dimension(plot["dim"])
         y = plot["y0"]
-        for x in range(plot["x1"], plot["x2"] + 1):
-            for z in range(plot["z1"], plot["z2"] + 1):
-                if x in (plot["x1"], plot["x2"]) or z in (plot["z1"], plot["z2"]):
+        x1, x2, z1, z2 = plot["x1"], plot["x2"], plot["z1"], plot["z2"]
+        for x in range(x1, x2 + 1):
+            if x in (x1, x2):
+                for z in range(z1, z2 + 1):
                     yield dim.get_block_at(x, y, z)
+            else:
+                yield dim.get_block_at(x, y, z1)
+                if z2 != z1:
+                    yield dim.get_block_at(x, y, z2)
 
     def paint_edge(self, plot):
+        if not self.edges_loaded(plot):
+            return False
         for b in self.edge_blocks(plot):
             b.set_type("minecraft:white_concrete")
+        return True
 
     def restore_edge(self, plot):
+        if not self.edges_loaded(plot):
+            self.run(self._job_restore_edge(plot["id"]))   # later, once it's loaded
+            return
         server = self.plugin.server
         for b, (t, states) in zip(self.edge_blocks(plot), plot.get("edges") or []):
             try:
@@ -497,23 +610,35 @@ class Plots:
             except Exception:
                 b.set_type(t)
 
+    def _job_restore_edge(self, pid):
+        plot = self.plots.get(pid)
+        if not plot:
+            return
+        self._keep_loaded(plot, True)
+        try:
+            yield 40
+            yield from self._wait_loaded(plot, 60)
+            if self.edges_loaded(plot) and plot.get("owner"):
+                self.restore_edge(plot)
+        finally:
+            self._keep_loaded(plot, False)
+
     def _job_create(self, pid, admin_uid):
         plot = self.plots[pid]
         self._keep_loaded(plot, True)
-        yield 60
-        for name, ax, az, bx, bz in self.tiles(plot):
-            self.cmd(f"structure save {name} {ax} {plot['bottom']} {az} {bx} {plot['top']} {bz} false disk true", plot)
-        yield 5
-        edges = []
-        for b in self.edge_blocks(plot):
-            d = b.data
-            edges.append((d.type, dict(d.block_states)))
-        plot["edges"] = edges
-        if plot["kind"] == "plot":
-            self.paint_edge(plot)
-        plot["status"] = "ready"
-        self.save(pid)
-        self._keep_loaded(plot, False)
+        try:
+            yield 60
+            for name, ax, az, bx, bz in self.tiles(plot):
+                self.cmd(f"structure save {name} {ax} {plot['bottom']} {az} {bx} {plot['top']} {bz} false disk true", plot)
+            yield 5
+            if plot["kind"] == "plot":
+                yield from self._wait_loaded(plot)
+                self.capture_edges(plot)
+                self.paint_edge(plot)
+            plot["status"] = "ready"
+            self.save(pid)
+        finally:
+            self._keep_loaded(plot, False)
         admin = self.plugin.server.get_player(admin_uid)
         if admin:
             if plot["kind"] == "plot":
@@ -526,25 +651,36 @@ class Plots:
         plot["status"] = "resetting"
         self.save(pid)
         self._keep_loaded(plot, True)
-        yield 60
-        for name, ax, az, bx, bz in self.tiles(plot):
-            self.cmd(f"structure load {name} {ax} {plot['bottom']} {az} 0_degrees none false true", plot)
-        for t in plot.get("extra_tiles") or []:   # strips added by plot upgrades
-            self.cmd(f"structure load {t['name']} {t['x']} {t['y']} {t['z']} 0_degrees none false true", plot)
-        yield 10
-        if plot.get("orig"):
-            self.capture_edges(plot)   # the edge moved when the plot was upgraded
-        if then_paint and plot["kind"] == "plot":
-            self.paint_edge(plot)
-        plot["status"] = "ready"
-        self.save(pid)
-        self._keep_loaded(plot, False)
+        try:
+            yield 60
+            for name, ax, az, bx, bz in self.tiles(plot):
+                self.cmd(f"structure load {name} {ax} {plot['bottom']} {az} 0_degrees none false true", plot)
+            for t in plot.get("extra_tiles") or []:   # strips added by plot upgrades
+                self.cmd(f"structure load {t['name']} {t['x']} {t['y']} {t['z']} 0_degrees none false true", plot)
+            yield 10
+            if plot["kind"] == "plot":
+                yield from self._wait_loaded(plot)
+                if plot.get("orig"):
+                    self.capture_edges(plot)   # the edge moved when the plot was upgraded
+                if then_paint:
+                    self.paint_edge(plot)
+        finally:
+            plot["status"] = "ready"
+            self.save(pid)
+            self._keep_loaded(plot, False)
 
     def _job_keep(self, pid, admin_uid):
         """Unclaimed with the builds kept: save what's there now as the plot's starting point, then open it up."""
         plot = self.plots[pid]
         self._keep_loaded(plot, True)
+        try:
+            yield from self._job_keep_steps(pid, plot, admin_uid)
+        finally:
+            self._keep_loaded(plot, False)
+
+    def _job_keep_steps(self, pid, plot, admin_uid):
         yield 60
+        yield from self._wait_loaded(plot)
         if plot.get("orig"):   # upgraded: the whole plot as it is now becomes the new starting land
             for t in plot.get("extra_tiles") or []:
                 self.cmd(f"structure delete {t['name']}", plot)
@@ -561,7 +697,6 @@ class Plots:
         yield 10
         plot["status"] = "ready"
         self.save(pid)
-        self._keep_loaded(plot, False)
         admin = self.plugin.server.get_player(admin_uid)
         if admin:
             admin.send_message(f"§a{self.label(plot)} is ready to claim, builds included.")
@@ -571,13 +706,16 @@ class Plots:
         self._keep_loaded(plot, True)
         yield 40
         if plot["kind"] == "plot" and not plot.get("owner"):
-            self.restore_edge(plot)
+            yield from self._wait_loaded(plot)
+            if self.edges_loaded(plot):
+                self.restore_edge(plot)
         for name, *_ in self.tiles(plot):
             self.cmd(f"structure delete {name}", plot)
         for t in plot.get("extra_tiles") or []:
             self.cmd(f"structure delete {t['name']}", plot)
         self._keep_loaded(plot, False)
         self.plots.pop(pid, None)
+        self._index = None
         self.db.execute("DELETE FROM plots WHERE id = ?", (pid,))
         self.db.commit()
 
@@ -688,12 +826,19 @@ class Plots:
                         on_click=lambda p: self.confirm_unclaim(p, pid))
         player.send_form(form)
 
+    def _owns(self, player, pid):
+        """Still this player's plot? (forms stay open, and the plot may have been sold or unclaimed meanwhile)"""
+        plot = self.plots.get(pid)
+        return bool(plot) and plot.get("owner") == str(player.xuid)
+
     def shop_sign_form(self, player, pid):
         plot = self.plots.get(pid)
         if not plot or plot.get("owner") != str(player.xuid):
             return
 
         def submit(p, data):
+            if not self._owns(p, pid):
+                return p.send_message("§cThat isn't your plot any more.")
             try:
                 v = json.loads(data)
             except ValueError:
@@ -748,6 +893,8 @@ class Plots:
 
     def add_member_form(self, player, pid):
         def submit(p, data):
+            if not self._owns(p, pid):
+                return p.send_message("§cThat isn't your plot any more.")
             try:
                 v = json.loads(data)
             except ValueError:
@@ -775,11 +922,15 @@ class Plots:
         other = "visitor" if m["role"] == "builder" else "builder"
 
         def set_role(p):
+            if not self._owns(p, pid):
+                return p.send_message("§cThat isn't your plot any more.")
             m["role"] = other
             self.save(pid)
             self.members_menu(p, pid)
 
         def remove(p):
+            if not self._owns(p, pid):
+                return p.send_message("§cThat isn't your plot any more.")
             plot["members"].pop(key, None)
             self.save(pid)
             p.send_message(f"§7Removed {m['name']}.")
@@ -802,6 +953,11 @@ class Plots:
         plot = self.plots.get(pid)
         if not plot:
             return
+        if not by_admin:
+            if plot.get("owner") != str(player.xuid):
+                return player.send_message("§cThat isn't your plot any more.")
+            if plot.get("rental"):
+                return player.send_message("§cThis plot is rented out right now. You can unclaim it when the rental ends.")
         owner = plot.get("owner")
         el = getattr(self.plugin, "elevators", None)
         if el:

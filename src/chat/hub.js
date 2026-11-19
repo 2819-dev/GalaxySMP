@@ -1,3 +1,4 @@
+import { flooding, closeFlooder } from "../lib/flood.js";
 // CommunityHub: one Cloudflare Durable Object that every open chat tab connects to.
 // It checks and saves each new message, then sends it to everyone instantly.
 // Uses the WebSocket Hibernation API, so it costs almost nothing while chat is quiet.
@@ -79,6 +80,7 @@ export class CommunityHub extends DurableObject {
     const last = this.activeAt.get(user.id) || 0;
     if (Date.now() - last < 55_000) return;  // several tabs open still count once a minute
     this.activeAt.set(user.id, Date.now());
+    if (this.activeAt.size > 5000) this.activeAt.clear();
     const { countActivity } = await import("./engage.js");
     await countActivity(this.env, getDb(this.env), user.id, { minute: true });
   }
@@ -237,6 +239,7 @@ export class CommunityHub extends DurableObject {
     } catch {
       return;
     }
+    if (flooding(ws)) return closeFlooder(ws);
     try {
       // "Act as Member" (look-only): nothing is sent, edited, reacted to or marked as seen
       if (user?.readOnly && ["send", "react", "seen", "edit", "typing", "delete"].includes(msg.type)) {
@@ -286,6 +289,10 @@ export class CommunityHub extends DurableObject {
     r.times.push(now);
     r.said.push({ key, at: now });
     this.recent.set(userId, r);
+    if (this.recent.size > 2000) {   // forget members who haven't written for 10 minutes
+      const cut = Date.now() - 600_000;
+      for (const [k, v] of this.recent) if (!(v.times || []).some((t) => t > cut)) this.recent.delete(k);
+    }
     return null;
   }
 
@@ -327,6 +334,7 @@ export class CommunityHub extends DurableObject {
       const when = wait >= 120 ? `${Math.ceil(wait / 60)} minutes` : `${wait} second${wait === 1 ? "" : "s"}`;
       if (wait > 0) return reject(`Slow mode is on: you can send another message in ${when}.`);
       this.slowSeen.set(key, Date.now());
+      if (this.slowSeen.size > 5000) { const cut = Date.now() - 3_600_000; for (const [k, t] of this.slowSeen) if (t < cut) this.slowSeen.delete(k); }
     }
     // One statement that also re-checks, fresh from the database, that the sender
     // isn't banned or muted and is allowed to post in this channel.
@@ -452,8 +460,11 @@ export class CommunityHub extends DurableObject {
     const rows = await sql`
       UPDATE messages SET seen_at = now()
        WHERE id = ANY(${ids}::bigint[]) AND user_id <> ${user.id} AND seen_at IS NULL AND deleted_at IS NULL
-       RETURNING id`;
-    if (rows.length) this.broadcast({ type: "seen", ids: rows.map((r) => Number(r.id)) });
+         AND channel_id IN (SELECT id FROM channels WHERE NOT staff_only OR ${hubCan(user, "staff_chat")})
+       RETURNING id, channel_id`;
+    const byChannel = new Map();
+    for (const r of rows) byChannel.set(Number(r.channel_id), [...(byChannel.get(Number(r.channel_id)) || []), Number(r.id)]);
+    for (const [ch, list] of byChannel) await this.broadcastChannel(ch, { type: "seen", ids: list });
   }
 
   // Edit your own message, only while nobody has seen it yet.

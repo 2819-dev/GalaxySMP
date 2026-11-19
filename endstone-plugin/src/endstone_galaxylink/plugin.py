@@ -18,6 +18,11 @@ from endstone.event import (PlayerLoginEvent, ActorDamageEvent, ActorDeathEvent,
                             PlayerRespawnEvent,
                             event_handler)
 from endstone.plugin import Plugin
+from endstone_galaxylink.safety import later
+try:  # pistons (newer Endstone versions)
+    from endstone.event import BlockPistonExtendEvent, BlockPistonRetractEvent
+except ImportError:
+    BlockPistonExtendEvent = BlockPistonRetractEvent = None
 
 from endstone_galaxylink import settings
 from endstone_galaxylink.auction import AuctionHouse
@@ -47,7 +52,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.66.0"
+VERSION = "2.67.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -254,7 +259,7 @@ class GalaxyLink(Plugin):
         self.moderation = Moderation(self)
         self.blocklog = BlockLog(self)
         self.progress = Progress(self)
-        self.server.scheduler.run_task(self, self.progress.tick, delay=1200, period=1200)
+        self.server.scheduler.run_task(self, self._safe("progress.tick", self.progress.tick), delay=1200, period=1200)
         self.leaderboards = Leaderboards(self)
         self.floating = FloatingTexts(self)
         self.jobs = Jobs(self)
@@ -301,38 +306,38 @@ class GalaxyLink(Plugin):
         except Exception as e:
             self.logger.warning(f"Couldn't check the world's packs: {e}")
         self.server.scheduler.run_task(self, self.ranks.refresh_pictures, delay=40)  # plan tags, even before ranks arrive
-        self.server.scheduler.run_task(self, self.elevators.tick, delay=2, period=2)
+        self.server.scheduler.run_task(self, self._safe("elevators.tick", self.elevators.tick), delay=2, period=2)
         self.server.scheduler.run_task(self, self._watched("checking AFK players", self.afk.tick), delay=100, period=100)
         self.server.scheduler.run_task(self, self._watched("checking command plates", self.plates.tick), delay=40, period=4)
         self.server.scheduler.run_task(self, self._watched("setting up the map item", self.galaxymap.setup), delay=200)
         self.server.scheduler.run_task(self, self._watched("checking parkour plates", self.parkour.tick), delay=40, period=4)
         self.server.scheduler.run_task(self, self._watched("item collection", self.collection.scan), delay=600, period=1200)
         self.server.scheduler.run_task(self, self._watched("plot rentals", self.plotplus.tick), delay=1200, period=1200)
-        self.server.scheduler.run_task(self, self.elevators.check_tools, delay=1200, period=1200)
-        self.server.scheduler.run_task(self, self.jobs.tick, delay=100, period=100)
-        self.server.scheduler.run_task(self, self.servercontrol.tick, delay=20, period=20)
-        self.server.scheduler.run_task(self, self.cosmetics.tick, delay=TRAIL_TICKS, period=TRAIL_TICKS)
+        self.server.scheduler.run_task(self, self._safe("elevators.check_tools", self.elevators.check_tools), delay=1200, period=1200)
+        self.server.scheduler.run_task(self, self._safe("jobs.tick", self.jobs.tick), delay=100, period=100)
+        self.server.scheduler.run_task(self, self._safe("servercontrol.tick", self.servercontrol.tick), delay=20, period=20)
+        self.server.scheduler.run_task(self, self._safe("cosmetics.tick", self.cosmetics.tick), delay=TRAIL_TICKS, period=TRAIL_TICKS)
         self.server.scheduler.run_task(self, self._watched("updating floating texts", self.floating.update), delay=1400, period=1200)
         self.server.scheduler.run_task(self, self._watched("updating floating leaderboards", self.leaderboards.update), delay=1300, period=1200)
-        self.server.scheduler.run_task(self, self.moderation.tick, delay=600, period=600)
-        self.server.scheduler.run_task(self, self.blocklog.tick, delay=20, period=20)
-        self.server.scheduler.run_task(self, self.announcements.tick, delay=20, period=20)
-        self.server.scheduler.run_task(self, self.minigames.tick, delay=600, period=600)
-        self.server.scheduler.run_task(self, self.bedwars.tick, delay=100, period=10)
+        self.server.scheduler.run_task(self, self._safe("moderation.tick", self.moderation.tick), delay=600, period=600)
+        self.server.scheduler.run_task(self, self._safe("blocklog.tick", self.blocklog.tick), delay=20, period=20)
+        self.server.scheduler.run_task(self, self._safe("announcements.tick", self.announcements.tick), delay=20, period=20)
+        self.server.scheduler.run_task(self, self._safe("minigames.tick", self.minigames.tick), delay=600, period=600)
+        self.server.scheduler.run_task(self, self._safe("bedwars.tick", self.bedwars.tick), delay=100, period=10)
         self.server.scheduler.run_task(self, self._watched("drawing the website map", self.livemap.tick), delay=200, period=40)  # website map
         self.server.scheduler.run_task(self, self._watched("a plot job (save/reset)", self.plots.tick, lambda: self.plots.jobs), delay=1, period=1)
-        self.server.scheduler.run_task(self, self.crashwatch.tick, delay=20, period=20)
+        self.server.scheduler.run_task(self, self._safe("crashwatch.tick", self.crashwatch.tick), delay=20, period=20)
         self.server.scheduler.run_task(self, self._watched("the Build Contest", self.buildcontest.tick,
                                                           lambda: self.buildcontest.jobs or self.buildcontest.running()), delay=40, period=20)
-        self.server.scheduler.run_task(self, self.plots.check_tools, delay=400, period=200)  # plot tools come back if missing
-        self.server.scheduler.run_task(self, self.auction.tick, delay=600, period=600)
+        self.server.scheduler.run_task(self, self._safe("plots.check_tools", self.plots.check_tools), delay=400, period=200)  # plot tools come back if missing
+        self.server.scheduler.run_task(self, self._safe("auction.tick", self.auction.tick), delay=600, period=600)
         self.register_events(self)
         # Minecraft's "Days played" line under the coordinates counts 20-minute game days, not real days,
         # which reads like a broken streak. Real daily streaks are in /daily and on profiles.
         self.server.scheduler.run_task(self, lambda: self.server.dispatch_command(self.server.command_sender, "gamerule showdaysplayed false"), delay=40)
-        self.server.scheduler.run_task(self, self.economy.tick, delay=HUD_TICKS, period=HUD_TICKS)
-        self.server.scheduler.run_task(self, self.npcs.tick, delay=HOLD_TICKS, period=HOLD_TICKS)
-        self.server.scheduler.run_task(self, self.plans.tick, delay=CHECK_TICKS, period=CHECK_TICKS)
+        self.server.scheduler.run_task(self, self._safe("economy.tick", self.economy.tick), delay=HUD_TICKS, period=HUD_TICKS)
+        self.server.scheduler.run_task(self, self._safe("npcs.tick", self.npcs.tick), delay=HOLD_TICKS, period=HOLD_TICKS)
+        self.server.scheduler.run_task(self, self._safe("plans.tick", self.plans.tick), delay=CHECK_TICKS, period=CHECK_TICKS)
         self._base = settings.WEBSITE.rstrip("/")
         if not settings.SECRET or settings.SECRET.startswith("PASTE_"):
             self.logger.warning("GalaxyLink is missing its secret. Download a fresh build from the website team.")
@@ -445,7 +450,7 @@ class GalaxyLink(Plugin):
         except Exception as e:
             self.logger.warning(f"Packs on join failed: {e}")
         if brand_new:  # very first join: welcome kit
-            self.server.scheduler.run_task(self, lambda: player.is_valid and self.servercontrol.welcome(player), delay=40)
+            later(self, player, self.servercontrol.welcome, 40)
         self.shopchests.on_join(player)
         self.elevators.check_tool(player)
         self.cosmetics.on_join(player)
@@ -456,18 +461,36 @@ class GalaxyLink(Plugin):
         if self._voice:
             self._voice.send_seen([player])
             from endstone_galaxylink.heads import send_head
-            self.server.scheduler.run_task(self, lambda: send_head(self, player), delay=40)  # head for the website
+            later(self, player, lambda p: send_head(self, p), 40)  # head for the website
 
     @event_handler
     def on_player_quit(self, event: PlayerQuitEvent):
-        self.ranks.forget(event.player)
-        self.plates.on_quit(event.player)
-        self.galaxymap.on_quit(event.player)
-        self.parkour.on_quit(event.player)
-        self.collection.on_quit(event.player)
-        self.teleports.on_quit(event.player)
-        self.progress.on_quit(event.player)
-        self.bedwars.on_quit(event.player)
+        p = event.player
+        # each one on its own, so one problem doesn't stop the others
+        for part in ("ranks.forget", "plates.on_quit", "galaxymap.on_quit", "parkour.on_quit", "collection.on_quit",
+                     "teleports.on_quit", "progress.on_quit", "bedwars.on_quit"):
+            obj, fn = part.split(".")
+            try:
+                getattr(getattr(self, obj), fn)(p)
+            except Exception as e:
+                self.logger.warning(f"{part} on quit failed: {e}")
+        # forget small per-player notes (they'd pile up over weeks otherwise)
+        uid = str(p.unique_id)
+        for obj, names in (("elevators", ("last_tap", "pending")), ("plots", ("inside",)), ("cosmetics", ()),):
+            o = getattr(self, obj, None)
+            for n in names:
+                d = getattr(o, n, None)
+                try:
+                    if isinstance(d, dict):
+                        d.pop(uid, None)
+                        d.pop(p.unique_id, None)
+                except Exception:
+                    pass
+        try:
+            self.elevators.crouching.discard(uid)
+            self.plots.highlight.discard(uid)
+        except Exception:
+            pass
 
     @event_handler
     def on_player_respawn(self, event: PlayerRespawnEvent):
@@ -504,7 +527,9 @@ class GalaxyLink(Plugin):
             return
         if self.cards.on_interact(event):  # crouch + tap a player: their card
             return
-        self.npcs.on_interact(event)
+        if self.npcs.npc_id(event.actor) is not None:
+            return self.npcs.on_interact(event)
+        self.plots.on_interact_actor(event)  # animals, armor stands, chest minecarts in someone's plot
 
     @event_handler
     def on_actor_damage(self, event: ActorDamageEvent):
@@ -518,8 +543,6 @@ class GalaxyLink(Plugin):
     def on_block_break(self, event: BlockBreakEvent):
         if self.blocklog.on_break(event):  # block inspector
             return
-        self.plates.on_break(event)  # a command plate that's broken stops being one
-        self.parkour.on_break(event)  # ...and a parkour plate leaves its course
         if self.bedwars.on_break(event):  # beds and the arena
             return
         if self.buildcontest.on_block(event, False):  # the Build Contest arena (no job money for Creative building)
@@ -530,6 +553,9 @@ class GalaxyLink(Plugin):
         if event.cancelled:
             return
         self.plots.on_break(event)
+        if not event.cancelled:  # only once the break is really allowed (and only staff may break them):
+            self.plates.on_break(event)  # a command plate that's broken stops being one
+            self.parkour.on_break(event)  # ...and a parkour plate leaves its course
         self.blocklog.log_break(event)
         if not event.cancelled:
             self.progress.on_break(event.player, event.block.type, states_of(event.block))
@@ -576,6 +602,15 @@ class GalaxyLink(Plugin):
     def on_block_explode(self, event: BlockExplodeEvent):
         self.buildcontest.on_explode(event)
         self.plots.on_explode(event)
+
+    if BlockPistonExtendEvent is not None:
+        @event_handler
+        def on_piston_extend(self, event: BlockPistonExtendEvent):
+            self.plots.on_piston(event)
+
+        @event_handler
+        def on_piston_retract(self, event: BlockPistonRetractEvent):
+            self.plots.on_piston(event)
 
     @event_handler
     def on_flow(self, event: BlockFromToEvent):
@@ -634,9 +669,24 @@ class GalaxyLink(Plugin):
             return
         self.moderation.on_command(event)  # muted players can't /msg or /me
 
+    def _safe(self, what, fn):
+        """A repeating task that can't break the server: an error is logged (once a minute at most) and the task
+        keeps running next time."""
+        last = [0.0]
+
+        def run():
+            try:
+                return fn()
+            except Exception as e:
+                if time.time() - last[0] > 60:
+                    last[0] = time.time()
+                    self.logger.warning(f"{what} failed: {type(e).__name__}: {e}")
+        return run
+
     def _watched(self, what, fn, only_if=None):
-        """Runs a scheduled task, noting it for the crash report while it runs."""
+        """Runs a scheduled task, noting it for the crash report while it runs (errors are logged, not raised)."""
         cw = self.crashwatch
+        last = [0.0]
 
         def run():
             if only_if is not None and not only_if():
@@ -645,6 +695,10 @@ class GalaxyLink(Plugin):
             t0 = time.perf_counter()
             try:
                 return fn()
+            except Exception as e:
+                if time.time() - last[0] > 60:
+                    last[0] = time.time()
+                    self.logger.warning(f"{what} failed: {type(e).__name__}: {e}")
             finally:
                 cw.mark("idle")
                 diag = getattr(self, "diagnostics", None)

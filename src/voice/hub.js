@@ -1,3 +1,4 @@
+import { flooding, closeFlooder } from "../lib/flood.js";
 // VoiceHub: one Durable Object that coordinates website voice chat.
 //
 // Audio never passes through here. Each browser sends its microphone to Cloudflare
@@ -390,7 +391,9 @@ export class VoiceHub extends DurableObject {
     const a = ws.deserializeAttachment();
     if (!a) return;
     try {
-      if (a.kind === "plugin") return this.onPlugin(msg);
+      if (a.kind === "plugin") return await this.onPlugin(msg);
+      if (flooding(ws)) return closeFlooder(ws);
+      if (msg.type === "rtc.session" && flooding(ws, "rtc", 0.4, 4)) throw new Error("Slow down a little.");
       await this.onVoice(ws, a, msg);
     } catch (e) {
       console.error("voice error", e);
@@ -725,7 +728,8 @@ export class VoiceHub extends DurableObject {
         return reply({ ok: true });
       }
       case "group.create": {
-        if (Object.keys(this.groups).length >= MAX_GROUPS) throw new Error("There are too many groups right now.");
+        // only temporary groups count (saved groups and staff rooms have their own limits)
+        if (Object.values(this.groups).filter((x) => !x.saved && !x.room).length >= MAX_GROUPS) throw new Error("There are too many groups right now.");
         const name = String(msg.name || "").trim().replace(/\s+/g, " ").slice(0, 24);
         if (name.length < 2) throw new Error("Group names need at least 2 characters.");
         const check = checkMessage(name, await this.wordList());
@@ -776,6 +780,7 @@ export class VoiceHub extends DurableObject {
         if (g.members.length >= 20) throw new Error("A group can have up to 20 invited players.");
         const savedMine = Object.values(this.groups).filter((x) => x.saved && x.createdBy === a.id && x.id !== g.id);
         if (!g.saved && savedMine.length >= 3) throw new Error("You can keep up to 3 saved groups. Delete one first.");
+        if (!g.saved && Object.values(this.groups).filter((x) => x.saved).length >= 500) throw new Error("There are too many saved groups right now.");
         if (!g.members.some((m) => m.id === Number(u.id))) g.members.push({ id: Number(u.id), username: u.username });
         g.saved = true;
         await this.saveGroups();

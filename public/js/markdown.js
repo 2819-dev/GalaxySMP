@@ -163,7 +163,15 @@ function link(href, label) {
   try { ok = ["http:", "https:"].includes(new URL(href).protocol); } catch { /* not a link */ }
   if (!ok) return document.createTextNode(label);
   const a = el("a", "msg-link");
-  a.textContent = label;
+  // A link whose text looks like a different web address than where it really goes ([galaxymc.us](https://evil.site)):
+  // show the real site next to it, so nobody is tricked
+  let shown = label;
+  try {
+    const real = new URL(href).host.replace(/^www\./, "");
+    const m = /(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})/i.exec(label);
+    if (label !== href && m && m[1].toLowerCase().replace(/^www\./, "") !== real.toLowerCase()) shown = `${label} (${real})`;
+  } catch { /* keep the label */ }
+  a.textContent = shown;
   a.href = href;
   a.target = "_blank";
   a.rel = "noopener noreferrer nofollow ugc";

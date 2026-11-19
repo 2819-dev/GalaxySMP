@@ -26,6 +26,9 @@ async function load() {
   });
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    // A code that came in a link: make sure it's the Cube in front of them (someone could send a link to their own Cube)
+    if (code.dataset.fromLink && !confirm(`Only link a Cube that's right in front of you.\n\nDoes its screen show the code ${code.value}?`)) return;
+    delete code.dataset.fromLink;
     go.disabled = true;
     try { const r = await postJson("/api/cube/pair/claim", { code: code.value }); toast(r.message); code.value = ""; setTimeout(drawList, 4000); drawList(); }
     catch (err) { toast(err.message); }
@@ -60,7 +63,7 @@ async function load() {
   }
   drawList();
   const pre = new URLSearchParams(location.search).get("code");
-  if (pre) { code.value = pre; code.dispatchEvent(new Event("input")); }
+  if (pre) { code.value = pre; code.dispatchEvent(new Event("input")); code.dataset.fromLink = "1"; }
 }
 load();
 void iconEl;

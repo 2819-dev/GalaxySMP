@@ -606,7 +606,8 @@ class Bedwars:
             self.plugin.server.scheduler.run_task(self.plugin, watch, delay=40)
             return
         if self.has_saved(player) and not self.playing(player):
-            self.plugin.server.scheduler.run_task(self.plugin, lambda: self._welcome_back(str(player.unique_id)), delay=40)
+            uid = str(player.unique_id)
+            self.plugin.server.scheduler.run_task(self.plugin, lambda: self._welcome_back(uid), delay=40)
 
     def _rejoin(self, uid):
         p = self.online(uid)
@@ -1016,9 +1017,15 @@ class Bedwars:
                 pass
 
     def restore_beds(self):
+        from endstone_galaxylink.safety import loaded_chunks
         server = self.plugin.server
+        have = loaded_chunks(self.dim(), max_age=0)
+        self.beds_pending = False
         for key, t in self.cfg["teams"].items():
             for b in t.get("bed") or []:
+                if (int(b[0]) >> 4, int(b[2]) >> 4) not in have:
+                    self.beds_pending = True   # put back later, once loaded
+                    continue
                 try:
                     block = self.dim().get_block_at(b[0], b[1], b[2])
                     block.set_data(server.create_block_data(b[3], b[4] if len(b) > 4 else None), False)
@@ -1114,14 +1121,24 @@ class Bedwars:
                 self.sound(p, "mob.enderdragon.growl", 0.3, 1.6)
 
     def clear_placed(self):
+        """Removes blocks players placed. Only in loaded chunks (touching an unloaded one can crash the server);
+        the rest are kept in the list and removed later, once they're loaded."""
+        from endstone_galaxylink.safety import loaded_chunks
         rows = self.db.execute("SELECT x, y, z FROM bw_placed").fetchall()
+        if not rows:
+            return
         dim = self.dim()
+        have = loaded_chunks(dim, max_age=0)
+        done = []
         for x, y, z in rows:
+            if (int(x) >> 4, int(z) >> 4) not in have:
+                continue
             try:
                 dim.get_block_at(x, y, z).set_type("minecraft:air", False)
             except Exception:
                 pass
-        self.db.execute("DELETE FROM bw_placed")
+            done.append((x, y, z))
+        self.db.executemany("DELETE FROM bw_placed WHERE x = ? AND y = ? AND z = ?", done)
         self.db.commit()
 
     def clear_drops(self):
@@ -1134,7 +1151,7 @@ class Bedwars:
         their items back when they next join)."""
         try:
             if self.db.execute("SELECT 1 FROM bw_placed LIMIT 1").fetchone():
-                self.plugin.server.scheduler.run_task(self.plugin, lambda: (self.clear_placed(), self.restore_beds()), delay=100)
+                self.beds_pending = True   # the lobby tick puts the beds back and clears blocks as chunks load
         except Exception:
             pass
 
@@ -1373,6 +1390,10 @@ class Bedwars:
                 self.game_tick(t)
             else:
                 self.lobby_tick(t)
+                if self._tick % 20 == 0:   # finish a map reset that had to wait for chunks to load
+                    if getattr(self, "beds_pending", False):
+                        self.restore_beds()
+                    self.clear_placed()
             if self._tick % 2 == 0:
                 self.hud_all(t)
             if self._tick % 10 == 0 and (self.game or getattr(self, "_live_was", False)):
@@ -1698,6 +1719,15 @@ class Bedwars:
         if self.is_leave(event.item):
             event.is_cancelled = True
             return True
+        # no throwing items out of the arena (to a friend waiting outside): near the edge or above the top
+        b = self.cfg.get("bounds")
+        if b and str(event.player.unique_id) in self.players:
+            l = event.player.location
+            edge = 6
+            if (l.x < b[0] + edge or l.x > b[3] + 1 - edge or l.z < b[2] + edge or l.z > b[5] + 1 - edge or l.y > b[4] + 8):
+                event.is_cancelled = True
+                event.player.send_message("§cYou can't drop items near the edge of the arena.")
+                return True
         return False
 
     def on_use(self, event):

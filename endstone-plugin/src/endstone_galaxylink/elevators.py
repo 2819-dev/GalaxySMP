@@ -53,15 +53,28 @@ class Elevators:
         self.crouching = set() # players who were crouching in a cabin last check
         self.ticks = 0
         self.last_tap = {}
-        for e in self.list.values():  # the server stopped mid-trip: put the floor back where it was
+        for e in self.list.values():  # the server stopped mid-trip: the floor is put back later, once its chunks load
             if e.get("row") is not None and e["row"] != e["cur"]:
+                e["repair_row"] = e["row"]
+            e["row"] = e["cur"]
+            e["queue"] = []
+
+    def _loaded(self, e):
+        from endstone_galaxylink.safety import area_loaded
+        try:
+            return area_loaded(self.dim(e), e["x1"], e["z1"], e["x2"], e["z2"])
+        except Exception:
+            return False
+
+    def repair(self):
+        """Puts back cabin floors left half-way by a restart (only when the elevator's chunks are loaded)."""
+        for e in self.list.values():
+            if e.get("repair_row") is not None and self._loaded(e):
                 try:
-                    self.set_row(e, e["row"], None)
+                    self.set_row(e, e.pop("repair_row"), None)
                     self.set_row(e, e["cur"], e["floor_block"])
                 except Exception:
                     pass
-            e["row"] = e["cur"]
-            e["queue"] = []
 
     def save(self):
         self.eco.set_config("elevators", self.list)
@@ -332,12 +345,16 @@ class Elevators:
         self.ticks += 1
         if self.ticks % 5 == 0 and self.list:
             self.check_crouch()
+        if self.ticks % 50 == 0 and self.list:
+            self.repair()
         for eid in list(self.trips):
             t = self.trips[eid]
             e = self.list.get(eid)
             if not e:
                 self.trips.pop(eid, None)
                 continue
+            if not self._loaded(e):
+                continue   # nobody is near and its chunks unloaded: wait until they load again
             if t["wait"] > 0:
                 t["wait"] -= 2
                 if t["wait"] <= 0:
@@ -375,6 +392,12 @@ class Elevators:
             if t["p"] >= distance:
                 self.arrive(eid)
 
+    def _sound_uid(self, uid, sound, volume, pitch):
+        from endstone_galaxylink.safety import alive
+        p = alive(self.plugin, uid)
+        if p is not None:
+            self._sound(p, sound, volume, pitch)
+
     def arrive(self, eid):
         e = self.list[eid]
         t = self.trips.pop(eid)
@@ -385,7 +408,8 @@ class Elevators:
         for p in self.plugin.server.online_players:
             if self.inside(e, p) or (p.dimension.name == e["dim"] and self.near(e, p.location, 4) and abs(p.location.y - (t["to"] + 1)) < 3):
                 self._sound(p, "note.pling", 0.9, 1.6)
-                self.plugin.server.scheduler.run_task(self.plugin, lambda p=p: self._sound(p, "note.pling", 0.9, 1.2), delay=4)
+                uid = p.unique_id
+                self.plugin.server.scheduler.run_task(self.plugin, lambda uid=uid: self._sound_uid(uid, "note.pling", 0.9, 1.2), delay=4)
                 self._sound(p, "random.door_open", 0.8, 1.0)
                 try:
                     show_title(self.plugin, p, "", f"§f§l{name}", 3, 25, 8)

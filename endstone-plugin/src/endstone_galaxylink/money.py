@@ -67,10 +67,13 @@ def item_id(stack):
 
 
 def is_special(stack):
-    """Named or enchanted items are never sold by /sell (so nobody loses their best gear)."""
+    """Named, enchanted or damaged items are never sold by /sell (so nobody loses their best gear), and never
+    go into shop chests or buy orders (they come back out as brand-new items, which would repair them for free)."""
     try:
         meta = stack.item_meta
-        return bool(meta.has_display_name or meta.has_enchants)
+        if meta.has_display_name or meta.has_enchants:
+            return True
+        return bool(getattr(meta, "has_damage", False) and getattr(meta, "damage", 0) > 0)
     except Exception:
         return False
 

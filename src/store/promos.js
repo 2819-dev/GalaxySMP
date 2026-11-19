@@ -245,3 +245,24 @@ export async function updateRoute(request, env, ctx, url, params) {
   await audit(sql, user.id, `promo.${body.action}`, { code: p.code });
   return json({ ok: true });
 }
+
+// Takes one use of a promo code, atomically: a lock on the code, then the limits are checked and the use written in the
+// same transaction. So two checkouts at the same moment can't both use a one-use code. Returns the redemption id.
+export async function reservePromo(sql, promo, userId, { item, option = null, price, final, status = "pending", paymentId = null }) {
+  const live = "(status = 'used' OR (status = 'pending' AND created_at > now() - interval '2 hours'))";
+  const [, rows] = await sql.transaction([
+    sql`SELECT pg_advisory_xact_lock(${770000000 + Number(promo.id)})`,
+    sql`INSERT INTO promo_redemptions (promo_id, user_id, item, option, price_cents, final_cents, status, payment_id)
+        SELECT ${promo.id}, ${userId}, ${item}, ${option}, ${price}, ${final}, ${status}, ${paymentId}
+         WHERE (${promo.max_uses}::int IS NULL OR (SELECT count(*) FROM promo_redemptions WHERE promo_id = ${promo.id}
+                  AND (status = 'used' OR (status = 'pending' AND created_at > now() - interval '2 hours'))) < ${promo.max_uses}::int)
+           AND (${promo.per_player}::int IS NULL OR (SELECT count(*) FROM promo_redemptions WHERE promo_id = ${promo.id} AND user_id = ${userId}
+                  AND (status = 'used' OR (status = 'pending' AND created_at > now() - interval '2 hours'))) < ${promo.per_player}::int)
+        RETURNING id`,
+  ]);
+  void live;
+  if (!rows.length) throw new HttpError(409, promo.per_player === 1 ? "You've already used that promo code." : "That promo code has been used up.");
+  return Number(rows[0].id);
+}
+export const promoUsed = (sql, id) => sql`UPDATE promo_redemptions SET status = 'used' WHERE id = ${id}`;
+export const promoCancel = (sql, id) => sql`UPDATE promo_redemptions SET status = 'cancelled' WHERE id = ${id} AND status <> 'used'`;

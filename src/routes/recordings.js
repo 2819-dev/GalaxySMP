@@ -162,7 +162,7 @@ export async function file(request, env, ctx, url, params) {
   if (!r) throw new HttpError(404, "That recording isn't available.");
   const obj = await env.RECORDINGS.get(r.r2_key, { range: request.headers });
   if (!obj) throw new HttpError(404, "That recording file is missing.");
-  const headers = new Headers({ "Content-Type": r.mime, "Accept-Ranges": "bytes", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" });
+  const headers = new Headers({ "Content-Type": r.mime, "Accept-Ranges": "bytes", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox" });
   if (url.searchParams.has("download")) headers.set("Content-Disposition", `attachment; filename="${String(r.title).replace(/[^\w\- ]+/g, "").slice(0, 40) || "stage"}.${r.mime === "video/mp4" ? "mp4" : "webm"}"`);
   if (obj.range && request.headers.get("Range")) {
     const start = obj.range.offset ?? 0;
@@ -320,7 +320,7 @@ export async function episodeAudio(request, env, ctx, url, params) {
   }
   const obj = await env.RECORDINGS.get(e.r2_key, { range: request.headers });
   if (!obj) throw new HttpError(404, "That episode file is missing.");
-  const headers = new Headers({ "Content-Type": e.mime || "audio/mpeg", "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff" });
+  const headers = new Headers({ "Content-Type": e.mime || "audio/mpeg", "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox" });
   if (obj.range && request.headers.get("Range")) {
     const start = obj.range.offset ?? 0;
     const len = obj.range.length ?? (obj.size - start);

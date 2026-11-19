@@ -179,18 +179,22 @@ class Jobs:
             except Exception:
                 pass
         x = str(player.xuid)
-        owed, _ = self.pending.get(x, (0, None))
-        self.pending[x] = (owed + cents, player)
+        owed = self.pending.get(x, (0, None, None))[0]
+        self.pending[x] = (owed + cents, player.name, player.unique_id)   # never keep the player object (they may leave)
 
     def tick(self):
         """Every 5 seconds: add what players earned and show it above the hotbar."""
         if not self.pending:
             return
-        for x, (cents, player) in list(self.pending.items()):
+        from endstone_galaxylink.safety import alive
+        for x, (cents, name, uid) in list(self.pending.items()):
             if cents <= 0:
                 continue
-            self.eco.add(x, player.name, cents)
+            self.eco.add(x, name, cents)
             info = self.data.get(x)
+            player = alive(self.plugin, uid)
+            if player is None:
+                continue
             try:
                 player.send_tip(f"§a+{dollars(cents)} §7({JOB_BY_KEY[info['job']][1]})" if info else f"§a+{dollars(cents)}")
             except Exception:

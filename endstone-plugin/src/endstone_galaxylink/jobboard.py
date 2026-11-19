@@ -14,8 +14,8 @@ class JobBoard:
     def __init__(self, plugin):
         self.plugin = plugin
         self.eco = plugin.economy
-        # job id -> True (money taken) / False (an operator: nothing taken)
-        self.held = {str(k): bool(v) for k, v in (self.eco.get_config("jobboard_held") or {}).items()}
+        # job id -> cents taken (older saves: True = taken) / False (an operator: nothing taken)
+        self.held = {str(k): (v if isinstance(v, (bool, int)) else bool(v)) for k, v in (self.eco.get_config("jobboard_held") or {}).items()}
 
     def save(self):
         if len(self.held) > 3000:
@@ -30,7 +30,7 @@ class JobBoard:
         """Takes the reward. Returns (ok, charged, message)."""
         jid = str(int(jid))
         if jid in self.held:
-            return True, self.held[jid], None
+            return True, bool(self.held[jid]), None
         cents = int(cents)
         xuid = str(xuid)
         if cents <= 0 or not xuid.isdigit():
@@ -43,7 +43,7 @@ class JobBoard:
             if not self.eco.take(xuid, cents):
                 return False, False, f"You need {money.exact(cents)} to post this job. You have {money.exact(have)}."
             charged = True
-        self.held[jid] = charged
+        self.held[jid] = cents if charged else False
         self.save()
         if p is not None:
             p.send_message("§aYour job was posted in §e#Jobs§a on galaxymc.us." + (f" §e{money.exact(cents)}§a is held until it's done." if charged else ""))
@@ -53,8 +53,12 @@ class JobBoard:
         """The website never managed to post this job: give the money back if it was taken. Returns True if it was."""
         charged = self.held.pop(str(int(jid)), None)
         self.save()
-        if charged and str(xuid).isdigit() and int(cents or 0) > 0:
-            self.eco.add(str(xuid), str(name or "")[:32], int(cents))
+        # give back what was really taken (never more than that)
+        amount = int(cents or 0) if charged is True else (charged if isinstance(charged, int) and not isinstance(charged, bool) else 0)
+        if charged is True:
+            amount = min(amount, 10_000_000_00)
+        if amount > 0 and str(xuid).isdigit():
+            self.eco.add(str(xuid), str(name or "")[:32], amount)
             return True
         return False
 

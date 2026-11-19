@@ -99,6 +99,9 @@ export async function decideAppeal(request, env, ctx, url, params) {
   if (!a) throw new HttpError(404, "That appeal no longer exists.");
   if (a.status !== "open") throw new HttpError(409, "This appeal was already answered.");
   const notes = [];
+  if (status === "accepted" && body.unban !== false && !can(user, "ban_members")) {
+    throw new HttpError(403, "Your rank can't lift bans. Accept without unbanning, or ask someone who can ban players.");
+  }
   if (status === "accepted" && body.unban !== false) {
     const bans = await bansFor(sql, a.gamertag);
     if (bans.website && bans.websiteUser && !isOwner(env, bans.websiteUser.username, false)) {

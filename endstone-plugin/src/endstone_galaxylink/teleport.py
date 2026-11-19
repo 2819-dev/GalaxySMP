@@ -39,6 +39,9 @@ class Teleports:
 
     def go(self, player, get_spot, label, run=None):
         """Teleport after a 3-second wait. get_spot is called at the end, so it follows moving players."""
+        if self.in_minigame(player):
+            player.send_message("§cYou can't teleport during a minigame. Leave it first.")
+            return
         # operators, and teleports from a command plate (people keep walking after stepping on one), go instantly
         from_plate = time.time() - getattr(self, "plate_at", {}).get(str(player.unique_id), 0) < 1.5
         if player.is_op or from_plate:
@@ -63,7 +66,22 @@ class Teleports:
             return
         self._finish(player, get_spot, label, run)
 
+    def in_minigame(self, player):
+        """Players in Bedwars or building in the Build Contest can't teleport out (they'd keep the game's items)."""
+        bw = getattr(self.plugin, "bedwars", None)
+        bc = getattr(self.plugin, "buildcontest", None)
+        try:
+            return bool((bw is not None and bw.playing(player)) or (bc is not None and bc.building(player)))
+        except Exception:
+            return False
+
     def _finish(self, player, get_spot, label, run=None):
+        if self.in_minigame(player):
+            player.send_message("§cYou can't teleport during a minigame. Leave it first.")
+            return
+        pk = getattr(self.plugin, "parkour", None)
+        if pk is not None and pk.runs.pop(str(player.unique_id), None):
+            player.send_message("§7Parkour run stopped because you teleported.")
         if run is not None:   # a teleport that isn't to a fixed spot (/rtp)
             self.back[str(player.unique_id)] = where(player)
             return run(player)

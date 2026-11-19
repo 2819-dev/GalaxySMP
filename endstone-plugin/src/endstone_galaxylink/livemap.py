@@ -189,14 +189,9 @@ class LiveMap:
     # ---------- the land ----------
     @staticmethod
     def loaded(dim):
-        """{(cx, cz)} of the chunks this dimension has loaded right now."""
-        out = set()
-        for c in dim.loaded_chunks:
-            try:
-                out.add((c.x, c.z))
-            except Exception:
-                continue
-        return out
+        """{(cx, cz)} of the chunks this dimension has loaded (shared, remembered for 2 seconds)."""
+        from endstone_galaxylink.safety import loaded_chunks
+        return loaded_chunks(dim)
 
     def wanted(self, now):
         """Chunks near Overworld players that need (re)drawing (and are loaded), nearest first."""

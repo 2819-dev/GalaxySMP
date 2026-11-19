@@ -49,7 +49,7 @@ class Rewards:
                 self.tell(xuid, cents, keys, str(r.get("reason") or "")[:120], packs)
             if any(packs.values()):
                 self.plugin.packs.give(xuid, packs)
-        self.given = self.given[-3000:]
+        self.given = self.given[-20000:]
         self.eco.set_config("rewards_given", self.given)
         if done:
             voice = getattr(self.plugin, "_voice", None)

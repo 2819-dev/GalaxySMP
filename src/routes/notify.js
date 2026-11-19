@@ -106,7 +106,8 @@ export async function testPush(request, env) {
 const NOT_IN_INBOX = new Set(["summary", "reward", "server"]);
 async function toInbox(sql, ids, kind, m) {
   const title = String(m.title || "GalaxySMP").slice(0, 80), body = String(m.body || "").slice(0, 200);
-  const url = String(m.url || "/").startsWith("/") ? String(m.url || "/").slice(0, 200) : "/";
+  const raw = String(m.url || "/");
+  const url = /^\/(?!\/)/.test(raw) && !raw.includes("\\") ? raw.slice(0, 200) : "/";   // a page on this site only (never //other-site)
   const tag = m.tag ? String(m.tag).slice(0, 80) : null;
   await sql`INSERT INTO notifications (user_id, kind, title, body, url, tag)
             SELECT x, ${kind}, ${title}, ${body}, ${url}, ${tag} FROM unnest(${ids}::bigint[]) AS x
@@ -192,7 +193,7 @@ export async function notify(env, userIds, kind, message, options = {}) {
   const payload = {
     title: String(message.title || "GalaxySMP").slice(0, 80),
     body: String(message.body || "").slice(0, 200),
-    url: message.url || "/",
+    url: /^\/(?!\/)/.test(String(message.url || "")) ? message.url : "/",
     tag: message.tag || kind || "galaxysmp",
     ttl: message.ttl,
     urgent: message.urgent,

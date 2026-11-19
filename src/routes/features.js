@@ -256,7 +256,8 @@ async function loadPoll(sql, pid, user) {
     SELECT p.id, p.question, p.multi, p.author_id, p.closes_at, p.channel_id, p.private, u.username AS author,
            (p.closed OR (p.closes_at IS NOT NULL AND p.closes_at < now())) AS is_closed,
            (SELECT count(DISTINCT v.user_id) FROM poll_votes v WHERE v.poll_id = p.id) AS voters
-      FROM polls p LEFT JOIN users u ON u.id = p.author_id WHERE p.id = ${pid} AND p.deleted_at IS NULL`;
+      FROM polls p LEFT JOIN users u ON u.id = p.author_id WHERE p.id = ${pid} AND p.deleted_at IS NULL
+       AND (p.channel_id IS NULL OR NOT EXISTS (SELECT 1 FROM channels c WHERE c.id = p.channel_id AND c.staff_only) OR ${can(user, "staff_chat")})`;
   if (!p) return null;
   const options = await sql`
     SELECT o.id, o.poll_id, o.label, (SELECT count(*) FROM poll_votes v WHERE v.option_id = o.id) AS votes,
@@ -301,7 +302,8 @@ export async function chatPollCreate(request, env) {
   const { question, opts, closesAt } = pollInput(body);
   await filterOrThrow(sql, [question, ...opts]);
   const [ch] = await sql`SELECT c.id FROM channels c, users u JOIN roles r ON r.id = u.role_id
-                          WHERE c.id = ${Number(body.channelId) || 0} AND c.kind = 'text' AND NOT c.hidden AND u.id = ${user.id} AND r.power >= c.min_post_power`;
+                          WHERE c.id = ${Number(body.channelId) || 0} AND c.kind = 'text' AND NOT c.hidden AND u.id = ${user.id} AND r.power >= c.min_post_power
+                            AND (NOT c.staff_only OR ${can(user, "staff_chat")})`;
   if (!ch) throw new HttpError(403, "You can't post in this channel.");
   if (body.private && !user.owner) throw new HttpError(403, "Only the owner can make private polls.");
   const [p] = await sql`INSERT INTO polls (question, multi, author_id, closes_at, channel_id, private)
@@ -346,7 +348,9 @@ export async function pollAction(request, env, ctx, url, params) {
   const user = await requireUser(request, env);
   const sql = getDb(env);
   const pid = id(params.id);
-  const [p] = await sql`SELECT id, question, multi, author_id, channel_id, (closed OR (closes_at IS NOT NULL AND closes_at < now())) AS is_closed FROM polls WHERE id = ${pid} AND deleted_at IS NULL`;
+  const [p] = await sql`SELECT id, question, multi, author_id, channel_id, (closed OR (closes_at IS NOT NULL AND closes_at < now())) AS is_closed FROM polls
+                         WHERE id = ${pid} AND deleted_at IS NULL
+                           AND (channel_id IS NULL OR NOT EXISTS (SELECT 1 FROM channels c WHERE c.id = polls.channel_id AND c.staff_only) OR ${can(user, "staff_chat")})`;
   const changed = () => (p.channel_id ? hubBroadcast(env, { type: "poll", id: Number(pid) }).catch(() => {}) : null);
   if (!p) throw new HttpError(404, "That poll no longer exists.");
   if (params.action === "vote") {
@@ -596,6 +600,11 @@ export async function tick(env) {
   await sql`DELETE FROM server_health WHERE at < now() - interval '3 days'`.catch(() => {});
   await sql`DELETE FROM server_errors WHERE last_at < now() - interval '30 days'`.catch(() => {});
   await sql`DELETE FROM server_events WHERE at < now() - interval '30 days'`.catch(() => {});
+  // pictures and voice messages uploaded but never sent (older than a day)
+  await sql`DELETE FROM message_images i WHERE i.created_at < now() - interval '1 day'
+              AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.image_id = i.id) AND NOT EXISTS (SELECT 1 FROM dm_messages d WHERE d.image_id = i.id)`.catch(() => {});
+  await sql`DELETE FROM message_audio a WHERE a.created_at < now() - interval '1 day'
+              AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.audio_id = a.id) AND NOT EXISTS (SELECT 1 FROM dm_messages d WHERE d.audio_id = a.id)`.catch(() => {});
   // "Starting in 15 minutes" to everyone who tapped Remind me.
   const soon = await sql`
     UPDATE events SET reminded = true

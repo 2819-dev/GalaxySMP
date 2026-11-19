@@ -113,6 +113,9 @@ class Plates:
             key = key_of(b.dimension.name, b.x, b.y, b.z)
         except Exception:
             return
+        if key in self.plates and not event.player.is_op:
+            event.is_cancelled = True
+            return
         if key in self.plates:
             self.plates.pop(key, None)
             self.save()

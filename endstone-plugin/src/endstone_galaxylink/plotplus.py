@@ -133,8 +133,9 @@ class PlotPlus:
             self.push()
             player.send_message("§7Your plot isn't listed any more.")
 
-    def buy(self, xuid, pid):
-        """Returns (ok, message). The buyer must be online (they need room for another plot)."""
+    def buy(self, xuid, pid, seen=None):
+        """Returns (ok, message). The buyer must be online (they need room for another plot).
+        seen: the price the buyer saw on the website (refused if the seller changed it since)."""
         p = self.online(xuid)
         if p is None:
             return False, "You need to be online in Minecraft to buy a plot."
@@ -147,6 +148,8 @@ class PlotPlus:
         if not self.plots.room(p, bool(plot.get("shop"))) and not p.is_op:
             return False, f"You've reached your {self.plots.kind_word(plot)} limit. Get more with Galaxy+ or Pro+ (galaxymc.us/store)."
         price = int(l["price"])
+        if seen is not None and int(seen) != price:
+            return False, "The seller just changed the price. Check the new price and try again."
         if not self.eco.charge(p, price):
             return False, f"You need {money.exact(price)} for this plot."
         old, old_name = plot["owner"], plot.get("owner_name")
@@ -168,7 +171,7 @@ class PlotPlus:
             market.record_sale("plot", f"{pid}-{int(time.time())}", old, old_name, p.xuid, p.name, self.plots.label(plot), 1, price)
         return True, f"You bought {self.plots.label(plot)} for {money.exact(price)}."
 
-    def rent(self, xuid, pid, days):
+    def rent(self, xuid, pid, days, seen=None):
         p = self.online(xuid)
         if p is None:
             return False, "You need to be online in Minecraft to rent a plot."
@@ -180,6 +183,8 @@ class PlotPlus:
             return False, "That's your own plot."
         if plot.get("rental"):
             return False, f"Someone is renting it right now. It's free again in {self.left(plot['rental']['until'])}."
+        if seen is not None and int(seen) != int(l["price"]):
+            return False, "The owner just changed the daily price. Check the new price and try again."
         days = max(1, min(int(days), int(l["maxDays"])))
         cost = days * int(l["price"])
         if not self.eco.charge(p, cost):
@@ -245,9 +250,9 @@ class PlotPlus:
         try:
             pid = int(msg.get("id"))
             if msg.get("op") == "buy":
-                ok, text = self.buy(msg.get("xuid"), pid)
+                ok, text = self.buy(msg.get("xuid"), pid, msg.get("price"))
             elif msg.get("op") == "rent":
-                ok, text = self.rent(msg.get("xuid"), pid, int(msg.get("days") or 1))
+                ok, text = self.rent(msg.get("xuid"), pid, int(msg.get("days") or 1), msg.get("price"))
             else:
                 ok, text = False, "Unknown action."
         except Exception as e:

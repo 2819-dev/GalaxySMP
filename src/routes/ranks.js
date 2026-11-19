@@ -174,9 +174,22 @@ async function changed(env) {
 }
 
 // One place for every change, used by both the website and the in-game menu.
+// A Control Panel member who isn't the owner can only hand out (or take away) website permissions they have themselves.
+function checkLimit(actor, perms) {
+  if (!actor.limit) return;
+  if ((perms || []).some((p) => !actor.limit.has(p))) throw new HttpError(403, "That rank has website permissions your rank doesn't have, so only someone with those permissions can change it.");
+}
+async function checkRankIds(sql, actor, ids) {
+  if (!actor.limit || !ids.length) return;
+  const rows = await sql`SELECT web_perms FROM ranks WHERE id = ANY(${ids})`;
+  for (const r of rows) checkLimit(actor, r.web_perms);
+}
+
 async function applyAction(env, sql, action, body, actor) {
+  if (action === "update" || action === "delete") await checkRankIds(sql, actor, [Number(body.id) || 0]);
   if (action === "create" || action === "update") {
     const r = await validRank(env, sql, body);
+    checkLimit(actor, r.webPerms);
     let rank;
     try {
       if (action === "create") {
@@ -270,6 +283,7 @@ async function applyAction(env, sql, action, body, actor) {
     }
     const added = next.filter((id) => !have.includes(id));
     const removed = have.filter((id) => !next.includes(id));
+    await checkRankIds(sql, actor, [...added, ...removed]);
     if (removed.length) await sql`DELETE FROM player_ranks WHERE xuid = ${xuid} AND rank_id = ANY(${removed})`;
     for (const id of added) {
       await sql`INSERT INTO player_ranks (xuid, rank_id, assigned_by) VALUES (${xuid}, ${id}, ${actor.label}) ON CONFLICT DO NOTHING`;
@@ -291,7 +305,7 @@ async function applyAction(env, sql, action, body, actor) {
 async function requireAdmin(request, env) {
   const user = await requireUser(request, env);
   if (!can(user, "manage_ranks")) throw new HttpError(403, "Your rank can't manage ranks.");
-  return { id: Number(user.id), label: user.username };
+  return { id: Number(user.id), label: user.username, limit: user.owner ? null : new Set(user.perms || []) };
 }
 
 export async function listRanks(request, env, ctx, url) {

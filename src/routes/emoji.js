@@ -27,7 +27,7 @@ export async function emojiImage(request, env, ctx, url, params) {
   if (!NAME_RE.test(name)) return new Response("Not found", { status: 404 });
   const [e] = await getDb(env)`SELECT mime, data FROM emoji WHERE name = ${name}`;
   if (!e) return new Response("Not found", { status: 404 });
-  return new Response(Buffer.from(e.data, "base64"), { headers: { "Content-Type": e.mime, "Cache-Control": "public, max-age=604800, immutable", "X-Content-Type-Options": "nosniff" } });
+  return new Response(Buffer.from(e.data, "base64"), { headers: { "Content-Type": e.mime, "Cache-Control": "public, max-age=604800, immutable", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox" } });
 }
 
 async function requireAdmin(request, env) {

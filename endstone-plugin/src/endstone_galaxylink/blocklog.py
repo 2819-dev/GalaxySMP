@@ -236,13 +236,21 @@ class BlockLog:
             first.setdefault(key, (ot, os_))
             last[key] = t
             by_key.setdefault(key, []).append(rid)
-        changes = []
+        # spots someone else changed afterwards are left alone (one query, not one per block)
+        others = {}
+        if first:
+            w2, a2 = "xuid <> ? AND t >= ? AND undone = 0", [str(xuid), since]
+            if radius is not None:
+                w2 += " AND dim = ? AND x BETWEEN ? AND ? AND z BETWEEN ? AND ?"
+                a2 += [dim, cx - radius, cx + radius, cz - radius, cz + radius]
+            for d, x, y, z, t in self.db.execute(f"SELECT dim, x, y, z, max(t) FROM block_log WHERE {w2} GROUP BY dim, x, y, z", a2):
+                others[(d, x, y, z)] = t
+        changes, ids = [], {}
         for key, (ot, os_) in first.items():
-            later = self.db.execute("SELECT 1 FROM block_log WHERE dim = ? AND x = ? AND y = ? AND z = ? AND xuid <> ? AND t > ? AND undone = 0 LIMIT 1",
-                                    (*key, str(xuid), last[key])).fetchone()
-            if not later:
-                changes.append((*key, ot, json.loads(os_ or "{}")))
-                ids += by_key[key]
+            if others.get(key, 0) > last[key]:
+                continue
+            changes.append((*key, ot, json.loads(os_ or "{}")))
+            ids[key] = by_key[key]
         return changes, ids
 
     def preview(self, player, name, span, radius):
@@ -286,17 +294,24 @@ class BlockLog:
         r = self.running
         if not r:
             return
+        from endstone_galaxylink.safety import loaded_chunks
         batch, r["todo"] = r["todo"][:BATCH], r["todo"][BATCH:]
+        r.setdefault("undone_ids", [])
         for d, x, y, z, block_type, states in batch:
             try:
+                # never touch an unloaded chunk (that can crash the server): those are left for a later rollback
+                if (int(x) >> 4, int(z) >> 4) not in loaded_chunks(self.plugin.server.level.get_dimension(d)):
+                    r["failed"] += 1
+                    continue
                 self.restore(d, x, y, z, block_type, states)
                 r["done"] += 1
+                r["undone_ids"] += r["ids"].get((d, x, y, z), [])
             except Exception:
                 r["failed"] += 1
         if r["todo"]:
             self.plugin.server.scheduler.run_task(self.plugin, self._step, delay=1)
             return
-        self.db.executemany("UPDATE block_log SET undone = 1 WHERE id = ?", [(i,) for i in r["ids"]])
+        self.db.executemany("UPDATE block_log SET undone = 1 WHERE id = ?", [(i,) for i in r.get("undone_ids", [])])
         self.db.commit()
         self.running = None
         by = self.plugin.server.get_player(r["by_uid"]) if r.get("by_uid") is not None else None

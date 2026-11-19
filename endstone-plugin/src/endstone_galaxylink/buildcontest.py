@@ -40,6 +40,9 @@ def usd(cents):
     return f"${cents / 100:,.2f}".replace(".00", "")
 
 
+STORAGE = ("chest", "barrel", "shulker", "hopper", "dropper", "dispenser", "crafter", "frame", "armor_stand", "minecart", "boat",
+           "furnace", "smoker", "brewing_stand", "lectern", "jukebox", "decorated_pot", "chiseled_bookshelf", "bundle", "campfire")
+
 class BuildContest:
     def __init__(self, plugin):
         self.plugin = plugin
@@ -351,7 +354,7 @@ class BuildContest:
             p = self.online(x)
             if p is not None:
                 self.restore_player(p, teleport=False)
-        self.cmd(f"kill @e[type=item,x={ox},y={oy},z={oz},dx={WIDTH},dy={HEIGHT + 2},dz={WIDTH}]")
+        self.cmd(f"kill @e[type=!player,type=!painting,x={ox},y={oy},z={oz},dx={WIDTH},dy={HEIGHT + 2},dz={WIDTH}]")
         voters = set(c["plots"])
         for p in self.plugin.server.online_players:
             l = p.location
@@ -615,6 +618,12 @@ class BuildContest:
                 self.jobs.append([self._job_reset(list((c.get("plots") or {}).values())), 200])
                 mg.mail(e["host"], "§eYour Build Contest stopped because the server restarted. Sorry! The prize was given back.")
 
+    @staticmethod
+    def _storage(type_id):
+        """Blocks and things that hold items (Creative items must not leave the arena in them)."""
+        t = str(type_id).lower().replace("chestplate", "")
+        return any(k in t for k in STORAGE)
+
     def on_block(self, event, placing):
         """Returns True when the contest handled it (allowed or refused)."""
         b = event.block
@@ -623,6 +632,12 @@ class BuildContest:
             return False
         e, c = self.contest()
         if c and c.get("phase") == "building" and str(p.xuid) in c["plots"]:
+            if placing:
+                new = getattr(event, "block_placed_state", None)
+                if new is not None and self._storage(new.type):
+                    event.is_cancelled = True
+                    p.send_message("§cChests and other storage can't be used in the Build Contest.")
+                    return True
             if self.plot_at(b.x, b.y, b.z) == c["plots"][str(p.xuid)]:
                 return True  # building in your own plot
             event.is_cancelled = True
@@ -635,6 +650,22 @@ class BuildContest:
         return True
 
     def on_interact(self, event):
+        # storage in the arena can't be opened while a contest is on (Creative items could be taken out)
+        try:
+            if event.has_block and self._storage(event.block.type):
+                b = event.block
+                _, c = self.contest()
+                if self.in_arena(b.dimension.name, b.x, b.y, b.z) and (c and c.get("phase") in ("building", "voting") or not event.player.is_op):
+                    event.is_cancelled = True
+                    event.player.send_message("§cStorage can't be opened in the Build Contest arena.")
+                    return True
+            it = event.item
+            if it is not None and self.building(event.player) and self._storage(getattr(it.type, "id", it.type)):
+                event.is_cancelled = True
+                event.player.send_message("§cChests and other storage can't be used in the Build Contest.")
+                return True
+        except Exception:
+            pass
         if not self.building(event.player):
             return False
         try:

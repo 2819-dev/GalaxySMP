@@ -1,3 +1,4 @@
+import { flooding, closeFlooder } from "../lib/flood.js";
 // StreamRoom: one Durable Object per live Stage (like Discord Stages: speakers talk, share their screen or
 // camera; the audience listens, chats, reacts and can raise their hand to speak).
 //
@@ -101,7 +102,8 @@ export class StreamRoom extends DurableObject {
     await this.ctx.storage.put("info", this.info);
     await this.ctx.storage.delete("chat");
     await this.ctx.storage.delete("poll");
-    this.chat = []; this.poll = null;
+    await this.ctx.storage.delete("kicked");
+    this.chat = []; this.poll = null; this.kicked = new Set();
     const n = this.people().size;
     await getDb(this.env)`UPDATE streams SET status = 'ended', ended_at = now(), ended_by = ${String(by || "").slice(0, 40)},
                            peak_viewers = greatest(peak_viewers, ${n}) WHERE id = ${this.info.id} AND status <> 'ended'`.catch((e) => console.error("stream end", e));
@@ -144,6 +146,8 @@ export class StreamRoom extends DurableObject {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected WebSocket", { status: 426 });
     const user = JSON.parse(request.headers.get("X-GSMP-User"));
     if (!this.info || (this.info.status !== "live" && this.info.status !== "backstage")) return new Response("This stage isn't live.", { status: 409 });
+    this.kicked ||= new Set((await this.ctx.storage.get("kicked")) || []);
+    if (this.kicked.has(Number(user.id)) && !user.manage && !user.mod) return new Response("A host removed you from this stage.", { status: 403 });
     if (this.info.status === "backstage" && !user.manage && !user.stage && !user.mod) return new Response("This stage hasn't started yet.", { status: 409 });
     const people = this.people();
     if (!people.has(user.id) && people.size >= MAX_VIEWERS && !user.manage && !user.stage && !user.mod) {
@@ -177,7 +181,9 @@ export class StreamRoom extends DurableObject {
     try { msg = JSON.parse(typeof raw === "string" ? raw : new TextDecoder().decode(raw)); } catch { return; }
     const a = ws.deserializeAttachment();
     if (!a || a.gone) return;
+    if (flooding(ws)) return closeFlooder(ws);
     const reply = (data) => this.send(ws, { type: "reply", req: msg.req, ...data });
+    if (msg.type === "rtc.session" && flooding(ws, "rtc", 0.4, 4)) return reply({ error: "Slow down a little." });
     try {
       await this.onMessage(ws, a, msg, reply);
     } catch (e) {
@@ -314,8 +320,7 @@ export class StreamRoom extends DurableObject {
         if (this.info?.chatOn === false && !a.manage && !a.mod) throw new Error("The hosts turned the chat off.");
         const now = Date.now();
         if (now - (a.lastChat || 0) < 1200) throw new Error("Slow down a little.");
-        const sql = getDb(this.env);
-        const words = compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`);
+        const words = await this.captionWords();
         const check = checkMessage(String(msg.text || ""), words, { allowLinks: false, maxLength: 200 });
         if (!check.ok) throw new Error(check.message || "That message isn't allowed.");
         if (!check.text.trim()) return reply({ ok: true });
@@ -338,6 +343,9 @@ export class StreamRoom extends DurableObject {
         if (!a.manage && !a.mod) throw new Error("Only the stage's hosts and staff can do that.");
         const p = target(msg.id);
         if (p && !p.a.manage) {
+          this.kicked ||= new Set((await this.ctx.storage.get("kicked")) || []);
+          this.kicked.add(Number(p.a.id));
+          await this.ctx.storage.put("kicked", [...this.kicked].slice(-500));
           this.send(p.ws, { type: "closed", reason: "A host removed you from this stage." });
           this.update(p.ws, { gone: true });
           try { p.ws.close(4004, "removed"); } catch { /* gone */ }

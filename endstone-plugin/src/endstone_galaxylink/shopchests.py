@@ -242,7 +242,7 @@ class ShopChests:
         if hand is None or not hand.amount:
             return player.send_message("§eHold the item you want to sell or buy, then sneak + tap the chest.")
         if money.is_special(hand):
-            return player.send_message("§cNamed or enchanted items can't go in shop chests. Use the Auction House: /ah")
+            return player.send_message("§cNamed, enchanted or damaged items can't go in shop chests. Use the Auction House: /ah")
         item = money.item_id(hand)
         name = money.item_label(hand)
         have = self.plugin.shop.count(player, item)

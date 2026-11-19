@@ -616,6 +616,18 @@ On Jewish holidays, New Year and the first day of each season, a holiday block s
 
 **Upgrade your plot.** In the Plot Manager tap **Upgrade plot** to make it 8 blocks wider, 8 blocks longer or 16 blocks taller. The first upgrade costs $5,000 and each one after that costs double.`,
   },
+  {
+    id: "2026-11-19-security-stability",
+    title: "Security and stability improvements",
+    body: `This update makes GalaxySMP safer and more reliable, on the website and in game.
+
+- **More stable server.** Plots, Bedwars, elevators and rollbacks now wait for the world to load before changing blocks, so they can't cause a crash. The server also keeps running smoothly if a single feature runs into a problem.
+- **Fairer play.** Minigame items stay in their minigames, plots are better protected (pistons, animals, armor stands and buckets), and parkour times have to be earned on foot.
+- **Safer trading.** When you buy or rent a plot from the website, you always pay the price you saw. Damaged gear can't go into shop chests or buy orders.
+- **Website protection.** Live chat, voice chat and Stages are protected against message flooding, and permissions, promo codes and gifts have extra checks.
+
+Thanks for playing on GalaxySMP. If you ever find a bug, please report it to staff instead of using it.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

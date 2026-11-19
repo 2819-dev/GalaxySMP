@@ -8,6 +8,7 @@ plan includes (plans.json "cosmetics"). Night Vision bought in the Store is kept
 import json
 import time
 
+from endstone_galaxylink.safety import later
 from endstone.form import ActionForm, ModalForm, TextInput, Toggle
 
 TRAILS = {
@@ -242,9 +243,9 @@ class Cosmetics:
                 except Exception:
                     pass
         if "join_firework" in mine and s.get("firework", True):
-            self.plugin.server.scheduler.run_task(self.plugin, lambda: self.firework(player), delay=40)
+            later(self.plugin, player, self.firework, 40)
         if self.night.get(str(player.xuid), 0) > time.time():
-            self.plugin.server.scheduler.run_task(self.plugin, lambda: self.night_vision_for(player), delay=40)
+            later(self.plugin, player, self.night_vision_for, 40)
 
     def firework(self, player):
         try:

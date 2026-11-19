@@ -11,7 +11,7 @@ import { getDb } from "../lib/db.js";
 import { json, readJson, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
 import { limit as rateLimit } from "../lib/ratelimit.js";
-import { product, checkPromo, appliesTo, MIN_CHARGE } from "../store/promos.js";
+import { product, checkPromo, appliesTo, MIN_CHARGE, reservePromo, promoUsed, promoCancel } from "../store/promos.js";
 import { SHOP_ITEMS } from "../store/shop.js";
 import { change, balance } from "../store/credits.js";
 import { createCheckout } from "../lib/stripe.js";
@@ -69,13 +69,14 @@ async function priceCart(env, sql, user, body, { needAddress }) {
   }
   // The discount is worked out on each line's total (the card minimum applies to the whole cart, not each item).
   let amountLeft = promo?.kind === "amount" ? Number(promo.value) : 0;
+  let oneUsed = false;   // "free" and "first month" codes cover one item
   for (const g of game) {
     g.unit = g.prod.price;
     g.paid = g.prod.price * g.qty;
     if (!promo || !appliesTo(promo, g.prod) || (promo.kind === "first_month" && !g.prod.isPlan)) continue;
     if (promo.kind === "percent") g.paid = Math.round(g.paid * (100 - Number(promo.value)) / 100);
-    else if (promo.kind === "free") g.paid = 0;
-    else if (promo.kind === "first_month") g.paid = g.prod.price * (g.qty - 1);
+    else if (promo.kind === "free") { if (oneUsed) continue; oneUsed = true; g.paid = Math.max(0, g.paid - g.unit); }   // one item free, not the whole cart
+    else if (promo.kind === "first_month") { if (oneUsed) continue; oneUsed = true; g.paid = g.prod.price * (g.qty - 1); }
     else if (promo.kind === "amount") { const off = Math.min(amountLeft, g.paid); g.paid -= off; amountLeft -= off; }
     g.paid = Math.max(0, g.paid);
   }
@@ -145,12 +146,15 @@ export async function checkout(request, env) {
 
   if (method === "credits" || c.total === 0) {
     const cost = method === "credits" ? c.credits : 0;
+    const rid = c.promo ? await reservePromo(sql, c.promo, user.id, { item: "cart", price: c.gameFull, final: c.gameTotal }) : null;
     if (cost > 0) {
       const left = await change(sql, user.id, -cost, "purchase", `Store cart (${outLines(c).length} item${outLines(c).length === 1 ? "" : "s"})`, "cart");
-      if (left === null) throw new HttpError(409, `This costs ${usd(cost)} in credits, but you have ${usd(await balance(sql, user.id))}. Top up, or pay with a card.`);
+      if (left === null) {
+        if (rid) await promoCancel(sql, rid);
+        throw new HttpError(409, `This costs ${usd(cost)} in credits, but you have ${usd(await balance(sql, user.id))}. Top up, or pay with a card.`);
+      }
     }
-    if (c.promo) await sql`INSERT INTO promo_redemptions (promo_id, user_id, item, option, price_cents, final_cents, status)
-                           VALUES (${c.promo.id}, ${user.id}, 'cart', null, ${c.gameFull}, ${c.gameTotal}, 'used')`;
+    if (rid) await promoUsed(sql, rid);
     const result = await fulfil(env, sql, user.id, cart, { method: c.total === 0 ? "promo" : "credits" });
     return json({ ok: true, done: true, message: result.message });
   }
@@ -158,14 +162,19 @@ export async function checkout(request, env) {
   if (!stripeReady(env)) return json({ ok: false, message: "Card payments aren't available yet. You can pay with Galaxy Credits." });
   const amount = Math.max(MIN_CHARGE, c.total);
   const [pay] = await sql`INSERT INTO payments (user_id, kind, item, amount_cents, promo_id, cart) VALUES (${user.id}, 'cart', 'cart', ${amount}, ${c.promo?.id || null}, ${JSON.stringify(cart)}::jsonb) RETURNING id`;
-  if (c.promo) await sql`INSERT INTO promo_redemptions (promo_id, user_id, item, option, price_cents, final_cents, status, payment_id)
-                         VALUES (${c.promo.id}, ${user.id}, 'cart', null, ${c.gameFull}, ${c.gameTotal}, 'pending', ${pay.id})`;
+  const rid = c.promo ? await reservePromo(sql, c.promo, user.id, { item: "cart", price: c.gameFull, final: c.gameTotal, paymentId: pay.id }) : null;
   const names = outLines(c).map((l) => `${l.qty > 1 ? `${l.qty} × ` : ""}${l.name}`).join(", ");
-  const session = await createCheckout(env, {
-    paymentId: pay.id, userId: user.id, name: "GalaxySMP Store",
-    description: `${names}${c.merch ? `. Shipping: ${usd(c.merch.shipping)}` : ""}${c.promo ? ` (promo ${c.promo.code})` : ""}`.slice(0, 500),
-    amountCents: amount, origin: new URL(request.url).origin, successPath: "/store?paid=cart", cancelPath: "/store",
-  });
+  let session;
+  try {
+    session = await createCheckout(env, {
+      paymentId: pay.id, userId: user.id, name: "GalaxySMP Store",
+      description: `${names}${c.merch ? `. Shipping: ${usd(c.merch.shipping)}` : ""}${c.promo ? ` (promo ${c.promo.code})` : ""}`.slice(0, 500),
+      amountCents: amount, origin: new URL(request.url).origin, successPath: "/store?paid=cart", cancelPath: "/store",
+    });
+  } catch (e) {
+    if (rid) await promoCancel(sql, rid);
+    throw e;
+  }
   await sql`UPDATE payments SET stripe_session = ${session.id} WHERE id = ${pay.id}`;
   return json({ ok: true, url: session.url });
 }

@@ -248,7 +248,7 @@ class GalaxyMap:
                         img = np.frombuffer(raw, dtype=np.uint8).reshape(SIZE, SIZE, 3).copy()
                         x0, z0 = int(data["x0"]), int(data["z0"])
             except Exception as e:
-                self.plugin.server.scheduler.run_task(self.plugin, lambda: self.fail(f"couldn't get the picture ({e})"))
+                self.plugin.server.scheduler.run_task(self.plugin, lambda msg=str(e): self.fail(f"couldn't get the picture ({msg})"))
 
             def done():
                 st["busy"] = False
