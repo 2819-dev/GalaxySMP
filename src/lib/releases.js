@@ -639,6 +639,11 @@ Thanks for playing on GalaxySMP. If you ever find a bug, please report it to sta
 
 Try **/level**, **/top**, **/stats**, **/online**, **/status**, **/coinflip**, **/roll** and **/8ball**. Some answers are just for you, like **/balance**. Type **/help** to see everything you can use.`,
   },
+  {
+    id: "2026-11-20-reapply-moderator",
+    title: "Apply for Moderator again any time",
+    body: `If your Moderator application wasn't accepted before, you no longer have to wait to try again. Open #Applications and send a new one whenever you're ready, and tell us what's changed since last time.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

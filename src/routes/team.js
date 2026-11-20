@@ -134,11 +134,11 @@ export async function listApplications(request, env, ctx, url) {
   const [mine] = await sql`SELECT * FROM staff_applications WHERE user_id = ${me.id} ORDER BY id DESC LIMIT 1`;
   if (mine?.user_unread && !me.acting_by) await sql`UPDATE staff_applications SET user_unread = 0 WHERE id = ${mine.id}`;
   const staff = can(me, "mod_panel");
-  const waitDays = mine && mine.status === "declined" ? Math.ceil(14 - (Date.now() - new Date(mine.decided_at)) / 864e5) : 0;
+  // anyone who isn't staff can apply, including after a declined application (only one open application at a time)
   return json({
     ok: true, owner: false, questions: QUESTIONS, staff, state: await appState(sql),
-    canApply: !staff && (!mine || mine.status === "withdrawn" || (mine.status === "declined" && waitDays <= 0)),
-    waitDays: Math.max(0, waitDays),
+    canApply: !staff && (!mine || mine.status !== "open"),
+    waitDays: 0,
     application: mine ? { ...appOut(mine), messages: await messages(sql, mine.id) } : null,
   });
 }
@@ -152,8 +152,6 @@ export async function createApplication(request, env) {
   const sql = getDb(env);
   const [mine] = await sql`SELECT status, decided_at FROM staff_applications WHERE user_id = ${me.id} ORDER BY id DESC LIMIT 1`;
   if (mine?.status === "open") throw new HttpError(409, "You already have an application waiting.");
-  if (mine?.status === "accepted") throw new HttpError(409, "Your application was already accepted.");
-  if (mine?.status === "declined" && Date.now() - new Date(mine.decided_at) < 14 * 864e5) throw new HttpError(429, "You can apply again 2 weeks after your last application.");
   const state = await appState(sql);
   if (state.closed) throw new HttpError(409, state.message ? `Applications are closed: ${state.message}` : "Applications are closed right now.");
   const body = await readJson(request);

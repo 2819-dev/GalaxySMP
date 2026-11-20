@@ -66,7 +66,7 @@ function memberView(wrap, d, { toast, setTimer }) {
     h("p", { class: "text-3", text: "Help keep GalaxySMP friendly and fun. Moderators help players, keep chat kind and handle reports. Only the owner reads applications." }));
   if (d.staff) { wrap.replaceChildren(intro, h("div", { class: "panel empty", text: "You're already a member of the staff team." })); return; }
   const a = d.application;
-  if (a && (a.status === "open" || a.status === "accepted" || (a.status === "declined" && !d.canApply))) {
+  if (a && a.status === "open") {
     const [label, cls] = STATUS[a.status];
     const log = h("div", { class: "dm-log jr-log" });
     const form = composer(async (text) => { await postJson(`/api/applications/${a.id}/messages`, { body: text }); reload(); }, "Message the owner");
@@ -76,7 +76,6 @@ function memberView(wrap, d, { toast, setTimer }) {
       actions: [{ label: "Cancel" }, { label: "Withdraw", kind: "danger", onClick: async () => { await postJson("/api/applications/withdraw", {}); reload(); } }],
     }) }) : null;
     wrap.replaceChildren(intro, h("section", { class: "panel ap-mine" }, head,
-      a.status === "declined" ? h("p", { class: "text-3 small", text: `You can apply again in ${d.waitDays} day${d.waitDays === 1 ? "" : "s"}.` }) : null,
       h("details", { class: "ap-details" }, h("summary", { text: "Your answers" }), answersBlock(d.questions, a.answers)),
       h("div", { class: "jr-chat" }, log, a.status === "open" ? form : null), withdraw));
     renderThread(log, a.messages, false, { ownerName: "Owner" });
@@ -100,6 +99,7 @@ function memberView(wrap, d, { toast, setTimer }) {
   });
   const send = h("button", { class: "btn btn-primary", type: "submit", text: "Send application" });
   const form = h("form", { class: "form panel ap-form" }, h("h3", { style: "margin:0", text: "Apply for Moderator" }),
+    a?.status === "declined" ? h("p", { class: "text-2 small", style: "margin:0", text: "Your last application wasn't accepted, but you're welcome to apply again. Tell us what's changed since then!" }) : null,
     h("p", { class: "text-3 small", style: "margin:0", text: "Be honest and take your time. After you send it, you can chat with the owner here." }), ...fields, h("div", {}, send));
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
