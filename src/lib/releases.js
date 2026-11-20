@@ -644,6 +644,13 @@ Try **/level**, **/top**, **/stats**, **/online**, **/status**, **/coinflip**, *
     title: "Apply for Moderator again any time",
     body: `If your Moderator application wasn't accepted before, you no longer have to wait to try again. Open #Applications and send a new one whenever you're ready, and tell us what's changed since last time.`,
   },
+  {
+    id: "2026-11-20-chat-levels-spam",
+    title: "Fairer chat levels and better spam protection",
+    body: `- **#Bot Commands is for commands only.** Type **/** to pick a command, or tap **+** › **Commands**.
+- **Chat levels count real conversation.** Commands, very short messages (like "k" or a single emoji), repeated messages and deleted messages no longer earn chat XP. If a message is removed, the XP it earned is removed too.
+- **Smarter spam protection.** The chat now catches near-copies of the same message, floods of one-word messages, repeated words and mass mentions. Members who keep spamming are muted for 10 minutes automatically.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

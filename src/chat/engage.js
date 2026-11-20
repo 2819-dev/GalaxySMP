@@ -6,6 +6,7 @@
 //   - Website activity for Friend Streaks: 15 minutes with Community open + at least 1 message in a day counts
 //     as "played" that day.
 import { loadMessage } from "./messages.js";
+import { earnsXp, spamKey } from "../lib/spam.js";
 
 export const BOT_NAME = "GalaxySMP";
 export const BOT_CHANNEL = "bot-commands";
@@ -55,29 +56,50 @@ export async function afterMessage(env, sql, user, channelId, message, broadcast
     if (m) await broadcast(m);
     return;  // commands don't earn XP
   }
-  await giveXp(sql, user, broadcast);
+  if (ch?.slug === BOT_CHANNEL) return;  // nothing in #Bot Commands earns XP
+  await giveXp(sql, user, broadcast, message);
 }
 
-async function giveXp(sql, user, broadcast) {
+// XP for a real message: not "k" / "lol" / emojis only, not a copy of their last XP message,
+// once a minute at most, capped per day. Each award is remembered so it's taken back if the message is deleted.
+async function giveXp(sql, user, broadcast, message) {
   if ((await botUserId(sql)) === Number(user.id)) return;  // GalaxySMP doesn't level up
+  const text = String(message?.content || "");
+  const [cur] = await sql`SELECT last_key FROM chat_xp WHERE user_id = ${user.id}`;
+  if (!earnsXp(text, cur?.last_key)) return;
+  const key = spamKey(text).slice(0, 200);
   const gain = XP_MIN + Math.floor(Math.random() * (XP_MAX - XP_MIN + 1));
   const day = today();
   const [row] = await sql`
-    INSERT INTO chat_xp (user_id, xp, level, last_at, day, day_xp) VALUES (${user.id}, ${gain}, 0, now(), ${day}::date, ${gain})
+    INSERT INTO chat_xp (user_id, xp, level, last_at, day, day_xp, last_key) VALUES (${user.id}, ${gain}, 0, now(), ${day}::date, ${gain}, ${key})
     ON CONFLICT (user_id) DO UPDATE SET
-      xp = chat_xp.xp + ${gain}, last_at = now(),
+      xp = chat_xp.xp + ${gain}, last_at = now(), last_key = ${key},
       day_xp = CASE WHEN chat_xp.day = ${day}::date THEN chat_xp.day_xp + ${gain} ELSE ${gain} END,
       day = ${day}::date
     WHERE (chat_xp.last_at IS NULL OR chat_xp.last_at < now() - make_interval(secs => ${XP_COOLDOWN_MS / 1000}))
       AND (chat_xp.day IS DISTINCT FROM ${day}::date OR chat_xp.day_xp < ${XP_DAILY_CAP})
     RETURNING xp, level`;
   if (!row) return;  // too soon, or the daily cap
+  if (message?.id) await sql`INSERT INTO chat_xp_log (message_id, user_id, xp, day) VALUES (${message.id}, ${user.id}, ${gain}, ${day}::date) ON CONFLICT DO NOTHING`;
   const { level } = levelFor(Number(row.xp));
   if (level <= Number(row.level)) return;
   await sql`UPDATE chat_xp SET level = ${level} WHERE user_id = ${user.id}`;
   const m = await botPost(sql, { slug: BOT_CHANNEL, kind: "levelup", meta: { userId: Number(user.id), level },
     content: `🎉 **${user.username}** reached chat level **${level}**! Keep chatting to level up.` });
   if (m) await broadcast(m);
+}
+
+// A message was deleted: the XP it earned is taken back (and the level goes down if needed).
+export async function takeBackXp(sql, messageId) {
+  const [r] = await sql`DELETE FROM chat_xp_log WHERE message_id = ${Number(messageId) || 0} RETURNING user_id, xp, day`;
+  if (!r) return;
+  const [x] = await sql`UPDATE chat_xp SET xp = greatest(0, xp - ${r.xp}),
+                          day_xp = CASE WHEN day = ${r.day}::date THEN greatest(0, day_xp - ${r.xp}) ELSE day_xp END
+                         WHERE user_id = ${r.user_id} RETURNING xp, level`;
+  if (x) {
+    const { level } = levelFor(Number(x.xp));
+    if (level < Number(x.level)) await sql`UPDATE chat_xp SET level = ${level} WHERE user_id = ${r.user_id}`;
+  }
 }
 
 export async function levelInfo(sql, userId) {

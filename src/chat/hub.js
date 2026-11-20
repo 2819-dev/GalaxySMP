@@ -7,6 +7,7 @@ const hubCan = (u, key) => Boolean(u && (u.owner || (Array.isArray(u.perms) && u
 import { DurableObject } from "cloudflare:workers";
 import { getDb } from "../lib/db.js";
 import { checkMessage, compileWordList, normalize, maxLengthFor } from "../lib/filter.js";
+import { SpamTracker, LIMITS } from "../lib/spam.js";
 import { REACTIONS, loadMessage, loadReactions } from "./messages.js";
 import { notify } from "../routes/notify.js";
 
@@ -268,32 +269,28 @@ export class CommunityHub extends DurableObject {
     return this.words;
   }
 
-  // Spam: too many messages too fast, or the same message again (ignoring caps, punctuation and stretched
-  // letters, so "hiii!!" and "HI" count as the same). The 3rd copy within 2 minutes is blocked; an immediate repeat too.
+  // Spam (see lib/spam.js): too fast, near-copies of recent messages ("hi1" "hi2" count as the same), lots of
+  // one-word messages, repeated words, mention or emoji floods. Returns null or { message, strike, mute }.
   rateCheck(userId, text) {
     const now = Date.now();
-    const r = this.recent.get(userId) || { times: [], said: [] };
-    r.times = r.times.filter((t) => now - t < SUSTAINED.windowMs);
-    r.said = (r.said || []).filter((x) => now - x.at < REPEAT_WINDOW_MS);
-    const burst = r.times.filter((t) => now - t < BURST.windowMs).length;
-    if (burst >= BURST.count || r.times.length >= SUSTAINED.count) {
-      return "You're sending messages too quickly. Please slow down.";
-    }
-    const key = normalize(text).replace(/[^a-z0-9]+/g, "").replace(/(.)\1+/g, "$1");
-    if (key) {
-      const same = r.said.filter((x) => x.key === key);
-      const last = r.said[r.said.length - 1];
-      if (last && last.key === key && now - last.at < DUPLICATE_MS) return "You just sent that message.";
-      if (same.length >= 2) return "Please don't send the same message over and over.";
-    }
-    r.times.push(now);
-    r.said.push({ key, at: now });
-    this.recent.set(userId, r);
+    let r = this.recent.get(userId);
+    if (!(r instanceof SpamTracker)) { r = new SpamTracker(); this.recent.set(userId, r); }
+    const res = r.check(text, now);
     if (this.recent.size > 2000) {   // forget members who haven't written for 10 minutes
-      const cut = Date.now() - 600_000;
-      for (const [k, v] of this.recent) if (!(v.times || []).some((t) => t > cut)) this.recent.delete(k);
+      for (const [k, v] of this.recent) if (!(v instanceof SpamTracker) || v.idle(now, 600_000)) this.recent.delete(k);
     }
-    return null;
+    return res;
+  }
+
+  // Too much spam in a short time: a 10-minute chat mute (staff who moderate are never auto-muted).
+  async autoMute(sql, user, reason) {
+    const mins = LIMITS.strikes.muteMinutes;
+    const [u] = await sql`UPDATE users SET muted_until = now() + make_interval(mins => ${mins}), mute_reason = ${"Automatic: spam"}
+                           WHERE id = ${user.id} AND (muted_until IS NULL OR muted_until < now() + make_interval(mins => ${mins}))
+                       RETURNING muted_until, username, (SELECT key FROM roles WHERE id = users.role_id) AS role`;
+    if (!u) return;
+    await sql`INSERT INTO audit_log (actor_id, action, target_user_id, details) VALUES (NULL, 'user.mute', ${user.id}, ${JSON.stringify({ minutes: mins, reason: `Automatic: ${reason}`, by: "Spam filter" })}::jsonb)`;
+    this.broadcast({ type: "member_updated", member: { id: Number(user.id), username: u.username, role: u.role }, mutedUntil: u.muted_until });
   }
 
   async onSend(ws, user, msg) {
@@ -309,14 +306,25 @@ export class CommunityHub extends DurableObject {
     const threadRoot = Number.isInteger(Number(msg.threadRoot)) && Number(msg.threadRoot) > 0 ? Number(msg.threadRoot) : null;
     // Admins (owners included) may post links anywhere; everyone may post web links in channels that allow them.
     const sql0 = getDb(this.env);
-    const [chOpts] = await sql0`SELECT allow_links, slow_seconds FROM channels WHERE id = ${channelId}`;
+    const [chOpts] = await sql0`SELECT slug, allow_links, slow_seconds FROM channels WHERE id = ${channelId}`;
+    // #Bot Commands is for commands only (they're run with /, which never comes here); staff can still post
+    if (chOpts?.slug === "bot-commands" && !hubCan(user, "delete_messages") && !threadRoot) {
+      return reject("Only commands work in #Bot Commands. Type / to pick one, or tap + › Commands.");
+    }
     const check = (imageId || audioId) && !String(msg.content || "").trim()
       ? { ok: true, text: "" }
       : checkMessage(msg.content, await this.wordList(), { allowLinks: hubCan(user, "post_links"), allowUrls: Boolean(chOpts?.allow_links), maxLength: maxLengthFor(user) });
     const logIt = (reason, detail) => this.ctx.waitUntil(import("../routes/mod.js").then((m) => m.logBlock(this.env, { userId: user.id, place: `chat:${channelId}`, content: msg.content, reason, detail })));
     if (!check.ok) { logIt(check.reason, check.detail); return reject(check.message); }
     const limited = this.rateCheck(user.id, check.text || `[media ${imageId || audioId}]`);
-    if (limited) { if (!/too quickly/.test(limited)) logIt("spam", limited); return reject(limited); }
+    if (limited) {
+      if (limited.strike) logIt("spam", limited.message);
+      if (limited.mute && !hubCan(user, "delete_messages")) {
+        await this.autoMute(sql0, user, limited.message);
+        return reject(`You've been muted for ${LIMITS.strikes.muteMinutes} minutes for spamming. Please don't flood the chat.`);
+      }
+      return reject(limited.message);
+    }
 
     const replyTo = msg.replyTo ? Number(msg.replyTo) : null;
     const sql = getDb(this.env);

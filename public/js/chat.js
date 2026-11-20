@@ -1184,7 +1184,7 @@ function renderComposer() {
   } else {
     form.hidden = false;
     note("");
-    input.placeholder = `Message #${ch.name}`;
+    input.placeholder = ch.slug === "bot-commands" ? "Type / for a command" : `Message #${ch.name}`;
   }
   for (const hook of composerHooks) hook(ch, !form.hidden);
 }
@@ -1217,6 +1217,10 @@ function submit() {
   if (text.startsWith("/") && !picture && !state.pendingAudio && submitHooks.some((hook) => hook(text))) {
     input.value = "";
     autosize();
+    return;
+  }
+  if (currentChannel()?.slug === "bot-commands" && !state.replyTo?.threadRoot && !(state.me?.perms || []).includes("delete_messages") && !state.me?.owner) {
+    note("Only commands work in #Bot Commands. Type / to pick one, or tap + › Commands.");
     return;
   }
   if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {

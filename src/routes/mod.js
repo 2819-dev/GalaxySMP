@@ -115,6 +115,7 @@ export async function deleteMessage(request, env, ctx, url, params) {
     }));
   }
   await sql.transaction(queries);
+  await import("../chat/engage.js").then((e) => e.takeBackXp(sql, messageId)).catch((e) => console.error("xp take back", e));  // deleted messages don't count
   await hubBroadcast(env, { type: "message_deleted", messageId });
   if (!own) await notifyReports(env, sql);
   return json({ ok: true });
