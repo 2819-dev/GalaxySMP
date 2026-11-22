@@ -651,6 +651,11 @@ Try **/level**, **/top**, **/stats**, **/online**, **/status**, **/coinflip**, *
 - **Chat levels count real conversation.** Commands, very short messages (like "k" or a single emoji), repeated messages and deleted messages no longer earn chat XP. If a message is removed, the XP it earned is removed too.
 - **Smarter spam protection.** The chat now catches near-copies of the same message, floods of one-word messages, repeated words and mass mentions. Members who keep spamming are muted for 10 minutes automatically.`,
   },
+  {
+    id: "2026-11-22-dm-pictures",
+    title: "Galaxy Pro+: pictures in direct messages",
+    body: `Galaxy Pro+ members can now send pictures in direct messages. Open a conversation, tap **+** next to the message box, then **Choose a photo**. You'll see a preview before you send it, and you can add a message too. The person you're talking to sees the picture right in the conversation (in game they get a note to view it on galaxymc.us).`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

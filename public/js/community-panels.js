@@ -17,6 +17,8 @@ import { renderJobs } from "/js/community-jobs.js";
 import { renderFriends } from "/js/community-friends.js";
 import { micButton, voicePlayer } from "/js/chat-voice.js";
 
+let dmRights = null;   // what this member may upload (pictures in DMs: Galaxy Pro+ and the owner)
+
 const panel = () => document.getElementById("channel-panel");
 const voiceBox = () => document.getElementById("voice-embed");
 let refreshTimer = null;
@@ -292,7 +294,13 @@ function renderDMs(p) {
       const sender = chatState.members.get(m.from);
       const admin = (chatState.roles.get(sender?.role)?.power || 0) >= 100;   // headings and -# small text: Admins only
       text.replaceChildren(renderMarkdown(m.body || "", { channels: chatState.channels, noHeadings: !admin }));
-      text.hidden = !m.body && Boolean(m.audio);
+      text.hidden = !m.body && Boolean(m.audio || m.image);
+      if (m.image && !node.querySelector(".dm-pic-link")) {
+        const ratio = m.image.w && m.image.h ? m.image.h / m.image.w : 0.6;
+        const width = Math.min(280, m.image.w || 280);
+        text.before(h("a", { class: "dm-pic-link msg-pic-link", href: `/api/chat/images/${m.image.id}`, target: "_blank", rel: "noopener" },
+          h("img", { class: "msg-pic dm-pic", src: `/api/chat/images/${m.image.id}`, alt: "Picture", loading: "lazy", width, height: Math.round(width * ratio) })));
+      }
       if (m.audio && !node.querySelector(".vp")) text.before(voicePlayer({ src: `/api/chat/voice/${m.audio.id}`, ms: m.audio.ms, seed: m.audio.id }));
       node.querySelector(".dm-meta").textContent = `${dmTime(m.at)}${m.via === "game" ? " · from the game" : ""}${m.editedAt ? " · edited" : ""}${m.from === meId ? (m.read ? " · Read" : " · Sent") : ""}`;
       node.querySelector(".dm-edit-btn")?.remove();
@@ -347,16 +355,48 @@ function renderDMs(p) {
     d.messages.forEach(add);
     const grow = () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight + 2, 140) + "px"; };
     input.addEventListener("input", grow);
-    // "+": Emojis and Gift (to this person)
-    const plusBtn = h("button", { class: "icon-btn composer-plus", type: "button", "aria-label": "More: emojis, gift", title: "Emojis, gift" }, iconEl("plus"));
+    // "+": Emojis, Gift (to this person) and, for Galaxy Pro+ (and the owner), Choose a photo
+    let pendingPic = null;   // { id, preview } uploaded and waiting to be sent
+    const picFile = h("input", { type: "file", accept: "image/*", hidden: true });
+    const picBar = h("div", { class: "pic-pending dm-pic-pending", hidden: true });
+    const drawPic = () => {
+      picBar.hidden = !pendingPic;
+      if (pendingPic) picBar.replaceChildren(h("img", { src: pendingPic.preview, alt: "" }), h("span", { text: "Picture ready. Add a message or press Send." }),
+        h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: () => { pendingPic = null; drawPic(); } }));
+    };
+    picFile.addEventListener("change", async () => {
+      const f = picFile.files[0];
+      picFile.value = "";
+      if (!f) return;
+      try {
+        const img = await extra.shrink(f);
+        const r = await postJson("/api/chat/images", { mime: img.mime, data: img.data, width: img.width, height: img.height });
+        pendingPic = { id: r.id, preview: img.preview };
+        drawPic();
+        input.focus();
+      } catch (e) { ctx.toast(e.message); }
+    });
+    const pickPhoto = async () => {
+      let r = dmRights;
+      if (!r) { try { r = dmRights = await getJson("/api/uploads/rights"); } catch { r = {}; } }
+      if (r.blocked) return ctx.toast("Staff turned off picture uploads for your account.");
+      if (!r.dm) {
+        openDialog({ title: "Pictures in DMs are a Galaxy Pro+ perk",
+          body: h("p", { class: "text-2", text: "Galaxy Pro+ members can send pictures in direct messages." }),
+          actions: [{ label: "Close" }, { label: "See Galaxy Pro+", kind: "primary", onClick: () => { location.href = "/store"; } }] });
+        return;
+      }
+      picFile.click();
+    };
+    const plusBtn = h("button", { class: "icon-btn composer-plus", type: "button", "aria-label": "More: emojis, gift, photo", title: "Emojis, gift, photo" }, iconEl("plus"));
     plusBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       openPlusMenu(plusBtn, { items: [
         { icon: "smile", label: "Emojis", onClick: () => emojiMenu(plusBtn, input) },
         { icon: "gift", label: "Gift", onClick: () => giftDialog({ id: d.other.id, username: d.other.username, head: d.other.head }) },
-      ], photo: null });
+      ], photo: pickPhoto });
     });
-    const composer = h("div", { class: "dm-composer" }, plusBtn, input);
+    const composer = h("div", { class: "dm-composer" }, plusBtn, input, picFile);
     composer.append(micButton(composer, async (audioId) => {
       const r = await postJson(`/api/dm/with/${userId}`, { body: "", audioId });
       if (!log.querySelector(`[data-id="${r.message.id}"]`)) add(r.message);
@@ -376,15 +416,17 @@ function renderDMs(p) {
       typingTimer = setTimeout(stopTyping, 6000);
     };
     input.addEventListener("input", () => { if (input.value.trim()) sendTyping({ dm: userId }); });
-    main.replaceChildren(h("div", { class: "dm-chat" }, head, log, typing, d.blocked ? h("p", { class: "text-3 small dm-start", text: "You blocked this member." }) : composer));
+    main.replaceChildren(h("div", { class: "dm-chat" }, head, log, typing, picBar, d.blocked ? h("p", { class: "text-3 small dm-start", text: "You blocked this member." }) : composer));
     log.scrollTop = log.scrollHeight;
     async function sendIt() {
       const text = input.value.trim();
-      if (!text) return;
+      if (!text && !pendingPic) return;
       send.disabled = true;
       try {
-        const r = await postJson(`/api/dm/with/${userId}`, { body: text });
+        const r = await postJson(`/api/dm/with/${userId}`, { body: text, imageId: pendingPic?.id || null });
         input.value = "";
+        pendingPic = null;
+        drawPic();
         grow();
         if (!log.querySelector(`[data-id="${r.message.id}"]`)) add(r.message);
         log.querySelector(".dm-start")?.remove();

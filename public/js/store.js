@@ -260,6 +260,7 @@ const COMPARE = [
   ]],
   ["Community", [
     ["Pictures and polls in community chat", false, true, true],
+    ["Pictures in direct messages", false, false, true],
     ["Host your own events", false, true, true],
     ["Event access", "Standard", "Level 2", "Priority"],
     ["Support", "Standard", "Level 2", "Priority"],

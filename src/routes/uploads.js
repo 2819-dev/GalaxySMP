@@ -44,6 +44,7 @@ export async function uploadRights(sql, user) {
     banner: !blocked && (can(user, "chat_pictures") || plan === "plus" || plan === "pro"),
     picture: !blocked && Boolean(r?.xuid) && (plan === "pro" || user.owner),
     voice: !blocked && (plan === "plus" || plan === "pro" || Boolean(user.owner) || can(user, "chat_pictures")),
+    dm: !blocked && (plan === "pro" || Boolean(user.owner)),   // pictures in DMs: Galaxy Pro+ and the owner
   };
 }
 
@@ -60,7 +61,7 @@ export async function rights(request, env) {
   const r = await uploadRights(sql, user);
   const [u] = await sql`SELECT u.id, u.banner_at, (u.banner IS NOT NULL) AS has_banner, p.pic_source, (p.custom_pic IS NOT NULL) AS has_pic
                           FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${user.id}`;
-  return json({ ok: true, chat: r.chat, voice: r.voice, banner: r.banner, picture: r.picture, plan: r.plan, blocked: r.blocked, linked: Boolean(r.xuid),
+  return json({ ok: true, chat: r.chat, dm: r.dm, voice: r.voice, banner: r.banner, picture: r.picture, plan: r.plan, blocked: r.blocked, linked: Boolean(r.xuid),
     bannerUrl: bannerUrl(u), picSource: u.pic_source || "auto", hasPicture: Boolean(u.has_pic) });
 }
 
@@ -71,7 +72,7 @@ export async function uploadChatImage(request, env) {
   const sql = getDb(env);
   const r = await uploadRights(sql, user);
   if (r.blocked) throw new HttpError(403, "Staff turned off picture uploads for your account.");
-  if (!r.chat) throw new HttpError(403, "Pictures in chat are a Galaxy+ and Galaxy Pro+ perk.");
+  if (!r.chat && !r.dm) throw new HttpError(403, "Pictures in chat are a Galaxy+ and Galaxy Pro+ perk.");
   await rateLimit(env, "AUTH_LIMITER", `chatimg:${user.id}`);
   const img = readImage(await readJson(request, 1_000_000));
   const [{ n }] = await sql`SELECT count(*)::int AS n FROM message_images WHERE user_id = ${user.id} AND created_at > now() - interval '1 hour'`;
@@ -89,6 +90,8 @@ export async function chatImage(request, env, ctx, url, params) {
      WHERE i.id = ${Number(params.id) || 0}
        AND (EXISTS (SELECT 1 FROM messages m JOIN channels c ON c.id = m.channel_id
                      WHERE m.image_id = i.id AND m.deleted_at IS NULL AND (NOT c.staff_only OR ${staff}))
+            OR EXISTS (SELECT 1 FROM dm_messages d JOIN dm_threads t ON t.id = d.thread_id
+                        WHERE d.image_id = i.id AND (t.user_a = ${user.id} OR t.user_b = ${user.id} OR ${Boolean(user.owner)}))
             OR (i.user_id = ${user.id} AND i.created_at > now() - interval '10 minutes'))`;
   return serve(row);
 }
