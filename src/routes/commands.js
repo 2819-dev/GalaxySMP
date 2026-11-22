@@ -45,6 +45,10 @@ export const COMMANDS = [
       { name: "reason", label: "Reason (they see it)", type: "text", max: 200 }] },
   { name: "unmute", group: "Staff", description: "Unmute a member", show: "private", perm: "mute_members",
     options: [{ name: "member", label: "Member", type: "member", required: true }] },
+  { name: "quietmode", group: "Staff", description: "Quiet Mode: slow mode on every channel for a while", show: "private", perm: "admin_panel",
+    options: [{ name: "action", label: "Turn it", type: "choice", required: true, choices: [["on", "On"], ["off", "Off"]] },
+      { name: "length", label: "For how long (like 30m, 3h, 1d)", type: "text", max: 20, hint: "3h" },
+      { name: "gap", label: "Wait between messages (like 30s, 5m)", type: "text", max: 20, hint: "5m" }] },
   { name: "say", group: "Staff", description: "Post a message here as GalaxySMP", show: "private", perm: "post_staff_channels",
     options: [{ name: "message", label: "Message", type: "text", required: true, max: 1500 }] },
 ];
@@ -75,7 +79,7 @@ export function parseTyped(line) {
   const args = {};
   c.options.forEach((o, i) => {
     if (!words.length) return;
-    const last = i === c.options.length - 1 || o.type === "text";
+    const last = i === c.options.length - 1;   // the last option takes the rest of the line
     args[o.name] = last ? words.splice(0).join(" ") : words.shift();
   });
   return { name: c.name, args };
@@ -196,6 +200,13 @@ async function run(request, env, ctx, sql, user, c, args, channel) {
       if (!d.ok) return say(d.error || "That didn't work.");
       return say(c.name === "mute" ? `🔇 **${target.username}** is muted for ${BY_NAME.get("mute").options[1].choices.find((x) => x[0] === String(args.minutes))?.[1] || `${args.minutes} minutes`}.`
         : `🔊 **${target.username}** is unmuted.`);
+    }
+    case "quietmode": {
+      const q = await import("./quiet.js");
+      if (args.action === "off") return say((await q.endQuiet(env, sql, user)) ? "Quiet Mode is off. Each channel's slow mode is back to how it was." : "Quiet Mode wasn't on.");
+      if (!args.length || !args.gap) return say('Say how long it lasts and the wait between messages, like `/quietmode on 3h 5m`.');
+      const { state, length } = await q.startQuiet(env, sql, user, { duration: args.length, gap: args.gap });
+      return say(`Quiet Mode is on for ${q.formatDuration(length)}: one message every ${q.formatDuration(state.seconds)} in each channel. It ends ${new Date(state.until).toUTCString().replace(" GMT", " UTC")}.`);
     }
     case "say": {
       const text = String(args.message || "").trim().slice(0, 1500);

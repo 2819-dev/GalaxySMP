@@ -114,6 +114,9 @@ eventHooks.push((data) => {
     pending.delete(data.nonce);
     if (panel && text && !panel.input.value) panel.input.value = text;
     toast(`Not sent: ${data.message}`);
+  } else if (data.type === "quiet_mode") {
+    state.quiet = data.on ? { on: true, until: data.until, seconds: data.seconds } : { on: false };
+    drawSlow(currentChannel());
   } else if (data.type === "slowmode") {
     const ch = state.channels.find((c) => c.id === data.channelId);
     if (ch) ch.slow = data.seconds;
@@ -139,7 +142,15 @@ composerHooks.push((ch) => {
 
 // ---------- slow mode ----------
 const canSlow = () => Boolean(state.me && (state.me.owner || (state.me.perms || []).includes("delete_messages")));
-const slowLabel = (s) => s < 60 ? `${s} seconds` : s < 3600 ? `${s / 60} minute${s === 60 ? "" : "s"}` : "1 hour";
+const slowLabel = (s) => {
+  const parts = [];
+  for (const [n, name] of [[86400, "day"], [3600, "hour"], [60, "minute"], [1, "second"]]) {
+    if (s >= n) { const k = Math.floor(s / n); s -= k * n; parts.push(`${k} ${name}${k === 1 ? "" : "s"}`); }
+  }
+  return parts.slice(0, 2).join(" ") || "0 seconds";
+};
+const quietOn = () => Boolean(state.quiet?.on && new Date(state.quiet.until) > new Date());
+const endsAt = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
 function drawSlow(ch) {
   let btn = document.getElementById("open-slowmode");
@@ -151,7 +162,8 @@ function drawSlow(ch) {
   if (btn) { btn.hidden = !show; btn.classList.toggle("on", Boolean(ch?.slow)); }
   const tag = document.getElementById("slow-note");
   if (ch?.slow && (!ch.kind || ch.kind === "text") && ch.canPost) {
-    const text = canSlow() ? `Slow mode: ${slowLabel(ch.slow)} between messages (staff aren't limited)` : `Slow mode is on: one message every ${slowLabel(ch.slow)}`;
+    const quiet = quietOn() ? `Quiet Mode until ${endsAt(state.quiet.until)}: ` : "Slow mode: ";
+    const text = canSlow() ? `${quiet}${slowLabel(ch.slow)} between messages (staff aren't limited)` : `${quietOn() ? `Quiet Mode until ${endsAt(state.quiet.until)}` : "Slow mode is on"}: one message every ${slowLabel(ch.slow)}`;
     if (tag) tag.lastChild.textContent = text;
     else document.querySelector(".composer-meta")?.prepend(h("span", { class: "slow-note", id: "slow-note" }, iconEl("hourglass"), h("span", { text })));
   } else tag?.remove();
@@ -161,12 +173,35 @@ function slowDialog() {
   const ch = currentChannel();
   if (!ch) return;
   const choices = [0, 5, 10, 30, 60, 300, 900, 1200, 3600];
+  if (ch.slow && !choices.includes(Number(ch.slow))) choices.push(Number(ch.slow)), choices.sort((a, b) => a - b);
   const sel = h("select", { class: "input", id: "slow-seconds" }, ...choices.map((s) => h("option", { value: s, text: s ? slowLabel(s) : "Off", selected: Number(ch.slow || 0) === s })));
-  openDialog({
+  // Quiet Mode (Admins): slow mode on every channel for a while
+  const admin = Boolean(state.me?.owner || (state.me?.perms || []).includes("admin_panel"));
+  const qLength = h("input", { class: "input", id: "quiet-length", placeholder: "e.g. 3h", maxlength: 20, autocomplete: "off" });
+  const qGap = h("input", { class: "input", id: "quiet-gap", placeholder: "e.g. 5m", maxlength: 20, autocomplete: "off" });
+  const quietBox = !admin ? null : h("div", { class: "quiet-box" },
+    h("h3", { class: "quiet-title" }, "🌙 Quiet Mode ", h("span", { class: "text-3 small", text: "· every channel" })),
+    quietOn()
+      ? h("div", { class: "form" },
+          h("p", { class: "text-2", style: "margin:0", text: `On until ${endsAt(state.quiet.until)}: one message every ${slowLabel(state.quiet.seconds)} in each channel.` }),
+          h("div", {}, h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Turn off Quiet Mode", onclick: async (e) => {
+            e.target.disabled = true;
+            try { const r = await postJson("/api/chat/quiet", { off: true }); state.quiet = r.quiet; toast(r.message); dlg.close(); } catch (err) { toast(err.message); e.target.disabled = false; }
+          } })))
+      : h("div", { class: "form" },
+          h("p", { class: "text-3 small", style: "margin:0", text: "Slows down every chat channel for a while, then puts each channel back the way it was. Type times like 30s, 5m, 3h or 1d." }),
+          h("div", { class: "row-2" },
+            h("label", { class: "field" }, h("span", { text: "For how long" }), qLength),
+            h("label", { class: "field" }, h("span", { text: "Wait between messages" }), qGap)),
+          h("div", {}, h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Turn on Quiet Mode", onclick: async (e) => {
+            e.target.disabled = true;
+            try { const r = await postJson("/api/chat/quiet", { duration: qLength.value, gap: qGap.value }); state.quiet = r.quiet; toast(r.message); dlg.close(); } catch (err) { toast(err.message); e.target.disabled = false; }
+          } }))));
+  const dlg = openDialog({
     title: `Slow mode in #${ch.name}`,
     body: h("div", { class: "form" },
       h("p", { class: "text-2", style: "margin:0", text: "Members can send one message per chosen time. Staff who can delete messages aren't limited." }),
-      h("label", { class: "field" }, h("span", { text: "Time between messages" }), sel)),
+      h("label", { class: "field" }, h("span", { text: "Time between messages" }), sel), quietBox),
     actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: async () => {
       try { const r = await postJson(`/api/chat/channels/${ch.id}/slowmode`, { seconds: Number(sel.value) }); toast(r.message); } catch (e) { toast(e.message); }
     } }],

@@ -352,6 +352,8 @@ const routes = [
   ["POST", "/api/community/polls", (req, env) => features.pollCreate(req, env)],
   ["POST", "/api/community/polls/:id/:action", features.pollAction],
   ["POST", "/api/chat/polls", (req, env) => features.chatPollCreate(req, env)],
+  ["GET", "/api/chat/quiet", (req, env) => import("./routes/quiet.js").then((m) => m.getQuiet(req, env))],
+  ["POST", "/api/chat/quiet", (req, env) => import("./routes/quiet.js").then((m) => m.setQuiet(req, env))],
   ["GET", "/api/chat/commands", (req, env) => import("./routes/commands.js").then((m) => m.listCommands(req, env))],
   ["POST", "/api/chat/command", (req, env, ctx) => import("./routes/commands.js").then((m) => m.runCommand(req, env, ctx))],
   ["GET", "/api/giveaways/items", (req, env) => import("./routes/giveaways.js").then((m) => m.itemsList(req, env))],

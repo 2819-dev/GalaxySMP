@@ -656,6 +656,11 @@ Try **/level**, **/top**, **/stats**, **/online**, **/status**, **/coinflip**, *
     title: "Galaxy Pro+: pictures in direct messages",
     body: `Galaxy Pro+ members can now send pictures in direct messages. Open a conversation, tap **+** next to the message box, then **Choose a photo**. You'll see a preview before you send it, and you can add a message too. The person you're talking to sees the picture right in the conversation (in game they get a note to view it on galaxymc.us).`,
   },
+  {
+    id: "2026-11-22-quiet-mode",
+    title: "Quiet Mode for busy times",
+    body: `Staff can now turn on **Quiet Mode** to keep the community calm during busy moments. While it's on, everyone can send one message every few minutes in each channel, and a note under the message box shows how long it lasts. When it ends, every channel goes back to normal by itself.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

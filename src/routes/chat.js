@@ -108,6 +108,7 @@ export async function bootstrap(request, env) {
       slow: Number(c.slow_seconds || 0),
     })),
     unread,   // { channelId: { n, mentions } } for channels with new messages since you last read them
+    quiet: await import("./quiet.js").then(async (q) => { const s = await q.quietState(sql); return s ? { on: true, until: s.until, seconds: s.seconds } : { on: false }; }).catch(() => ({ on: false })),
     roles: roles.map((r) => ({ key: r.key, name: r.name, color: r.color, power: r.power })),
     members: members.map((m) => ({
       id: Number(m.id), username: m.username, role: m.role, rank: displayRank(rankOf(m), m.plan, planPriority, PLANS),

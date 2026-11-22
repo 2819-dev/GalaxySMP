@@ -1603,6 +1603,7 @@ export async function startChat({ onSignedOut }) {
   if (data.onboarding) { location.replace("/welcome"); return; } // finish the welcome steps first
   state.me = data.me;
   state.channels = data.channels;
+  state.quiet = data.quiet || { on: false };
   if (data.ticketUnread) {
     const support = data.channels.find((c) => c.kind === "support");
     if (support) state.unread.add(support.id);
