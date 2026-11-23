@@ -32,6 +32,15 @@ CHIPS = {
                                "Water Breathing, Night Vision and 20 extra hearts for 5 minutes"),
 }
 
+# what you see around you while a power is on (particles), and the icon in front of its name above the hotbar
+LOOKS = {
+    "Potato Power": ("", ["minecraft:critical_hit_emitter", "minecraft:villager_happy"]),
+    "Fire Crunch": ("", ["minecraft:basic_flame_particle", "minecraft:lava_particle"]),
+    "Sour Rush": ("", ["minecraft:villager_happy", "minecraft:electric_spark_particle"]),
+    "Cosmic Crunch": ("", ["minecraft:endrod", "minecraft:totem_particle", "minecraft:obsidian_glow_dust_particle"]),
+}
+GRACE_LOOK = ("", ["minecraft:water_splash_particle_manual", "minecraft:snowflake_particle"])
+
 # Super rare Galaxy Crate prizes (added once to the Galaxy Crate; staff can change them in /crates)
 CRATE_PRIZES = [
     {"kind": "item", "item": "galaxysmp:penguin_spawn_egg", "count": 1, "weight": 1, "name": "Penguin Spawn Egg"},
@@ -71,7 +80,9 @@ def item_id(stack):
 class Penguins:
     def __init__(self, plugin):
         self.plugin = plugin
-        self.graced = {}   # player uuid -> last time Penguin's Grace was shown (to avoid spamming the tip)
+        self.powers = {}   # player uuid -> {power name: (color, until time)}
+        self.graced = set()   # players with Penguin's Grace right now
+        self.ticks = 0
         self.add_crate_prizes()
 
     # ---------- crates ----------
@@ -110,13 +121,26 @@ class Penguins:
                     actor.add_scoreboard_tag(NAME_TAG + player.name.replace(" ", "_"))
                 except Exception:
                     pass
-                player.send_message("§b🐧 You tamed a penguin! §7It follows you and fights for you. Keep it close for §bPenguin's Grace§7.")
+                self.hearts(actor)
             return False
         if owner != str(player.xuid) and not player.is_op:
             event.is_cancelled = True
             player.send_message(f"§cThis penguin belongs to {owner_name or 'someone else'}.")
             return True
         return False
+
+    def hearts(self, actor):
+        """Hearts float up from a penguin when it's tamed (like taming a wolf or a cat)."""
+        try:
+            from endstone_galaxylink.floating import dim_cmd
+            l = actor.location
+            where = dim_cmd(actor.dimension.name)
+            server = self.plugin.server
+            for i, (dx, dz) in enumerate(((0, 0), (0.3, 0.2), (-0.3, -0.1), (0.1, -0.3), (-0.2, 0.3), (0.25, -0.25), (-0.1, 0.1))):
+                server.dispatch_command(server.command_sender,
+                    f"execute in {where} run particle minecraft:heart_particle {l.x + dx:.2f} {l.y + 1.0 + (i % 3) * 0.3:.2f} {l.z + dz:.2f}")
+        except Exception:
+            pass
 
     def on_damage(self, event):
         """Nobody but its owner can hurt a tamed penguin. Returns True when it cancelled the damage."""
@@ -134,7 +158,47 @@ class Penguins:
         return False
 
     def tick(self):
-        """Every second: Penguin's Grace for owners whose penguin is close."""
+        """Every half second: Penguin's Grace for owners whose penguin is close, and what you see while a power is on
+        (a line above the hotbar with each power's name and time left, and particles around you)."""
+        self.ticks += 1
+        server = self.plugin.server
+        if self.ticks % 2 == 0:
+            self.graced = self.grace_check()
+        now = time.time()
+        for p in server.online_players:
+            uid = str(p.unique_id)
+            mine = {k: v for k, v in (self.powers.get(uid) or {}).items() if v[1] > now}
+            if mine:
+                self.powers[uid] = mine
+            else:
+                self.powers.pop(uid, None)
+            grace = uid in self.graced
+            if not mine and not grace:
+                continue
+            parts = [f"{v[0]}§l{k}§r §7{int((v[1] - now) // 60)}:{int((v[1] - now) % 60):02d}" for k, v in mine.items()]
+            if grace:
+                parts.append("§b§lPenguin's Grace")
+            try:
+                p.send_tip("  ".join(parts))
+            except Exception:
+                pass
+            # particles around you (everyone nearby sees them)
+            looks = [LOOKS[k][1] for k in mine] + ([GRACE_LOOK[1]] if grace else [])
+            try:
+                from endstone_galaxylink.floating import dim_cmd
+                import random
+                l = p.location
+                where = dim_cmd(p.dimension.name)
+                for names in looks:
+                    for _ in range(2):
+                        part = random.choice(names)
+                        server.dispatch_command(server.command_sender,
+                            f"execute in {where} run particle {part} {l.x + random.uniform(-0.6, 0.6):.2f} {l.y + random.uniform(0.2, 1.9):.2f} {l.z + random.uniform(-0.6, 0.6):.2f}")
+            except Exception:
+                pass
+
+    def grace_check(self):
+        """Gives Penguin's Grace to owners whose penguin is within 16 blocks. Returns their uuids."""
         level = self.plugin.server.level
         near = {}   # owner xuid -> list of (dim, x, y, z)
         for dim in level.dimensions:
@@ -149,8 +213,9 @@ class Penguins:
                 if owner:
                     l = a.location
                     near.setdefault(owner, []).append((dim.name, l.x, l.y, l.z))
+        out = set()
         if not near:
-            return
+            return out
         server = self.plugin.server
         for p in server.online_players:
             spots = near.get(str(p.xuid))
@@ -161,24 +226,19 @@ class Penguins:
             if not any(d == dname and (x - l.x) ** 2 + (y - l.y) ** 2 + (z - l.z) ** 2 <= GRACE_RANGE ** 2 for d, x, y, z in spots):
                 continue
             name = p.name.replace('"', "")
-            boost = None
             try:
                 if p.is_in_water:
-                    boost = "water"
                     server.dispatch_command(server.command_sender, f'effect "{name}" dolphins_grace 3 0 true')
                     server.dispatch_command(server.command_sender, f'effect "{name}" speed 3 1 true')
+                    out.add(str(p.unique_id))
                 else:
                     below = str(p.dimension.get_block_at(int(l.x // 1), int(l.y // 1) - 1, int(l.z // 1)).type)
                     if "ice" in below:
-                        boost = "ice"
                         server.dispatch_command(server.command_sender, f'effect "{name}" speed 3 4 true')
+                        out.add(str(p.unique_id))
             except Exception:
                 continue
-            if boost:
-                try:
-                    p.send_tip("§b🐧 Penguin's Grace §7· " + ("swimming fast" if boost == "water" else "sliding fast on ice"))
-                except Exception:
-                    pass
+        return out
 
     # ---------- potato chips ----------
     def on_consume(self, event):
@@ -210,5 +270,7 @@ class Penguins:
             except Exception:
                 pass
             p.send_message(f"{color}§l{power}!§r §7{desc}.")
+            secs = max(s for _, s, _ in effects)
+            self.powers.setdefault(str(p.unique_id), {})[power] = (color, time.time() + secs)
         server.scheduler.run_task(self.plugin, apply, delay=1)   # after the food itself is eaten
         return False

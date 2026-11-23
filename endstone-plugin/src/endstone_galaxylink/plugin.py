@@ -53,7 +53,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.68.0"
+VERSION = "2.69.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -309,7 +309,7 @@ class GalaxyLink(Plugin):
             self.logger.warning(f"Couldn't check the world's packs: {e}")
         self.server.scheduler.run_task(self, self.ranks.refresh_pictures, delay=40)  # plan tags, even before ranks arrive
         self.server.scheduler.run_task(self, self._safe("elevators.tick", self.elevators.tick), delay=2, period=2)
-        self.server.scheduler.run_task(self, self._safe("penguins.tick", self.penguins.tick), delay=40, period=20)
+        self.server.scheduler.run_task(self, self._safe("penguins.tick", self.penguins.tick), delay=40, period=10)
         self.server.scheduler.run_task(self, self._watched("checking AFK players", self.afk.tick), delay=100, period=100)
         self.server.scheduler.run_task(self, self._watched("checking command plates", self.plates.tick), delay=40, period=4)
         self.server.scheduler.run_task(self, self._watched("setting up the map item", self.galaxymap.setup), delay=200)

@@ -679,6 +679,13 @@ Try **/level**, **/top**, **/stats**, **/online**, **/status**, **/coinflip**, *
 
 Penguins and chips are super rare prizes in Galaxy Crates, and staff may hand them out at events. Both can be traded and sold. Chips can't be eaten during minigames.`,
   },
+  {
+    id: "2026-11-23-penguin-visuals",
+    title: "Penguins and Chips: hearts and visible powers",
+    body: `- **Taming hearts:** hearts now float up from a penguin when you tame it.
+- **See your powers:** while a chip power is active, its name and time left appear above your hotbar (for example **Potato Power 2:41**), with matching particles around you that everyone nearby can see.
+- **Penguin's Grace** also shows above your hotbar, with a splash of snow and water around you.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).
