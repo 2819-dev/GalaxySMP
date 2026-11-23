@@ -689,6 +689,7 @@ class Welcome:
                 player.teleport(tp.location(spot))
             except Exception as e:
                 self.plugin.logger.warning(f"Main Menu: couldn't move {player.name}: {e}")
+                player.send_message(f"§cSorry, we couldn't take you to {label or 'that server'}. §7Please tell staff.")
         try:
             player.play_sound(player.location, "random.levelup", 0.6, 1.2)
         except Exception:

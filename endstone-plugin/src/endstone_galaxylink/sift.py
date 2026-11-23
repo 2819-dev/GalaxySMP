@@ -204,7 +204,7 @@ class Sift:
 
     def spot(self):
         top = column(0, 0)[0]
-        return {"dim": "overworld", "x": CX + 0.5, "y": top + 1.0, "z": CZ + 0.5, "yaw": 0.0, "pitch": 0.0}
+        return {"dim": "Overworld", "x": CX + 0.5, "y": top + 1.0, "z": CZ + 0.5, "yaw": 0.0, "pitch": 0.0}
 
     @staticmethod
     def inside(loc):

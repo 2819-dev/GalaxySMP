@@ -505,6 +505,13 @@ Your pets are yours alone: other players can't feed, ride or hurt them.`,
 - **Easier joining:** there's now a **Join** button at the top of the Featured Servers list. Join Server and tapping a selected server again still work too, and you'll see the server's name when you arrive.
 - **New button style:** the Main Menu buttons now use the GalaxySMP colors.`,
   },
+  {
+    id: "2026-11-24-sift-join-fix",
+    title: "Joining the Sift fixed",
+    body: `Picking **The Sift** on the Main Menu now takes you there. Before, you stayed where you were.
+
+If a trip ever can't be completed, you'll now see a message instead of nothing happening.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
