@@ -14,7 +14,7 @@ from endstone import ColorFormat, Player
 from endstone.command import Command, CommandSender
 from endstone.event import (PlayerLoginEvent, ActorDamageEvent, ActorDeathEvent, ActorExplodeEvent, ActorSpawnEvent, BlockBreakEvent, BlockExplodeEvent,
                             BlockFromToEvent, BlockPlaceEvent, PlayerChatEvent, PlayerCommandEvent, PlayerDeathEvent,
-                            PlayerDropItemEvent, PlayerInteractActorEvent, PlayerInteractEvent, PlayerJoinEvent, PlayerQuitEvent,
+                            PlayerDropItemEvent, PlayerItemConsumeEvent, PlayerInteractActorEvent, PlayerInteractEvent, PlayerJoinEvent, PlayerQuitEvent,
                             PlayerRespawnEvent,
                             event_handler)
 from endstone.plugin import Plugin
@@ -37,6 +37,7 @@ from endstone_galaxylink.jobs import Jobs
 from endstone_galaxylink.shopchests import ShopChests
 from endstone_galaxylink.servercontrol import ServerControl
 from endstone_galaxylink.crates import Crates
+from endstone_galaxylink.penguins import Penguins
 from endstone_galaxylink.elevators import Elevators
 from endstone_galaxylink.ranktags import RankTags
 from endstone_galaxylink import ranks as ranks_module
@@ -52,7 +53,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.67.0"
+VERSION = "2.68.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -266,6 +267,7 @@ class GalaxyLink(Plugin):
         self.shopchests = ShopChests(self)
         self.servercontrol = ServerControl(self)  # maintenance mode, scheduled restart, welcome kit (website)
         self.crates = Crates(self)
+        self.penguins = Penguins(self)  # penguins (tamed with fish, Penguin's Grace) and potato chips
         self.elevators = Elevators(self)
         from endstone_galaxylink.potm import PlayerOfTheMonth
         self.potm = PlayerOfTheMonth(self)  # Player of the Month: Voting Computers
@@ -307,6 +309,7 @@ class GalaxyLink(Plugin):
             self.logger.warning(f"Couldn't check the world's packs: {e}")
         self.server.scheduler.run_task(self, self.ranks.refresh_pictures, delay=40)  # plan tags, even before ranks arrive
         self.server.scheduler.run_task(self, self._safe("elevators.tick", self.elevators.tick), delay=2, period=2)
+        self.server.scheduler.run_task(self, self._safe("penguins.tick", self.penguins.tick), delay=40, period=20)
         self.server.scheduler.run_task(self, self._watched("checking AFK players", self.afk.tick), delay=100, period=100)
         self.server.scheduler.run_task(self, self._watched("checking command plates", self.plates.tick), delay=40, period=4)
         self.server.scheduler.run_task(self, self._watched("setting up the map item", self.galaxymap.setup), delay=200)
@@ -527,13 +530,21 @@ class GalaxyLink(Plugin):
             return
         if self.cards.on_interact(event):  # crouch + tap a player: their card
             return
+        if self.penguins.on_interact_actor(event):  # only a penguin's owner can use it
+            return
         if self.npcs.npc_id(event.actor) is not None:
             return self.npcs.on_interact(event)
         self.plots.on_interact_actor(event)  # animals, armor stands, chest minecarts in someone's plot
 
     @event_handler
+    def on_item_consume(self, event: PlayerItemConsumeEvent):
+        self.penguins.on_consume(event)  # potato chips powers
+
+    @event_handler
     def on_actor_damage(self, event: ActorDamageEvent):
         if self.bedwars.on_damage(event):  # Bedwars deaths, teams and the waiting room
+            return
+        if self.penguins.on_damage(event):  # only a penguin's owner can hurt it
             return
         self.npcs.on_damage(event)
         self.plots.on_damage(event)

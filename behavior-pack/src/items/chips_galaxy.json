@@ -1,0 +1,33 @@
+{
+  "format_version": "1.21.40",
+  "minecraft:item": {
+    "description": {
+      "identifier": "galaxysmp:chips_galaxy",
+      "menu_category": {
+        "category": "items"
+      }
+    },
+    "components": {
+      "minecraft:icon": {
+        "textures": {
+          "default": "galaxysmp_chips_galaxy"
+        }
+      },
+      "minecraft:display_name": {
+        "value": "§d§lPotato Chips: Galaxy Flavor"
+      },
+      "minecraft:max_stack_size": 16,
+      "minecraft:food": {
+        "nutrition": 10,
+        "saturation_modifier": 1.2,
+        "can_always_eat": true
+      },
+      "minecraft:use_animation": "eat",
+      "minecraft:use_modifiers": {
+        "use_duration": 1.0,
+        "movement_modifier": 0.35
+      },
+      "minecraft:glint": true
+    }
+  }
+}

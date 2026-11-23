@@ -1,3 +1,5 @@
 tile.galaxysmp:computer.name=Minigame Computer
 entity.galaxysmp:floating_text.name=Leaderboard
 tile.galaxysmp:desktop_computer.name=Computer
+entity.galaxysmp:penguin.name=Penguin
+item.spawn_egg.entity.galaxysmp:penguin.name=Penguin Spawn Egg

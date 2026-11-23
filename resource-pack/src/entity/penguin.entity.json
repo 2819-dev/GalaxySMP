@@ -1,0 +1,29 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "galaxysmp:penguin",
+      "materials": { "default": "entity_alphatest" },
+      "textures": { "default": "textures/entity/galaxysmp_penguin" },
+      "geometry": { "default": "geometry.galaxysmp_penguin" },
+      "animations": {
+        "walk": "animation.galaxysmp_penguin.walk",
+        "idle": "animation.galaxysmp_penguin.idle",
+        "swim": "animation.galaxysmp_penguin.swim",
+        "sit": "animation.galaxysmp_penguin.sit",
+        "look_at_target": "animation.galaxysmp_penguin.look_at_target"
+      },
+      "scripts": {
+        "animate": [
+          "look_at_target",
+          { "walk": "!query.is_in_water && !query.is_sitting" },
+          { "idle": "!query.is_in_water" },
+          { "swim": "query.is_in_water" },
+          { "sit": "query.is_sitting" }
+        ]
+      },
+      "render_controllers": [ "controller.render.default" ],
+      "spawn_egg": { "base_color": "#1f2333", "overlay_color": "#f29b2e" }
+    }
+  }
+}

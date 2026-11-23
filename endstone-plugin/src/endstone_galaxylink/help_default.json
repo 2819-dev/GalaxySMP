@@ -232,6 +232,16 @@
    "example": "/shop"
   },
   {
+   "command": "Penguins",
+   "description": "Tame a penguin with fish. It follows you, fights for you, and only you can use it. Keep it close for Penguin's Grace: fast swimming and even faster on ice. Super rare from Galaxy Crates.",
+   "example": "/crates"
+  },
+  {
+   "command": "Potato chips",
+   "description": "Four OP flavors with powers like Potato Power and Cosmic Crunch. Super rare from Galaxy Crates, or from staff. Can't be eaten during minigames.",
+   "example": "/crates"
+  },
+  {
    "command": "Elevators",
    "description": "Press a button next to an elevator to call it. Inside, tap the cabin floor to pick a floor. Galaxy+ and Pro+ get an Elevator Tool to build them in their plots (/elevator gives it back).",
    "example": "/elevator"
@@ -355,6 +365,12 @@
    "command": "/givekey <player> <common|rare|galaxy> [amount]",
    "description": "Give crate keys (works from the console too, e.g. for event prizes).",
    "example": "/givekey Steve123 galaxy 1",
+   "staff": true
+  },
+  {
+   "command": "/give <player> galaxysmp:penguin_spawn_egg",
+   "description": "Give a penguin spawn egg. Chips: galaxysmp:chips_classic, chips_spicy, chips_sour or chips_galaxy.",
+   "example": "/give Steve123 galaxysmp:chips_galaxy 1",
    "staff": true
   }
  ]

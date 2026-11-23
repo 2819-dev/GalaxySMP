@@ -1,0 +1,32 @@
+{
+  "format_version": "1.21.40",
+  "minecraft:item": {
+    "description": {
+      "identifier": "galaxysmp:chips_spicy",
+      "menu_category": {
+        "category": "items"
+      }
+    },
+    "components": {
+      "minecraft:icon": {
+        "textures": {
+          "default": "galaxysmp_chips_spicy"
+        }
+      },
+      "minecraft:display_name": {
+        "value": "§cPotato Chips: Flamin' Spicy"
+      },
+      "minecraft:max_stack_size": 16,
+      "minecraft:food": {
+        "nutrition": 6,
+        "saturation_modifier": 0.8,
+        "can_always_eat": true
+      },
+      "minecraft:use_animation": "eat",
+      "minecraft:use_modifiers": {
+        "use_duration": 1.0,
+        "movement_modifier": 0.35
+      }
+    }
+  }
+}

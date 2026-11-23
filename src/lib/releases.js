@@ -666,6 +666,19 @@ Try **/level**, **/top**, **/stats**, **/online**, **/status**, **/coinflip**, *
     title: "Secure forms in direct messages",
     body: `The GalaxySMP owner can now send a **secure form** in direct messages, for example to collect details needed to deliver a prize. Answering is always optional: you can tap **Decline**. Your answers are encrypted, and only the owner can read them.`,
   },
+  {
+    id: "2026-11-23-penguins-chips",
+    title: "Penguins and Potato Chips have arrived",
+    body: `**Penguins 🐧** Tame a penguin by feeding it fish. Once it's yours, nobody else can take it or hurt it. It follows you, waddles around, swims, and fights monsters and anyone who attacks you. Keep it close for **Penguin's Grace**: you swim fast in water and slide even faster on ice.
+
+**Potato Chips 🥔** Four flavors, each with its own power:
+- **Classic: Potato Power** (Strength III, Resistance II, Regeneration II and 8 extra hearts)
+- **Flamin' Spicy: Fire Crunch** (Strength IV, Fire Resistance and Speed II)
+- **Salt & Vinegar: Sour Rush** (Speed III, Haste III and Jump Boost II)
+- **Galaxy Flavor: Cosmic Crunch** (all of the above and more, with 20 extra hearts)
+
+Penguins and chips are super rare prizes in Galaxy Crates, and staff may hand them out at events. Both can be traded and sold. Chips can't be eaten during minigames.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).
