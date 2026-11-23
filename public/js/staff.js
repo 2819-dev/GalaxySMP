@@ -989,7 +989,7 @@ async function loadWelcome() {
   renderWelcome();
 }
 
-const SERVER_PICS = [["galaxysmp", "GalaxySMP"], ["event", "Event"], ["bedwars", "Bedwars"], ["parkour", "Parkour"], ["build", "Building"]];
+const SERVER_PICS = [["galaxysmp", "Wilderness Bound"], ["event", "Chaos Cubed"], ["bedwars", "Chaos Cubed (close-up)"], ["build", "Copper Age"], ["parkour", "The Sift"]];
 const JOIN_BLOCKS = [["grass", "Grass"], ["diamond", "Diamond"], ["gold", "Gold"], ["emerald", "Emerald"], ["netherite", "Netherite"], ["amethyst", "Amethyst"],
   ["lava", "Lava"], ["ice", "Ice"], ["galaxy", "Galaxy"], ["ender", "Ender"], ["rainbow", "Rainbow"]];
 const SERVER_ACTIONS = [["play", "Play (main server)"], ["spawn", "Go to spawn"], ["warp", "Go to a warp"], ["minigames", "Open the Minigame Center"], ["soon", "Coming soon"]];

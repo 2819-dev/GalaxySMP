@@ -1,7 +1,7 @@
 """The GalaxySMP Main Menu: a full-screen title screen every time you join (and from /menu, the menu compass in the last
 hotbar slot, or Main Menu in /guide).
 
-  Title screen       a 3D scene (a different one each join), the GalaxySMP logo, a random splash line, your character,
+  Title screen       a wallpaper (a different one each join), the GalaxySMP logo, a random splash line, your character,
                      and Play, How to Play, Rules, What's New and Store. Minecraft's menu music plays while it's open.
   Featured Servers   the server list on the left; the selected server (the first one to start with) in a sidebar:
                      its banner, ping and players next to a Join Server button, then its name, description and activities
@@ -28,7 +28,7 @@ from endstone.form import ActionForm
 
 MARK = "§g§s§m§p"
 TITLE, SERVERS, PAGE, JOINING = MARK + "§1", MARK + "§2", MARK + "§3", MARK + "§4"
-SCENES = ["valley", "trials", "deepdark", "lush", "nether", "end", "sift"]
+SCENES = ["wilderness", "copper", "sift", "chaos"]   # the background wallpapers (resource pack textures/ui/gsmp_bg_*)
 THEMES = ["grass", "diamond", "gold", "emerald", "netherite", "amethyst", "lava", "ice", "galaxy", "ender", "rainbow"]
 THEME_CODE = "0123456789a"
 THEME_COLOR = {"grass": "§a", "diamond": "§b", "gold": "§6", "emerald": "§a", "netherite": "§d", "amethyst": "§d", "lava": "§6",

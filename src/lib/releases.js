@@ -740,6 +740,11 @@ The Featured Servers list has new 3D pictures too.`,
 
 Open the menu any time with **/menu**, with the new **GalaxySMP Menu** compass in your last hotbar slot, or from **/guide**.`,
   },
+  {
+    id: "2026-11-23-main-menu-wallpapers",
+    title: "Main Menu: new backgrounds",
+    body: `The Main Menu now shows official Minecraft artwork in the background: **The Copper Age**, **Wilderness Bound**, **Chaos Cubed** and **The Sift**, with a different one each time you join. The Featured Servers pictures use them too.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).
