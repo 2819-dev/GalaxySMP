@@ -2,6 +2,7 @@
 # Builds the GalaxySMP add-on packs from resource-pack/src and behavior-pack/src:
 #   GalaxySMP_Voice_Icons.mcpack  - resource pack: voice/rank icons, logo, Minigame Computer model
 #   GalaxySMP_Blocks.mcpack       - behavior pack: the Minigame Computer block (galaxysmp:computer)
+#   GalaxySMP.mcaddon             - both packs in one file
 # Usage: resource-pack/build.sh /absolute/output/dir
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -22,4 +23,12 @@ PY
 }
 pack "$here/src" "$out/GalaxySMP_Voice_Icons.mcpack"
 pack "$here/../behavior-pack/src" "$out/GalaxySMP_Blocks.mcpack"
-ls -la "$out/GalaxySMP_Voice_Icons.mcpack" "$out/GalaxySMP_Blocks.mcpack"
+# both packs in one file (an .mcaddon is a zip of .mcpack files; Minecraft and most hosts import both at once)
+python3 - "$out" <<'PY'
+import os, sys, zipfile
+out = sys.argv[1]
+with zipfile.ZipFile(os.path.join(out, "GalaxySMP.mcaddon"), "w", zipfile.ZIP_DEFLATED) as z:
+    for f in ("GalaxySMP_Voice_Icons.mcpack", "GalaxySMP_Blocks.mcpack"):
+        z.write(os.path.join(out, f), f)
+PY
+ls -la "$out/GalaxySMP_Voice_Icons.mcpack" "$out/GalaxySMP_Blocks.mcpack" "$out/GalaxySMP.mcaddon"
