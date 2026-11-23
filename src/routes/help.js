@@ -84,6 +84,7 @@ export async function loadWelcome(sql) {
 
 const SERVER_IMAGES = ["galaxysmp", "event", "bedwars", "parkour", "build"];
 const SERVER_ACTIONS = ["play", "spawn", "warp", "minigames", "soon"];
+const JOIN_BLOCKS = ["grass", "diamond", "gold", "emerald", "netherite", "amethyst", "lava", "ice", "galaxy", "ender", "rainbow"];
 
 function validWelcome(body) {
   const intro = clean(body?.intro, 1200);
@@ -103,10 +104,12 @@ function validWelcome(body) {
     const action = SERVER_ACTIONS.includes(v?.action) ? v.action : "play";
     const warp = clean(v?.warp, 16);
     if (action === "warp" && !/^[A-Za-z0-9_-]{3,16}$/.test(warp)) throw new HttpError(400, `Server ${i + 1}: type the name of the warp it sends players to.`);
-    return { name, description: clean(v?.description, 90), tags: clean(v?.tags, 50), image, action, warp: action === "warp" ? warp : "", enabled: v?.enabled !== false };
+    return { name, description: clean(v?.description, 90), tags: clean(v?.tags, 60), image, action, warp: action === "warp" ? warp : "", enabled: v?.enabled !== false,
+             anim: JOIN_BLOCKS.includes(v?.anim) ? v.anim : "grass", odds: Boolean(v?.odds), joinName: clean(v?.joinName, 24) || name };
   });
   if (!servers.some((v) => v.enabled && v.action === "play")) throw new HttpError(400, "Keep at least one server that's switched on and set to \"Play\" (the main server).");
-  return { enabled: body?.enabled !== false, splash: clean(body?.splash, 60), intro, tabs, servers };
+  const splashes = (Array.isArray(body?.splashes) ? body.splashes : String(body?.splash || "").split("\n")).map((x) => clean(x, 60)).filter(Boolean).slice(0, 40);
+  return { enabled: body?.enabled !== false, splashes, intro, tabs, servers };
 }
 
 // The latest news and the next event, shown as live info on the welcome screen.

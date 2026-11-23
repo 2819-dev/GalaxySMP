@@ -56,6 +56,39 @@ DEFS = [  # name, top, side, bottom, tint(top) / tint(all), cutout, emissive, wa
     ("lava", "lava_still", "lava_still", "lava_still", None, False, 1.4, False),
     ("glass", "glass", "glass", "glass", None, True, 0, False),
     ("deepslate", "deepslate_top", "deepslate_top", "deepslate_top", None, False, 0, False),
+    ("tuff_bricks", "tuff_bricks", "tuff_bricks", "tuff_bricks", None, False, 0, False),
+    ("tuff", "tuff", "tuff", "tuff", None, False, 0, False),
+    ("chiseled_tuff", "chiseled_tuff", "chiseled_tuff", "chiseled_tuff", None, False, 0, False),
+    ("polished_tuff", "polished_tuff", "polished_tuff", "polished_tuff", None, False, 0, False),
+    ("copper", "cut_copper", "cut_copper", "cut_copper", None, False, 0, False),
+    ("copper_ox", "oxidized_cut_copper", "oxidized_cut_copper", "oxidized_cut_copper", None, False, 0, False),
+    ("copper_we", "weathered_cut_copper", "weathered_cut_copper", "weathered_cut_copper", None, False, 0, False),
+    ("copper_bulb", "copper_bulb_lit", "copper_bulb_lit", "copper_bulb_lit", None, False, 1.8, False),
+    ("spawner", "trial_spawner_top_active", "trial_spawner_side_active", "trial_spawner_top_active", None, True, 1.2, False),
+    ("sculk", "sculk", "sculk", "sculk", None, False, 0.35, False),
+    ("catalyst", "sculk_catalyst_top", "sculk_catalyst_side", "sculk_catalyst_top", None, False, 1.0, False),
+    ("ds_bricks", "deepslate_bricks", "deepslate_bricks", "deepslate_bricks", None, False, 0, False),
+    ("ds_tiles", "deepslate_tiles", "deepslate_tiles", "deepslate_tiles", None, False, 0, False),
+    ("cobbled_ds", "cobbled_deepslate", "cobbled_deepslate", "cobbled_deepslate", None, False, 0, False),
+    ("soul_lamp", "sea_lantern", "sea_lantern", "sea_lantern", ("all", np.array([0.45, 0.95, 1.0])), False, 1.8, False),
+    ("moss", "moss_block", "moss_block", "moss_block", None, False, 0, False),
+    ("azalea", "azalea_leaves", "azalea_leaves", "azalea_leaves", None, True, 0, False),
+    ("clay", "clay", "clay", "clay", None, False, 0, False),
+    ("dripstone", "dripstone_block", "dripstone_block", "dripstone_block", None, False, 0, False),
+    ("berries", "shroomlight", "shroomlight", "shroomlight", None, False, 1.7, False),
+    ("netherrack", "netherrack", "netherrack", "netherrack", None, False, 0, False),
+    ("nether_brick", "nether_brick", "nether_brick", "nether_brick", None, False, 0, False),
+    ("soul_sand", "soul_sand", "soul_sand", "soul_sand", None, False, 0, False),
+    ("crimson", "netherrack", "crimson_nylium_side", "netherrack", ("top", np.array([1.0, 0.35, 0.35])), False, 0, False),
+    ("end_bricks", "end_bricks", "end_bricks", "end_bricks", None, False, 0, False),
+    ("purpur_pillar", "purpur_pillar_top", "purpur_pillar", "purpur_pillar_top", None, False, 0, False),
+    ("bone", "bone_block_top", "bone_block_side", "bone_block_top", None, False, 0, False),
+    ("red_sand", "red_sand", "red_sand", "red_sand", None, False, 0, False),
+    ("sandstone", "sandstone_top", "sandstone_normal", "sandstone_top", None, False, 0, False),
+    ("calcite", "calcite", "calcite", "calcite", None, False, 0, False),
+    ("amethyst", "amethyst_block", "amethyst_block", "amethyst_block", None, False, 0.5, False),
+    ("crying", "crying_obsidian", "crying_obsidian", "crying_obsidian", None, False, 0.6, False),
+    ("pale_grass", "grass_top", "grass_side_carried", "dirt", ("top", np.array([0.62, 0.78, 0.55])), False, 0, False),
 ]
 B = {d[0]: i for i, d in enumerate(DEFS)}
 
@@ -254,11 +287,147 @@ def clouds(o, d, sky, t_scene, height=150):
     return np.clip(1 - t / 1600, 0, 1) ** 0.7 * 0.6 * is_c
 
 
+# ---------------------------------------------------------------- people (boxes) and lights
+class Boxes:
+    """Axis-aligned boxes traced exactly (for people, capes, swords, wings). kind 1 = a head (face on its front)."""
+    def __init__(self):
+        self.lo, self.hi, self.col, self.kind, self.front, self.hair, self.emit = [], [], [], [], [], [], []
+
+    def add(self, lo, hi, col, kind=0, front=(2, 1), hair=(0.3, 0.2, 0.1), emit=0.0):
+        self.lo.append(lo); self.hi.append(hi); self.col.append(np.array(col, np.float32) ** 2.2)
+        self.kind.append(kind); self.front.append(front); self.hair.append(np.array(hair, np.float32) ** 2.2); self.emit.append(emit)
+
+    def arrays(self):
+        if not self.lo:
+            return None
+        return dict(lo=np.array(self.lo, np.float32), hi=np.array(self.hi, np.float32), col=np.stack(self.col),
+                    kind=np.array(self.kind), front=np.array(self.front), hair=np.stack(self.hair), emit=np.array(self.emit, np.float32))
+
+
+def box_hit(O, D, bx):
+    n = D.shape[0]
+    best = np.full(n, np.inf, np.float32); bk = np.full(n, -1); bax = np.zeros(n, np.int64)
+    if bx is None:
+        return best, bk, bax
+    inv = 1.0 / np.where(np.abs(D) < 1e-9, 1e-9, D)
+    for k in range(len(bx["lo"])):
+        t1 = (bx["lo"][k] - O) * inv; t2 = (bx["hi"][k] - O) * inv
+        tmin = np.minimum(t1, t2); tmax = np.maximum(t1, t2)
+        tn = tmin.max(1); tf = tmax.min(1)
+        ok = (tn <= tf) & (tn > 1e-3) & (tn < best)
+        best[ok] = tn[ok]; bk[ok] = k; bax[ok] = tmin[ok].argmax(1)
+    return best, bk, bax
+
+
+def box_albedo(p, k, ax, sgn, bx):
+    col = bx["col"][k].copy()
+    lo, hi = bx["lo"][k], bx["hi"][k]
+    rel = (p - lo) / np.maximum(hi - lo, 1e-6)
+    # pixel-y cloth/skin: 8x8 grid noise per face
+    a1 = np.where(ax == 0, 2, 0); a2 = np.where(ax == 1, 2, 1)
+    u = np.take_along_axis(rel, a1[:, None], 1)[:, 0]; v = np.take_along_axis(rel, a2[:, None], 1)[:, 0]
+    gx, gy = np.floor(u * 8).astype(np.int64), np.floor(v * 8).astype(np.int64)
+    hsh = ((gx * 73856093) ^ (gy * 19349663) ^ (k * 83492791)) & 0xFF
+    col *= (0.88 + 0.24 * (hsh / 255.0))[:, None]
+    head = bx["kind"][k] == 1
+    if head.any():
+        fa, fs = bx["front"][k, 0], bx["front"][k, 1]
+        front = head & (ax == fa) & (sgn == fs)
+        # on the front face: u across, v up (y)
+        uu = np.where(fa == 2, rel[:, 0], rel[:, 2]); uu = np.where(fs < 0, uu, 1 - uu)
+        vv = rel[:, 1]
+        hair = head & ((vv > 0.78) | (~front & (vv > 0.45)))
+        col = np.where(hair[:, None], bx["hair"][k], col)
+        eye = front & (vv > 0.40) & (vv < 0.55) & (((uu > 0.18) & (uu < 0.40)) | ((uu > 0.60) & (uu < 0.82)))
+        pupil = eye & (((uu > 0.28) & (uu < 0.40)) | ((uu > 0.70) & (uu < 0.82)))
+        col = np.where(eye[:, None], np.array([0.95, 0.95, 0.95]) ** 2.2, col)
+        col = np.where(pupil[:, None], np.array([0.25, 0.35, 0.85]) ** 2.2, col)
+    return col
+
+
+def adventurer(bx, x, y, z, facing=0.0, outfit="galaxy", item=None, cape=None, wings=False, pose=0.0):
+    """A blocky GalaxySMP adventurer standing at (x, y, z) (feet), facing +z (0), +x (90), -z (180) or -x (270)."""
+    skin = (0.86, 0.66, 0.52)
+    looks = {
+        "galaxy": ((0.36, 0.20, 0.62), (0.18, 0.22, 0.45), (0.30, 0.85, 0.95), (0.20, 0.13, 0.08)),
+        "knight": ((0.72, 0.74, 0.78), (0.55, 0.57, 0.62), (0.85, 0.20, 0.25), (0.35, 0.25, 0.15)),
+        "explorer": ((0.42, 0.55, 0.28), (0.45, 0.32, 0.20), (0.90, 0.70, 0.30), (0.55, 0.35, 0.15)),
+        "mage": ((0.15, 0.45, 0.55), (0.12, 0.25, 0.32), (0.95, 0.85, 0.40), (0.85, 0.85, 0.85)),
+        "netherite": ((0.27, 0.24, 0.26), (0.20, 0.18, 0.20), (0.75, 0.45, 0.95), (0.10, 0.08, 0.08)),
+    }
+    shirt, pants, accent, hair = looks[outfit]
+    f = int(round(facing / 90)) % 4
+    def rot(dx, dz):
+        return [(dx, dz), (dz, -dx), (-dx, -dz), (-dz, dx)][f]
+    def box(x0, y0, z0, x1, y1, z1, col, **kw):
+        a = rot(x0, z0); b = rot(x1, z1)
+        bx.add((x + min(a[0], b[0]), y + y0, z + min(a[1], b[1])), (x + max(a[0], b[0]), y + y1, z + max(a[1], b[1])), col, **kw)
+    front = [(2, 1), (0, 1), (2, -1), (0, -1)][f]
+    sw = 0.12 * math.sin(pose)
+    box(-0.25, 0, -0.125 + sw, -0.005, 0.75, 0.125 + sw, pants)              # legs
+    box(0.005, 0, -0.125 - sw, 0.25, 0.75, 0.125 - sw, pants)
+    box(-0.25, 0.75, -0.125, 0.25, 1.5, 0.125, shirt)                        # body
+    box(-0.25, 1.2, -0.13, 0.25, 1.3, 0.13, accent)                          # galaxy stripe
+    box(-0.5, 0.78, -0.125, -0.255, 1.5, 0.125, shirt)                       # arms
+    box(0.255, 0.78 + 0.25 * max(0, sw * 4), -0.125, 0.5, 1.5, 0.125, shirt)
+    box(-0.25, 1.5, -0.25, 0.25, 2.0, 0.25, skin, kind=1, front=front, hair=hair)   # head
+    if cape:
+        box(-0.24, 0.55, -0.20, 0.24, 1.48, -0.15, cape)
+    if wings:
+        box(-0.75, 0.7, -0.22, -0.25, 1.45, -0.18, (0.55, 0.45, 0.75))
+        box(0.25, 0.7, -0.22, 0.75, 1.45, -0.18, (0.55, 0.45, 0.75))
+    if item == "sword":
+        box(0.33, 0.85, 0.10, 0.42, 0.95, 0.30, (0.35, 0.25, 0.15))
+        box(0.35, 0.9, 0.30, 0.40, 1.0, 1.05, (0.55, 0.95, 0.95), emit=0.4)
+    elif item == "mace":
+        box(0.34, 0.85, 0.10, 0.41, 0.95, 0.70, (0.35, 0.25, 0.15))
+        box(0.27, 0.8, 0.70, 0.48, 1.02, 0.92, (0.62, 0.62, 0.66))
+    elif item == "lantern":
+        box(0.30, 0.55, 0.15, 0.46, 0.75, 0.31, (0.5, 0.95, 1.0), emit=2.5)
+    elif item == "torch":
+        box(0.34, 0.85, 0.15, 0.41, 1.25, 0.22, (0.45, 0.32, 0.18))
+        box(0.33, 1.25, 0.14, 0.42, 1.34, 0.23, (1.0, 0.85, 0.4), emit=3.0)
+
+
+def gather_lights(W, extra_lights=(), limit=90, seed=1):
+    em = np.nonzero(EMIT[W] > 0.9)
+    pts = np.stack(em, 1) if em[0].size else np.zeros((0, 3), int)
+    rng = np.random.default_rng(seed)
+    if len(pts) > limit:
+        pts = pts[rng.choice(len(pts), limit, replace=False)]
+    cols = []
+    for q in pts:
+        b = W[q[0], q[1], q[2]]
+        cols.append(ATLAS[FT[b, 1], ..., :3].mean((0, 1)) * EMIT[b] * 1.4)
+    pos = [q + 0.5 for q in pts] + [l[0] for l in extra_lights]
+    cols = cols + [np.array(l[1], np.float32) for l in extra_lights]
+    if not pos:
+        return None
+    return np.array(pos, np.float32), np.array(cols, np.float32)
+
+
+def point_light(p, nrm, lights, radius):
+    if lights is None:
+        return 0
+    pos, col = lights
+    out = np.zeros_like(p)
+    for i in range(len(pos)):
+        v = pos[i] - p
+        dist = np.linalg.norm(v, axis=1) + 1e-3
+        ndl = np.clip((nrm * v).sum(1) / dist, 0, 1) * 0.8 + 0.2
+        fall = np.clip(1 - dist / radius, 0, 1) ** 2
+        out += (ndl * fall)[:, None] * col[i]
+    return out
+
+
 # ---------------------------------------------------------------- shading
-def shade(o, d, W, sky, sun_col, amb_col, fog_density, max_steps):
+def shade(o, d, W, sky, sun_col, amb_col, fog_density, max_steps, boxes=None, lights=None, light_radius=11.0, sun_on=True):
     n = d.shape[0]
     O = np.broadcast_to(o, (n, 3)).astype(np.float32)
     t, ax, b, c, wt = trace(O, d, W, max_steps)
+    bt, bk, bax = box_hit(O, d, boxes)
+    is_box = bt < t
+    t = np.where(is_box, bt, t)
     hit = np.isfinite(t)
     col = sky(d)
     if hit.any():
@@ -269,6 +438,16 @@ def shade(o, d, W, sky, sun_col, amb_col, fog_density, max_steps):
         face = np.where(ax[hi] == 1, np.where(sgn > 0, 0, 2), 1)
         tx = FT[b[hi], face]
         alb = ATLAS[tx, (v * 16).astype(int), (u * 16).astype(int), :3]
+        emit = EMIT[b[hi]]
+        hb = is_box[hi]
+        if hb.any():
+            bi = np.nonzero(hb)[0]
+            kk = bk[hi[bi]]; axb = bax[hi[bi]]
+            sg = np.where(d[hi[bi], axb] > 0, -1, 1)
+            ax[hi[bi]] = axb
+            sgn = sgn.copy(); sgn[bi] = sg
+            alb[bi] = box_albedo(p[bi], kk, axb, sg, boxes)
+            emit = emit.copy(); emit[bi] = boxes["emit"][kk]
         nrm = np.zeros((hi.size, 3), np.float32); nrm[np.arange(hi.size), ax[hi]] = sgn
         # sun shadows
         ndl = np.clip(nrm @ sky.sun, 0, 1)
@@ -277,9 +456,15 @@ def shade(o, d, W, sky, sun_col, amb_col, fog_density, max_steps):
         if lit.any():
             li = np.nonzero(lit)[0]
             so = p[li] + nrm[li] * 0.002
-            st, *_ = trace(so, np.broadcast_to(sky.sun, (li.size, 3)).astype(np.float32), W, 160, shadow=True)
-            vis[li] = ~np.isfinite(st)
+            sd_ = np.broadcast_to(sky.sun, (li.size, 3)).astype(np.float32)
+            st, *_ = trace(so, sd_, W, 160, shadow=True)
+            sbt, *_ = box_hit(so, sd_, boxes)
+            vis[li] = ~np.isfinite(st) & ~np.isfinite(sbt)
+        if not sun_on:
+            vis[:] = 0
         # smooth-lighting corner shadows
+        if hb.any():
+            c = c.copy(); c[hi[hb]] = np.floor(p[hb] - nrm[hb] * 0.01).astype(np.int32)
         a = c[hi] + nrm.astype(np.int32)
         ao = np.zeros(hi.size, np.float32)
         f = p - np.floor(p)
@@ -295,8 +480,8 @@ def shade(o, d, W, sky, sun_col, amb_col, fog_density, max_steps):
                 ao += m * s * np.clip(w - 0.35, 0, 1) ** 1.5 * 1.6
         ao = 1 - np.clip(ao, 0, 1) * 0.55
         sky_amb = amb_col * (0.75 + 0.25 * np.clip(nrm[:, 1], 0, 1))[:, None]
-        light = sky_amb * ao[:, None] + sun_col * (ndl * vis)[:, None]
-        shaded = alb * light + alb * EMIT[b[hi], None] * 1.6
+        light = sky_amb * ao[:, None] + sun_col * (ndl * vis)[:, None] + point_light(p, nrm, lights, light_radius) * ao[:, None]
+        shaded = alb * light + alb * emit[:, None] * 1.6
         # fog toward the horizon colour
         fog = 1 - np.exp(-t[hi] * fog_density)
         hz = d[hi].copy(); hz[:, 1] = np.abs(hz[:, 1]) * 0.15 + 0.02
@@ -351,13 +536,14 @@ _JOB = {}
 def _work(rows):
     j = _JOB
     d = j["d"][rows[0] * j["w"]: rows[1] * j["w"]]
-    return shade(j["o"], d, j["W"], j["sky"], j["sun"], j["amb"], j["fog"], j["steps"])
+    return shade(j["o"], d, j["W"], j["sky"], j["sun"], j["amb"], j["fog"], j["steps"], j.get("boxes"), j.get("lights"), j.get("lr", 11.0), j.get("sun_on", True))
 
 
-def render(W, o, look, size, hfov, vfov, sky, sun_col, amb_col, fog=0.004, steps=420, cylindrical=False, ss=2):
+def render(W, o, look, size, hfov, vfov, sky, sun_col, amb_col, fog=0.004, steps=420, cylindrical=False, ss=2, boxes=None, lights=None, lr=11.0, sun_on=True):
     w, h = size[0] * ss, size[1] * ss
     d = camera_rays(w, h, np.array(o, np.float32), np.array(look, np.float32), hfov, vfov, cylindrical)
-    _JOB.update(d=d, w=w, o=np.array(o, np.float32), W=W, sky=sky, sun=np.array(sun_col), amb=np.array(amb_col), fog=fog, steps=steps)
+    _JOB.update(d=d, w=w, o=np.array(o, np.float32), W=W, sky=sky, sun=np.array(sun_col), amb=np.array(amb_col), fog=fog, steps=steps,
+                boxes=boxes.arrays() if isinstance(boxes, Boxes) else boxes, lights=lights, lr=lr, sun_on=sun_on)
     chunks = [(r, min(h, r + 24)) for r in range(0, h, 24)]
     with Pool(os.cpu_count()) as pool:
         parts = pool.map(_work, chunks)

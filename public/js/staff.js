@@ -990,6 +990,8 @@ async function loadWelcome() {
 }
 
 const SERVER_PICS = [["galaxysmp", "GalaxySMP"], ["event", "Event"], ["bedwars", "Bedwars"], ["parkour", "Parkour"], ["build", "Building"]];
+const JOIN_BLOCKS = [["grass", "Grass"], ["diamond", "Diamond"], ["gold", "Gold"], ["emerald", "Emerald"], ["netherite", "Netherite"], ["amethyst", "Amethyst"],
+  ["lava", "Lava"], ["ice", "Ice"], ["galaxy", "Galaxy"], ["ender", "Ender"], ["rainbow", "Rainbow"]];
 const SERVER_ACTIONS = [["play", "Play (main server)"], ["spawn", "Go to spawn"], ["warp", "Go to a warp"], ["minigames", "Open the Minigame Center"], ["soon", "Coming soon"]];
 
 function welcomeSelect(options, value, onChange) {
@@ -1017,6 +1019,10 @@ function renderServers() {
         welcomeSelect([...SERVER_PICS, ["custom", "My own picture (link)"]], custom ? "custom" : v.image, (x) => { v.image = x === "custom" ? "https://" : x; })),
       custom ? h("label", { class: "small text-3" }, "Picture link (https://..., a wide picture works best)", welcomeInput(v.image, { maxlength: 300 }, (x) => { v.image = x; preview.src = x; })) : null,
       h("label", { class: "small text-3" }, "When picked", welcomeSelect(SERVER_ACTIONS, v.action || "play", (x) => { v.action = x; })),
+      h("label", { class: "small text-3" }, "Joining animation block", welcomeSelect(JOIN_BLOCKS, v.anim || "grass", (x) => { v.anim = x; })),
+      h("label", { class: "small text-3" }, "Name shown while joining (e.g. EventSMP)", welcomeInput(v.joinName || v.name, { maxlength: 24 }, (x) => { v.joinName = x; })),
+      h("label", { class: "check" }, (() => { const c = h("input", { type: "checkbox", checked: Boolean(v.odds) }); c.addEventListener("change", () => { v.odds = c.checked; welcomeChanged(); }); return c; })(),
+        "Rare blocks sometimes (the website's loading screen odds)"),
       v.action === "warp" ? h("label", { class: "small text-3" }, "Warp name", welcomeInput(v.warp, { maxlength: 16, placeholder: "e.g. EventArena" }, (x) => { v.warp = x; })) : null,
       h("div", { class: "eco-head" },
         h("label", { class: "check" }, on, "Shown"),
@@ -1031,7 +1037,9 @@ function renderServers() {
 function renderWelcome() {
   $("welcome-enabled").checked = welcomeData.enabled !== false;
   welcomeData.servers ||= [];
-  $("welcome-splash").replaceChildren(welcomeInput(welcomeData.splash, { maxlength: 60, placeholder: "e.g. Now with penguins!" }, (v) => { welcomeData.splash = v; }));
+  welcomeData.splashes ||= welcomeData.splash ? [welcomeData.splash] : [];
+  $("welcome-splash").replaceChildren(welcomeInput(welcomeData.splashes.join("\n"), { rows: 5, placeholder: "Now with penguins!\nAlso try Bedwars!" },
+    (v) => { welcomeData.splashes = v.split("\n").map((x) => x.trim()).filter(Boolean); }));
   renderServers();
   $("welcome-intro").replaceChildren(welcomeInput(welcomeData.intro, { rows: 4, maxlength: 1200, "aria-label": "How to Play overview" }, (v) => { welcomeData.intro = v; }));
   const list = $("welcome-tabs");
@@ -1051,7 +1059,7 @@ function renderWelcome() {
 }
 
 $("welcome-enabled").addEventListener("change", () => { welcomeData.enabled = $("welcome-enabled").checked; welcomeChanged(); });
-$("welcome-add-server").addEventListener("click", () => { welcomeData.servers.push({ name: "New Event", description: "", tags: "Event", image: "event", action: "soon", warp: "", enabled: true }); welcomeChanged(); renderWelcome(); });
+$("welcome-add-server").addEventListener("click", () => { welcomeData.servers.push({ name: "New Event", description: "", tags: "Event", image: "event", action: "soon", warp: "", enabled: true, anim: "galaxy", odds: false, joinName: "" }); welcomeChanged(); renderWelcome(); });
 $("welcome-add-tab").addEventListener("click", () => { welcomeData.tabs.push({ title: "New tab", text: "" }); welcomeChanged(); renderWelcome(); });
 $("welcome-save").addEventListener("click", async () => {
   $("welcome-save").disabled = true;
@@ -1064,7 +1072,7 @@ $("welcome-save").addEventListener("click", async () => {
 });
 $("welcome-reset").addEventListener("click", () => openDialog({
   title: "Go back to the built-in join screen?",
-  body: h("p", { class: "text-2", text: "This replaces the splash line, servers and How to Play tabs with the original ones." }),
+  body: h("p", { class: "text-2", text: "This replaces the splash lines, servers and How to Play tabs with the original ones." }),
   actions: [{ label: "Cancel" }, {
     label: "Reset", kind: "danger",
     onClick: async () => { await postJson("/api/mod/welcome/reset", {}); welcomeDirty = false; toast("Join screen reset."); loadWelcome(); },

@@ -1,6 +1,5 @@
 {
  "enabled": true,
- "splash": "Now with penguins!",
  "intro": "Welcome to **GalaxySMP**, a friendly survival server for everyone. Build, trade, play minigames and hang out with the community.\n\nPick a topic on the left to learn the basics. When you're ready, go back and press **Play**.",
  "servers": [
   {
@@ -9,7 +8,10 @@
    "tags": "Survival · Plots · Minigames",
    "image": "galaxysmp",
    "action": "play",
-   "warp": ""
+   "warp": "",
+   "anim": "grass",
+   "odds": true,
+   "joinName": "GalaxySMP"
   }
  ],
  "tabs": [
@@ -33,5 +35,19 @@
    "title": "Minigames",
    "text": "**Play together**\n- Type **/minigames** for Bedwars, Parkour and the Build Contest.\n- Win to climb the leaderboards on the website."
   }
+ ],
+ "splashes": [
+  "Now with penguins!",
+  "Also try Bedwars!",
+  "100% blocky!",
+  "Made with love!",
+  "Potato Power!",
+  "Mind the creepers!",
+  "Join the Galaxy!",
+  "Ask about the Sift!",
+  "Plots for everyone!",
+  "Free to play!",
+  "Shiny chips inside!",
+  "Trust the penguin!"
  ]
 }

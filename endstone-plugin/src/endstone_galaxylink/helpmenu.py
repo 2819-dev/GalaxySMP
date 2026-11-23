@@ -43,6 +43,10 @@ class HelpMenu:
         form.add_button("§lServer Information§r\n§8About GalaxySMP and the website", icon=INFO_ICON, on_click=self.open_info)
         form.add_button("§lRules§r\n§8How we keep GalaxySMP fun and safe", icon=RULES_ICON, on_click=self.open_rules)
         form.add_button("§lCommands§r\n§8What you can type and how", icon=COMMANDS_ICON, on_click=self.open_commands)
+        welcome = getattr(self.plugin, "welcome", None)
+        if welcome is not None:
+            form.add_button("§lMain Menu§r\n§8Featured Servers, How to Play, Store", icon="textures/items/galaxysmp_menu",
+                            on_click=welcome.open_menu)
         player.send_form(form)
 
     def back_button(self, form):

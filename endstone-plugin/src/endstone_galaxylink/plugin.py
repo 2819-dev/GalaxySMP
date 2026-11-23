@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.74.0"
+VERSION = "2.75.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -93,7 +93,8 @@ class GalaxyLink(Plugin):
         "takemoney": _cmd("Take money from a player.", "/takemoney <player: player> <amount: message>",
                           "galaxylink.command.takemoney"),
         "shopnpc": _cmd("Summon a shop NPC where you stand (tap it to edit it). /shopnpc fix puts back missing NPCs near you.", "/shopnpc [action: message]", "galaxylink.command.shopnpc"),
-        "guide": _cmd("Help: server info, rules and commands. Command blocks: guide @p", "/guide [player: player]", "galaxylink.command.guide", ["menu"]),
+        "guide": _cmd("Help: server info, rules and commands. Command blocks: guide @p", "/guide [player: player]", "galaxylink.command.guide"),
+        "menu": _cmd("The GalaxySMP Main Menu: Featured Servers, How to Play, Rules, What's New and Store.", "/menu", "galaxylink.command.menu", ["mainmenu", "hub"]),
         "tpa": _cmd("Ask to teleport to a player.", "/tpa <player: player>", "galaxylink.command.tpa"),
         "tpahere": _cmd("Ask a player to teleport to you.", "/tpahere <player: player>", "galaxylink.command.tpahere"),
         "tpaccept": _cmd("Accept a teleport request.", "/tpaccept [player: message]", "galaxylink.command.tpaccept", ["tpyes"]),
@@ -162,6 +163,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.takemoney": _perm("Allows /takemoney (server operators).", "op"),
         "galaxylink.command.shopnpc": _perm("Allows /shopnpc and editing NPCs (server operators).", "op"),
         "galaxylink.command.guide": _perm("Allows /guide.", True),
+        "galaxylink.command.menu": _perm("Allows /menu.", True),
         "galaxylink.command.tpa": _perm("Allows /tpa.", True),
         "galaxylink.command.tpahere": _perm("Allows /tpahere.", True),
         "galaxylink.command.tpaccept": _perm("Allows /tpaccept.", True),
@@ -442,6 +444,7 @@ class GalaxyLink(Plugin):
             for fn in (self.support.on_join, self.market.on_join, self.visits.on_join):
                 self.welcome.after(player, fn)   # once they press Continue
         else:
+            later(self, player, self.welcome.give_compass, 60)   # the GalaxySMP Menu compass in the last hotbar slot
             self.server.scheduler.run_task(self, lambda: self.support.on_join(player) if player.is_valid else None, delay=60)  # staff answers to /support
             self.server.scheduler.run_task(self, lambda: self.market.on_join(player) if player.is_valid else None, delay=80)  # items from buy orders
             self.server.scheduler.run_task(self, lambda: self.visits.on_join(player) if player.is_valid else None, delay=100)  # Visit picked on the website
@@ -613,6 +616,8 @@ class GalaxyLink(Plugin):
         if self.blocklog.on_interact(event):  # block inspector
             return
         if event.has_item and self.bedwars.on_use(event):  # the Leave Bedwars item
+            return
+        if event.has_item and self.welcome.on_use(event):  # the GalaxySMP Menu compass
             return
         if self.buildcontest.on_interact(event):  # no ender chests while building
             return
@@ -820,7 +825,7 @@ class GalaxyLink(Plugin):
         player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "tpa", "tpahere", "tpaccept",
                        "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd", "plate",
                        "report", "mod", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates", "elevator",
-                       "shift", "whois", "support", "map", "parkour", "warp", "setwarp", "delwarp", "goal", "votecomputer"}
+                       "shift", "whois", "support", "map", "parkour", "warp", "setwarp", "delwarp", "goal", "votecomputer", "menu"}
         if name in player_only and not isinstance(sender, Player):
             sender.send_message(f"/{name} can only be used in game.")
             return True
@@ -848,6 +853,7 @@ class GalaxyLink(Plugin):
         tp = self.teleports
         simple = {
             "guide": lambda: self._guide(sender, args),
+            "menu": lambda: self.welcome.open_menu(sender),
             "tpa": lambda: tp.request(sender, args, "to"),
             "tpahere": lambda: tp.request(sender, args, "here"),
             "tpaccept": lambda: tp.accept(sender, args),

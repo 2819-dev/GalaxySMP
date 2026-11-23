@@ -1,0 +1,30 @@
+{
+  "format_version": "1.21.40",
+  "minecraft:item": {
+    "description": {
+      "identifier": "galaxysmp:menu",
+      "menu_category": {
+        "category": "items"
+      }
+    },
+    "components": {
+      "minecraft:icon": {
+        "textures": {
+          "default": "galaxysmp_menu"
+        }
+      },
+      "minecraft:display_name": {
+        "value": "§b§lGalaxySMP Menu§r §7(use)"
+      },
+      "minecraft:max_stack_size": 1,
+      "minecraft:glint": true,
+      "minecraft:use_modifiers": {
+        "use_duration": 0.05
+      },
+      "minecraft:cooldown": {
+        "category": "galaxysmp_menu",
+        "duration": 0.5
+      }
+    }
+  }
+}

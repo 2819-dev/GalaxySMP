@@ -728,6 +728,18 @@ Also fixed: your view no longer looks zoomed in after joining.`,
 
 The Featured Servers list has new 3D pictures too.`,
   },
+  {
+    id: "2026-11-23-main-menu",
+    title: "The new GalaxySMP Main Menu",
+    body: `Joining GalaxySMP now starts at a brand-new Main Menu:
+- **3D scenes:** a different one every time you join: the Trial Chambers, the Deep Dark, Lush Caves, the Nether, the End, a desert of giant bones inspired by The Sift, and our own valley at sunset. Each one has GalaxySMP adventurers exploring it.
+- **Your character** stands on the right, menu music plays, and a new yellow splash line appears under the logo each time.
+- **Featured Servers:** pick a server to see its banner, your ping, how many players are there and its activities, then press **Join Server**. Event servers will show up here too.
+- **A joining animation** like our website's loading screen: the server's block cracks and bursts, and rare blocks can appear.
+- **Store**, **How to Play**, **Rules** and **What's New** are all one tap away.
+
+Open the menu any time with **/menu**, with the new **GalaxySMP Menu** compass in your last hotbar slot, or from **/guide**.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

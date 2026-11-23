@@ -1,541 +1,1922 @@
+// GalaxySMP join screens. A menu whose title has the hidden marker §g§s§m§p fills the screen:
+//   §1 title screen (logo, splash, buttons, your character), §2 Featured Servers (list + sidebar: button 0 = Join Server
+//   with the selected server's banner, button 1 = ping/players line, the rest = the list), §3 info pages, §4 joining animation.
+//   §o§<1-6> picks the 3D background scene (none = the valley), §m§<1-9,a> the joining block (none = grass).
+// Every other menu looks exactly like Minecraft's. Art: render3d.py / scenes.py / draw_join.py / draw_ui_icons.py.
 {
-  "namespace": "server_form",
-
-  // GalaxySMP join screens. A menu (ActionForm) whose title contains a hidden marker fills the whole screen:
-  //   §g§s§m§p§1  title screen: panning night landscape, the GalaxySMP logo, a splash line and big buttons
-  //   §g§s§m§p§2  Featured Servers: server cards with a picture, description and who's playing
-  //   §g§s§m§p§3  info page (How to Play, Rules, What's New): tabs on the left, text on the right
-  // Every other menu looks exactly like Minecraft's (Mojang's long_form, copied below as gsmp_vanilla_long_form).
-  // The plugin sends them on every join (endstone-plugin/src/endstone_galaxylink/welcome.py).
-  // Art: textures/ui/gsmp_title_bg, gsmp_srv_*, gsmp_card* (resource-pack/draw_title.py).
-
-  // the same screen as Mojang's, but our background sits on the full-screen layer (edge to edge, outside the safe area)
-  "third_party_server_screen@common.base_screen": {
-    "$screen_content": "server_form.main_screen_content",
-    "$screen_bg_content": "server_form.gsmp_screen_bg",
-    "button_mappings": [
+ "namespace": "server_form",
+ "third_party_server_screen@common.base_screen": {
+  "$screen_content": "server_form.main_screen_content",
+  "$screen_bg_content": "server_form.gsmp_screen_bg",
+  "button_mappings": [
+   {
+    "from_button_id": "button.menu_cancel",
+    "to_button_id": "button.menu_exit",
+    "mapping_type": "global"
+   }
+  ]
+ },
+ "main_screen_content": {
+  "type": "panel",
+  "size": [
+   "100%",
+   "100%"
+  ],
+  "controls": [
+   {
+    "server_form_factory": {
+     "type": "factory",
+     "control_ids": {
+      "long_form": "@server_form.long_form",
+      "custom_form": "@server_form.custom_form"
+     }
+    }
+   }
+  ]
+ },
+ "long_form": {
+  "type": "panel",
+  "size": [
+   "100%",
+   "100%"
+  ],
+  "controls": [
+   {
+    "vanilla@server_form.gsmp_vanilla_long_form": {
+     "bindings": [
       {
-        "from_button_id": "button.menu_cancel",
-        "to_button_id": "button.menu_exit",
-        "mapping_type": "global"
-      }
-    ]
-  },
-
-  "gsmp_screen_bg": {
-    "type": "panel",
-    "size": [ "100%", "100%" ],
-    "controls": [
-      {
-        "art@server_form.gsmp_backdrop": {
-          "bindings": [
-            { "binding_name": "#title_text" },
-            { "binding_type": "view", "source_property_name": "(not ((#title_text - '§g§s§m§p') = #title_text))", "target_property_name": "#visible" }
-          ]
-        }
+       "binding_name": "#title_text"
       },
       {
-        "title_fade": {
-          "type": "image",
-          "texture": "textures/ui/gsmp_fade",
-          "bilinear": true,
-          "size": [ "100%", "100%" ],
-          "layer": 3,
-          "bindings": [
-            { "binding_name": "#title_text" },
-            { "binding_type": "view", "source_property_name": "(not ((#title_text - '§g§s§m§p§1') = #title_text))", "target_property_name": "#visible" }
-          ]
-        }
+       "binding_type": "view",
+       "source_property_name": "((#title_text - '§g§s§m§p') = #title_text)",
+       "target_property_name": "#visible"
+      }
+     ]
+    }
+   },
+   {
+    "title_screen@server_form.gsmp_title_screen": {
+     "bindings": [
+      {
+       "binding_name": "#title_text"
       },
       {
-        "page_dim": {
-          "type": "image",
-          "texture": "textures/ui/Black",
-          "alpha": 0.55,
-          "size": [ "100%", "100%" ],
-          "layer": 3,
-          "bindings": [
-            { "binding_name": "#title_text" },
-            { "binding_type": "view", "source_property_name": "(not (((#title_text - '§g§s§m§p§2') = #title_text) and ((#title_text - '§g§s§m§p§3') = #title_text)))", "target_property_name": "#visible" }
-          ]
-        }
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§g§s§m§p§1') = #title_text))",
+       "target_property_name": "#visible"
       }
-    ]
-  },
-
-  "main_screen_content": {
-    "type": "panel",
-    "size": [ "100%", "100%" ],
-    "controls": [
+     ]
+    }
+   },
+   {
+    "servers_screen@server_form.gsmp_servers_screen": {
+     "bindings": [
       {
-        "server_form_factory": {
-          "type": "factory",
-          "control_ids": {
-            "long_form": "@server_form.long_form",
-            "custom_form": "@server_form.custom_form"
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§g§s§m§p§2') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ]
+    }
+   },
+   {
+    "page_screen@server_form.gsmp_page_screen": {
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§g§s§m§p§3') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ]
+    }
+   },
+   {
+    "joining_screen@server_form.gsmp_joining_screen": {
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§g§s§m§p§4') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "gsmp_vanilla_long_form@common_dialogs.main_panel_no_buttons": {
+  "$title_panel": "common_dialogs.standard_title_label",
+  "$title_size": [
+   "100% - 15px",
+   10
+  ],
+  "$title_max_size": [
+   "100% - 15px",
+   10
+  ],
+  "size": [
+   225,
+   200
+  ],
+  "$text_name": "#title_text",
+  "$title_text_binding_type": "none",
+  "$child_control": "server_form.long_form_panel",
+  "layer": 2
+ },
+ "gsmp_pan_a": {
+  "anim_type": "offset",
+  "easing": "in_out_sine",
+  "duration": 45,
+  "from": [
+   0,
+   0
+  ],
+  "to": [
+   "-33%",
+   0
+  ],
+  "next": "@server_form.gsmp_pan_b"
+ },
+ "gsmp_pan_b": {
+  "anim_type": "offset",
+  "easing": "in_out_sine",
+  "duration": 45,
+  "from": [
+   "-33%",
+   0
+  ],
+  "to": [
+   0,
+   0
+  ],
+  "next": "@server_form.gsmp_pan_a"
+ },
+ "gsmp_screen_bg": {
+  "type": "panel",
+  "size": [
+   "100%",
+   "100%"
+  ],
+  "controls": [
+   {
+    "scene_valley": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "clips_children": true,
+     "layer": 1,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "((not ((#title_text - '§g§s§m§p') = #title_text)) and ((#title_text - '§o§1') = #title_text) and ((#title_text - '§o§2') = #title_text) and ((#title_text - '§o§3') = #title_text) and ((#title_text - '§o§4') = #title_text) and ((#title_text - '§o§5') = #title_text) and ((#title_text - '§o§6') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "image": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_bg_valley",
+        "bilinear": true,
+        "size": [
+         "150%",
+         "100%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_pan_a"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "scene_trials": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "clips_children": true,
+     "layer": 1,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§o§1') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "image": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_bg_trials",
+        "bilinear": true,
+        "size": [
+         "150%",
+         "100%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_pan_a"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "scene_deepdark": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "clips_children": true,
+     "layer": 1,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§o§2') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "image": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_bg_deepdark",
+        "bilinear": true,
+        "size": [
+         "150%",
+         "100%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_pan_a"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "scene_lush": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "clips_children": true,
+     "layer": 1,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§o§3') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "image": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_bg_lush",
+        "bilinear": true,
+        "size": [
+         "150%",
+         "100%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_pan_a"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "scene_nether": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "clips_children": true,
+     "layer": 1,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§o§4') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "image": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_bg_nether",
+        "bilinear": true,
+        "size": [
+         "150%",
+         "100%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_pan_a"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "scene_end": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "clips_children": true,
+     "layer": 1,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§o§5') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "image": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_bg_end",
+        "bilinear": true,
+        "size": [
+         "150%",
+         "100%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_pan_a"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "scene_sift": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "clips_children": true,
+     "layer": 1,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§o§6') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "image": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_bg_sift",
+        "bilinear": true,
+        "size": [
+         "150%",
+         "100%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_pan_a"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "title_fade": {
+     "type": "image",
+     "texture": "textures/ui/gsmp_fade",
+     "bilinear": true,
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 3,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§g§s§m§p§1') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ]
+    }
+   },
+   {
+    "page_dim": {
+     "type": "image",
+     "texture": "textures/ui/Black",
+     "alpha": 0.55,
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 3,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "((not ((#title_text - '§g§s§m§p§2') = #title_text)) or (not ((#title_text - '§g§s§m§p§3') = #title_text)))",
+       "target_property_name": "#visible"
+      }
+     ]
+    }
+   },
+   {
+    "join_dim": {
+     "type": "image",
+     "texture": "textures/ui/Black",
+     "alpha": 0.7,
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 3,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§g§s§m§p§4') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "gsmp_mc_button": {
+  "type": "panel",
+  "size": [
+   "100%",
+   30
+  ],
+  "controls": [
+   {
+    "button@common_buttons.light_text_button": {
+     "$pressed_button_name": "button.form_button_click",
+     "size": [
+      "100%",
+      26
+     ],
+     "anchor_from": "top_middle",
+     "anchor_to": "top_middle",
+     "$button_text": "#form_button_text",
+     "$button_text_binding_type": "collection",
+     "$button_text_grid_collection_name": "form_buttons",
+     "$button_text_max_size": [
+      "100% - 8px",
+      20
+     ],
+     "bindings": [
+      {
+       "binding_type": "collection_details",
+       "binding_collection_name": "form_buttons"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "gsmp_mc_buttons": {
+  "type": "stack_panel",
+  "orientation": "vertical",
+  "size": [
+   "100%",
+   "100%c"
+  ],
+  "factory": {
+   "name": "buttons",
+   "control_ids": {
+    "button": "@server_form.gsmp_mc_button"
+   }
+  },
+  "collection_name": "form_buttons",
+  "bindings": [
+   {
+    "binding_name": "#form_button_contents",
+    "binding_name_override": "#collection_length"
+   }
+  ]
+ },
+ "gsmp_back@common_buttons.light_text_button": {
+  "$pressed_button_name": "button.menu_exit",
+  "size": [
+   56,
+   20
+  ],
+  "anchor_from": "left_middle",
+  "anchor_to": "left_middle",
+  "$button_text": "< Back",
+  "$button_text_binding_type": "none"
+ },
+ "gsmp_header": {
+  "type": "panel",
+  "size": [
+   "100%",
+   26
+  ],
+  "$header_text|default": "#title_text",
+  "controls": [
+   {
+    "back@server_form.gsmp_back": {}
+   },
+   {
+    "title": {
+     "type": "label",
+     "text": "$header_text",
+     "shadow": true,
+     "font_scale_factor": 1.25,
+     "color": [
+      1,
+      1,
+      1
+     ],
+     "anchor_from": "center",
+     "anchor_to": "center",
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "gsmp_splash_bob_a": {
+  "anim_type": "offset",
+  "easing": "in_out_sine",
+  "duration": 0.9,
+  "from": [
+   0,
+   0
+  ],
+  "to": [
+   0,
+   -2
+  ],
+  "next": "@server_form.gsmp_splash_bob_b"
+ },
+ "gsmp_splash_bob_b": {
+  "anim_type": "offset",
+  "easing": "in_out_sine",
+  "duration": 0.9,
+  "from": [
+   0,
+   -2
+  ],
+  "to": [
+   0,
+   0
+  ],
+  "next": "@server_form.gsmp_splash_bob_a"
+ },
+ "gsmp_title_screen": {
+  "type": "panel",
+  "size": [
+   "100%",
+   "100%"
+  ],
+  "layer": 2,
+  "controls": [
+   {
+    "middle": {
+     "type": "stack_panel",
+     "orientation": "vertical",
+     "size": [
+      230,
+      "100%c"
+     ],
+     "anchor_from": "center",
+     "anchor_to": "center",
+     "offset": [
+      -30,
+      6
+     ],
+     "layer": 10,
+     "controls": [
+      {
+       "logo": {
+        "type": "image",
+        "texture": "textures/ui/galaxysmp_logo",
+        "bilinear": false,
+        "keep_ratio": true,
+        "size": [
+         "100%",
+         46
+        ]
+       }
+      },
+      {
+       "splash_box": {
+        "type": "panel",
+        "size": [
+         "100%",
+         16
+        ],
+        "controls": [
+         {
+          "splash": {
+           "type": "label",
+           "text": "#form_text",
+           "color": [
+            1.0,
+            1.0,
+            0.33
+           ],
+           "shadow": true,
+           "text_alignment": "center",
+           "font_scale_factor": 1.1,
+           "size": [
+            "100%",
+            "default"
+           ],
+           "offset": "@server_form.gsmp_splash_bob_a",
+           "anchor_from": "center",
+           "anchor_to": "center",
+           "bindings": [
+            {
+             "binding_name": "#form_text"
+            }
+           ]
           }
-        }
-      }
-    ]
-  },
-
-  "long_form": {
-    "type": "panel",
-    "size": [ "100%", "100%" ],
-    "controls": [
-      {
-        "vanilla@server_form.gsmp_vanilla_long_form": {
-          "bindings": [
-            { "binding_name": "#title_text" },
-            { "binding_type": "view", "source_property_name": "((#title_text - '§g§s§m§p') = #title_text)", "target_property_name": "#visible" }
-          ]
-        }
+         }
+        ]
+       }
       },
       {
-        "title_screen@server_form.gsmp_title_screen": {
-          "bindings": [
-            { "binding_name": "#title_text" },
-            { "binding_type": "view", "source_property_name": "(not ((#title_text - '§g§s§m§p§1') = #title_text))", "target_property_name": "#visible" }
-          ]
-        }
+       "gap": {
+        "type": "panel",
+        "size": [
+         "100%",
+         10
+        ]
+       }
       },
       {
-        "servers_screen@server_form.gsmp_servers_screen": {
-          "bindings": [
-            { "binding_name": "#title_text" },
-            { "binding_type": "view", "source_property_name": "(not ((#title_text - '§g§s§m§p§2') = #title_text))", "target_property_name": "#visible" }
-          ]
-        }
+       "buttons_box": {
+        "type": "panel",
+        "size": [
+         210,
+         "100%c"
+        ],
+        "controls": [
+         {
+          "buttons@server_form.gsmp_mc_buttons": {}
+         }
+        ]
+       }
+      }
+     ]
+    }
+   },
+   {
+    "player": {
+     "type": "panel",
+     "size": [
+      "28%",
+      "78%"
+     ],
+     "anchor_from": "right_middle",
+     "anchor_to": "right_middle",
+     "offset": [
+      "-3%",
+      "4%"
+     ],
+     "layer": 10,
+     "controls": [
+      {
+       "player_renderer": {
+        "type": "custom",
+        "renderer": "live_player_renderer",
+        "property_bag": {
+         "#look_at_cursor": true
+        },
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "layer": 8,
+        "anchor_from": "center",
+        "anchor_to": "center"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "site": {
+     "type": "label",
+     "text": "galaxymc.us",
+     "shadow": true,
+     "color": [
+      0.85,
+      0.9,
+      1.0
+     ],
+     "anchor_from": "bottom_left",
+     "anchor_to": "bottom_left",
+     "offset": [
+      4,
+      -3
+     ],
+     "layer": 10
+    }
+   },
+   {
+    "made": {
+     "type": "label",
+     "text": "GalaxySMP Network",
+     "shadow": true,
+     "color": [
+      0.85,
+      0.9,
+      1.0
+     ],
+     "anchor_from": "bottom_right",
+     "anchor_to": "bottom_right",
+     "offset": [
+      -4,
+      -3
+     ],
+     "layer": 10
+    }
+   }
+  ]
+ },
+ "gsmp_card_face": {
+  "type": "image",
+  "texture": "$card_texture",
+  "size": [
+   "100%",
+   "100%"
+  ],
+  "controls": [
+   {
+    "selected": {
+     "type": "image",
+     "texture": "textures/ui/gsmp_card_hover",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 1,
+     "bindings": [
+      {
+       "binding_name": "#form_button_text",
+       "binding_type": "collection",
+       "binding_collection_name": "form_buttons"
       },
       {
-        "page_screen@server_form.gsmp_page_screen": {
-          "bindings": [
-            { "binding_name": "#title_text" },
-            { "binding_type": "view", "source_property_name": "(not ((#title_text - '§g§s§m§p§3') = #title_text))", "target_property_name": "#visible" }
-          ]
-        }
+       "binding_type": "view",
+       "source_property_name": "(not ((#form_button_text - '§q§s') = #form_button_text))",
+       "target_property_name": "#visible"
       }
-    ]
-  },
-
-  // Mojang's long_form, unchanged
-  "gsmp_vanilla_long_form@common_dialogs.main_panel_no_buttons": {
-    "$title_panel": "common_dialogs.standard_title_label",
-    "$title_size": [ "100% - 15px", 10 ],
-    "$title_max_size": [ "100% - 15px", 10 ],
-    "size": [ 225, 200 ],
-    "$text_name": "#title_text",
-    "$title_text_binding_type": "none",
-    "$child_control": "server_form.long_form_panel",
-    "layer": 2
-  },
-
-  // ---------- shared pieces ----------
-  "gsmp_pan_a": { "anim_type": "offset", "easing": "in_out_sine", "duration": 40, "from": [ 0, 0 ], "to": [ "-50%", 0 ], "next": "@server_form.gsmp_pan_b" },
-  "gsmp_pan_b": { "anim_type": "offset", "easing": "in_out_sine", "duration": 40, "from": [ "-50%", 0 ], "to": [ 0, 0 ], "next": "@server_form.gsmp_pan_a" },
-
-  // the slowly panning night landscape, with a dark layer on top ($dim: 0 = none)
-  "gsmp_backdrop": {
-    "type": "panel",
-    "size": [ "100%", "100%" ],
-    "clips_children": true,
-    "$dim|default": 0.0,
-    "controls": [
+     ]
+    }
+   },
+   {
+    "row": {
+     "type": "stack_panel",
+     "orientation": "horizontal",
+     "size": [
+      "100% - 8px",
+      36
+     ],
+     "anchor_from": "center",
+     "anchor_to": "center",
+     "layer": 2,
+     "controls": [
       {
-        "landscape": {
-          "type": "image",
-          "texture": "textures/ui/gsmp_title_bg",
-          "bilinear": true,
-          "size": [ "150%", "100%" ],
-          "anchor_from": "top_left",
-          "anchor_to": "top_left",
-          "offset": "@server_form.gsmp_pan_a",
-          "layer": 1
-        }
+       "picture": {
+        "type": "image",
+        "size": [
+         64,
+         36
+        ],
+        "bilinear": true,
+        "layer": 2,
+        "bindings": [
+         {
+          "binding_name": "#form_button_texture",
+          "binding_name_override": "#texture",
+          "binding_type": "collection",
+          "binding_collection_name": "form_buttons"
+         },
+         {
+          "binding_name": "#form_button_texture_file_system",
+          "binding_name_override": "#texture_file_system",
+          "binding_type": "collection",
+          "binding_collection_name": "form_buttons"
+         }
+        ]
+       }
       },
       {
-        "shade": {
-          "type": "image",
-          "texture": "textures/ui/Black",
-          "alpha": "$dim",
-          "size": [ "100%", "100%" ],
-          "layer": 2
-        }
-      }
-    ]
-  },
-
-  // Minecraft-style button (the game's own button look)
-  "gsmp_mc_button": {
-    "type": "panel",
-    "size": [ "100%", 30 ],
-    "controls": [
+       "gap": {
+        "type": "panel",
+        "size": [
+         6,
+         "100%"
+        ]
+       }
+      },
       {
-        "button@common_buttons.light_text_button": {
-          "$pressed_button_name": "button.form_button_click",
-          "size": [ "100%", 26 ],
-          "anchor_from": "top_middle",
-          "anchor_to": "top_middle",
-          "$button_text": "#form_button_text",
-          "$button_text_binding_type": "collection",
-          "$button_text_grid_collection_name": "form_buttons",
-          "$button_text_max_size": [ "100% - 8px", 20 ],
-          "bindings": [ { "binding_type": "collection_details", "binding_collection_name": "form_buttons" } ]
-        }
-      }
-    ]
-  },
-
-  "gsmp_mc_buttons": {
-    "type": "stack_panel",
-    "orientation": "vertical",
-    "size": [ "100%", "100%c" ],
-    "factory": { "name": "buttons", "control_ids": { "button": "@server_form.gsmp_mc_button" } },
-    "collection_name": "form_buttons",
-    "bindings": [ { "binding_name": "#form_button_contents", "binding_name_override": "#collection_length" } ]
-  },
-
-  // "< Back" in the top-left corner: closes the menu, and the plugin opens the title screen again
-  "gsmp_back@common_buttons.light_text_button": {
-    "$pressed_button_name": "button.menu_exit",
-    "size": [ 56, 20 ],
-    "anchor_from": "left_middle",
-    "anchor_to": "left_middle",
-    "$button_text": "< Back",
-    "$button_text_binding_type": "none"
-  },
-
-  "gsmp_header": {
-    "type": "panel",
-    "size": [ "100%", 26 ],
-    "$header_text|default": "#title_text",
-    "controls": [
-      { "back@server_form.gsmp_back": {} },
-      {
-        "title": {
-          "type": "label",
-          "text": "$header_text",
-          "shadow": true,
-          "font_scale_factor": 1.25,
-          "color": [ 1.0, 1.0, 1.0 ],
-          "anchor_from": "center",
-          "anchor_to": "center",
-          "bindings": [ { "binding_name": "#title_text" } ]
-        }
-      }
-    ]
-  },
-
-  // ---------- 1. title screen ----------
-  "gsmp_title_screen": {
-    "type": "panel",
-    "size": [ "100%", "100%" ],
-    "layer": 2,
-    "controls": [
-      {
-        "middle": {
-          "type": "stack_panel",
-          "orientation": "vertical",
-          "size": [ 240, "100%c" ],
-          "anchor_from": "center",
-          "anchor_to": "center",
-          "offset": [ 0, 4 ],
-          "layer": 10,
-          "controls": [
+       "text": {
+        "type": "panel",
+        "size": [
+         "fill",
+         "100%"
+        ],
+        "controls": [
+         {
+          "label": {
+           "type": "label",
+           "text": "#form_button_text",
+           "shadow": true,
+           "color": [
+            1,
+            1,
+            1
+           ],
+           "size": [
+            "100%",
+            "default"
+           ],
+           "anchor_from": "left_middle",
+           "anchor_to": "left_middle",
+           "layer": 3,
+           "bindings": [
             {
-              "logo": {
-                "type": "image",
-                "texture": "textures/ui/galaxysmp_logo",
-                "bilinear": false,
-                "keep_ratio": true,
-                "size": [ "100%", 46 ]
-              }
-            },
-            {
-              "splash": {
-                "type": "label",
-                "text": "#form_text",
-                "color": [ 1.0, 1.0, 0.33 ],
-                "shadow": true,
-                "text_alignment": "center",
-                "size": [ "100%", "default" ],
-                "bindings": [ { "binding_name": "#form_text" } ]
-              }
-            },
-            { "gap": { "type": "panel", "size": [ "100%", 14 ] } },
-            {
-              "buttons_box": {
-                "type": "panel",
-                "size": [ 210, "100%c" ],
-                "controls": [ { "buttons@server_form.gsmp_mc_buttons": {} } ]
-              }
+             "binding_name": "#form_button_text",
+             "binding_type": "collection",
+             "binding_collection_name": "form_buttons"
             }
-          ]
-        }
+           ]
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "gsmp_server_card": {
+  "type": "panel",
+  "size": [
+   "100%",
+   48
+  ],
+  "bindings": [
+   {
+    "binding_name": "#form_button_text",
+    "binding_type": "collection",
+    "binding_collection_name": "form_buttons"
+   },
+   {
+    "binding_type": "view",
+    "source_property_name": "((#form_button_text - '§j§') = #form_button_text)",
+    "target_property_name": "#visible"
+   }
+  ],
+  "controls": [
+   {
+    "card@common.button": {
+     "$pressed_button_name": "button.form_button_click",
+     "size": [
+      "100%",
+      44
+     ],
+     "anchor_from": "top_left",
+     "anchor_to": "top_left",
+     "bindings": [
+      {
+       "binding_type": "collection_details",
+       "binding_collection_name": "form_buttons"
+      }
+     ],
+     "controls": [
+      {
+       "default@server_form.gsmp_card_face": {
+        "$card_texture": "textures/ui/gsmp_card"
+       }
       },
       {
-        "site": {
-          "type": "label",
-          "text": "galaxymc.us",
-          "shadow": true,
-          "color": [ 0.85, 0.9, 1.0 ],
-          "anchor_from": "bottom_left",
-          "anchor_to": "bottom_left",
-          "offset": [ 4, -3 ],
-          "layer": 10
-        }
+       "hover@server_form.gsmp_card_face": {
+        "$card_texture": "textures/ui/gsmp_card_hover"
+       }
       },
       {
-        "made": {
-          "type": "label",
-          "text": "GalaxySMP Network",
-          "shadow": true,
-          "color": [ 0.85, 0.9, 1.0 ],
-          "anchor_from": "bottom_right",
-          "anchor_to": "bottom_right",
-          "offset": [ -4, -3 ],
-          "layer": 10
-        }
+       "pressed@server_form.gsmp_card_face": {
+        "$card_texture": "textures/ui/gsmp_card_pressed"
+       }
       }
-    ]
+     ]
+    }
+   }
+  ]
+ },
+ "gsmp_server_cards": {
+  "type": "stack_panel",
+  "orientation": "vertical",
+  "size": [
+   "100%",
+   "100%c"
+  ],
+  "factory": {
+   "name": "buttons",
+   "control_ids": {
+    "button": "@server_form.gsmp_server_card"
+   }
   },
-
-  // ---------- 2. Featured Servers ----------
-  "gsmp_servers_screen": {
-    "type": "panel",
-    "size": [ "100%", "100%" ],
-    "layer": 2,
-    "controls": [
+  "collection_name": "form_buttons",
+  "bindings": [
+   {
+    "binding_name": "#form_button_contents",
+    "binding_name_override": "#collection_length"
+   }
+  ]
+ },
+ "gsmp_join_button@common_buttons.light_text_button": {
+  "$pressed_button_name": "button.form_button_click",
+  "size": [
+   92,
+   24
+  ],
+  "anchor_from": "right_middle",
+  "anchor_to": "right_middle",
+  "collection_index": 0,
+  "$button_text": "§a§lJoin Server",
+  "$button_text_binding_type": "none",
+  "$default_button_texture": "textures/ui/gsmp_button",
+  "$hover_button_texture": "textures/ui/gsmp_button_hover",
+  "$pressed_button_texture": "textures/ui/gsmp_button_pressed",
+  "bindings": [
+   {
+    "binding_type": "collection_details",
+    "binding_collection_name": "form_buttons"
+   }
+  ]
+ },
+ "gsmp_sidebar": {
+  "type": "image",
+  "texture": "textures/ui/gsmp_card",
+  "size": [
+   "fill",
+   "100%"
+  ],
+  "controls": [
+   {
+    "inner": {
+     "type": "panel",
+     "size": [
+      "100% - 10px",
+      "100% - 10px"
+     ],
+     "anchor_from": "center",
+     "anchor_to": "center",
+     "controls": [
       {
-        "page": {
-          "type": "stack_panel",
-          "orientation": "vertical",
-          "size": [ "100% - 24px", "100% - 10px" ],
-          "anchor_from": "center",
-          "anchor_to": "center",
-          "layer": 10,
-          "controls": [
-            { "header@server_form.gsmp_header": { "$header_text": "Featured Servers" } },
+       "scroll@common.scrolling_panel": {
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "$show_background": false,
+        "$scrolling_content": "server_form.gsmp_sidebar_content",
+        "$scroll_size": [
+         4,
+         "100% - 4px"
+        ],
+        "$scrolling_pane_size": [
+         "100% - 6px",
+         "100%"
+        ],
+        "$scrolling_pane_offset": [
+         0,
+         0
+        ],
+        "$scroll_bar_right_padding_size": [
+         0,
+         0
+        ]
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "gsmp_sidebar_content": {
+  "type": "stack_panel",
+  "orientation": "vertical",
+  "size": [
+   "100%",
+   "100%c"
+  ],
+  "collection_name": "form_buttons",
+  "controls": [
+   {
+    "banner": {
+     "type": "image",
+     "size": [
+      "100%",
+      "56.25%x"
+     ],
+     "bilinear": true,
+     "collection_index": 0,
+     "bindings": [
+      {
+       "binding_name": "#form_button_texture",
+       "binding_name_override": "#texture",
+       "binding_type": "collection",
+       "binding_collection_name": "form_buttons"
+      },
+      {
+       "binding_name": "#form_button_texture_file_system",
+       "binding_name_override": "#texture_file_system",
+       "binding_type": "collection",
+       "binding_collection_name": "form_buttons"
+      }
+     ]
+    }
+   },
+   {
+    "gap1": {
+     "type": "panel",
+     "size": [
+      "100%",
+      4
+     ]
+    }
+   },
+   {
+    "stats_row": {
+     "type": "panel",
+     "size": [
+      "100%",
+      26
+     ],
+     "controls": [
+      {
+       "stats": {
+        "type": "label",
+        "text": "#form_button_text",
+        "shadow": true,
+        "color": [
+         1,
+         1,
+         1
+        ],
+        "size": [
+         "100% - 96px",
+         "default"
+        ],
+        "anchor_from": "left_middle",
+        "anchor_to": "left_middle",
+        "collection_index": 1,
+        "bindings": [
+         {
+          "binding_name": "#form_button_text",
+          "binding_type": "collection",
+          "binding_collection_name": "form_buttons"
+         }
+        ]
+       }
+      },
+      {
+       "join@server_form.gsmp_join_button": {}
+      }
+     ],
+     "collection_name": "form_buttons"
+    }
+   },
+   {
+    "gap2": {
+     "type": "panel",
+     "size": [
+      "100%",
+      4
+     ]
+    }
+   },
+   {
+    "details": {
+     "type": "label",
+     "text": "#form_text",
+     "shadow": true,
+     "color": [
+      0.95,
+      0.96,
+      1.0
+     ],
+     "size": [
+      "100%",
+      "default"
+     ],
+     "bindings": [
+      {
+       "binding_name": "#form_text"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "gsmp_servers_screen": {
+  "type": "panel",
+  "size": [
+   "100%",
+   "100%"
+  ],
+  "layer": 2,
+  "controls": [
+   {
+    "page": {
+     "type": "stack_panel",
+     "orientation": "vertical",
+     "size": [
+      "100% - 20px",
+      "100% - 8px"
+     ],
+     "anchor_from": "center",
+     "anchor_to": "center",
+     "layer": 10,
+     "controls": [
+      {
+       "header@server_form.gsmp_header": {
+        "$header_text": "Featured Servers"
+       }
+      },
+      {
+       "gap": {
+        "type": "panel",
+        "size": [
+         "100%",
+         4
+        ]
+       }
+      },
+      {
+       "body": {
+        "type": "stack_panel",
+        "orientation": "horizontal",
+        "size": [
+         "100%",
+         "fill"
+        ],
+        "controls": [
+         {
+          "list": {
+           "type": "panel",
+           "size": [
+            "42%",
+            "100%"
+           ],
+           "controls": [
             {
-              "hint": {
-                "type": "label",
-                "text": "#form_text",
-                "color": [ 0.75, 0.8, 0.95 ],
-                "text_alignment": "center",
-                "size": [ "100%", "default" ],
-                "bindings": [ { "binding_name": "#form_text" } ]
-              }
-            },
-            { "gap": { "type": "panel", "size": [ "100%", 4 ] } },
-            {
-              "list": {
-                "type": "panel",
-                "size": [ "100%", "fill" ],
-                "controls": [
-                  {
-                    "scroll@common.scrolling_panel": {
-                      "size": [ "100%", "100%" ],
-                      "$show_background": false,
-                      "$scrolling_content": "server_form.gsmp_server_cards",
-                      "$scroll_size": [ 4, "100% - 4px" ],
-                      "$scrolling_pane_size": [ "100% - 6px", "100%" ],
-                      "$scrolling_pane_offset": [ 0, 0 ],
-                      "$scroll_bar_right_padding_size": [ 0, 0 ]
-                    }
-                  }
-                ]
-              }
+             "scroll@common.scrolling_panel": {
+              "size": [
+               "100%",
+               "100%"
+              ],
+              "$show_background": false,
+              "$scrolling_content": "server_form.gsmp_server_cards",
+              "$scroll_size": [
+               4,
+               "100% - 4px"
+              ],
+              "$scrolling_pane_size": [
+               "100% - 6px",
+               "100%"
+              ],
+              "$scrolling_pane_offset": [
+               0,
+               0
+              ],
+              "$scroll_bar_right_padding_size": [
+               0,
+               0
+              ]
+             }
             }
-          ]
-        }
+           ]
+          }
+         },
+         {
+          "gap": {
+           "type": "panel",
+           "size": [
+            6,
+            "100%"
+           ]
+          }
+         },
+         {
+          "sidebar@server_form.gsmp_sidebar": {}
+         }
+        ]
+       }
       }
-    ]
-  },
-
-  "gsmp_server_cards": {
-    "type": "stack_panel",
-    "orientation": "vertical",
-    "size": [ "100%", "100%c" ],
-    "factory": { "name": "buttons", "control_ids": { "button": "@server_form.gsmp_server_card" } },
-    "collection_name": "form_buttons",
-    "bindings": [ { "binding_name": "#form_button_contents", "binding_name_override": "#collection_length" } ]
-  },
-
-  "gsmp_server_card": {
-    "type": "panel",
-    "size": [ "100%", 66 ],
-    "controls": [
+     ]
+    }
+   }
+  ]
+ },
+ "gsmp_text": {
+  "type": "panel",
+  "size": [
+   "100%",
+   "100%c + 6px"
+  ],
+  "controls": [
+   {
+    "label": {
+     "type": "label",
+     "text": "#form_text",
+     "color": [
+      0.93,
+      0.95,
+      1.0
+     ],
+     "shadow": true,
+     "size": [
+      "100% - 6px",
+      "default"
+     ],
+     "offset": [
+      3,
+      3
+     ],
+     "anchor_from": "top_left",
+     "anchor_to": "top_left",
+     "bindings": [
       {
-        "card@common.button": {
-          "$pressed_button_name": "button.form_button_click",
-          "size": [ "100%", 62 ],
-          "anchor_from": "top_left",
-          "anchor_to": "top_left",
-          "bindings": [ { "binding_type": "collection_details", "binding_collection_name": "form_buttons" } ],
-          "controls": [
-            { "default@server_form.gsmp_card_face": { "$card_texture": "textures/ui/gsmp_card" } },
-            { "hover@server_form.gsmp_card_face": { "$card_texture": "textures/ui/gsmp_card_hover" } },
-            { "pressed@server_form.gsmp_card_face": { "$card_texture": "textures/ui/gsmp_card_pressed" } }
-          ]
-        }
+       "binding_name": "#form_text"
       }
-    ]
-  },
-
-  "gsmp_card_face": {
-    "type": "image",
-    "texture": "$card_texture",
-    "size": [ "100%", "100%" ],
-    "controls": [
+     ]
+    }
+   }
+  ]
+ },
+ "gsmp_page_screen": {
+  "type": "panel",
+  "size": [
+   "100%",
+   "100%"
+  ],
+  "layer": 2,
+  "controls": [
+   {
+    "page": {
+     "type": "stack_panel",
+     "orientation": "vertical",
+     "size": [
+      "100% - 20px",
+      "100% - 8px"
+     ],
+     "anchor_from": "center",
+     "anchor_to": "center",
+     "layer": 10,
+     "controls": [
       {
-        "row": {
-          "type": "stack_panel",
-          "orientation": "horizontal",
-          "size": [ "100% - 8px", 54 ],
-          "anchor_from": "center",
-          "anchor_to": "center",
-          "controls": [
+       "header@server_form.gsmp_header": {}
+      },
+      {
+       "gap": {
+        "type": "panel",
+        "size": [
+         "100%",
+         4
+        ]
+       }
+      },
+      {
+       "body": {
+        "type": "stack_panel",
+        "orientation": "horizontal",
+        "size": [
+         "100%",
+         "fill"
+        ],
+        "controls": [
+         {
+          "tabs": {
+           "type": "panel",
+           "size": [
+            "30%",
+            "100%"
+           ],
+           "controls": [
             {
-              "picture": {
-                "type": "image",
-                "size": [ 96, 54 ],
-                "bilinear": true,
-                "layer": 2,
-                "bindings": [
-                  { "binding_name": "#form_button_texture", "binding_name_override": "#texture", "binding_type": "collection", "binding_collection_name": "form_buttons" },
-                  { "binding_name": "#form_button_texture_file_system", "binding_name_override": "#texture_file_system", "binding_type": "collection", "binding_collection_name": "form_buttons" }
-                ]
-              }
-            },
-            { "gap": { "type": "panel", "size": [ 8, "100%" ] } },
-            {
-              "text": {
-                "type": "panel",
-                "size": [ "fill", "100%" ],
-                "controls": [
-                  {
-                    "label": {
-                      "type": "label",
-                      "text": "#form_button_text",
-                      "shadow": true,
-                      "color": [ 1.0, 1.0, 1.0 ],
-                      "size": [ "100%", "default" ],
-                      "anchor_from": "left_middle",
-                      "anchor_to": "left_middle",
-                      "layer": 3,
-                      "bindings": [ { "binding_name": "#form_button_text", "binding_type": "collection", "binding_collection_name": "form_buttons" } ]
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              "join": {
-                "type": "label",
-                "text": "§aJoin §f>",
-                "shadow": true,
-                "size": [ 34, "100%" ],
-                "text_alignment": "right",
-                "layer": 3
-              }
+             "scroll@common.scrolling_panel": {
+              "size": [
+               "100%",
+               "100%"
+              ],
+              "$show_background": false,
+              "$scrolling_content": "server_form.gsmp_mc_buttons",
+              "$scroll_size": [
+               4,
+               "100% - 4px"
+              ],
+              "$scrolling_pane_size": [
+               "100% - 6px",
+               "100%"
+              ],
+              "$scrolling_pane_offset": [
+               0,
+               0
+              ],
+              "$scroll_bar_right_padding_size": [
+               0,
+               0
+              ]
+             }
             }
-          ]
-        }
-      }
-    ]
-  },
-
-  // ---------- 3. info page (How to Play, Rules, What's New) ----------
-  "gsmp_page_screen": {
-    "type": "panel",
-    "size": [ "100%", "100%" ],
-    "layer": 2,
-    "controls": [
-      {
-        "page": {
-          "type": "stack_panel",
-          "orientation": "vertical",
-          "size": [ "100% - 24px", "100% - 10px" ],
-          "anchor_from": "center",
-          "anchor_to": "center",
-          "layer": 10,
-          "controls": [
-            { "header@server_form.gsmp_header": {} },
-            { "gap": { "type": "panel", "size": [ "100%", 4 ] } },
+           ]
+          }
+         },
+         {
+          "gap": {
+           "type": "panel",
+           "size": [
+            6,
+            "100%"
+           ]
+          }
+         },
+         {
+          "text_box": {
+           "type": "image",
+           "texture": "textures/ui/gsmp_card",
+           "size": [
+            "fill",
+            "100%"
+           ],
+           "controls": [
             {
-              "body": {
-                "type": "stack_panel",
-                "orientation": "horizontal",
-                "size": [ "100%", "fill" ],
-                "controls": [
-                  {
-                    "tabs": {
-                      "type": "panel",
-                      "size": [ "30%", "100%" ],
-                      "controls": [
-                        {
-                          "scroll@common.scrolling_panel": {
-                            "size": [ "100%", "100%" ],
-                            "$show_background": false,
-                            "$scrolling_content": "server_form.gsmp_mc_buttons",
-                            "$scroll_size": [ 4, "100% - 4px" ],
-                            "$scrolling_pane_size": [ "100% - 6px", "100%" ],
-                            "$scrolling_pane_offset": [ 0, 0 ],
-                            "$scroll_bar_right_padding_size": [ 0, 0 ]
-                          }
-                        }
-                      ]
-                    }
-                  },
-                  { "gap": { "type": "panel", "size": [ 6, "100%" ] } },
-                  {
-                    "text_box": {
-                      "type": "image",
-                      "texture": "textures/ui/gsmp_card",
-                      "size": [ "fill", "100%" ],
-                      "controls": [
-                        {
-                          "scroll@common.scrolling_panel": {
-                            "size": [ "100% - 8px", "100% - 8px" ],
-                            "anchor_from": "center",
-                            "anchor_to": "center",
-                            "$show_background": false,
-                            "$scrolling_content": "server_form.gsmp_text",
-                            "$scroll_size": [ 4, "100% - 4px" ],
-                            "$scrolling_pane_size": [ "100% - 6px", "100%" ],
-                            "$scrolling_pane_offset": [ 2, 0 ],
-                            "$scroll_bar_right_padding_size": [ 0, 0 ]
-                          }
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
+             "scroll@common.scrolling_panel": {
+              "size": [
+               "100% - 8px",
+               "100% - 8px"
+              ],
+              "anchor_from": "center",
+              "anchor_to": "center",
+              "$show_background": false,
+              "$scrolling_content": "server_form.gsmp_text",
+              "$scroll_size": [
+               4,
+               "100% - 4px"
+              ],
+              "$scrolling_pane_size": [
+               "100% - 6px",
+               "100%"
+              ],
+              "$scrolling_pane_offset": [
+               2,
+               0
+              ],
+              "$scroll_bar_right_padding_size": [
+               0,
+               0
+              ]
+             }
             }
-          ]
-        }
+           ]
+          }
+         }
+        ]
+       }
       }
-    ]
-  },
-
-  "gsmp_text": {
-    "type": "panel",
-    "size": [ "100%", "100%c + 6px" ],
-    "controls": [
+     ]
+    }
+   }
+  ]
+ },
+ "gsmp_join_flip": {
+  "anim_type": "flip_book",
+  "initial_uv": [
+   0,
+   0
+  ],
+  "frame_count": 24,
+  "frame_step": 160,
+  "fps": 12,
+  "reversible": false,
+  "looping": false,
+  "orientation": "vertical"
+ },
+ "gsmp_name_wait": {
+  "anim_type": "wait",
+  "duration": 1.0,
+  "next": "@server_form.gsmp_name_in"
+ },
+ "gsmp_name_in": {
+  "anim_type": "alpha",
+  "easing": "out_cubic",
+  "duration": 0.6,
+  "from": 0,
+  "to": 1
+ },
+ "gsmp_bar_grow": {
+  "anim_type": "size",
+  "easing": "in_out_sine",
+  "duration": 2.4,
+  "from": [
+   0,
+   4
+  ],
+  "to": [
+   "100%",
+   4
+  ]
+ },
+ "gsmp_joining_screen": {
+  "type": "panel",
+  "size": [
+   "100%",
+   "100%"
+  ],
+  "layer": 2,
+  "controls": [
+   {
+    "stack": {
+     "type": "stack_panel",
+     "orientation": "vertical",
+     "size": [
+      260,
+      "100%c"
+     ],
+     "anchor_from": "center",
+     "anchor_to": "center",
+     "layer": 10,
+     "controls": [
       {
-        "label": {
-          "type": "label",
-          "text": "#form_text",
-          "color": [ 0.93, 0.95, 1.0 ],
-          "shadow": true,
-          "size": [ "100% - 6px", "default" ],
-          "offset": [ 3, 3 ],
-          "anchor_from": "top_left",
-          "anchor_to": "top_left",
-          "bindings": [ { "binding_name": "#form_text" } ]
-        }
+       "anim": {
+        "type": "panel",
+        "size": [
+         "100%",
+         120
+        ],
+        "controls": [
+         {
+          "flip_grass": {
+           "type": "image",
+           "texture": "textures/ui/gsmp_join_grass",
+           "uv_size": [
+            160,
+            160
+           ],
+           "uv": "@server_form.gsmp_join_flip",
+           "size": [
+            120,
+            120
+           ],
+           "bilinear": false,
+           "disable_anim_fast_forward": true,
+           "anchor_from": "center",
+           "anchor_to": "center",
+           "bindings": [
+            {
+             "binding_name": "#title_text"
+            },
+            {
+             "binding_type": "view",
+             "source_property_name": "((not ((#title_text - '§g§s§m§p§4') = #title_text)) and ((#title_text - '§m§1') = #title_text) and ((#title_text - '§m§2') = #title_text) and ((#title_text - '§m§3') = #title_text) and ((#title_text - '§m§4') = #title_text) and ((#title_text - '§m§5') = #title_text) and ((#title_text - '§m§6') = #title_text) and ((#title_text - '§m§7') = #title_text) and ((#title_text - '§m§8') = #title_text) and ((#title_text - '§m§9') = #title_text) and ((#title_text - '§m§a') = #title_text))",
+             "target_property_name": "#visible"
+            }
+           ]
+          }
+         },
+         {
+          "flip_diamond": {
+           "type": "image",
+           "texture": "textures/ui/gsmp_join_diamond",
+           "uv_size": [
+            160,
+            160
+           ],
+           "uv": "@server_form.gsmp_join_flip",
+           "size": [
+            120,
+            120
+           ],
+           "bilinear": false,
+           "disable_anim_fast_forward": true,
+           "anchor_from": "center",
+           "anchor_to": "center",
+           "bindings": [
+            {
+             "binding_name": "#title_text"
+            },
+            {
+             "binding_type": "view",
+             "source_property_name": "(not ((#title_text - '§m§1') = #title_text))",
+             "target_property_name": "#visible"
+            }
+           ]
+          }
+         },
+         {
+          "flip_gold": {
+           "type": "image",
+           "texture": "textures/ui/gsmp_join_gold",
+           "uv_size": [
+            160,
+            160
+           ],
+           "uv": "@server_form.gsmp_join_flip",
+           "size": [
+            120,
+            120
+           ],
+           "bilinear": false,
+           "disable_anim_fast_forward": true,
+           "anchor_from": "center",
+           "anchor_to": "center",
+           "bindings": [
+            {
+             "binding_name": "#title_text"
+            },
+            {
+             "binding_type": "view",
+             "source_property_name": "(not ((#title_text - '§m§2') = #title_text))",
+             "target_property_name": "#visible"
+            }
+           ]
+          }
+         },
+         {
+          "flip_emerald": {
+           "type": "image",
+           "texture": "textures/ui/gsmp_join_emerald",
+           "uv_size": [
+            160,
+            160
+           ],
+           "uv": "@server_form.gsmp_join_flip",
+           "size": [
+            120,
+            120
+           ],
+           "bilinear": false,
+           "disable_anim_fast_forward": true,
+           "anchor_from": "center",
+           "anchor_to": "center",
+           "bindings": [
+            {
+             "binding_name": "#title_text"
+            },
+            {
+             "binding_type": "view",
+             "source_property_name": "(not ((#title_text - '§m§3') = #title_text))",
+             "target_property_name": "#visible"
+            }
+           ]
+          }
+         },
+         {
+          "flip_netherite": {
+           "type": "image",
+           "texture": "textures/ui/gsmp_join_netherite",
+           "uv_size": [
+            160,
+            160
+           ],
+           "uv": "@server_form.gsmp_join_flip",
+           "size": [
+            120,
+            120
+           ],
+           "bilinear": false,
+           "disable_anim_fast_forward": true,
+           "anchor_from": "center",
+           "anchor_to": "center",
+           "bindings": [
+            {
+             "binding_name": "#title_text"
+            },
+            {
+             "binding_type": "view",
+             "source_property_name": "(not ((#title_text - '§m§4') = #title_text))",
+             "target_property_name": "#visible"
+            }
+           ]
+          }
+         },
+         {
+          "flip_amethyst": {
+           "type": "image",
+           "texture": "textures/ui/gsmp_join_amethyst",
+           "uv_size": [
+            160,
+            160
+           ],
+           "uv": "@server_form.gsmp_join_flip",
+           "size": [
+            120,
+            120
+           ],
+           "bilinear": false,
+           "disable_anim_fast_forward": true,
+           "anchor_from": "center",
+           "anchor_to": "center",
+           "bindings": [
+            {
+             "binding_name": "#title_text"
+            },
+            {
+             "binding_type": "view",
+             "source_property_name": "(not ((#title_text - '§m§5') = #title_text))",
+             "target_property_name": "#visible"
+            }
+           ]
+          }
+         },
+         {
+          "flip_lava": {
+           "type": "image",
+           "texture": "textures/ui/gsmp_join_lava",
+           "uv_size": [
+            160,
+            160
+           ],
+           "uv": "@server_form.gsmp_join_flip",
+           "size": [
+            120,
+            120
+           ],
+           "bilinear": false,
+           "disable_anim_fast_forward": true,
+           "anchor_from": "center",
+           "anchor_to": "center",
+           "bindings": [
+            {
+             "binding_name": "#title_text"
+            },
+            {
+             "binding_type": "view",
+             "source_property_name": "(not ((#title_text - '§m§6') = #title_text))",
+             "target_property_name": "#visible"
+            }
+           ]
+          }
+         },
+         {
+          "flip_ice": {
+           "type": "image",
+           "texture": "textures/ui/gsmp_join_ice",
+           "uv_size": [
+            160,
+            160
+           ],
+           "uv": "@server_form.gsmp_join_flip",
+           "size": [
+            120,
+            120
+           ],
+           "bilinear": false,
+           "disable_anim_fast_forward": true,
+           "anchor_from": "center",
+           "anchor_to": "center",
+           "bindings": [
+            {
+             "binding_name": "#title_text"
+            },
+            {
+             "binding_type": "view",
+             "source_property_name": "(not ((#title_text - '§m§7') = #title_text))",
+             "target_property_name": "#visible"
+            }
+           ]
+          }
+         },
+         {
+          "flip_galaxy": {
+           "type": "image",
+           "texture": "textures/ui/gsmp_join_galaxy",
+           "uv_size": [
+            160,
+            160
+           ],
+           "uv": "@server_form.gsmp_join_flip",
+           "size": [
+            120,
+            120
+           ],
+           "bilinear": false,
+           "disable_anim_fast_forward": true,
+           "anchor_from": "center",
+           "anchor_to": "center",
+           "bindings": [
+            {
+             "binding_name": "#title_text"
+            },
+            {
+             "binding_type": "view",
+             "source_property_name": "(not ((#title_text - '§m§8') = #title_text))",
+             "target_property_name": "#visible"
+            }
+           ]
+          }
+         },
+         {
+          "flip_ender": {
+           "type": "image",
+           "texture": "textures/ui/gsmp_join_ender",
+           "uv_size": [
+            160,
+            160
+           ],
+           "uv": "@server_form.gsmp_join_flip",
+           "size": [
+            120,
+            120
+           ],
+           "bilinear": false,
+           "disable_anim_fast_forward": true,
+           "anchor_from": "center",
+           "anchor_to": "center",
+           "bindings": [
+            {
+             "binding_name": "#title_text"
+            },
+            {
+             "binding_type": "view",
+             "source_property_name": "(not ((#title_text - '§m§9') = #title_text))",
+             "target_property_name": "#visible"
+            }
+           ]
+          }
+         },
+         {
+          "flip_rainbow": {
+           "type": "image",
+           "texture": "textures/ui/gsmp_join_rainbow",
+           "uv_size": [
+            160,
+            160
+           ],
+           "uv": "@server_form.gsmp_join_flip",
+           "size": [
+            120,
+            120
+           ],
+           "bilinear": false,
+           "disable_anim_fast_forward": true,
+           "anchor_from": "center",
+           "anchor_to": "center",
+           "bindings": [
+            {
+             "binding_name": "#title_text"
+            },
+            {
+             "binding_type": "view",
+             "source_property_name": "(not ((#title_text - '§m§a') = #title_text))",
+             "target_property_name": "#visible"
+            }
+           ]
+          }
+         }
+        ]
+       }
+      },
+      {
+       "name": {
+        "type": "label",
+        "text": "#form_text",
+        "shadow": true,
+        "font_scale_factor": 2.0,
+        "text_alignment": "center",
+        "size": [
+         "100%",
+         "default"
+        ],
+        "alpha": 0,
+        "anims": [
+         "@server_form.gsmp_name_wait"
+        ],
+        "bindings": [
+         {
+          "binding_name": "#form_text"
+         }
+        ]
+       }
+      },
+      {
+       "gap": {
+        "type": "panel",
+        "size": [
+         "100%",
+         8
+        ]
+       }
+      },
+      {
+       "bar_bg": {
+        "type": "image",
+        "texture": "textures/ui/Black",
+        "alpha": 0.5,
+        "size": [
+         180,
+         4
+        ],
+        "controls": [
+         {
+          "bar": {
+           "type": "image",
+           "texture": "textures/ui/White",
+           "color": [
+            0.55,
+            0.85,
+            1.0
+           ],
+           "size": [
+            0,
+            4
+           ],
+           "anchor_from": "left_middle",
+           "anchor_to": "left_middle",
+           "anims": [
+            "@server_form.gsmp_bar_grow"
+           ]
+          }
+         }
+        ]
+       }
+      },
+      {
+       "joining": {
+        "type": "label",
+        "text": "Joining...",
+        "color": [
+         0.75,
+         0.8,
+         0.95
+        ],
+        "shadow": true,
+        "text_alignment": "center",
+        "size": [
+         "100%",
+         "default"
+        ]
+       }
       }
-    ]
-  }
+     ]
+    }
+   }
+  ]
+ }
 }
