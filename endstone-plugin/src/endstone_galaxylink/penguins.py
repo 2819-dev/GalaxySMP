@@ -2,9 +2,11 @@
 
 Penguins (galaxysmp:penguin): tamed with fish. The first player to tame one owns it for good: nobody else can feed,
 sit, leash, name or hurt it. A tamed penguin follows its owner and fights monsters and anyone who attacks them.
-While your own penguin is within 16 blocks you get Penguin's Grace: fast swimming in water and even faster on ice.
+While your own penguin is within 16 blocks you get Penguin's Grace: faster in water (and no drowning), even faster on ice.
+When your penguin is more than 16 blocks away, a penguin pointer above your hotbar shows the way (only you see it).
 
 Potato Chips (galaxysmp:chips_*): four flavors, each with a strong custom-named power when eaten.
+The powers are done by the plugin (not Minecraft effects), so only the power's name shows.
 
 Both come from staff (/give) or as super rare Galaxy Crate prizes, and both can be traded and sold.
 """
@@ -17,20 +19,23 @@ OWNER_TAG = "gsmp_owner_"      # + xuid
 NAME_TAG = "gsmp_ownername_"   # + gamertag (spaces as _)
 GRACE_RANGE = 16
 
-# flavor -> (power name, color, [(effect, seconds, amplifier)], description)
+# flavor -> (power name, color, seconds, perks, description)
+# The powers are made by the plugin itself (not Minecraft effects), so the effects list stays clean and only the
+# power's name shows. Perks: strength = extra melee/arrow damage, resist = less damage taken, regen = health back every
+# 2 seconds, hearts = extra hearts, speed = faster walking, fireproof / waterproof (no drowning) / nofall.
 CHIPS = {
-    "galaxysmp:chips_classic": ("Potato Power", "§6", [("strength", 180, 2), ("resistance", 180, 1), ("regeneration", 180, 1), ("absorption", 180, 3)],
-                                "Strength III, Resistance II, Regeneration II and 8 extra hearts for 3 minutes"),
-    "galaxysmp:chips_spicy": ("Fire Crunch", "§c", [("strength", 180, 3), ("fire_resistance", 180, 0), ("speed", 180, 1)],
-                              "Strength IV, Fire Resistance and Speed II for 3 minutes"),
-    "galaxysmp:chips_sour": ("Sour Rush", "§a", [("speed", 300, 2), ("haste", 300, 2), ("jump_boost", 300, 1)],
-                             "Speed III, Haste III and Jump Boost II for 5 minutes"),
-    "galaxysmp:chips_galaxy": ("Cosmic Crunch", "§d", [("strength", 300, 2), ("resistance", 300, 2), ("regeneration", 300, 2), ("speed", 300, 1),
-                                                     ("haste", 300, 1), ("fire_resistance", 300, 0), ("water_breathing", 300, 0),
-                                                     ("night_vision", 300, 0), ("health_boost", 300, 4), ("absorption", 300, 4)],
-                               "Everything at once: Strength III, Resistance III, Regeneration III, Speed II, Haste II, Fire Resistance, "
-                               "Water Breathing, Night Vision and 20 extra hearts for 5 minutes"),
+    "galaxysmp:chips_classic": ("Potato Power", "§6", 180, {"strength": 0.6, "resist": 0.3, "regen": 1, "hearts": 8},
+                                "60% more damage, 30% less damage taken, fast healing and 8 extra hearts for 3 minutes"),
+    "galaxysmp:chips_spicy": ("Fire Crunch", "§c", 180, {"strength": 0.9, "fireproof": True, "speed": 0.4},
+                              "90% more damage, immune to fire and lava, and 40% faster for 3 minutes"),
+    "galaxysmp:chips_sour": ("Sour Rush", "§a", 300, {"speed": 0.6, "nofall": True, "resist": 0.2},
+                             "60% faster, no fall damage and 20% less damage taken for 5 minutes"),
+    "galaxysmp:chips_galaxy": ("Cosmic Crunch", "§d", 300, {"strength": 0.7, "resist": 0.45, "regen": 2, "hearts": 10, "speed": 0.4,
+                                                          "fireproof": True, "waterproof": True, "nofall": True},
+                               "Everything at once: 70% more damage, 45% less damage taken, very fast healing, 10 extra hearts, "
+                               "40% faster, and immune to fire, lava, drowning and fall damage for 5 minutes"),
 }
+WALK = 0.1   # Minecraft's normal walking speed
 
 # what you see around you while a power is on (particles), and the icon in front of its name above the hotbar
 LOOKS = {
@@ -80,8 +85,9 @@ def item_id(stack):
 class Penguins:
     def __init__(self, plugin):
         self.plugin = plugin
-        self.powers = {}   # player uuid -> {power name: (color, until time)}
-        self.graced = set()   # players with Penguin's Grace right now
+        self.powers = {}   # player uuid -> {power name: (color, until time, perks)}
+        self.graced = {}   # player uuid -> "water" or "ice" while they have Penguin's Grace
+        self.penguins_of = {}   # owner xuid -> where their penguins were last seen [(dimension, x, y, z)]
         self.ticks = 0
         self.add_crate_prizes()
 
@@ -142,24 +148,94 @@ class Penguins:
         except Exception:
             pass
 
+    # ---------- damage: penguin protection and chip powers ----------
     def on_damage(self, event):
-        """Nobody but its owner can hurt a tamed penguin. Returns True when it cancelled the damage."""
+        """Nobody but its owner can hurt a tamed penguin, and chip powers change damage.
+        Returns True when it cancelled the damage."""
         try:
             victim = event.actor
-            if type_of(victim) != PENGUIN:
-                return False
-            owner, _ = owner_of(victim)
             attacker = event.damage_source.actor
+            kind = str(event.damage_source.type)
         except Exception:
             return False
-        if owner and attacker is not None and hasattr(attacker, "xuid") and str(attacker.xuid) != owner:
-            event.is_cancelled = True
-            return True
+        if type_of(victim) == PENGUIN:
+            owner, _ = owner_of(victim)
+            if owner and attacker is not None and hasattr(attacker, "xuid") and str(attacker.xuid) != owner:
+                event.is_cancelled = True
+                return True
+            return False
+        try:
+            mine = self.perks(victim) if hasattr(victim, "xuid") else {}
+            if mine:
+                if (mine.get("nofall") and "fall" in kind) or \
+                   (mine.get("fireproof") and any(k in kind for k in ("fire", "lava", "magma"))) or \
+                   (mine.get("waterproof") and "drown" in kind):
+                    event.is_cancelled = True
+                    return True
+                if mine.get("resist"):
+                    event.damage = float(event.damage) * (1 - mine["resist"])
+            if attacker is not None and hasattr(attacker, "xuid") and any(k in kind for k in ("attack", "projectile")):
+                theirs = self.perks(attacker)
+                if theirs.get("strength"):
+                    event.damage = float(event.damage) * (1 + theirs["strength"])
+        except Exception:
+            pass
         return False
 
+    def perks(self, player, now=None):
+        """A player's chip perks right now (several powers at once: the strongest of each)."""
+        now = now or time.time()
+        out = {}
+        for power, (color, until, perks) in (self.powers.get(str(player.unique_id)) or {}).items():
+            if until <= now:
+                continue
+            for k, v in perks.items():
+                out[k] = max(out.get(k, 0), v) if not isinstance(v, bool) else (out.get(k) or v)
+        grace = self.graced.get(str(player.unique_id))
+        if grace == "water":
+            out["speed"] = max(out.get("speed", 0), 0.6)
+            out["waterproof"] = True
+        elif grace == "ice":
+            out["speed"] = max(out.get("speed", 0), 1.0)
+        return out
+
+    def in_minigame(self, p):
+        bw = getattr(self.plugin, "bedwars", None)
+        bc = getattr(self.plugin, "buildcontest", None)
+        try:
+            return (bw is not None and bw.playing(p)) or (bc is not None and bc.building(p))
+        except Exception:
+            return False
+
+    def apply_body(self, p, mine):
+        """Speed and extra hearts (only changed when they need to be)."""
+        try:
+            want = round(WALK * (1 + mine.get("speed", 0)), 3)
+            if abs(float(p.walk_speed) - want) > 0.001:
+                p.walk_speed = want
+        except Exception:
+            pass
+        try:
+            want = 20 + 2 * int(mine.get("hearts", 0))
+            if int(p.max_health) != want:
+                p.max_health = want
+                if p.health > want:
+                    p.health = want
+        except Exception:
+            pass
+
+    def on_join(self, p):
+        """Back to normal speed and hearts (a power may have been on when the server restarted)."""
+        self.apply_body(p, self.perks(p))
+
+    def on_quit(self, p):
+        self.apply_body(p, {})
+        self.graced.pop(str(p.unique_id), None)
+
     def tick(self):
-        """Every half second: Penguin's Grace for owners whose penguin is close, and what you see while a power is on
-        (a line above the hotbar with each power's name and time left, and particles around you)."""
+        """Every half second: Penguin's Grace, chip powers (speed, hearts, healing), what you see while a power is on
+        (a line above the hotbar with each power's name and time left, and particles around you), and a pointer to your
+        penguin when it's lost."""
         self.ticks += 1
         server = self.plugin.server
         if self.ticks % 2 == 0:
@@ -168,22 +244,38 @@ class Penguins:
         for p in server.online_players:
             uid = str(p.unique_id)
             mine = {k: v for k, v in (self.powers.get(uid) or {}).items() if v[1] > now}
+            if mine and self.in_minigame(p):
+                mine = {}
+                p.send_message("§7Your chip power ended because you joined a minigame.")
             if mine:
                 self.powers[uid] = mine
             else:
                 self.powers.pop(uid, None)
-            grace = uid in self.graced
-            if not mine and not grace:
+            perks = self.perks(p, now)
+            self.apply_body(p, perks)
+            if perks.get("regen") and self.ticks % 4 == 0:
+                try:
+                    if 0 < p.health < p.max_health:
+                        p.health = min(p.max_health, p.health + int(perks["regen"]))
+                except Exception:
+                    pass
+            grace = self.graced.get(uid)
+            pointer = self.pointer(p)
+            if not mine and not grace and not pointer:
                 continue
             parts = [f"{v[0]}§l{k}§r §7{int((v[1] - now) // 60)}:{int((v[1] - now) % 60):02d}" for k, v in mine.items()]
             if grace:
                 parts.append("§b§lPenguin's Grace")
+            if pointer:
+                parts.append(pointer)
             try:
                 p.send_tip("  ".join(parts))
             except Exception:
                 pass
             # particles around you (everyone nearby sees them)
             looks = [LOOKS[k][1] for k in mine] + ([GRACE_LOOK[1]] if grace else [])
+            if not looks:
+                continue
             try:
                 from endstone_galaxylink.floating import dim_cmd
                 import random
@@ -197,8 +289,29 @@ class Penguins:
             except Exception:
                 pass
 
+    def pointer(self, p):
+        """When your penguin is more than 16 blocks away: a penguin icon, an arrow toward it and how far it is.
+        Only you see it."""
+        spots = self.penguins_of.get(str(p.xuid))
+        if not spots:
+            return ""
+        try:
+            l = p.location
+            dname = p.dimension.name
+        except Exception:
+            return ""
+        here = [s for s in spots if s[0] == dname]
+        if not here:
+            return f"§b{ICON} §7Your penguin is in another dimension"
+        d, x, y, z = min(here, key=lambda s: (s[1] - l.x) ** 2 + (s[3] - l.z) ** 2)
+        dist = ((x - l.x) ** 2 + (y - l.y) ** 2 + (z - l.z) ** 2) ** 0.5
+        if dist <= GRACE_RANGE:
+            return ""
+        return f"§b{ICON} {arrow(x - l.x, z - l.z, getattr(l, 'yaw', 0))} §f{int(dist)} blocks"
+
     def grace_check(self):
-        """Gives Penguin's Grace to owners whose penguin is within 16 blocks. Returns their uuids."""
+        """Finds every tamed penguin, and gives Penguin's Grace to owners whose penguin is within 16 blocks and who
+        are in water or on ice. Returns {uuid: "water" or "ice"}."""
         level = self.plugin.server.level
         near = {}   # owner xuid -> list of (dim, x, y, z)
         for dim in level.dimensions:
@@ -213,11 +326,26 @@ class Penguins:
                 if owner:
                     l = a.location
                     near.setdefault(owner, []).append((dim.name, l.x, l.y, l.z))
-        out = set()
+        # remember where each owner's penguins were last seen (for the pointer), even when its area isn't loaded
+        for owner, spots in near.items():
+            self.penguins_of[owner] = spots
+        # a penguin that's gone (it died) while its owner stands next to where it was: forget it
+        for p in self.plugin.server.online_players:
+            x = str(p.xuid)
+            if x in near or x not in self.penguins_of:
+                continue
+            try:
+                l, dname = p.location, p.dimension.name
+                self.penguins_of[x] = [s for s in self.penguins_of[x]
+                                       if not (s[0] == dname and (s[1] - l.x) ** 2 + (s[3] - l.z) ** 2 < 32 ** 2)]
+                if not self.penguins_of[x]:
+                    del self.penguins_of[x]
+            except Exception:
+                pass
+        out = {}
         if not near:
             return out
-        server = self.plugin.server
-        for p in server.online_players:
+        for p in self.plugin.server.online_players:
             spots = near.get(str(p.xuid))
             if not spots:
                 continue
@@ -225,20 +353,19 @@ class Penguins:
             dname = p.dimension.name
             if not any(d == dname and (x - l.x) ** 2 + (y - l.y) ** 2 + (z - l.z) ** 2 <= GRACE_RANGE ** 2 for d, x, y, z in spots):
                 continue
-            name = p.name.replace('"', "")
             try:
-                if p.is_in_water:
-                    server.dispatch_command(server.command_sender, f'effect "{name}" dolphins_grace 3 0 true')
-                    server.dispatch_command(server.command_sender, f'effect "{name}" speed 3 1 true')
-                    out.add(str(p.unique_id))
-                else:
-                    below = str(p.dimension.get_block_at(int(l.x // 1), int(l.y // 1) - 1, int(l.z // 1)).type)
-                    if "ice" in below:
-                        server.dispatch_command(server.command_sender, f'effect "{name}" speed 3 4 true')
-                        out.add(str(p.unique_id))
+                if p.is_in_water or "water" in self.block(p, 0):
+                    out[str(p.unique_id)] = "water"
+                elif "ice" in self.block(p, -1):
+                    out[str(p.unique_id)] = "ice"
             except Exception:
                 continue
         return out
+
+    @staticmethod
+    def block(p, dy):
+        l = p.location
+        return str(p.dimension.get_block_at(int(l.x // 1), int(l.y // 1) + dy, int(l.z // 1)).type)
 
     # ---------- potato chips ----------
     def on_consume(self, event):
@@ -246,13 +373,11 @@ class Penguins:
         if not chip:
             return False
         player = event.player
-        bw = getattr(self.plugin, "bedwars", None)
-        bc = getattr(self.plugin, "buildcontest", None)
-        if (bw is not None and bw.playing(player)) or (bc is not None and bc.building(player)):
+        if self.in_minigame(player):
             event.is_cancelled = True
             player.send_message("§cPotato chips can't be eaten during a minigame. Save them for later!")
             return True
-        power, color, effects, desc = chip
+        power, color, secs, perks, desc = chip
         server = self.plugin.server
         name = player.name.replace('"', "")
 
@@ -260,8 +385,14 @@ class Penguins:
             p = server.get_player(player.unique_id)
             if p is None:
                 return
-            for effect, secs, amp in effects:
-                server.dispatch_command(server.command_sender, f'effect "{name}" {effect} {secs} {amp} true')
+            self.powers.setdefault(str(p.unique_id), {})[power] = (color, time.time() + secs, perks)
+            mine = self.perks(p)
+            self.apply_body(p, mine)
+            if mine.get("hearts"):
+                try:
+                    p.health = p.max_health
+                except Exception:
+                    pass
             try:
                 server.dispatch_command(server.command_sender, f'title "{name}" times 5 40 10')
                 server.dispatch_command(server.command_sender, f'title "{name}" subtitle §7{power} activated!')
@@ -270,7 +401,17 @@ class Penguins:
             except Exception:
                 pass
             p.send_message(f"{color}§l{power}!§r §7{desc}.")
-            secs = max(s for _, s, _ in effects)
-            self.powers.setdefault(str(p.unique_id), {})[power] = (color, time.time() + secs)
         server.scheduler.run_task(self.plugin, apply, delay=1)   # after the food itself is eaten
         return False
+
+
+ICON = ""   # penguin icon (resource pack, glyph_F7.png)
+ARROWS = ["", "", "", "", "", "", "", ""]   # ahead, ahead-right, right ... ahead-left
+
+
+def arrow(dx, dz, yaw):
+    """Arrow from where you're looking toward (dx, dz). Minecraft yaw: 0 = south (+z), 90 = west (-x)."""
+    import math
+    target = math.degrees(math.atan2(-dx, dz))
+    rel = (target - float(yaw)) % 360
+    return ARROWS[int((rel + 22.5) // 45) % 8]

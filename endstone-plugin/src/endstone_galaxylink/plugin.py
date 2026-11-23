@@ -53,7 +53,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.69.0"
+VERSION = "2.70.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -429,6 +429,7 @@ class GalaxyLink(Plugin):
             player.kick(self.servercontrol.kick_text())
             return
         brand_new = self.progress.load(player.xuid) is None
+        self.server.scheduler.run_task(self, lambda: self.penguins.on_join(player) if player.is_valid else None, delay=40)  # normal speed and hearts
         self.server.scheduler.run_task(self, lambda: self.support.on_join(player) if player.is_valid else None, delay=60)  # staff answers to /support
         self.server.scheduler.run_task(self, lambda: self.market.on_join(player) if player.is_valid else None, delay=80)  # items from buy orders
         self.server.scheduler.run_task(self, lambda: self.visits.on_join(player) if player.is_valid else None, delay=100)  # Visit picked on the website
@@ -471,7 +472,7 @@ class GalaxyLink(Plugin):
         p = event.player
         # each one on its own, so one problem doesn't stop the others
         for part in ("ranks.forget", "plates.on_quit", "galaxymap.on_quit", "parkour.on_quit", "collection.on_quit",
-                     "teleports.on_quit", "progress.on_quit", "bedwars.on_quit"):
+                     "teleports.on_quit", "progress.on_quit", "bedwars.on_quit", "penguins.on_quit"):
             obj, fn = part.split(".")
             try:
                 getattr(getattr(self, obj), fn)(p)

@@ -686,6 +686,19 @@ Penguins and chips are super rare prizes in Galaxy Crates, and staff may hand th
 - **See your powers:** while a chip power is active, its name and time left appear above your hotbar (for example **Potato Power 2:41**), with matching particles around you that everyone nearby can see.
 - **Penguin's Grace** also shows above your hotbar, with a splash of snow and water around you.`,
   },
+  {
+    id: "2026-11-23-chip-powers-v2",
+    title: "Chip powers rebuilt, plus a penguin pointer",
+    body: `**Cleaner chip powers.** Potato chip powers are now their own powers instead of a stack of regular effects, so your effects list stays clear and only the power's name and time left show above your hotbar.
+- **Potato Power:** 60% more damage, 30% less damage taken, fast healing and 8 extra hearts (3 minutes)
+- **Fire Crunch:** 90% more damage, immune to fire and lava, 40% faster (3 minutes)
+- **Sour Rush:** 60% faster, no fall damage, 20% less damage taken (5 minutes)
+- **Cosmic Crunch:** 70% more damage, 45% less damage taken, very fast healing, 10 extra hearts, 40% faster, and immune to fire, lava, drowning and fall damage (5 minutes)
+
+**Penguin's Grace** works the same way: keep your penguin within 16 blocks to move faster in water (and never drown) and even faster on ice.
+
+**Penguin pointer.** If your penguin wanders more than 16 blocks away, a small penguin icon and an arrow above your hotbar point you back to it. Only you can see it.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).
