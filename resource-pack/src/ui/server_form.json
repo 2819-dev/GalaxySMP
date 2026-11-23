@@ -1250,7 +1250,7 @@
   "type": "panel",
   "size": [
    "100%",
-   30
+   25
   ],
   "controls": [
    {
@@ -1258,7 +1258,7 @@
      "$pressed_button_name": "button.form_button_click",
      "size": [
       "100%",
-      26
+      22
      ],
      "anchor_from": "top_middle",
      "anchor_to": "top_middle",
@@ -1267,7 +1267,7 @@
      "$button_text_grid_collection_name": "form_buttons",
      "$button_text_max_size": [
       "100% - 8px",
-      20
+      18
      ],
      "bindings": [
       {
@@ -1394,470 +1394,484 @@
   "controls": [
    {
     "middle": {
-     "type": "stack_panel",
-     "orientation": "vertical",
+     "type": "panel",
      "size": [
-      230,
-      "100%c"
+      "56%",
+      "100% - 12px"
      ],
-     "anchor_from": "center",
-     "anchor_to": "center",
+     "max_size": [
+      240,
+      "100% - 12px"
+     ],
+     "anchor_from": "left_middle",
+     "anchor_to": "left_middle",
      "offset": [
-      -30,
-      6
+      "7%",
+      3
      ],
      "layer": 10,
      "controls": [
       {
-       "logo_row": {
-        "type": "panel",
+       "stack": {
+        "type": "stack_panel",
+        "orientation": "vertical",
         "size": [
          "100%",
-         46
+         "100%"
         ],
         "controls": [
          {
-          "logo": {
-           "type": "image",
-           "texture": "textures/ui/galaxysmp_logo",
-           "bilinear": false,
-           "keep_ratio": true,
+          "logo_row": {
+           "type": "panel",
            "size": [
             "100%",
-            "100%"
+            32
+           ],
+           "controls": [
+            {
+             "logo": {
+              "type": "image",
+              "texture": "textures/ui/galaxysmp_logo",
+              "bilinear": false,
+              "keep_ratio": true,
+              "size": [
+               "100%",
+               "100%"
+              ]
+             }
+            },
+            {
+             "emblem": {
+              "type": "panel",
+              "size": [
+               48,
+               40
+              ],
+              "anchor_from": "right_middle",
+              "anchor_to": "left_middle",
+              "offset": [
+               -6,
+               0
+              ],
+              "controls": [
+               {
+                "emblem_rosh": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_rosh",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "(not ((#title_text - '§h§1') = #title_text))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               },
+               {
+                "emblem_sukkot": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_sukkot",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "(not ((#title_text - '§h§2') = #title_text))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               },
+               {
+                "emblem_chanukah_1": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_chanukah_1",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§1') = #title_text)))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               },
+               {
+                "emblem_chanukah_2": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_chanukah_2",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§2') = #title_text)))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               },
+               {
+                "emblem_chanukah_3": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_chanukah_3",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§3') = #title_text)))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               },
+               {
+                "emblem_chanukah_4": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_chanukah_4",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§4') = #title_text)))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               },
+               {
+                "emblem_chanukah_5": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_chanukah_5",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§5') = #title_text)))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               },
+               {
+                "emblem_chanukah_6": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_chanukah_6",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§6') = #title_text)))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               },
+               {
+                "emblem_chanukah_7": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_chanukah_7",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§7') = #title_text)))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               },
+               {
+                "emblem_chanukah_8": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_chanukah_8",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§8') = #title_text)))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               },
+               {
+                "emblem_tubishvat": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_tubishvat",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "(not ((#title_text - '§h§4') = #title_text))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               },
+               {
+                "emblem_purim": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_purim",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "(not ((#title_text - '§h§5') = #title_text))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               },
+               {
+                "emblem_pesach": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_pesach",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "(not ((#title_text - '§h§6') = #title_text))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               },
+               {
+                "emblem_lagbaomer": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_lagbaomer",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "(not ((#title_text - '§h§7') = #title_text))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               },
+               {
+                "emblem_shavuot": {
+                 "type": "image",
+                 "texture": "textures/ui/gsmp_hol_shavuot",
+                 "bilinear": true,
+                 "keep_ratio": true,
+                 "size": [
+                  48,
+                  40
+                 ],
+                 "bindings": [
+                  {
+                   "binding_name": "#title_text"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "(not ((#title_text - '§h§8') = #title_text))",
+                   "target_property_name": "#visible"
+                  }
+                 ]
+                }
+               }
+              ]
+             }
+            }
            ]
           }
          },
          {
-          "emblem": {
+          "splash_box": {
            "type": "panel",
            "size": [
-            48,
-            40
-           ],
-           "anchor_from": "right_middle",
-           "anchor_to": "left_middle",
-           "offset": [
-            -6,
-            0
+            "100%",
+            13
            ],
            "controls": [
             {
-             "emblem_rosh": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_rosh",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
+             "splash": {
+              "type": "label",
+              "text": "#form_text",
+              "color": [
+               1.0,
+               1.0,
+               0.33
               ],
+              "shadow": true,
+              "text_alignment": "center",
+              "font_scale_factor": 1.0,
+              "size": [
+               "100%",
+               "default"
+              ],
+              "offset": "@server_form.gsmp_splash_bob_a",
+              "anchor_from": "center",
+              "anchor_to": "center",
               "bindings": [
                {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "(not ((#title_text - '§h§1') = #title_text))",
-                "target_property_name": "#visible"
-               }
-              ]
-             }
-            },
-            {
-             "emblem_sukkot": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_sukkot",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
-              ],
-              "bindings": [
-               {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "(not ((#title_text - '§h§2') = #title_text))",
-                "target_property_name": "#visible"
-               }
-              ]
-             }
-            },
-            {
-             "emblem_chanukah_1": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_chanukah_1",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
-              ],
-              "bindings": [
-               {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§1') = #title_text)))",
-                "target_property_name": "#visible"
-               }
-              ]
-             }
-            },
-            {
-             "emblem_chanukah_2": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_chanukah_2",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
-              ],
-              "bindings": [
-               {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§2') = #title_text)))",
-                "target_property_name": "#visible"
-               }
-              ]
-             }
-            },
-            {
-             "emblem_chanukah_3": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_chanukah_3",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
-              ],
-              "bindings": [
-               {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§3') = #title_text)))",
-                "target_property_name": "#visible"
-               }
-              ]
-             }
-            },
-            {
-             "emblem_chanukah_4": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_chanukah_4",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
-              ],
-              "bindings": [
-               {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§4') = #title_text)))",
-                "target_property_name": "#visible"
-               }
-              ]
-             }
-            },
-            {
-             "emblem_chanukah_5": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_chanukah_5",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
-              ],
-              "bindings": [
-               {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§5') = #title_text)))",
-                "target_property_name": "#visible"
-               }
-              ]
-             }
-            },
-            {
-             "emblem_chanukah_6": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_chanukah_6",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
-              ],
-              "bindings": [
-               {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§6') = #title_text)))",
-                "target_property_name": "#visible"
-               }
-              ]
-             }
-            },
-            {
-             "emblem_chanukah_7": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_chanukah_7",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
-              ],
-              "bindings": [
-               {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§7') = #title_text)))",
-                "target_property_name": "#visible"
-               }
-              ]
-             }
-            },
-            {
-             "emblem_chanukah_8": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_chanukah_8",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
-              ],
-              "bindings": [
-               {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§8') = #title_text)))",
-                "target_property_name": "#visible"
-               }
-              ]
-             }
-            },
-            {
-             "emblem_tubishvat": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_tubishvat",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
-              ],
-              "bindings": [
-               {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "(not ((#title_text - '§h§4') = #title_text))",
-                "target_property_name": "#visible"
-               }
-              ]
-             }
-            },
-            {
-             "emblem_purim": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_purim",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
-              ],
-              "bindings": [
-               {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "(not ((#title_text - '§h§5') = #title_text))",
-                "target_property_name": "#visible"
-               }
-              ]
-             }
-            },
-            {
-             "emblem_pesach": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_pesach",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
-              ],
-              "bindings": [
-               {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "(not ((#title_text - '§h§6') = #title_text))",
-                "target_property_name": "#visible"
-               }
-              ]
-             }
-            },
-            {
-             "emblem_lagbaomer": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_lagbaomer",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
-              ],
-              "bindings": [
-               {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "(not ((#title_text - '§h§7') = #title_text))",
-                "target_property_name": "#visible"
-               }
-              ]
-             }
-            },
-            {
-             "emblem_shavuot": {
-              "type": "image",
-              "texture": "textures/ui/gsmp_hol_shavuot",
-              "bilinear": true,
-              "keep_ratio": true,
-              "size": [
-               48,
-               40
-              ],
-              "bindings": [
-               {
-                "binding_name": "#title_text"
-               },
-               {
-                "binding_type": "view",
-                "source_property_name": "(not ((#title_text - '§h§8') = #title_text))",
-                "target_property_name": "#visible"
+                "binding_name": "#form_text"
                }
               ]
              }
             }
            ]
           }
-         }
-        ]
-       }
-      },
-      {
-       "splash_box": {
-        "type": "panel",
-        "size": [
-         "100%",
-         16
-        ],
-        "controls": [
+         },
          {
-          "splash": {
-           "type": "label",
-           "text": "#form_text",
-           "color": [
-            1.0,
-            1.0,
-            0.33
-           ],
-           "shadow": true,
-           "text_alignment": "center",
-           "font_scale_factor": 1.1,
+          "gap": {
+           "type": "panel",
            "size": [
             "100%",
-            "default"
+            3
+           ]
+          }
+         },
+         {
+          "list": {
+           "type": "panel",
+           "size": [
+            "100%",
+            "fill"
            ],
-           "offset": "@server_form.gsmp_splash_bob_a",
-           "anchor_from": "center",
-           "anchor_to": "center",
-           "bindings": [
+           "controls": [
             {
-             "binding_name": "#form_text"
+             "scroll@common.scrolling_panel": {
+              "size": [
+               "100%",
+               "100%"
+              ],
+              "$show_background": false,
+              "$scrolling_content": "server_form.gsmp_title_list",
+              "$scroll_size": [
+               4,
+               "100% - 4px"
+              ],
+              "$scrolling_pane_size": [
+               "100% - 6px",
+               "100%"
+              ],
+              "$scrolling_pane_offset": [
+               0,
+               0
+              ],
+              "$scroll_bar_right_padding_size": [
+               0,
+               0
+              ]
+             }
             }
            ]
           }
-         }
-        ]
-       }
-      },
-      {
-       "gap": {
-        "type": "panel",
-        "size": [
-         "100%",
-         10
-        ]
-       }
-      },
-      {
-       "buttons_box": {
-        "type": "panel",
-        "size": [
-         210,
-         "100%c"
-        ],
-        "controls": [
-         {
-          "buttons@server_form.gsmp_mc_buttons": {}
-         }
-        ]
-       }
-      },
-      {
-       "friends_gap": {
-        "type": "panel",
-        "size": [
-         "100%",
-         4
-        ]
-       }
-      },
-      {
-       "friends_box": {
-        "type": "panel",
-        "size": [
-         210,
-         34
-        ],
-        "collection_name": "form_buttons",
-        "controls": [
-         {
-          "box@server_form.gsmp_friends_box": {}
          }
         ]
        }
@@ -1869,13 +1883,13 @@
     "player": {
      "type": "panel",
      "size": [
-      "28%",
-      "78%"
+      "30%",
+      "80%"
      ],
      "anchor_from": "right_middle",
      "anchor_to": "right_middle",
      "offset": [
-      "-3%",
+      "-2%",
       "4%"
      ],
      "layer": 10,
@@ -3278,6 +3292,63 @@
        "binding_type": "collection",
        "binding_collection_name": "form_buttons"
       }
+     ]
+    }
+   }
+  ]
+ },
+ "gsmp_title_list": {
+  "type": "stack_panel",
+  "orientation": "vertical",
+  "size": [
+   "100%",
+   "100%c"
+  ],
+  "controls": [
+   {
+    "buttons_box": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%c"
+     ],
+     "controls": [
+      {
+       "buttons@server_form.gsmp_mc_buttons": {}
+      }
+     ]
+    }
+   },
+   {
+    "friends_gap": {
+     "type": "panel",
+     "size": [
+      "100%",
+      3
+     ]
+    }
+   },
+   {
+    "friends_box": {
+     "type": "panel",
+     "size": [
+      "100%",
+      30
+     ],
+     "collection_name": "form_buttons",
+     "controls": [
+      {
+       "box@server_form.gsmp_friends_box": {}
+      }
+     ]
+    }
+   },
+   {
+    "end_gap": {
+     "type": "panel",
+     "size": [
+      "100%",
+      2
      ]
     }
    }

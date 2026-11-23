@@ -477,6 +477,14 @@ Server logs are kept for 3 days and error reports for 30 days. See the Privacy P
 
 Your pets are yours alone: other players can't feed, ride or hurt them.`,
   },
+  {
+    id: "2026-11-23-main-menu-phones",
+    title: "Main Menu fixes for phones and tablets",
+    body: `The Main Menu now fits smaller screens properly.
+
+- **Fits your screen:** the title screen is more compact, and its buttons scroll when there isn't enough room, so nothing is cut off or overlapping.
+- **Safer trips to the Sift:** if the Sift isn't finished yet when you arrive, you're brought straight back to spawn instead of falling.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

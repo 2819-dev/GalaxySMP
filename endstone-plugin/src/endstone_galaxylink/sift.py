@@ -251,6 +251,7 @@ class Sift:
         else:
             tx, tz = self.tile
             self.queue = tile_commands(tx, tz)
+            self.sent, self.failed = 0, 0
             self.cmd(f"tickingarea add {CX + tx} {BASE} {CZ + tz} {CX + tx + TILE - 1} {BASE} {CZ + tz + TILE - 1} {AREA} true")
         self.wait = 100   # let the chunks load
 
@@ -285,8 +286,21 @@ class Sift:
         for _ in range(PER_TICK):
             if not self.queue:
                 break
-            self.cmd(self.queue.pop(0))
+            self.sent = getattr(self, "sent", 0) + 1
+            if self.cmd(self.queue.pop(0)) is False:
+                self.failed = getattr(self, "failed", 0) + 1
         if not self.queue:
+            if self.failed > self.sent * 0.05:
+                # the area wasn't loaded yet: try this piece again (more patiently), up to 3 times
+                tries = self.tries.get(self.tile, 0) + 1 if hasattr(self, "tries") else 1
+                self.tries = getattr(self, "tries", {})
+                self.tries[self.tile] = tries
+                self.plugin.logger.warning(f"The Sift: piece {self.tile} didn't build ({self.failed}/{self.sent} failed), try {tries}")
+                if tries < 4:
+                    self.todo.insert(0, self.tile)
+                self.next_tile()
+                self.wait = 200 * tries
+                return
             tiles = list(self.plugin.economy.get_config("sift_tiles") or [])
             tiles.append(list(self.tile))
             self.plugin.economy.set_config("sift_tiles", tiles)
@@ -305,6 +319,9 @@ class Sift:
         tp = getattr(self.plugin, "teleports", None)
         try:
             player.teleport(tp.location(self.spot()))
+            self.cmd(f'effect "{player.name}" slow_falling 8 0 true')   # a soft landing, just in case
+            from endstone_galaxylink.safety import later
+            later(self.plugin, player, self.check_landing, 40)
         except Exception:
             return False
         try:
@@ -312,6 +329,29 @@ class Sift:
         except Exception:
             pass
         return True
+
+    def check_landing(self, player):
+        """2 seconds after arriving (the area is loaded now): if the ground isn't there, the build didn't take.
+        Send them back to spawn and build the Sift again."""
+        try:
+            top = column(0, 0)[0]
+            name = str(getattr(player.dimension.get_block_at(CX, top, CZ), "type", ""))
+        except Exception:
+            return
+        if name != "minecraft:air":
+            return
+        self.plugin.logger.warning("The Sift: no ground at the landing spot, rebuilding")
+        spot = self.plugin.economy.get_config("spawn")
+        try:
+            if spot:
+                player.teleport(self.plugin.teleports.location(spot))
+        except Exception:
+            pass
+        player.send_message("§bSorry! The Sift isn't finished yet. §7It's being made now; try again in a few minutes.")
+        self.plugin.economy.set_config("sift_built", False)
+        self.plugin.economy.set_config("sift_tiles", [])
+        if not self.building():
+            self.start_build()
 
     # ---------- life: mobs and fireflies ----------
     def tick(self):
