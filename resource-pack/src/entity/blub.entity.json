@@ -1,0 +1,44 @@
+{
+ "format_version": "1.10.0",
+ "minecraft:client_entity": {
+  "description": {
+   "identifier": "galaxysmp:blub",
+   "materials": {
+    "default": "entity_alphatest"
+   },
+   "textures": {
+    "default": "textures/entity/galaxysmp_blub"
+   },
+   "geometry": {
+    "default": "geometry.galaxysmp_blub"
+   },
+   "animations": {
+    "move": "animation.galaxysmp_blub.move",
+    "idle": "animation.galaxysmp_blub.idle",
+    "air": "animation.galaxysmp_blub.air",
+    "sit": "animation.galaxysmp_blub.sit"
+   },
+   "scripts": {
+    "animate": [
+     "idle",
+     {
+      "move": "query.is_on_ground && !query.is_sitting"
+     },
+     {
+      "air": "!query.is_on_ground && !query.is_riding"
+     },
+     {
+      "sit": "query.is_sitting"
+     }
+    ]
+   },
+   "render_controllers": [
+    "controller.render.default"
+   ],
+   "spawn_egg": {
+    "base_color": "#bee8f5",
+    "overlay_color": "#6e2832"
+   }
+  }
+ }
+}

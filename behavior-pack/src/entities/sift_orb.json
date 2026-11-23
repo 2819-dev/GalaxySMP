@@ -1,0 +1,55 @@
+{
+ "format_version": "1.21.40",
+ "minecraft:entity": {
+  "description": {
+   "identifier": "galaxysmp:sift_orb",
+   "is_spawnable": false,
+   "is_summonable": true,
+   "is_experimental": false
+  },
+  "component_groups": {},
+  "components": {
+   "minecraft:collision_box": {
+    "width": 0.3,
+    "height": 0.3
+   },
+   "minecraft:projectile": {
+    "on_hit": {
+     "impact_damage": {
+      "damage": 4,
+      "knockback": true
+     },
+     "remove_on_hit": {}
+    },
+    "power": 0.6,
+    "gravity": 0.0,
+    "inertia": 1.0,
+    "liquid_inertia": 1.0,
+    "uncertainty_base": 1,
+    "uncertainty_multiplier": 0,
+    "anchor": 1,
+    "offset": [
+     0,
+     0.5,
+     0
+    ],
+    "homing": true,
+    "reflect_on_hurt": true,
+    "hit_sound": "bow.hit"
+   },
+   "minecraft:physics": {},
+   "minecraft:pushable": {
+    "is_pushable": false,
+    "is_pushable_by_piston": false
+   },
+   "minecraft:despawn": {
+    "filters": {
+     "test": "actor_health",
+     "operator": "<",
+     "value": 0
+    }
+   }
+  },
+  "events": {}
+ }
+}

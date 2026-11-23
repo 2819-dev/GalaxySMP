@@ -1,0 +1,48 @@
+{
+ "format_version": "1.10.0",
+ "animation_controllers": {
+  "controller.animation.galaxysmp_dumpling.bounce": {
+   "initial_state": "ground",
+   "states": {
+    "ground": {
+     "animations": [
+      {
+       "idle": "!query.is_sitting"
+      },
+      {
+       "sit": "query.is_sitting"
+      }
+     ],
+     "transitions": [
+      {
+       "air": "!query.is_on_ground"
+      }
+     ]
+    },
+    "air": {
+     "animations": [
+      "air"
+     ],
+     "transitions": [
+      {
+       "land": "query.is_on_ground"
+      }
+     ]
+    },
+    "land": {
+     "animations": [
+      "land"
+     ],
+     "transitions": [
+      {
+       "ground": "query.all_animations_finished"
+      },
+      {
+       "air": "!query.is_on_ground"
+      }
+     ]
+    }
+   }
+  }
+ }
+}

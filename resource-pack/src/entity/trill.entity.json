@@ -1,0 +1,38 @@
+{
+ "format_version": "1.10.0",
+ "minecraft:client_entity": {
+  "description": {
+   "identifier": "galaxysmp:trill",
+   "materials": {
+    "default": "entity_alphatest"
+   },
+   "textures": {
+    "default": "textures/entity/galaxysmp_trill"
+   },
+   "geometry": {
+    "default": "geometry.galaxysmp_trill"
+   },
+   "animations": {
+    "fly": "animation.galaxysmp_trill.fly",
+    "perch": "animation.galaxysmp_trill.perch"
+   },
+   "scripts": {
+    "animate": [
+     {
+      "fly": "!query.is_on_ground"
+     },
+     {
+      "perch": "query.is_on_ground"
+     }
+    ]
+   },
+   "render_controllers": [
+    "controller.render.default"
+   ],
+   "spawn_egg": {
+    "base_color": "#4678e6",
+    "overlay_color": "#6edcfa"
+   }
+  }
+ }
+}

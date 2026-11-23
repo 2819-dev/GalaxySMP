@@ -1,0 +1,50 @@
+{
+ "format_version": "1.8.0",
+ "animations": {
+  "animation.galaxysmp_seedling.walk": {
+   "loop": true,
+   "bones": {
+    "legl": {
+     "rotation": [
+      "math.cos(query.modified_distance_moved * 60) * 40 * query.modified_move_speed",
+      0,
+      0
+     ]
+    },
+    "legr": {
+     "rotation": [
+      "-math.cos(query.modified_distance_moved * 60) * 40 * query.modified_move_speed",
+      0,
+      0
+     ]
+    },
+    "body": {
+     "position": [
+      0,
+      "math.abs(math.sin(query.modified_distance_moved * 60)) * 0.6",
+      0
+     ]
+    }
+   }
+  },
+  "animation.galaxysmp_seedling.idle": {
+   "loop": true,
+   "bones": {
+    "leaf1": {
+     "rotation": [
+      0,
+      0,
+      "-30 - math.sin(query.life_time * 160) * 10"
+     ]
+    },
+    "leaf2": {
+     "rotation": [
+      0,
+      0,
+      "30 + math.sin(query.life_time * 160) * 10"
+     ]
+    }
+   }
+  }
+ }
+}

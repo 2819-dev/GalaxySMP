@@ -21,6 +21,11 @@ GRACE_RANGE = 16
 # mobs that can be tamed: they're kept just outside spawn (where mobs don't survive)
 PETS = {PENGUIN, "minecraft:wolf", "minecraft:cat", "minecraft:parrot", "minecraft:horse", "minecraft:donkey", "minecraft:mule",
         "minecraft:llama", "minecraft:trader_llama", "minecraft:camel", "minecraft:skeleton_horse", "minecraft:ocelot", "minecraft:fox"}
+DUMPLING = "galaxysmp:dumpling"
+BLUB = "galaxysmp:blub"
+# pets that only their owner can use: mob -> (what it's called, the food that tames it)
+OWNABLE = {PENGUIN: ("Penguin", FISH), DUMPLING: ("Dumpling", ("galaxysmp:dumpling_treat",)), BLUB: ("Blub", ("minecraft:glow_berries",))}
+PETS |= {DUMPLING, BLUB}
 EDGE = 2   # blocks: a pet this close to spawn's edge (or inside) is moved back out
 
 # flavor -> (power name, color, seconds, perks, description)
@@ -119,26 +124,39 @@ class Penguins:
     def on_interact_actor(self, event):
         """Taming and ownership. Returns True when it handled the event."""
         actor = event.actor
-        if type_of(actor) != PENGUIN:
+        kind = type_of(actor)
+        if kind not in OWNABLE:
             return False
+        what, food = OWNABLE[kind]
         player = event.player
         owner, owner_name = owner_of(actor)
         if owner is None:
             held = player.inventory.item_in_main_hand
-            if held is not None and item_id(held) in FISH:
-                # the first player to feed it fish tames it (the add-on tames it on the same tap)
-                try:
-                    actor.add_scoreboard_tag(OWNER_TAG + str(player.xuid))
-                    actor.add_scoreboard_tag(NAME_TAG + player.name.replace(" ", "_"))
-                except Exception:
-                    pass
+            if held is not None and item_id(held) in food:
+                # the first player to feed it tames it (the add-on tames it on the same tap)
+                self.claim(actor, player)
                 self.hearts(actor)
+                pets = getattr(self.plugin, "pets", None)
+                if pets is not None:
+                    pets.ask_name(player, actor, what)   # "What would you like to name your Dumpling?"
             return False
         if owner != str(player.xuid) and not player.is_op:
             event.is_cancelled = True
-            player.send_message(f"§cThis penguin belongs to {owner_name or 'someone else'}.")
+            player.send_message(f"§cThis {what.lower()} belongs to {owner_name or 'someone else'}.")
+            return True
+        pets = getattr(self.plugin, "pets", None)
+        if pets is not None and pets.on_owner_tap(player, actor, kind):
+            event.is_cancelled = True
             return True
         return False
+
+    @staticmethod
+    def claim(actor, player):
+        try:
+            actor.add_scoreboard_tag(OWNER_TAG + str(player.xuid))
+            actor.add_scoreboard_tag(NAME_TAG + player.name.replace(" ", "_"))
+        except Exception:
+            pass
 
     def hud_line(self, p):
         return self.hud.get(str(p.unique_id), "")
@@ -222,13 +240,16 @@ class Penguins:
     def on_damage(self, event):
         """Nobody but its owner can hurt a tamed penguin, and chip powers change damage.
         Returns True when it cancelled the damage."""
+        pets = getattr(self.plugin, "pets", None)
+        if pets is not None and pets.on_damage(event):   # no fall damage after a dumpling bounce
+            return True
         try:
             victim = event.actor
             attacker = event.damage_source.actor
             kind = str(event.damage_source.type)
         except Exception:
             return False
-        if type_of(victim) == PENGUIN:
+        if type_of(victim) in OWNABLE:
             owner, _ = owner_of(victim)
             if owner and attacker is not None and hasattr(attacker, "xuid") and str(attacker.xuid) != owner:
                 event.is_cancelled = True

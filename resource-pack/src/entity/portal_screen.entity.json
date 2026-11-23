@@ -1,0 +1,31 @@
+{
+ "format_version": "1.10.0",
+ "minecraft:client_entity": {
+  "description": {
+   "identifier": "galaxysmp:portal_screen",
+   "materials": {
+    "default": "entity_alphatest"
+   },
+   "textures": {
+    "wilderness": "textures/ui/gsmp_bg_wilderness",
+    "copper": "textures/ui/gsmp_bg_copper",
+    "sift": "textures/ui/gsmp_bg_sift",
+    "chaos": "textures/ui/gsmp_bg_chaos"
+   },
+   "geometry": {
+    "default": "geometry.galaxysmp_portal_screen"
+   },
+   "animations": {
+    "size": "animation.galaxysmp_portal_screen.size"
+   },
+   "scripts": {
+    "animate": [
+     "size"
+    ]
+   },
+   "render_controllers": [
+    "controller.render.galaxysmp_portal_screen"
+   ]
+  }
+ }
+}

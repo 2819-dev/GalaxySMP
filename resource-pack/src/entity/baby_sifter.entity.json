@@ -1,0 +1,32 @@
+{
+ "format_version": "1.10.0",
+ "minecraft:client_entity": {
+  "description": {
+   "identifier": "galaxysmp:baby_sifter",
+   "materials": {
+    "default": "entity_alphatest"
+   },
+   "textures": {
+    "default": "textures/entity/galaxysmp_baby_sifter"
+   },
+   "geometry": {
+    "default": "geometry.galaxysmp_baby_sifter"
+   },
+   "animations": {
+    "walk": "animation.galaxysmp_baby_sifter.walk"
+   },
+   "scripts": {
+    "animate": [
+     "walk"
+    ]
+   },
+   "render_controllers": [
+    "controller.render.default"
+   ],
+   "spawn_egg": {
+    "base_color": "#963c46",
+    "overlay_color": "#5af0e6"
+   }
+  }
+ }
+}

@@ -1,0 +1,46 @@
+{
+ "format_version": "1.10.0",
+ "minecraft:client_entity": {
+  "description": {
+   "identifier": "galaxysmp:dumpling",
+   "materials": {
+    "default": "entity_alphatest"
+   },
+   "textures": {
+    "red": "textures/entity/galaxysmp_dumpling_red",
+    "blue": "textures/entity/galaxysmp_dumpling_blue",
+    "green": "textures/entity/galaxysmp_dumpling_green",
+    "yellow": "textures/entity/galaxysmp_dumpling_yellow",
+    "purple": "textures/entity/galaxysmp_dumpling_purple",
+    "pink": "textures/entity/galaxysmp_dumpling_pink",
+    "white": "textures/entity/galaxysmp_dumpling_white",
+    "orange": "textures/entity/galaxysmp_dumpling_orange"
+   },
+   "geometry": {
+    "default": "geometry.galaxysmp_dumpling"
+   },
+   "animations": {
+    "idle": "animation.galaxysmp_dumpling.idle",
+    "air": "animation.galaxysmp_dumpling.air",
+    "land": "animation.galaxysmp_dumpling.land",
+    "sit": "animation.galaxysmp_dumpling.sit",
+    "bounce": "controller.animation.galaxysmp_dumpling.bounce"
+   },
+   "scripts": {
+    "animate": [
+     "bounce"
+    ]
+   },
+   "render_controllers": [
+    "controller.render.galaxysmp_dumpling"
+   ],
+   "spawn_egg": {
+    "base_color": "#f3e6c8",
+    "overlay_color": "#e85c5c"
+   },
+   "sound_effects": {
+    "boing": "mob.slime.jump"
+   }
+  }
+ }
+}

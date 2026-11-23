@@ -149,6 +149,21 @@ class Welcome:
             self.open[str(player.unique_id)] = self.new_state(False, reopened=True)
         self.show(player)
 
+    def travel(self, player, name):
+        """Walking into a portal: the joining animation for that Featured Server, then off you go."""
+        servers = list(self.servers() or [])
+        i = next((k for k, s in enumerate(servers) if str(s.get("name", "")).lower() == str(name).lower()), None)
+        if i is None and str(name).lower() == "the sift":
+            servers.append({"name": "The Sift", "action": "sift", "anim": "amethyst"})
+            i = len(servers) - 1
+        if i is None or self.in_minigame(player):
+            return False
+        st = self.new_state(False, reopened=True)
+        st["portal"] = True
+        self.open[str(player.unique_id)] = st
+        self.join(player, i, servers)
+        return True
+
     def on_quit(self, player):
         self.open.pop(str(player.unique_id), None)
         self.joined.pop(str(player.unique_id), None)
@@ -571,9 +586,9 @@ class Welcome:
         later(self.plugin, player, self.show, delay)
 
     # ---------- joining ----------
-    def join(self, player, i):
+    def join(self, player, i, servers=None):
         st = self.state(player)
-        servers = self.servers() or [{"name": "GalaxySMP", "action": "play"}]
+        servers = servers or self.servers() or [{"name": "GalaxySMP", "action": "play"}]
         if st is None or i >= len(servers):
             return
         s = servers[i]
@@ -597,6 +612,17 @@ class Welcome:
             spot = w["spot"]
         elif action == "spawn":
             spot = self.plugin.economy.get_config("spawn")
+        elif action == "sift":
+            sift = getattr(self.plugin, "sift", None)
+            if sift is None or not sift.built():
+                if sift is not None and not sift.building():
+                    sift.start_build()
+                try:
+                    player.send_toast("§bAlmost ready", "The Sift is still being made. Try again in a few minutes!")
+                except Exception:
+                    pass
+                return self.show_servers(player) if not st.get("portal") else self.open.pop(str(player.unique_id), None)
+            spot = sift.spot()
         theme = s.get("anim") if s.get("anim") in THEMES else "grass"
         if s.get("odds"):
             theme = roll_theme() or theme

@@ -1,0 +1,443 @@
+{
+ "format_version": "1.21.40",
+ "minecraft:entity": {
+  "description": {
+   "identifier": "galaxysmp:portal_screen",
+   "is_spawnable": false,
+   "is_summonable": true,
+   "is_experimental": false,
+   "properties": {
+    "galaxysmp:w": {
+     "type": "int",
+     "range": [
+      1,
+      32
+     ],
+     "default": 3,
+     "client_sync": true
+    },
+    "galaxysmp:h": {
+     "type": "int",
+     "range": [
+      1,
+      32
+     ],
+     "default": 4,
+     "client_sync": true
+    },
+    "galaxysmp:img": {
+     "type": "int",
+     "range": [
+      0,
+      7
+     ],
+     "default": 0,
+     "client_sync": true
+    }
+   }
+  },
+  "component_groups": {},
+  "components": {
+   "minecraft:type_family": {
+    "family": [
+     "inanimate",
+     "galaxysmp_portal"
+    ]
+   },
+   "minecraft:collision_box": {
+    "width": 0.01,
+    "height": 0.01
+   },
+   "minecraft:physics": {
+    "has_gravity": false,
+    "has_collision": false
+   },
+   "minecraft:pushable": {
+    "is_pushable": false,
+    "is_pushable_by_piston": false
+   },
+   "minecraft:damage_sensor": {
+    "triggers": {
+     "cause": "all",
+     "deals_damage": "no"
+    }
+   },
+   "minecraft:knockback_resistance": {
+    "value": 1.0
+   },
+   "minecraft:health": {
+    "value": 1,
+    "max": 1
+   },
+   "minecraft:fire_immune": {},
+   "minecraft:nameable": {
+    "always_show": false,
+    "allow_name_tag_renaming": false
+   },
+   "minecraft:persistent": {}
+  },
+  "events": {
+   "galaxysmp:w1": {
+    "set_property": {
+     "galaxysmp:w": 1
+    }
+   },
+   "galaxysmp:h1": {
+    "set_property": {
+     "galaxysmp:h": 1
+    }
+   },
+   "galaxysmp:w2": {
+    "set_property": {
+     "galaxysmp:w": 2
+    }
+   },
+   "galaxysmp:h2": {
+    "set_property": {
+     "galaxysmp:h": 2
+    }
+   },
+   "galaxysmp:w3": {
+    "set_property": {
+     "galaxysmp:w": 3
+    }
+   },
+   "galaxysmp:h3": {
+    "set_property": {
+     "galaxysmp:h": 3
+    }
+   },
+   "galaxysmp:w4": {
+    "set_property": {
+     "galaxysmp:w": 4
+    }
+   },
+   "galaxysmp:h4": {
+    "set_property": {
+     "galaxysmp:h": 4
+    }
+   },
+   "galaxysmp:w5": {
+    "set_property": {
+     "galaxysmp:w": 5
+    }
+   },
+   "galaxysmp:h5": {
+    "set_property": {
+     "galaxysmp:h": 5
+    }
+   },
+   "galaxysmp:w6": {
+    "set_property": {
+     "galaxysmp:w": 6
+    }
+   },
+   "galaxysmp:h6": {
+    "set_property": {
+     "galaxysmp:h": 6
+    }
+   },
+   "galaxysmp:w7": {
+    "set_property": {
+     "galaxysmp:w": 7
+    }
+   },
+   "galaxysmp:h7": {
+    "set_property": {
+     "galaxysmp:h": 7
+    }
+   },
+   "galaxysmp:w8": {
+    "set_property": {
+     "galaxysmp:w": 8
+    }
+   },
+   "galaxysmp:h8": {
+    "set_property": {
+     "galaxysmp:h": 8
+    }
+   },
+   "galaxysmp:w9": {
+    "set_property": {
+     "galaxysmp:w": 9
+    }
+   },
+   "galaxysmp:h9": {
+    "set_property": {
+     "galaxysmp:h": 9
+    }
+   },
+   "galaxysmp:w10": {
+    "set_property": {
+     "galaxysmp:w": 10
+    }
+   },
+   "galaxysmp:h10": {
+    "set_property": {
+     "galaxysmp:h": 10
+    }
+   },
+   "galaxysmp:w11": {
+    "set_property": {
+     "galaxysmp:w": 11
+    }
+   },
+   "galaxysmp:h11": {
+    "set_property": {
+     "galaxysmp:h": 11
+    }
+   },
+   "galaxysmp:w12": {
+    "set_property": {
+     "galaxysmp:w": 12
+    }
+   },
+   "galaxysmp:h12": {
+    "set_property": {
+     "galaxysmp:h": 12
+    }
+   },
+   "galaxysmp:w13": {
+    "set_property": {
+     "galaxysmp:w": 13
+    }
+   },
+   "galaxysmp:h13": {
+    "set_property": {
+     "galaxysmp:h": 13
+    }
+   },
+   "galaxysmp:w14": {
+    "set_property": {
+     "galaxysmp:w": 14
+    }
+   },
+   "galaxysmp:h14": {
+    "set_property": {
+     "galaxysmp:h": 14
+    }
+   },
+   "galaxysmp:w15": {
+    "set_property": {
+     "galaxysmp:w": 15
+    }
+   },
+   "galaxysmp:h15": {
+    "set_property": {
+     "galaxysmp:h": 15
+    }
+   },
+   "galaxysmp:w16": {
+    "set_property": {
+     "galaxysmp:w": 16
+    }
+   },
+   "galaxysmp:h16": {
+    "set_property": {
+     "galaxysmp:h": 16
+    }
+   },
+   "galaxysmp:w17": {
+    "set_property": {
+     "galaxysmp:w": 17
+    }
+   },
+   "galaxysmp:h17": {
+    "set_property": {
+     "galaxysmp:h": 17
+    }
+   },
+   "galaxysmp:w18": {
+    "set_property": {
+     "galaxysmp:w": 18
+    }
+   },
+   "galaxysmp:h18": {
+    "set_property": {
+     "galaxysmp:h": 18
+    }
+   },
+   "galaxysmp:w19": {
+    "set_property": {
+     "galaxysmp:w": 19
+    }
+   },
+   "galaxysmp:h19": {
+    "set_property": {
+     "galaxysmp:h": 19
+    }
+   },
+   "galaxysmp:w20": {
+    "set_property": {
+     "galaxysmp:w": 20
+    }
+   },
+   "galaxysmp:h20": {
+    "set_property": {
+     "galaxysmp:h": 20
+    }
+   },
+   "galaxysmp:w21": {
+    "set_property": {
+     "galaxysmp:w": 21
+    }
+   },
+   "galaxysmp:h21": {
+    "set_property": {
+     "galaxysmp:h": 21
+    }
+   },
+   "galaxysmp:w22": {
+    "set_property": {
+     "galaxysmp:w": 22
+    }
+   },
+   "galaxysmp:h22": {
+    "set_property": {
+     "galaxysmp:h": 22
+    }
+   },
+   "galaxysmp:w23": {
+    "set_property": {
+     "galaxysmp:w": 23
+    }
+   },
+   "galaxysmp:h23": {
+    "set_property": {
+     "galaxysmp:h": 23
+    }
+   },
+   "galaxysmp:w24": {
+    "set_property": {
+     "galaxysmp:w": 24
+    }
+   },
+   "galaxysmp:h24": {
+    "set_property": {
+     "galaxysmp:h": 24
+    }
+   },
+   "galaxysmp:w25": {
+    "set_property": {
+     "galaxysmp:w": 25
+    }
+   },
+   "galaxysmp:h25": {
+    "set_property": {
+     "galaxysmp:h": 25
+    }
+   },
+   "galaxysmp:w26": {
+    "set_property": {
+     "galaxysmp:w": 26
+    }
+   },
+   "galaxysmp:h26": {
+    "set_property": {
+     "galaxysmp:h": 26
+    }
+   },
+   "galaxysmp:w27": {
+    "set_property": {
+     "galaxysmp:w": 27
+    }
+   },
+   "galaxysmp:h27": {
+    "set_property": {
+     "galaxysmp:h": 27
+    }
+   },
+   "galaxysmp:w28": {
+    "set_property": {
+     "galaxysmp:w": 28
+    }
+   },
+   "galaxysmp:h28": {
+    "set_property": {
+     "galaxysmp:h": 28
+    }
+   },
+   "galaxysmp:w29": {
+    "set_property": {
+     "galaxysmp:w": 29
+    }
+   },
+   "galaxysmp:h29": {
+    "set_property": {
+     "galaxysmp:h": 29
+    }
+   },
+   "galaxysmp:w30": {
+    "set_property": {
+     "galaxysmp:w": 30
+    }
+   },
+   "galaxysmp:h30": {
+    "set_property": {
+     "galaxysmp:h": 30
+    }
+   },
+   "galaxysmp:w31": {
+    "set_property": {
+     "galaxysmp:w": 31
+    }
+   },
+   "galaxysmp:h31": {
+    "set_property": {
+     "galaxysmp:h": 31
+    }
+   },
+   "galaxysmp:w32": {
+    "set_property": {
+     "galaxysmp:w": 32
+    }
+   },
+   "galaxysmp:h32": {
+    "set_property": {
+     "galaxysmp:h": 32
+    }
+   },
+   "galaxysmp:img0": {
+    "set_property": {
+     "galaxysmp:img": 0
+    }
+   },
+   "galaxysmp:img1": {
+    "set_property": {
+     "galaxysmp:img": 1
+    }
+   },
+   "galaxysmp:img2": {
+    "set_property": {
+     "galaxysmp:img": 2
+    }
+   },
+   "galaxysmp:img3": {
+    "set_property": {
+     "galaxysmp:img": 3
+    }
+   },
+   "galaxysmp:img4": {
+    "set_property": {
+     "galaxysmp:img": 4
+    }
+   },
+   "galaxysmp:img5": {
+    "set_property": {
+     "galaxysmp:img": 5
+    }
+   },
+   "galaxysmp:img6": {
+    "set_property": {
+     "galaxysmp:img": 6
+    }
+   },
+   "galaxysmp:img7": {
+    "set_property": {
+     "galaxysmp:img": 7
+    }
+   },
+   "minecraft:entity_spawned": {}
+  }
+ }
+}

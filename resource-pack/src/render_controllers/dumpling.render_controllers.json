@@ -1,0 +1,30 @@
+{
+ "format_version": "1.8.0",
+ "render_controllers": {
+  "controller.render.galaxysmp_dumpling": {
+   "arrays": {
+    "textures": {
+     "Array.skins": [
+      "Texture.red",
+      "Texture.blue",
+      "Texture.green",
+      "Texture.yellow",
+      "Texture.purple",
+      "Texture.pink",
+      "Texture.white",
+      "Texture.orange"
+     ]
+    }
+   },
+   "geometry": "Geometry.default",
+   "materials": [
+    {
+     "*": "Material.default"
+    }
+   ],
+   "textures": [
+    "Array.skins[query.variant]"
+   ]
+  }
+ }
+}

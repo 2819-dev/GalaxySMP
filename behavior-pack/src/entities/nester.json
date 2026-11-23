@@ -1,0 +1,114 @@
+{
+ "format_version": "1.21.40",
+ "minecraft:entity": {
+  "description": {
+   "identifier": "galaxysmp:nester",
+   "is_spawnable": true,
+   "is_summonable": true,
+   "is_experimental": false
+  },
+  "component_groups": {},
+  "components": {
+   "minecraft:physics": {},
+   "minecraft:jump.static": {},
+   "minecraft:nameable": {},
+   "minecraft:pushable": {
+    "is_pushable": true,
+    "is_pushable_by_piston": true
+   },
+   "minecraft:behavior.float": {
+    "priority": 0
+   },
+   "minecraft:behavior.look_at_player": {
+    "priority": 9,
+    "look_distance": 6,
+    "probability": 0.02
+   },
+   "minecraft:behavior.random_look_around": {
+    "priority": 10
+   },
+   "minecraft:movement.basic": {},
+   "minecraft:navigation.walk": {
+    "avoid_water": true,
+    "can_pass_doors": true
+   },
+   "minecraft:behavior.hurt_by_target": {
+    "priority": 1
+   },
+   "minecraft:behavior.nearest_attackable_target": {
+    "priority": 2,
+    "must_see": true,
+    "reselect_targets": true,
+    "entity_types": [
+     {
+      "filters": {
+       "any_of": [
+        {
+         "test": "is_family",
+         "subject": "other",
+         "value": "player"
+        },
+        {
+         "test": "is_family",
+         "subject": "other",
+         "value": "galaxysmp_pet"
+        }
+       ]
+      },
+      "max_dist": 16
+     }
+    ]
+   },
+   "minecraft:behavior.random_stroll": {
+    "priority": 6,
+    "speed_multiplier": 0.9
+   },
+   "minecraft:experience_reward": {
+    "on_death": "query.last_hit_by_player ? 5 : 0"
+   },
+   "minecraft:despawn": {
+    "despawn_from_distance": {
+     "min_distance": 48,
+     "max_distance": 96
+    }
+   },
+   "minecraft:type_family": {
+    "family": [
+     "nester",
+     "sift_hostile",
+     "monster",
+     "mob"
+    ]
+   },
+   "minecraft:collision_box": {
+    "width": 0.9,
+    "height": 1.0
+   },
+   "minecraft:health": {
+    "value": 20,
+    "max": 20
+   },
+   "minecraft:movement": {
+    "value": 0.3
+   },
+   "minecraft:attack": {
+    "damage": 5
+   },
+   "minecraft:behavior.leap_at_target": {
+    "priority": 3,
+    "yd": 0.45,
+    "must_be_on_ground": true
+   },
+   "minecraft:behavior.melee_attack": {
+    "priority": 4,
+    "speed_multiplier": 1.2,
+    "track_target": true,
+    "cooldown_time": 1.5
+   },
+   "minecraft:loot": {
+    "table": "loot_tables/entities/galaxysmp_sifter.json"
+   }
+  },
+  "events": {}
+ }
+}

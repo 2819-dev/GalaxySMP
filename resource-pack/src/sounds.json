@@ -1,0 +1,88 @@
+{
+ "entity_sounds": {
+  "entities": {
+   "galaxysmp:blub": {
+    "volume": 0.6,
+    "pitch": [
+     1.5,
+     1.8
+    ],
+    "events": {
+     "ambient": "mob.rabbit.idle",
+     "hurt": "mob.rabbit.hurt",
+     "death": "mob.rabbit.death"
+    }
+   },
+   "galaxysmp:dumpling": {
+    "volume": 0.7,
+    "pitch": [
+     1.3,
+     1.6
+    ],
+    "events": {
+     "hurt": "mob.slime.small",
+     "death": "mob.slime.small"
+    }
+   },
+   "galaxysmp:trill": {
+    "volume": 0.5,
+    "pitch": [
+     1.4,
+     1.8
+    ],
+    "events": {
+     "ambient": "mob.parrot.idle",
+     "hurt": "mob.parrot.hurt",
+     "death": "mob.parrot.death"
+    }
+   },
+   "galaxysmp:seedling": {
+    "volume": 0.4,
+    "pitch": [
+     1.6,
+     2.0
+    ],
+    "events": {
+     "hurt": "mob.rabbit.hurt",
+     "death": "mob.rabbit.death"
+    }
+   },
+   "galaxysmp:baby_sifter": {
+    "volume": 0.7,
+    "pitch": [
+     1.3,
+     1.5
+    ],
+    "events": {
+     "ambient": "mob.endermite.say",
+     "hurt": "mob.endermite.hit",
+     "death": "mob.endermite.kill"
+    }
+   },
+   "galaxysmp:bearded_sifter": {
+    "volume": 0.8,
+    "pitch": [
+     0.8,
+     1.0
+    ],
+    "events": {
+     "ambient": "mob.evocation_illager.ambient",
+     "hurt": "mob.zombie.hurt",
+     "death": "mob.zombie.death"
+    }
+   },
+   "galaxysmp:nester": {
+    "volume": 0.8,
+    "pitch": [
+     0.9,
+     1.1
+    ],
+    "events": {
+     "ambient": "mob.ravager.ambient",
+     "hurt": "mob.ravager.hurt",
+     "death": "mob.ravager.death"
+    }
+   }
+  }
+ }
+}

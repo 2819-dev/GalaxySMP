@@ -12,6 +12,17 @@
    "anim": "grass",
    "odds": true,
    "joinName": "GalaxySMP"
+  },
+  {
+   "name": "The Sift",
+   "description": "A glowing land far away. Tame Dumplings and Blubs, and watch out for Sifters at night!",
+   "tags": "Adventure · Pets · New mobs",
+   "image": "parkour",
+   "action": "sift",
+   "warp": "",
+   "anim": "amethyst",
+   "odds": false,
+   "joinName": "The Sift"
   }
  ],
  "tabs": [
@@ -49,5 +60,6 @@
   "Free to play!",
   "Shiny chips inside!",
   "Trust the penguin!"
- ]
+ ],
+ "siftCard": true
 }

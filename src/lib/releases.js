@@ -462,6 +462,21 @@ Also: when staff change the status of your suggestion, you now always get a noti
 
 Server logs are kept for 3 days and error reports for 30 days. See the Privacy Policy for details.`,
   },
+  {
+    id: "2026-11-23-the-sift",
+    title: "The Sift is here: Dumplings, Blubs and new creatures",
+    body: `A brand-new land has opened far beyond the edge of the world: **the Sift**. Pick **The Sift** under Featured Servers on the Main Menu, or step through a Sift portal.
+
+- **The Sift:** a glowing island with three areas to explore: the teal Glow Meadow, the pink Rose Hills and the Bone Flats.
+- **Dumplings:** soft, squishy little friends in eight colors that boing when they hop. Tame one with a **Dumpling Treat** (wheat, kelp and sugar makes 4). Jump on top of a Dumpling for a big bounce, with no fall damage.
+- **Blubs:** glowing, chirpy creatures. Tame one with glow berries, then crouch and tap it to carry it on your shoulder.
+- **Name your pet:** when you tame a Dumpling, Blub or Penguin, you'll be asked what you'd like to name it. No name tag or anvil needed.
+- **Babies:** feed two of your tamed Dumplings or Penguins to get a baby. It belongs to you, grows up in 20 minutes, and baby Dumplings take one of their parents' colors.
+- **Wildlife:** Seedlings scurry away from you, and Trills fly around in flocks.
+- **Watch out at night:** Baby Sifters bite, Bearded Sifters fire glowing orbs, and Nesters pounce. They drop amethyst, bones and glow berries, and sometimes a Dumpling Treat.
+
+Your pets are yours alone: other players can't feed, ride or hurt them.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

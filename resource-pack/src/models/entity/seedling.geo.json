@@ -1,0 +1,174 @@
+{
+ "format_version": "1.12.0",
+ "minecraft:geometry": [
+  {
+   "description": {
+    "identifier": "geometry.galaxysmp_seedling",
+    "texture_width": 32,
+    "texture_height": 16,
+    "visible_bounds_width": 1,
+    "visible_bounds_height": 1,
+    "visible_bounds_offset": [
+     0,
+     0.5,
+     0
+    ]
+   },
+   "bones": [
+    {
+     "name": "root",
+     "pivot": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "name": "body",
+     "pivot": [
+      0,
+      1,
+      0
+     ],
+     "parent": "root",
+     "cubes": [
+      {
+       "origin": [
+        -2,
+        1,
+        -2
+       ],
+       "size": [
+        4,
+        4,
+        4
+       ],
+       "uv": [
+        0,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "name": "leaf1",
+     "pivot": [
+      0,
+      5,
+      0
+     ],
+     "parent": "body",
+     "cubes": [
+      {
+       "origin": [
+        0,
+        5,
+        -1
+       ],
+       "size": [
+        3,
+        0,
+        2
+       ],
+       "uv": [
+        16,
+        0
+       ]
+      }
+     ],
+     "rotation": [
+      0,
+      0,
+      -30
+     ]
+    },
+    {
+     "name": "leaf2",
+     "pivot": [
+      0,
+      5,
+      0
+     ],
+     "parent": "body",
+     "cubes": [
+      {
+       "origin": [
+        -3,
+        5,
+        -1
+       ],
+       "size": [
+        3,
+        0,
+        2
+       ],
+       "uv": [
+        16,
+        0
+       ]
+      }
+     ],
+     "rotation": [
+      0,
+      0,
+      30
+     ]
+    },
+    {
+     "name": "legl",
+     "pivot": [
+      -1,
+      1,
+      0
+     ],
+     "parent": "root",
+     "cubes": [
+      {
+       "origin": [
+        -1.5,
+        0,
+        -0.5
+       ],
+       "size": [
+        1,
+        1,
+        1
+       ],
+       "uv": [
+        16,
+        4
+       ]
+      }
+     ]
+    },
+    {
+     "name": "legr",
+     "pivot": [
+      1,
+      1,
+      0
+     ],
+     "parent": "root",
+     "cubes": [
+      {
+       "origin": [
+        0.5,
+        0,
+        -0.5
+       ],
+       "size": [
+        1,
+        1,
+        1
+       ],
+       "uv": [
+        16,
+        4
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

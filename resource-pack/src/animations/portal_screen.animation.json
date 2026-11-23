@@ -1,0 +1,17 @@
+{
+ "format_version": "1.8.0",
+ "animations": {
+  "animation.galaxysmp_portal_screen.size": {
+   "loop": true,
+   "bones": {
+    "plane": {
+     "scale": [
+      "query.property('galaxysmp:w')",
+      "query.property('galaxysmp:h')",
+      1
+     ]
+    }
+   }
+  }
+ }
+}

@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.77.0"
+VERSION = "2.78.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -96,6 +96,8 @@ class GalaxyLink(Plugin):
         "guide": _cmd("Help: server info, rules and commands. Command blocks: guide @p", "/guide [player: player]", "galaxylink.command.guide"),
         "party": _cmd("Your party: invite players, accept an invite, or leave. Party chat: /p <message>.", "/party [accept|leave|invite <player>]", "galaxylink.command.party"),
         "p": _cmd("Party chat.", "/p <message: message>", "galaxylink.command.party", ["pc"]),
+        "sift": _cmd("Staff: go to the Sift, or build it (/sift build, /sift status).", "/sift [build|status]", "galaxylink.command.sift"),
+        "portal": _cmd("Picture portals: get the Portal Axe, list or remove portals.", "/portal [axe|list|remove <id>]", "galaxylink.command.portal"),
         "menu": _cmd("The GalaxySMP Main Menu: Featured Servers, How to Play, Rules, What's New and Store.", "/menu", "galaxylink.command.menu", ["mainmenu", "hub"]),
         "tpa": _cmd("Ask to teleport to a player.", "/tpa <player: player>", "galaxylink.command.tpa"),
         "tpahere": _cmd("Ask a player to teleport to you.", "/tpahere <player: player>", "galaxylink.command.tpahere"),
@@ -166,6 +168,8 @@ class GalaxyLink(Plugin):
         "galaxylink.command.shopnpc": _perm("Allows /shopnpc and editing NPCs (server operators).", "op"),
         "galaxylink.command.guide": _perm("Allows /guide.", True),
         "galaxylink.command.menu": _perm("Allows /menu.", True),
+        "galaxylink.command.sift": _perm("Allows /sift (server operators).", "op"),
+        "galaxylink.command.portal": _perm("Allows /portal (server operators).", "op"),
         "galaxylink.command.party": _perm("Allows /party and /p.", True),
         "galaxylink.command.tpa": _perm("Allows /tpa.", True),
         "galaxylink.command.tpahere": _perm("Allows /tpahere.", True),
@@ -285,6 +289,12 @@ class GalaxyLink(Plugin):
         self.crates = Crates(self)
         self.penguins = Penguins(self)  # penguins (tamed with fish, Penguin's Grace) and potato chips
         self.welcome = Welcome(self)  # full-screen welcome screen on every join
+        from endstone_galaxylink.pets import Pets
+        self.pets = Pets(self)  # pet names, babies, Blub shoulder rides, Dumpling bounces
+        from endstone_galaxylink.sift import Sift
+        self.sift = Sift(self)  # the Sift: a sky island far away, its mobs and fireflies
+        from endstone_galaxylink.portals import Portals
+        self.portals = Portals(self)  # picture portals made with the Portal Axe
         from endstone_galaxylink.social import Social
         self.social = Social(self)  # Main Menu > Social: friends, parties, recent players, profile card
         self.elevators = Elevators(self)
@@ -329,6 +339,12 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self.ranks.refresh_pictures, delay=40)  # plan tags, even before ranks arrive
         self.server.scheduler.run_task(self, self._safe("elevators.tick", self.elevators.tick), delay=2, period=2)
         self.server.scheduler.run_task(self, self._safe("penguins.tick", self.penguins.tick), delay=40, period=10)
+        self.server.scheduler.run_task(self, self._safe("pets.tick", self.pets.tick), delay=40, period=3)
+        self.server.scheduler.run_task(self, self._safe("portals.tick", self.portals.tick), delay=40, period=4)
+        self.server.scheduler.run_task(self, self._safe("sift.build_tick", self.sift.build_tick), delay=20, period=1)
+        self.server.scheduler.run_task(self, self._safe("sift.tick", self.sift.tick), delay=200, period=100)
+        if not self.sift.built():  # build the Sift once, a minute after the first start
+            self.server.scheduler.run_task(self, self._safe("sift.start_build", self.sift.start_build), delay=1200)
         self.server.scheduler.run_task(self, self._watched("checking AFK players", self.afk.tick), delay=100, period=100)
         self.server.scheduler.run_task(self, self._watched("checking command plates", self.plates.tick), delay=40, period=4)
         self.server.scheduler.run_task(self, self._watched("setting up the map item", self.galaxymap.setup), delay=200)
@@ -511,7 +527,8 @@ class GalaxyLink(Plugin):
         p = event.player
         # each one on its own, so one problem doesn't stop the others
         for part in ("ranks.forget", "plates.on_quit", "galaxymap.on_quit", "parkour.on_quit", "collection.on_quit",
-                     "teleports.on_quit", "progress.on_quit", "bedwars.on_quit", "penguins.on_quit", "welcome.on_quit", "social.on_quit"):
+                     "teleports.on_quit", "progress.on_quit", "bedwars.on_quit", "penguins.on_quit", "welcome.on_quit", "social.on_quit",
+                     "pets.on_quit", "portals.on_quit"):
             obj, fn = part.split(".")
             try:
                 getattr(getattr(self, obj), fn)(p)
@@ -640,6 +657,8 @@ class GalaxyLink(Plugin):
             return
         if event.has_item and self.welcome.on_use(event):  # the GalaxySMP Menu compass
             return
+        if event.has_item and self.portals.on_interact(event):  # the Portal Axe
+            return
         if self.buildcontest.on_interact(event):  # no ender chests while building
             return
         if self.crates.on_interact(event) or self.shopchests.on_interact(event):  # crates and shop chests
@@ -711,6 +730,9 @@ class GalaxyLink(Plugin):
 
     @event_handler
     def on_actor_spawn(self, event: ActorSpawnEvent):
+        pets = getattr(self, "pets", None)
+        if pets is not None:
+            pets.on_spawn(event)  # babies of tamed pets belong to the same owner
         floating = getattr(self, "floating", None)
         if floating is not None and floating.expecting is not None:
             floating.on_spawn(event)  # the floating label we're summoning right now
@@ -891,6 +913,8 @@ class GalaxyLink(Plugin):
         simple = {
             "guide": lambda: self._guide(sender, args),
             "menu": lambda: self.welcome.open_menu(sender),
+            "sift": lambda: self.sift.command(sender, args),
+            "portal": lambda: self.portals.command(sender, args),
             "party": lambda: self._party(sender, args),
             "p": lambda: self.social.party_chat(sender, " ".join(args).strip()) if args else sender.send_message("§eUsage: /p <message>"),
             "tpa": lambda: tp.request(sender, args, "to"),

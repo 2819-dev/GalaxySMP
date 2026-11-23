@@ -79,11 +79,17 @@ export async function adminHelpAction(request, env, ctx, url, params) {
 // ---------- the in-game welcome screen (full screen on every join; text edited here, next to the Help menu) ----------
 export async function loadWelcome(sql) {
   const rows = await sql`SELECT value, updated_at, updated_by FROM economy_config WHERE key = 'welcome'`;
+  if (rows[0] && !rows[0].value.siftCard) {
+    // The Sift arrived after this Main Menu was saved: add its card once (staff can remove it, and it stays removed)
+    const v = rows[0].value, sift = DEFAULT_WELCOME.servers.find((s) => s.action === "sift");
+    if (sift && Array.isArray(v.servers) && v.servers.length < 10 && !v.servers.some((s) => s.action === "sift")) v.servers = [...v.servers, sift];
+    v.siftCard = true;
+  }
   return rows[0] ? { welcome: { ...DEFAULT_WELCOME, ...rows[0].value }, custom: true, updated: { at: rows[0].updated_at, by: rows[0].updated_by } } : { welcome: DEFAULT_WELCOME, custom: false, updated: null };
 }
 
 const SERVER_IMAGES = ["galaxysmp", "event", "bedwars", "parkour", "build"];
-const SERVER_ACTIONS = ["play", "spawn", "warp", "minigames", "soon"];
+const SERVER_ACTIONS = ["play", "spawn", "warp", "minigames", "sift", "soon"];
 const JOIN_BLOCKS = ["grass", "diamond", "gold", "emerald", "netherite", "amethyst", "lava", "ice", "galaxy", "ender", "rainbow"];
 
 function validWelcome(body) {
@@ -109,7 +115,7 @@ function validWelcome(body) {
   });
   if (!servers.some((v) => v.enabled && v.action === "play")) throw new HttpError(400, "Keep at least one server that's switched on and set to \"Play\" (the main server).");
   const splashes = (Array.isArray(body?.splashes) ? body.splashes : String(body?.splash || "").split("\n")).map((x) => clean(x, 60)).filter(Boolean).slice(0, 40);
-  return { enabled: body?.enabled !== false, splashes, intro, tabs, servers };
+  return { enabled: body?.enabled !== false, splashes, intro, tabs, servers, siftCard: true };
 }
 
 // The latest news and the next event, shown as live info on the welcome screen.

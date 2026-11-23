@@ -1,0 +1,28 @@
+{
+ "format_version": "1.8.0",
+ "render_controllers": {
+  "controller.render.galaxysmp_portal_screen": {
+   "arrays": {
+    "textures": {
+     "Array.pics": [
+      "Texture.wilderness",
+      "Texture.copper",
+      "Texture.sift",
+      "Texture.chaos"
+     ]
+    }
+   },
+   "geometry": "Geometry.default",
+   "materials": [
+    {
+     "*": "Material.default"
+    }
+   ],
+   "textures": [
+    "Array.pics[query.property('galaxysmp:img')]"
+   ],
+   "light_color_multiplier": 1.0,
+   "ignore_lighting": true
+  }
+ }
+}

@@ -1,0 +1,352 @@
+{
+ "format_version": "1.21.40",
+ "minecraft:entity": {
+  "description": {
+   "identifier": "galaxysmp:dumpling",
+   "is_spawnable": true,
+   "is_summonable": true,
+   "is_experimental": false
+  },
+  "component_groups": {
+   "galaxysmp:wild": {
+    "minecraft:tameable": {
+     "probability": 1.0,
+     "tame_items": [
+      "galaxysmp:dumpling_treat"
+     ],
+     "tame_event": {
+      "event": "galaxysmp:on_tame",
+      "target": "self"
+     }
+    },
+    "minecraft:behavior.tempt": {
+     "priority": 4,
+     "speed_multiplier": 1.1,
+     "items": [
+      "galaxysmp:dumpling_treat"
+     ]
+    },
+    "minecraft:type_family": {
+     "family": [
+      "dumpling",
+      "galaxysmp_pet",
+      "mob"
+     ]
+    }
+   },
+   "galaxysmp:tame": {
+    "minecraft:is_tamed": {},
+    "minecraft:sittable": {},
+    "minecraft:type_family": {
+     "family": [
+      "dumpling",
+      "galaxysmp_pet",
+      "galaxysmp_tamed",
+      "mob"
+     ]
+    },
+    "minecraft:behavior.stay_while_sitting": {
+     "priority": 3
+    },
+    "minecraft:behavior.follow_owner": {
+     "priority": 5,
+     "speed_multiplier": 1.2,
+     "start_distance": 8,
+     "stop_distance": 2
+    },
+    "minecraft:healable": {
+     "items": [
+      {
+       "item": "galaxysmp:dumpling_treat",
+       "heal_amount": 6
+      }
+     ]
+    },
+    "minecraft:breedable": {
+     "require_tame": true,
+     "inherit_tamed": true,
+     "breed_items": [
+      "galaxysmp:dumpling_treat"
+     ],
+     "love_filters": {
+      "test": "is_sitting",
+      "value": false
+     },
+     "breeds_with": {
+      "mate_type": "galaxysmp:dumpling",
+      "baby_type": "galaxysmp:dumpling",
+      "breed_event": {
+       "event": "minecraft:entity_born",
+       "target": "baby"
+      }
+     },
+     "mutation_factor": {
+      "variant": 0.15
+     }
+    }
+   },
+   "galaxysmp:baby": {
+    "minecraft:is_baby": {},
+    "minecraft:scale": {
+     "value": 0.55
+    },
+    "minecraft:ageable": {
+     "duration": 1200,
+     "feed_items": [
+      "galaxysmp:dumpling_treat"
+     ],
+     "grow_up": {
+      "event": "galaxysmp:grow_up",
+      "target": "self"
+     }
+    },
+    "minecraft:behavior.follow_parent": {
+     "priority": 6,
+     "speed_multiplier": 1.1
+    }
+   },
+   "galaxysmp:adult": {
+    "minecraft:scale": {
+     "value": 1.0
+    }
+   },
+   "galaxysmp:v0": {
+    "minecraft:variant": {
+     "value": 0
+    }
+   },
+   "galaxysmp:v1": {
+    "minecraft:variant": {
+     "value": 1
+    }
+   },
+   "galaxysmp:v2": {
+    "minecraft:variant": {
+     "value": 2
+    }
+   },
+   "galaxysmp:v3": {
+    "minecraft:variant": {
+     "value": 3
+    }
+   },
+   "galaxysmp:v4": {
+    "minecraft:variant": {
+     "value": 4
+    }
+   },
+   "galaxysmp:v5": {
+    "minecraft:variant": {
+     "value": 5
+    }
+   },
+   "galaxysmp:v6": {
+    "minecraft:variant": {
+     "value": 6
+    }
+   },
+   "galaxysmp:v7": {
+    "minecraft:variant": {
+     "value": 7
+    }
+   }
+  },
+  "components": {
+   "minecraft:physics": {},
+   "minecraft:jump.static": {},
+   "minecraft:nameable": {},
+   "minecraft:persistent": {},
+   "minecraft:pushable": {
+    "is_pushable": true,
+    "is_pushable_by_piston": true
+   },
+   "minecraft:behavior.float": {
+    "priority": 0
+   },
+   "minecraft:behavior.look_at_player": {
+    "priority": 9,
+    "look_distance": 6,
+    "probability": 0.02
+   },
+   "minecraft:behavior.random_look_around": {
+    "priority": 10
+   },
+   "minecraft:type_family": {
+    "family": [
+     "dumpling",
+     "galaxysmp_pet",
+     "mob"
+    ]
+   },
+   "minecraft:variant": {
+    "value": 0
+   },
+   "minecraft:collision_box": {
+    "width": 0.7,
+    "height": 0.5
+   },
+   "minecraft:health": {
+    "value": 14,
+    "max": 14
+   },
+   "minecraft:movement": {
+    "value": 0.28
+   },
+   "minecraft:movement.skip": {},
+   "minecraft:jump.dynamic": {},
+   "minecraft:navigation.walk": {
+    "can_path_over_water": true,
+    "avoid_water": true,
+    "avoid_damage_blocks": true
+   },
+   "minecraft:damage_sensor": {
+    "triggers": [
+     {
+      "cause": "fall",
+      "deals_damage": false
+     }
+    ]
+   },
+   "minecraft:behavior.panic": {
+    "priority": 1,
+    "speed_multiplier": 1.4
+   },
+   "minecraft:behavior.breed": {
+    "priority": 2,
+    "speed_multiplier": 1.0
+   },
+   "minecraft:behavior.random_stroll": {
+    "priority": 7,
+    "speed_multiplier": 0.9
+   }
+  },
+  "events": {
+   "minecraft:entity_spawned": {
+    "sequence": [
+     {
+      "randomize": [
+       {
+        "weight": 1,
+        "add": {
+         "component_groups": [
+          "galaxysmp:v0"
+         ]
+        }
+       },
+       {
+        "weight": 1,
+        "add": {
+         "component_groups": [
+          "galaxysmp:v1"
+         ]
+        }
+       },
+       {
+        "weight": 1,
+        "add": {
+         "component_groups": [
+          "galaxysmp:v2"
+         ]
+        }
+       },
+       {
+        "weight": 1,
+        "add": {
+         "component_groups": [
+          "galaxysmp:v3"
+         ]
+        }
+       },
+       {
+        "weight": 1,
+        "add": {
+         "component_groups": [
+          "galaxysmp:v4"
+         ]
+        }
+       },
+       {
+        "weight": 1,
+        "add": {
+         "component_groups": [
+          "galaxysmp:v5"
+         ]
+        }
+       },
+       {
+        "weight": 1,
+        "add": {
+         "component_groups": [
+          "galaxysmp:v6"
+         ]
+        }
+       },
+       {
+        "weight": 1,
+        "add": {
+         "component_groups": [
+          "galaxysmp:v7"
+         ]
+        }
+       }
+      ]
+     },
+     {
+      "randomize": [
+       {
+        "weight": 88,
+        "add": {
+         "component_groups": [
+          "galaxysmp:wild",
+          "galaxysmp:adult"
+         ]
+        }
+       },
+       {
+        "weight": 12,
+        "add": {
+         "component_groups": [
+          "galaxysmp:wild",
+          "galaxysmp:baby"
+         ]
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "minecraft:entity_born": {
+    "add": {
+     "component_groups": [
+      "galaxysmp:baby",
+      "galaxysmp:tame"
+     ]
+    }
+   },
+   "galaxysmp:on_tame": {
+    "remove": {
+     "component_groups": [
+      "galaxysmp:wild"
+     ]
+    },
+    "add": {
+     "component_groups": [
+      "galaxysmp:tame"
+     ]
+    }
+   },
+   "galaxysmp:grow_up": {
+    "remove": {
+     "component_groups": [
+      "galaxysmp:baby"
+     ]
+    },
+    "add": {
+     "component_groups": [
+      "galaxysmp:adult"
+     ]
+    }
+   }
+  }
+ }
+}
