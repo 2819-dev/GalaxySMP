@@ -43,6 +43,11 @@ class Social:
         def run():
             try:
                 res = fn()
+                if isinstance(res, tuple):   # plugin._request gives (status, data)
+                    status, data = res
+                    res = data if isinstance(data, dict) else {}
+                    if status != 200 and res.get("ok") is not False:
+                        res = {**res, "ok": False, "error": res.get("error") or f"The website answered {status}"}
             except Exception as e:
                 res = {"ok": False, "error": str(e)}
             self.plugin.server.scheduler.run_task(self.plugin, lambda: done(res))
@@ -77,8 +82,18 @@ class Social:
         self._bg(lambda: self.plugin._request("/api/plugin/link-code", body), done)
 
     def on_join(self, player):
-        self.refresh([player])
-        self.link_info(player)
+        # when the website answers, redraw the Main Menu's title screen so the friends box is right
+        self.refresh([player], then=lambda: self.redraw_title(player))
+        self.link_info(player, then=lambda: self.redraw_title(player))
+
+    def redraw_title(self, player):
+        try:
+            wl = getattr(self.plugin, "welcome", None)
+            st = wl.state(player) if wl is not None and player.is_valid else None
+            if st is not None and st.get("screen") == "title" and st.get("shown"):
+                wl.show(player)
+        except Exception:
+            pass
 
     def on_quit(self, player):
         uid = str(player.unique_id)

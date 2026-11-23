@@ -496,6 +496,15 @@ Your pets are yours alone: other players can't feed, ride or hurt them.`,
 - **Simpler title screen:** Social and Link Account are now in the friends box at the bottom, so everything fits on smaller screens.
 - **The Sift:** if it's still being built, the menu now tells you instead of sending you back to the server list.`,
   },
+  {
+    id: "2026-11-24-main-menu-social-join",
+    title: "Main Menu: linked accounts and joining fixed",
+    body: `More fixes for the Main Menu:
+
+- **Linked accounts are recognized:** the friends box no longer asks you to link an account that's already linked. Your friends, requests and party now load properly too.
+- **Easier joining:** there's now a **Join** button at the top of the Featured Servers list. Join Server and tapping a selected server again still work too, and you'll see the server's name when you arrive.
+- **New button style:** the Main Menu buttons now use the GalaxySMP colors.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

@@ -265,6 +265,7 @@ class Welcome:
         if h.get("greet"):
             splash = h["greet"]
         form = ActionForm(title=f"{TITLE}{self.codes(st)}{self.holiday_codes()}§lGalaxySMP", content=splash)
+        st["shown"] = True
         form.add_button("§j§f" + self.friends_line(player), on_click=lambda p: self.go(p, "social"))   # the friends box
         form.add_button("§j§r" + self.restart_line(), on_click=lambda p: self.show(p))                 # the restart notice
         form.add_button("§lPlay", on_click=lambda p: self.go(p, "servers"))
@@ -496,6 +497,9 @@ class Welcome:
         form.add_button("§j§nJoin Server", icon=image_of(s), on_click=lambda p, i=sel: self.join(p, i))
         # (this line isn't a button on screen, but if a phone reports the Join Server tap as this one, it joins too)
         form.add_button("§j§i" + self.stats_line(player, s), on_click=lambda p, i=sel: self.join(p, i))
+        # a plain Join button at the top of the list too (the same kind of button as the server cards)
+        if s.get("action") != "soon":
+            form.add_button(f"§a§l» Join {s['name']}§r\n§7Tap to play", icon=image_of(s), on_click=lambda p, i=sel: self.join(p, i))
         for i, v in enumerate(servers):
             mark = "§q§s" if i == sel else ""
             status = "§eComing soon" if v.get("action") == "soon" else f"§a● §7{self.players_on(v)} playing"
@@ -687,6 +691,10 @@ class Welcome:
                 self.plugin.logger.warning(f"Main Menu: couldn't move {player.name}: {e}")
         try:
             player.play_sound(player.location, "random.levelup", 0.6, 1.2)
+        except Exception:
+            pass
+        try:
+            player.send_title(f"§b§l{label or 'GalaxySMP'}", "§7Have fun!", 5, 40, 15)
         except Exception:
             pass
         if not st.get("reopened"):

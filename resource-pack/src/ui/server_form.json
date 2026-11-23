@@ -1274,7 +1274,10 @@
        "binding_type": "collection_details",
        "binding_collection_name": "form_buttons"
       }
-     ]
+     ],
+     "$default_button_texture": "textures/ui/gsmp_button",
+     "$hover_button_texture": "textures/ui/gsmp_button_hover",
+     "$pressed_button_texture": "textures/ui/gsmp_button_pressed"
     }
    }
   ],
