@@ -187,15 +187,17 @@ def card(fill, border, glow):
 
 
 os.makedirs(OUT, exist_ok=True)
-title_bg().save(os.path.join(OUT, "gsmp_title_bg.png"))
-for k in ("galaxysmp", "event", "bedwars", "parkour", "build"):
-    banner(k).save(os.path.join(OUT, f"gsmp_srv_{k}.png"))
+# The background and server pictures are now real 3D renders (render3d.py); pass "flat" to draw these old flat ones.
+if "flat" in sys.argv:
+    title_bg().save(os.path.join(OUT, "gsmp_title_bg.png"))
+    for k in ("galaxysmp", "event", "bedwars", "parkour", "build"):
+        banner(k).save(os.path.join(OUT, f"gsmp_srv_{k}.png"))
 card((14, 18, 44, 215), (90, 110, 190, 255), (140, 170, 255, 160)).save(os.path.join(OUT, "gsmp_card.png"))
 card((26, 34, 80, 230), (110, 220, 255, 255), (170, 235, 255, 200)).save(os.path.join(OUT, "gsmp_card_hover.png"))
 card((40, 30, 90, 235), (190, 140, 255, 255), (220, 190, 255, 200)).save(os.path.join(OUT, "gsmp_card_pressed.png"))
 for n in ("gsmp_card", "gsmp_card_hover", "gsmp_card_pressed"):
     open(os.path.join(OUT, n + ".json"), "w").write('{"nineslice_size": 6, "base_size": [24, 24]}')
-if len(sys.argv) > 2:
+if len(sys.argv) > 2 and sys.argv[2] != "flat":
     bg = Image.open(os.path.join(OUT, "gsmp_title_bg.png"))
     prev = Image.new("RGBA", (bg.width, bg.height + 230), (20, 20, 20, 255))
     prev.paste(bg, (0, 0))

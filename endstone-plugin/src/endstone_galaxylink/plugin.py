@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.73.0"
+VERSION = "2.74.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -438,7 +438,7 @@ class GalaxyLink(Plugin):
         except Exception as e:
             self.logger.warning(f"Welcome screen failed: {e}")
         if welcomed:
-            later(self, player, self.welcome.show, 50)
+            later(self, player, self.welcome.show, 80)  # once the game has finished loading
             for fn in (self.support.on_join, self.market.on_join, self.visits.on_join):
                 self.welcome.after(player, fn)   # once they press Continue
         else:

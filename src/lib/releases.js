@@ -721,6 +721,13 @@ Use the tabs to learn the basics (Getting Started, Plots, Money & Store, Voice C
 
 Also fixed: your view no longer looks zoomed in after joining.`,
   },
+  {
+    id: "2026-11-23-title-screen-3d",
+    title: "The title screen, now in full 3D",
+    body: `The join screen has a brand-new look: a real 3D view of a GalaxySMP valley at sunset, with snowy mountains, forests, a lake and the spawn tower glowing in the evening light, slowly drifting behind the logo. It now fills your whole screen, edge to edge.
+
+The Featured Servers list has new 3D pictures too.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

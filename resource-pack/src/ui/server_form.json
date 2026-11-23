@@ -9,6 +9,60 @@
   // The plugin sends them on every join (endstone-plugin/src/endstone_galaxylink/welcome.py).
   // Art: textures/ui/gsmp_title_bg, gsmp_srv_*, gsmp_card* (resource-pack/draw_title.py).
 
+  // the same screen as Mojang's, but our background sits on the full-screen layer (edge to edge, outside the safe area)
+  "third_party_server_screen@common.base_screen": {
+    "$screen_content": "server_form.main_screen_content",
+    "$screen_bg_content": "server_form.gsmp_screen_bg",
+    "button_mappings": [
+      {
+        "from_button_id": "button.menu_cancel",
+        "to_button_id": "button.menu_exit",
+        "mapping_type": "global"
+      }
+    ]
+  },
+
+  "gsmp_screen_bg": {
+    "type": "panel",
+    "size": [ "100%", "100%" ],
+    "controls": [
+      {
+        "art@server_form.gsmp_backdrop": {
+          "bindings": [
+            { "binding_name": "#title_text" },
+            { "binding_type": "view", "source_property_name": "(not ((#title_text - '§g§s§m§p') = #title_text))", "target_property_name": "#visible" }
+          ]
+        }
+      },
+      {
+        "title_fade": {
+          "type": "image",
+          "texture": "textures/ui/gsmp_fade",
+          "bilinear": true,
+          "size": [ "100%", "100%" ],
+          "layer": 3,
+          "bindings": [
+            { "binding_name": "#title_text" },
+            { "binding_type": "view", "source_property_name": "(not ((#title_text - '§g§s§m§p§1') = #title_text))", "target_property_name": "#visible" }
+          ]
+        }
+      },
+      {
+        "page_dim": {
+          "type": "image",
+          "texture": "textures/ui/Black",
+          "alpha": 0.55,
+          "size": [ "100%", "100%" ],
+          "layer": 3,
+          "bindings": [
+            { "binding_name": "#title_text" },
+            { "binding_type": "view", "source_property_name": "(not (((#title_text - '§g§s§m§p§2') = #title_text) and ((#title_text - '§g§s§m§p§3') = #title_text)))", "target_property_name": "#visible" }
+          ]
+        }
+      }
+    ]
+  },
+
   "main_screen_content": {
     "type": "panel",
     "size": [ "100%", "100%" ],
@@ -91,7 +145,7 @@
         "landscape": {
           "type": "image",
           "texture": "textures/ui/gsmp_title_bg",
-          "bilinear": false,
+          "bilinear": true,
           "size": [ "150%", "100%" ],
           "anchor_from": "top_left",
           "anchor_to": "top_left",
@@ -114,12 +168,12 @@
   // Minecraft-style button (the game's own button look)
   "gsmp_mc_button": {
     "type": "panel",
-    "size": [ "100%", 28 ],
+    "size": [ "100%", 30 ],
     "controls": [
       {
         "button@common_buttons.light_text_button": {
           "$pressed_button_name": "button.form_button_click",
-          "size": [ "100%", 24 ],
+          "size": [ "100%", 26 ],
           "anchor_from": "top_middle",
           "anchor_to": "top_middle",
           "$button_text": "#form_button_text",
@@ -178,15 +232,14 @@
     "size": [ "100%", "100%" ],
     "layer": 2,
     "controls": [
-      { "backdrop@server_form.gsmp_backdrop": { "layer": 1 } },
       {
         "middle": {
           "type": "stack_panel",
           "orientation": "vertical",
-          "size": [ 220, "100%c" ],
+          "size": [ 240, "100%c" ],
           "anchor_from": "center",
           "anchor_to": "center",
-          "offset": [ 0, -6 ],
+          "offset": [ 0, 4 ],
           "layer": 10,
           "controls": [
             {
@@ -195,7 +248,7 @@
                 "texture": "textures/ui/galaxysmp_logo",
                 "bilinear": false,
                 "keep_ratio": true,
-                "size": [ "100%", 42 ]
+                "size": [ "100%", 46 ]
               }
             },
             {
@@ -209,8 +262,14 @@
                 "bindings": [ { "binding_name": "#form_text" } ]
               }
             },
-            { "gap": { "type": "panel", "size": [ "100%", 12 ] } },
-            { "buttons@server_form.gsmp_mc_buttons": {} }
+            { "gap": { "type": "panel", "size": [ "100%", 14 ] } },
+            {
+              "buttons_box": {
+                "type": "panel",
+                "size": [ 210, "100%c" ],
+                "controls": [ { "buttons@server_form.gsmp_mc_buttons": {} } ]
+              }
+            }
           ]
         }
       },
@@ -247,7 +306,6 @@
     "size": [ "100%", "100%" ],
     "layer": 2,
     "controls": [
-      { "backdrop@server_form.gsmp_backdrop": { "layer": 1, "$dim": 0.55 } },
       {
         "page": {
           "type": "stack_panel",
@@ -341,7 +399,7 @@
               "picture": {
                 "type": "image",
                 "size": [ 96, 54 ],
-                "bilinear": false,
+                "bilinear": true,
                 "layer": 2,
                 "bindings": [
                   { "binding_name": "#form_button_texture", "binding_name_override": "#texture", "binding_type": "collection", "binding_collection_name": "form_buttons" },
@@ -393,7 +451,6 @@
     "size": [ "100%", "100%" ],
     "layer": 2,
     "controls": [
-      { "backdrop@server_form.gsmp_backdrop": { "layer": 1, "$dim": 0.6 } },
       {
         "page": {
           "type": "stack_panel",
