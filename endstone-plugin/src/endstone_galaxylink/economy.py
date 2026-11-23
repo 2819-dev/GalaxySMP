@@ -119,7 +119,9 @@ class Economy:
             text = HUD.format(self.balance_text(p))
             try:
                 if bw is None or not bw.playing(p):
-                    p.send_tip(text)
+                    pg = getattr(self.plugin, "penguins", None)
+                    extra = pg.hud_line(p) if pg is not None else ""   # chip powers, Penguin's Grace, penguin pointer
+                    p.send_tip(f"{text}\n{extra}" if extra else text)
                 key = str(p.unique_id)
                 if self.shown.get(key) != text:
                     p.score_tag = text

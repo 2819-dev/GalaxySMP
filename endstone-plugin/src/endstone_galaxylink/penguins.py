@@ -18,6 +18,10 @@ FISH = ("minecraft:cod", "minecraft:salmon", "minecraft:tropical_fish", "minecra
 OWNER_TAG = "gsmp_owner_"      # + xuid
 NAME_TAG = "gsmp_ownername_"   # + gamertag (spaces as _)
 GRACE_RANGE = 16
+# mobs that can be tamed: they're kept just outside spawn (where mobs don't survive)
+PETS = {PENGUIN, "minecraft:wolf", "minecraft:cat", "minecraft:parrot", "minecraft:horse", "minecraft:donkey", "minecraft:mule",
+        "minecraft:llama", "minecraft:trader_llama", "minecraft:camel", "minecraft:skeleton_horse", "minecraft:ocelot", "minecraft:fox"}
+EDGE = 2   # blocks: a pet this close to spawn's edge (or inside) is moved back out
 
 # flavor -> (power name, color, seconds, perks, description)
 # The powers are made by the plugin itself (not Minecraft effects), so the effects list stays clean and only the
@@ -89,6 +93,7 @@ class Penguins:
         self.graced = {}   # player uuid -> "water" or "ice" while they have Penguin's Grace
         self.penguins_of = {}   # owner xuid -> where their penguins were last seen [(dimension, x, y, z)]
         self.ticks = 0
+        self.hud = {}   # player uuid -> the power/grace/pointer line shown under the money display
         self.add_crate_prizes()
 
     # ---------- crates ----------
@@ -133,6 +138,71 @@ class Penguins:
             event.is_cancelled = True
             player.send_message(f"§cThis penguin belongs to {owner_name or 'someone else'}.")
             return True
+        return False
+
+    def hud_line(self, p):
+        return self.hud.get(str(p.unique_id), "")
+
+    # ---------- pets wait outside spawn (mobs don't survive in spawn) ----------
+    def spawns(self):
+        plots = getattr(getattr(self.plugin, "plots", None), "plots", None) or {}
+        return [a for a in plots.values() if a.get("kind") == "area" and "spawn" in str(a.get("name") or "").lower()]
+
+    @staticmethod
+    def inside(area, dim, x, z, pad=0.0):
+        return area["dim"] == dim and area["x1"] - pad <= x < area["x2"] + 1 + pad and area["z1"] - pad <= z < area["z2"] + 1 + pad
+
+    @staticmethod
+    def outside_spot(area, x, z, margin=4):
+        """The nearest spot just outside the area's edge."""
+        sides = [(x - area["x1"], area["x1"] - margin, z), (area["x2"] + 1 - x, area["x2"] + 1 + margin, z),
+                 (z - area["z1"], x, area["z1"] - margin), (area["z2"] + 1 - z, x, area["z2"] + 1 + margin)]
+        _, nx, nz = min(sides, key=lambda s: s[0])
+        return nx, nz
+
+    def keep_pets_out(self):
+        """Tamed-type mobs (wolves, cats, parrots, horses, penguins...) that reach the edge of spawn are moved back
+        a few blocks outside, so they wait there instead of following their owner in and dying."""
+        spawns = self.spawns()
+        if not spawns:
+            return
+        from endstone.level import Location
+        for dim in self.plugin.server.level.dimensions:
+            here = [a for a in spawns if a["dim"] == dim.name]
+            if not here:
+                continue
+            try:
+                actors = dim.actors
+            except Exception:
+                continue
+            for a in actors:
+                if type_of(a) not in PETS:
+                    continue
+                l = a.location
+                for area in here:
+                    if self.inside(area, dim.name, l.x, l.z, EDGE):
+                        nx, nz = self.outside_spot(area, l.x, l.z)
+                        try:
+                            y = dim.get_highest_block_y_at(int(nx // 1), int(nz // 1)) + 1
+                        except Exception:
+                            y = l.y
+                        try:
+                            a.teleport(Location(dim, nx, y, nz))
+                        except Exception:
+                            pass
+                        break
+
+    def on_teleport(self, event):
+        """A pet can't teleport to its owner inside spawn (it waits outside)."""
+        try:
+            if type_of(event.actor) not in PETS:
+                return False
+            to = event.to_location
+            if any(self.inside(area, to.dimension.name, to.x, to.z, EDGE) for area in self.spawns()):
+                event.is_cancelled = True
+                return True
+        except Exception:
+            pass
         return False
 
     def hearts(self, actor):
@@ -238,6 +308,10 @@ class Penguins:
         penguin when it's lost."""
         self.ticks += 1
         server = self.plugin.server
+        try:
+            self.keep_pets_out()
+        except Exception:
+            pass
         if self.ticks % 2 == 0:
             self.graced = self.grace_check()
         now = time.time()
@@ -262,16 +336,14 @@ class Penguins:
             grace = self.graced.get(uid)
             pointer = self.pointer(p)
             if not mine and not grace and not pointer:
+                self.hud.pop(uid, None)
                 continue
             parts = [f"{v[0]}§l{k}§r §7{int((v[1] - now) // 60)}:{int((v[1] - now) % 60):02d}" for k, v in mine.items()]
             if grace:
                 parts.append("§b§lPenguin's Grace")
             if pointer:
                 parts.append(pointer)
-            try:
-                p.send_tip("  ".join(parts))
-            except Exception:
-                pass
+            self.hud[uid] = "  ".join(parts)   # shown under your money above the hotbar (economy.py)
             # particles around you (everyone nearby sees them)
             looks = [LOOKS[k][1] for k in mine] + ([GRACE_LOOK[1]] if grace else [])
             if not looks:

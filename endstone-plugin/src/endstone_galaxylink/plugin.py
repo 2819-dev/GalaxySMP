@@ -12,7 +12,7 @@ import urllib.request
 
 from endstone import ColorFormat, Player
 from endstone.command import Command, CommandSender
-from endstone.event import (PlayerLoginEvent, ActorDamageEvent, ActorDeathEvent, ActorExplodeEvent, ActorSpawnEvent, BlockBreakEvent, BlockExplodeEvent,
+from endstone.event import (PlayerLoginEvent, ActorDamageEvent, ActorDeathEvent, ActorExplodeEvent, ActorSpawnEvent, ActorTeleportEvent, BlockBreakEvent, BlockExplodeEvent,
                             BlockFromToEvent, BlockPlaceEvent, PlayerChatEvent, PlayerCommandEvent, PlayerDeathEvent,
                             PlayerDropItemEvent, PlayerItemConsumeEvent, PlayerInteractActorEvent, PlayerInteractEvent, PlayerJoinEvent, PlayerQuitEvent,
                             PlayerRespawnEvent,
@@ -53,7 +53,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.70.0"
+VERSION = "2.71.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -536,6 +536,10 @@ class GalaxyLink(Plugin):
         if self.npcs.npc_id(event.actor) is not None:
             return self.npcs.on_interact(event)
         self.plots.on_interact_actor(event)  # animals, armor stands, chest minecarts in someone's plot
+
+    @event_handler
+    def on_actor_teleport(self, event: ActorTeleportEvent):
+        self.penguins.on_teleport(event)  # pets wait outside spawn
 
     @event_handler
     def on_item_consume(self, event: PlayerItemConsumeEvent):

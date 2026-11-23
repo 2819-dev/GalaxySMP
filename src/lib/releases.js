@@ -699,6 +699,12 @@ Penguins and chips are super rare prizes in Galaxy Crates, and staff may hand th
 
 **Penguin pointer.** If your penguin wanders more than 16 blocks away, a small penguin icon and an arrow above your hotbar point you back to it. Only you can see it.`,
   },
+  {
+    id: "2026-11-23-pets-spawn",
+    title: "Pets wait outside spawn, and chip powers now show up",
+    body: `- **Pets wait outside spawn.** Tamed-type animals (wolves, cats, parrots, horses, penguins and more) no longer follow you into spawn, where they wouldn't survive. They wait just outside the edge until you come back.
+- **Chip powers now show.** The power name, time left and Penguin's Grace now appear under your money above the hotbar, instead of being covered by it.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).
