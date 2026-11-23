@@ -11,7 +11,7 @@ import { limit, clientIp } from "../lib/ratelimit.js";
 const CODE_MINUTES = 10;
 const BCRYPT_COST = 10;
 
-function checkPassword(password, name) {
+export function checkPassword(password, name) {
   const pw = String(password || "");
   const bytes = new TextEncoder().encode(pw).length;
   if (pw.length < 8) throw new HttpError(400, "Passwords must be at least 8 characters.");

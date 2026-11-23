@@ -199,7 +199,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.76.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.77.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -250,6 +250,10 @@ class VoiceLink:
             self._on_main(lambda: self.plugin.shop.update_from_website(msg))
         elif msg.get("type") == "help":
             self._on_main(lambda: self.plugin.help.update_from_website(msg))
+        elif msg.get("type") == "backup_now":
+            self._on_main(lambda: self.plugin.backups.start("from the website"))
+        elif msg.get("type") == "backup_restore" and msg.get("key"):
+            self._on_main(lambda m=msg: self.plugin.backups.restore(str(m["key"]), str(m.get("by") or "")))
         elif msg.get("type") == "welcome":
             self._on_main(lambda: self.plugin.welcome.update_from_website(msg))
         elif msg.get("type") == "plans":

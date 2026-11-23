@@ -4806,3 +4806,7 @@ html[data-theme="light"] .mk-balance { color: rgb(160,110,8); }
 .srv-row { display: flex; gap: 12px; align-items: flex-start; }
 .srv-pic { width: 112px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; image-rendering: pixelated; background: var(--surface-2, #1b1f3a); flex: none; }
 @media (max-width: 480px) { .srv-row { flex-direction: column; } .srv-pic { width: 100%; } }
+
+/* Control Panel: world backups */
+.bk-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.bk-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2, rgba(255,255,255,.04)); }

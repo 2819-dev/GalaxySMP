@@ -10,7 +10,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const ADMIN_ROLE = 4;
 const MEMBER_ROLE = 1;
 
-async function checkSecret(request, env) {
+export async function checkSecret(request, env) {
   if (!env.PLUGIN_SECRET) throw new HttpError(503, "PLUGIN_SECRET is not set on the website.");
   const header = request.headers.get("Authorization") || "";
   const given = header.startsWith("Bearer ") ? header.slice(7) : "";

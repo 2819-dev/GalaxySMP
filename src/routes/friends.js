@@ -9,6 +9,7 @@ import { headUrlFor } from "./heads.js";
 import { notify } from "./notify.js";
 import { postTimeline } from "./feed.js";
 import { streaksFor, MAX_STREAKS } from "./friendstreaks.js";
+import { checkSecret } from "./plugin.js";
 
 const MAX_FRIENDS = 200;
 const pair = (x, y) => (x < y ? [x, y] : [y, x]);
@@ -55,7 +56,11 @@ export async function act(request, env) {
   const me = await requireUser(request, env);
   if (me.banned) throw new HttpError(403, "Your account has been banned.");
   await rateLimit(env, "AUTH_LIMITER", `friends:${me.id}`);
-  const body = await readJson(request);
+  return actAs(env, me, await readJson(request));
+}
+
+// The friend actions for a member (from the website, or from the game's Main Menu through the plugin).
+export async function actAs(env, me, body) {
   const sql = getDb(env);
   let other = Number(body.userId) || null;
   if (!other && body.username) {
@@ -166,4 +171,60 @@ export async function tpa(request, env) {
     .then((r) => r.json()).catch(() => ({ ok: false, message: "The server is offline right now." }));
   if (!a.ok) throw new HttpError(409, a.message || "That didn't work.");
   return json({ ok: true, message: a.message });
+}
+
+
+// ---------- from the game (Main Menu > Social) ----------
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function memberFor(sql, uuid) {
+  if (!UUID_RE.test(String(uuid || ""))) throw new HttpError(400, "Bad player.");
+  const [u] = await sql`SELECT id, username, banned FROM users WHERE mc_uuid = ${uuid}::uuid AND NOT is_bot`;
+  return u || null;
+}
+
+// POST /api/plugin/social { uuids: [...] } -> for each linked player: friends (with xuid and in game), requests
+export async function pluginState(request, env) {
+  await checkSecret(request, env);
+  const body = await readJson(request, 65536);
+  const sql = getDb(env);
+  const uuids = (Array.isArray(body.uuids) ? body.uuids : []).filter((u) => UUID_RE.test(String(u))).slice(0, 50);
+  const out = {};
+  for (const uuid of uuids) {
+    const me = await memberFor(sql, uuid);
+    if (!me) { out[uuid] = { linked: false }; continue; }
+    const rows = await sql`
+      SELECT f.status, f.requested_by, u.id, u.username, p.xuid, p.gamertag, p.last_seen,
+             (p.online_at > now() - interval '150 seconds') AS in_game
+        FROM friends f
+        JOIN users u ON u.id = CASE WHEN f.a = ${me.id} THEN f.b ELSE f.a END
+        LEFT JOIN players p ON p.uuid = u.mc_uuid
+       WHERE (f.a = ${me.id} OR f.b = ${me.id}) AND NOT u.banned
+       ORDER BY lower(u.username)`;
+    const person = (r) => ({ id: Number(r.id), name: r.gamertag || r.username, xuid: r.xuid || null, inGame: Boolean(r.in_game), lastSeen: r.last_seen || null });
+    out[uuid] = {
+      linked: true, id: Number(me.id), name: me.username,
+      friends: rows.filter((r) => r.status === "accepted").map(person),
+      incoming: rows.filter((r) => r.status === "pending" && Number(r.requested_by) !== Number(me.id)).map(person),
+      outgoing: rows.filter((r) => r.status === "pending" && Number(r.requested_by) === Number(me.id)).map(person),
+    };
+  }
+  return json({ ok: true, players: out });
+}
+
+// POST /api/plugin/social/act { uuid, action, userId | username }
+export async function pluginAct(request, env) {
+  await checkSecret(request, env);
+  const body = await readJson(request);
+  const sql = getDb(env);
+  const me = await memberFor(sql, body.uuid);
+  if (!me) throw new HttpError(409, "Link your account first (Main Menu > Link Account) to add friends.");
+  if (me.banned) throw new HttpError(403, "Your account has been banned.");
+  try {
+    const res = await actAs(env, me, { action: body.action, userId: body.userId, username: body.username });
+    return res;
+  } catch (e) {
+    if (e instanceof HttpError) return json({ ok: false, error: e.message }, 200);
+    throw e;
+  }
 }

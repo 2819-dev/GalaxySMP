@@ -55,7 +55,7 @@ export async function siteNotice(request, env) {
   }, 200, { "Cache-Control": "public, max-age=20" });
 }
 
-async function requireOwner(request, env) {
+export async function requireOwner(request, env) {
   const user = await requireUser(request, env);
   if (!isOwner(env, user.username, user.platform === "bedrock")) throw new HttpError(403, "Only the owner can use server controls.");
   return user;

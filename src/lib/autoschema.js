@@ -375,6 +375,11 @@ const PENDING = [
     "ALTER TABLE dm_messages ADD COLUMN IF NOT EXISTS form_id bigint REFERENCES dm_forms(id) ON DELETE SET NULL",
     "INSERT INTO schema_migrations (version) VALUES ('0088_dm_forms') ON CONFLICT DO NOTHING",
   ]],
+  ["0089_game_link_codes", [
+    "CREATE TABLE IF NOT EXISTS game_link_codes (id bigserial PRIMARY KEY, code text NOT NULL UNIQUE, mc_uuid uuid NOT NULL, xuid text, name text NOT NULL, bedrock boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL, used_at timestamptz)",
+    "CREATE INDEX IF NOT EXISTS game_link_codes_uuid_idx ON game_link_codes (mc_uuid) WHERE used_at IS NULL",
+    "INSERT INTO schema_migrations (version) VALUES ('0089_game_link_codes') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

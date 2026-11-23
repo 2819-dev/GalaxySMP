@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.76.0"
+VERSION = "2.77.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -94,6 +94,8 @@ class GalaxyLink(Plugin):
                           "galaxylink.command.takemoney"),
         "shopnpc": _cmd("Summon a shop NPC where you stand (tap it to edit it). /shopnpc fix puts back missing NPCs near you.", "/shopnpc [action: message]", "galaxylink.command.shopnpc"),
         "guide": _cmd("Help: server info, rules and commands. Command blocks: guide @p", "/guide [player: player]", "galaxylink.command.guide"),
+        "party": _cmd("Your party: invite players, accept an invite, or leave. Party chat: /p <message>.", "/party [accept|leave|invite <player>]", "galaxylink.command.party"),
+        "p": _cmd("Party chat.", "/p <message: message>", "galaxylink.command.party", ["pc"]),
         "menu": _cmd("The GalaxySMP Main Menu: Featured Servers, How to Play, Rules, What's New and Store.", "/menu", "galaxylink.command.menu", ["mainmenu", "hub"]),
         "tpa": _cmd("Ask to teleport to a player.", "/tpa <player: player>", "galaxylink.command.tpa"),
         "tpahere": _cmd("Ask a player to teleport to you.", "/tpahere <player: player>", "galaxylink.command.tpahere"),
@@ -164,6 +166,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.shopnpc": _perm("Allows /shopnpc and editing NPCs (server operators).", "op"),
         "galaxylink.command.guide": _perm("Allows /guide.", True),
         "galaxylink.command.menu": _perm("Allows /menu.", True),
+        "galaxylink.command.party": _perm("Allows /party and /p.", True),
         "galaxylink.command.tpa": _perm("Allows /tpa.", True),
         "galaxylink.command.tpahere": _perm("Allows /tpahere.", True),
         "galaxylink.command.tpaccept": _perm("Allows /tpaccept.", True),
@@ -217,6 +220,14 @@ class GalaxyLink(Plugin):
         STAFF_PERMISSION: _perm("Minigame Staff: accept or decline minigame host requests. Give it with a rank.", "op"),
     }
 
+    def on_load(self) -> None:
+        # a world restore from the website is put in place here, before Minecraft opens the world
+        try:
+            from endstone_galaxylink.backup import apply_pending_restore
+            apply_pending_restore(self.logger)
+        except Exception as e:
+            self.logger.error(f"[Backups] Restore check failed: {e}")
+
     def on_enable(self) -> None:
         self._last_use = {}
         self._voice = None
@@ -269,9 +280,13 @@ class GalaxyLink(Plugin):
         self.jobs = Jobs(self)
         self.shopchests = ShopChests(self)
         self.servercontrol = ServerControl(self)  # maintenance mode, scheduled restart, welcome kit (website)
+        from endstone_galaxylink.backup import Backups
+        self.backups = Backups(self)  # nightly world backups (server + website)
         self.crates = Crates(self)
         self.penguins = Penguins(self)  # penguins (tamed with fish, Penguin's Grace) and potato chips
         self.welcome = Welcome(self)  # full-screen welcome screen on every join
+        from endstone_galaxylink.social import Social
+        self.social = Social(self)  # Main Menu > Social: friends, parties, recent players, profile card
         self.elevators = Elevators(self)
         from endstone_galaxylink.potm import PlayerOfTheMonth
         self.potm = PlayerOfTheMonth(self)  # Player of the Month: Voting Computers
@@ -330,6 +345,8 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self._safe("blocklog.tick", self.blocklog.tick), delay=20, period=20)
         self.server.scheduler.run_task(self, self._safe("announcements.tick", self.announcements.tick), delay=20, period=20)
         self.server.scheduler.run_task(self, self._safe("minigames.tick", self.minigames.tick), delay=600, period=600)
+        self.server.scheduler.run_task(self, self._safe("backups.tick", self.backups.tick), delay=1200, period=1200)
+        self.server.scheduler.run_task(self, self._safe("social.tick", self.social.tick), delay=600, period=600)
         self.server.scheduler.run_task(self, self._safe("bedwars.tick", self.bedwars.tick), delay=100, period=10)
         self.server.scheduler.run_task(self, self._watched("drawing the website map", self.livemap.tick), delay=200, period=40)  # website map
         self.server.scheduler.run_task(self, self._watched("a plot job (save/reset)", self.plots.tick, lambda: self.plots.jobs), delay=1, period=1)
@@ -436,6 +453,10 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, lambda: self.penguins.on_join(player) if player.is_valid else None, delay=40)  # normal speed and hearts
         welcomed = False
         try:
+            self.social.on_join(player)   # friends and link status from the website (in the background)
+        except Exception as e:
+            self.logger.warning(f"Social on join failed: {e}")
+        try:
             welcomed = self.welcome.on_join(player, brand_new)  # full-screen welcome screen; frozen until Continue
         except Exception as e:
             self.logger.warning(f"Welcome screen failed: {e}")
@@ -490,7 +511,7 @@ class GalaxyLink(Plugin):
         p = event.player
         # each one on its own, so one problem doesn't stop the others
         for part in ("ranks.forget", "plates.on_quit", "galaxymap.on_quit", "parkour.on_quit", "collection.on_quit",
-                     "teleports.on_quit", "progress.on_quit", "bedwars.on_quit", "penguins.on_quit", "welcome.on_quit"):
+                     "teleports.on_quit", "progress.on_quit", "bedwars.on_quit", "penguins.on_quit", "welcome.on_quit", "social.on_quit"):
             obj, fn = part.split(".")
             try:
                 getattr(getattr(self, obj), fn)(p)
@@ -707,6 +728,22 @@ class GalaxyLink(Plugin):
             return
         self.moderation.on_command(event)  # muted players can't /msg or /me
 
+    def _party(self, sender, args):
+        sub = (args[0].lower() if args else "")
+        if sub == "accept":
+            return self.social.accept(sender)
+        if sub == "leave":
+            return self.social.leave_party(sender)
+        if sub == "invite" and len(args) > 1:
+            target = self.server.get_player(" ".join(args[1:]))
+            if target is None:
+                return sender.send_message("§cThat player isn't online.")
+            return self.social.invite(sender, target)
+        self.welcome.open_menu(sender)
+        st = self.welcome.state(sender)
+        if st is not None:
+            self.welcome.go(sender, "social", 2)
+
     def _safe(self, what, fn):
         """A repeating task that can't break the server: an error is logged (once a minute at most) and the task
         keeps running next time."""
@@ -825,7 +862,7 @@ class GalaxyLink(Plugin):
         player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "tpa", "tpahere", "tpaccept",
                        "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd", "plate",
                        "report", "mod", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates", "elevator",
-                       "shift", "whois", "support", "map", "parkour", "warp", "setwarp", "delwarp", "goal", "votecomputer", "menu"}
+                       "shift", "whois", "support", "map", "parkour", "warp", "setwarp", "delwarp", "goal", "votecomputer", "menu", "party", "p"}
         if name in player_only and not isinstance(sender, Player):
             sender.send_message(f"/{name} can only be used in game.")
             return True
@@ -854,6 +891,8 @@ class GalaxyLink(Plugin):
         simple = {
             "guide": lambda: self._guide(sender, args),
             "menu": lambda: self.welcome.open_menu(sender),
+            "party": lambda: self._party(sender, args),
+            "p": lambda: self.social.party_chat(sender, " ".join(args).strip()) if args else sender.send_message("§eUsage: /p <message>"),
             "tpa": lambda: tp.request(sender, args, "to"),
             "tpahere": lambda: tp.request(sender, args, "here"),
             "tpaccept": lambda: tp.accept(sender, args),

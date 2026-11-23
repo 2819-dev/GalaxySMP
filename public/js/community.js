@@ -217,6 +217,40 @@ $("code-restart").addEventListener("click", () => {
   show("auth");
 });
 
+// ---------- Linking from the game (Main Menu > Link Account shows a QR code to /community?game=CODE) ----------
+async function gameLink() {
+  const code = new URLSearchParams(location.search).get("game");
+  if (!code) return false;
+  history.replaceState(null, "", location.pathname);
+  const { h, openDialog } = await import("/js/dialog.js");
+  let info;
+  try { info = await api(`/api/link/game?code=${encodeURIComponent(code)}`); } catch (e) { toast(e.message); return false; }
+  const pass = h("input", { class: "input", type: "password", autocomplete: "new-password", placeholder: "At least 8 characters" });
+  const pass2 = h("input", { class: "input", type: "password", autocomplete: "new-password", placeholder: "Type it again" });
+  const err = h("p", { class: "text-3 small", style: "color:var(--danger,#ff6b6b);margin:0" });
+  return new Promise((resolve) => {
+    openDialog({
+      title: `Finish linking ${info.name}`,
+      body: h("div", { class: "stack", style: "gap:10px" },
+        h("p", { class: "text-2", style: "margin:0", text: `Pick a password for your GalaxySMP account. Your username is ${info.name}, the same as in Minecraft.` }),
+        h("label", { class: "small text-3" }, "Password", pass), h("label", { class: "small text-3" }, "Password again", pass2), err),
+      actions: [{ label: "Cancel", onClick: () => resolve(false) }, {
+        label: "Create my account", kind: "primary",
+        onClick: async () => {
+          err.textContent = "";
+          if (pass.value.length < 8) { err.textContent = "Passwords must be at least 8 characters."; return false; }
+          if (pass.value !== pass2.value) { err.textContent = "The passwords do not match."; return false; }
+          try {
+            await api("/api/link/game", { code, password: pass.value });
+            toast("Your account is linked. Welcome to GalaxySMP!");
+            resolve(true);
+          } catch (e) { err.textContent = e.message; return false; }
+        },
+      }],
+    });
+  });
+}
+
 // ---------- Start ----------
 async function loadMe() {
   try {
@@ -229,6 +263,7 @@ async function loadMe() {
 }
 
 loadMe();
+gameLink().then((ok) => { if (ok) location.reload(); }).catch(() => {});
 
 // On a Realm there's no plugin to confirm /link codes, so sign-up waits for our own server.
 if (config.hosting === "realm") {

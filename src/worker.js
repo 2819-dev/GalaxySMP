@@ -31,6 +31,8 @@ import * as cube from "./routes/cube.js";
 import * as ranks from "./routes/ranks.js";
 import * as economy from "./routes/economy.js";
 import * as help from "./routes/help.js";
+import * as backups from "./routes/backups.js";
+import * as gamelink from "./routes/gamelink.js";
 import * as plans from "./routes/plans.js";
 import * as community from "./routes/community.js";
 import * as support from "./routes/support.js";
@@ -96,6 +98,18 @@ const routes = [
   ["GET", "/api/me", (req, env) => me(req, env)],
   ["GET", "/api/plugin/ping", (req, env) => pluginPing(req, env)],
   ["POST", "/api/plugin/link", (req, env) => pluginLink(req, env)],
+  ["POST", "/api/plugin/link-code", gamelink.pluginCode],
+  ["GET", "/api/link/game", gamelink.info],
+  ["POST", "/api/link/game", gamelink.claim],
+  ["GET", "/api/qr/game/:code", gamelink.qr],
+  ["POST", "/api/plugin/social", friends.pluginState],
+  ["POST", "/api/plugin/social/act", friends.pluginAct],
+  ["POST", "/api/plugin/backup/start", backups.start],
+  ["PUT", "/api/plugin/backup/part", backups.part],
+  ["POST", "/api/plugin/backup/complete", backups.complete],
+  ["GET", "/api/plugin/backup/download", backups.download],
+  ["GET", "/api/panel/backups", backups.list],
+  ["POST", "/api/panel/backups", backups.act],
   ["GET", "/api/chat/bootstrap", (req, env) => bootstrap(req, env)],
   ["GET", "/api/chat/channels/:id/messages", history],
   ["GET", "/api/chat/channels/:id/pins", chatPins],

@@ -22,6 +22,7 @@ also zooms the player's view.
 import json
 import random
 import re
+import time
 from importlib import resources
 
 from endstone.form import ActionForm
@@ -35,6 +36,8 @@ THEME_COLOR = {"grass": "§a", "diamond": "§b", "gold": "§6", "emerald": "§a"
                "ice": "§b", "galaxy": "§5", "ender": "§3", "rainbow": "§e"}
 PRESETS = ("galaxysmp", "event", "bedwars", "parkour", "build")
 MENU_ITEM = "galaxysmp:menu"
+HOLIDAY_CODES = {"rosh": "1", "sukkot": "2", "chanukah": "3", "tubishvat": "4", "purim": "5", "pesach": "6", "lagbaomer": "7", "shavuot": "8",
+                 "newyear": "9", "spring": "a", "summer": "b", "autumn": "c", "winter": "d"}
 JOIN_TICKS = 50          # the joining animation (about 2.5 seconds)
 
 # small icons from the resource pack (glyph_F7.png)
@@ -168,7 +171,7 @@ class Welcome:
         if st is None:
             return
         {"servers": self.show_servers, "howto": self.show_howto, "rules": self.show_rules, "news": self.show_news,
-         "store": self.show_store}.get(st["screen"], self.show_title)(player)
+         "store": self.show_store, "social": self.show_social, "link": self.show_link}.get(st["screen"], self.show_title)(player)
 
     def go(self, player, screen, tab=0):
         st = self.state(player)
@@ -193,16 +196,241 @@ class Welcome:
         except Exception:
             pass
 
+    def holiday_codes(self):
+        h = self.news.get("holiday") or {}
+        code = HOLIDAY_CODES.get(h.get("id"))
+        if not code:
+            return ""
+        night = f"§n§{int(h['night'])}" if h.get("id") == "chanukah" and h.get("night") else ""
+        return f"§h§{code}{night}"
+
+    def restart_line(self):
+        sc = getattr(self.plugin, "servercontrol", None)
+        r = getattr(sc, "restart", None) if sc is not None else None
+        try:
+            left = float(r["at"]) - time.time() if r else -1
+        except Exception:
+            left = -1
+        if left <= 0:
+            return ""
+        mins = int(left // 60)
+        when = f"{mins // 60}h {mins % 60}m" if mins >= 60 else (f"{mins} min" if mins >= 1 else "less than a minute")
+        return f"§6⚠ Server restart in {when}" + (f" §7({r['reason']})" if r.get("reason") else "")
+
+    def friends_line(self, player):
+        social = getattr(self.plugin, "social", None)
+        if social is None:
+            return "§lSocial"
+        if not social.linked(player):
+            return "§b§lSocial§r\n§7Link your account to add friends"
+        online = social.online_friends(player)
+        reqs = len((social.state.get(str(player.unique_id)) or {}).get("incoming") or [])
+        top = f"§b§lFriends online: §a{len(online)}" + (f"  §e{reqs} request{'s' if reqs != 1 else ''}" if reqs else "")
+        names = ", ".join(p.name for f, p in online[:3]) + (f" +{len(online) - 3}" if len(online) > 3 else "")
+        return f"{top}§r\n§7{names or 'Tap to see your friends and party'}"
+
     def show_title(self, player):
         st = self.state(player)
-        form = ActionForm(title=f"{TITLE}{self.codes(st)}§lGalaxySMP", content=st["splash"])
+        splash = st["splash"]
+        h = self.news.get("holiday") or {}
+        if h.get("greet"):
+            splash = h["greet"]
+        form = ActionForm(title=f"{TITLE}{self.codes(st)}{self.holiday_codes()}§lGalaxySMP", content=splash)
+        form.add_button("§j§f" + self.friends_line(player), on_click=lambda p: self.go(p, "social"))   # the friends box
+        form.add_button("§j§r" + self.restart_line(), on_click=lambda p: self.show(p))                 # the restart notice
         form.add_button("§lPlay", on_click=lambda p: self.go(p, "servers"))
         form.add_button("How to Play", on_click=lambda p: self.go(p, "howto"))
         form.add_button("Rules", on_click=lambda p: self.go(p, "rules"))
         form.add_button("What's New", on_click=lambda p: self.go(p, "news"))
         form.add_button("Store", on_click=lambda p: self.go(p, "store"))
+        form.add_button("Social", on_click=lambda p: self.go(p, "social"))
+        social = getattr(self.plugin, "social", None)
+        if social is not None and not social.linked(player):
+            form.add_button("§bLink Account", on_click=lambda p: self.go(p, "link"))
         self.send(player, form)
         self.music(player, True)
+
+    # ---------- Link Account ----------
+    def show_link(self, player):
+        st = self.state(player)
+        social = getattr(self.plugin, "social", None)
+        uid = str(player.unique_id)
+        if social is not None and social.linked(player):
+            return self.page(player, "Link Account", ["Done"], 0, "§aYour account is linked.§r\n\nYou can chat, use voice chat and add friends on §bgalaxymc.us§r.")
+        info = social.links.get(uid) if social is not None else None
+        if not info:
+            if social is not None and not st.get("link_asked"):
+                st["link_asked"] = True
+                social.link_info(player, then=lambda: self.show(player) if self.state(player) and self.state(player)["screen"] == "link" else None)
+            return self.page(player, "Link Account", ["Refresh"], 0, "§7Getting your code...")
+        body = (f"§l§fLink your account§r\n\n"
+                f"§71.§r Scan the QR code with your phone's camera,\n§7   or go to §bgalaxymc.us/community§r and enter:\n\n"
+                f"§l§e   {info['code']}§r\n\n"
+                f"§72.§r Pick a password. That's it!\n\n"
+                f"§7Linked players can chat and use voice chat on the website, add friends, and see their stats.\n"
+                f"§8The code works for 30 minutes.")
+        form = ActionForm(title=f"{PAGE}{self.codes(st)}§lLink Account", content=body)
+        form.add_button("§j§q", icon=info.get("qr") or "", on_click=lambda p: self.show(p))
+        form.add_button("§e§lI've linked it", on_click=lambda p: self.check_linked(p))
+        self.send(player, form)
+
+    def check_linked(self, player):
+        social = getattr(self.plugin, "social", None)
+        if social is None:
+            return
+        social.link_info(player, then=lambda: (social.refresh([player], then=lambda: self.go(player, "title")) if social.linked(player)
+                                               else self.show(player)))
+
+    # ---------- Social ----------
+    SOCIAL_TABS = ["Friends", "Requests", "Party", "Recent", "My Card"]
+
+    def social_tabs(self, player, tab):
+        social = self.plugin.social
+        reqs = len((social.state.get(str(player.unique_id)) or {}).get("incoming") or [])
+        party = social.party_of(str(player.unique_id))
+        labels = ["Friends", f"Requests ({reqs})" if reqs else "Requests", f"Party ({len(party)})" if party else "Party", "Recent", "My Card"]
+        return labels
+
+    def show_social(self, player):
+        st = self.state(player)
+        social = getattr(self.plugin, "social", None)
+        if social is None:
+            return self.show_title(player)
+        if not st.get("social_loaded"):
+            st["social_loaded"] = True
+            social.refresh([player], then=lambda: self.show(player) if self.state(player) and self.state(player)["screen"] == "social" else None)
+        tab = st["tab"]
+        labels = self.social_tabs(player, tab)
+        form = ActionForm(title=f"{PAGE}{self.codes(st)}§lSocial", content="")
+        for i, label in enumerate(labels):
+            form.add_button(f"§e§l{label}" if i == tab else label, on_click=lambda p, i=i: self.go(p, "social", i))
+        lines = []
+        uid = str(player.unique_id)
+        linked = social.linked(player)
+        if tab in (0, 1) and not linked:
+            lines = ["§l§fFriends§r", "", "§7Link your account to add friends. Friends work in game and on galaxymc.us."]
+            form.add_button("§bLink Account", on_click=lambda p: self.go(p, "link"))
+        elif tab == 0:
+            friends = social.friends(player)
+            online = {f["xuid"]: p for f, p in social.online_friends(player)}
+            lines = [f"§l§fFriends §r§7({len(friends)})", ""]
+            if not friends:
+                lines.append("§7No friends yet. Add someone by name, or from Recent players.")
+            for f in sorted(friends, key=lambda f: (f.get("xuid") not in online, f["name"].lower()))[:40]:
+                p = online.get(f.get("xuid"))
+                status = f"§a● §7{social.where(p)}" if p else "§8○ Offline"
+                lines.append(f"§f{f['name']}  {status}")
+                form.add_button(f"{'§a● ' if p else '§8○ '}§f{f['name']}", on_click=lambda pl, f=f: self.friend_menu(pl, f))
+            form.add_button("§a+ Add Friend", on_click=lambda p: social.ask_name(p, "Add Friend", "Their gamertag",
+                            lambda pl, name: social.act(pl, "request", then=lambda: self.go(pl, "social", 0), username=name)))
+        elif tab == 1:
+            data = social.state.get(uid) or {}
+            inc, out = data.get("incoming") or [], data.get("outgoing") or []
+            lines = ["§l§fFriend requests§r", ""]
+            if not inc and not out:
+                lines.append("§7No requests right now.")
+            for f in inc:
+                lines.append(f"§e{f['name']} §7wants to be friends")
+                form.add_button(f"§aAccept §f{f['name']}", on_click=lambda p, f=f: social.act(p, "accept", then=lambda: self.go(p, "social", 1), userId=f["id"]))
+                form.add_button(f"§cDecline §f{f['name']}", on_click=lambda p, f=f: social.act(p, "decline", then=lambda: self.go(p, "social", 1), userId=f["id"]))
+            for f in out:
+                lines.append(f"§7Waiting for §f{f['name']}")
+                form.add_button(f"§7Cancel §f{f['name']}", on_click=lambda p, f=f: social.act(p, "cancel", then=lambda: self.go(p, "social", 1), userId=f["id"]))
+        elif tab == 2:
+            party = social.party_of(uid)
+            lines = ["§l§fParty§r §7(up to 4 players)", ""]
+            bw = social.bw()
+            inv = bw.invites.get(uid) if bw is not None else None
+            if party:
+                for m in party:
+                    mp = social.online(m)
+                    lines.append(f"§f{mp.name if mp else 'Offline player'}{' §e(leader)' if m == party[0] else ''}")
+                lines += ["", "§7When the leader joins a server from the Main Menu, the party comes along. Type §e/p <message>§7 for party chat."]
+            else:
+                lines.append("§7Make a party to play together: join servers and minigames as a group, with party chat.")
+            if inv and not party and time.time() - inv[1] < 300:
+                lp = social.online(inv[0])
+                form.add_button(f"§aJoin {lp.name if lp else 'the'}'s party", on_click=lambda p: (social.accept(p), self.go(p, "social", 2)))
+            if not party or party[0] == uid:
+                form.add_button("§a+ Invite", on_click=self.party_invite_menu)
+            if party and party[0] == uid:
+                for m in party[1:]:
+                    mp = social.online(m)
+                    form.add_button(f"§cRemove §f{mp.name if mp else 'player'}", on_click=lambda p, m=m: (social.kick(p, m), self.go(p, "social", 2)))
+            if party:
+                form.add_button("§cLeave Party", on_click=lambda p: (social.leave_party(p), self.go(p, "social", 2)))
+        elif tab == 3:
+            rows = social.recent(player)
+            lines = ["§l§fRecent players§r", "", "§7People you played near lately." if rows else "§7Nobody yet. Play near other players and they show up here."]
+            friend_x = {f.get("xuid") for f in social.friends(player)}
+            for other, name, at in rows[:20]:
+                ago = int((time.time() - at) // 60)
+                when = "just now" if ago < 2 else (f"{ago} min ago" if ago < 60 else (f"{ago // 60} h ago" if ago < 1440 else f"{ago // 1440} d ago"))
+                lines.append(f"§f{name} §7· {when}" + (" §a(friend)" if other in friend_x else ""))
+                if other not in friend_x and linked:
+                    form.add_button(f"§a+ Add §f{name}", on_click=lambda p, n=name: social.act(p, "request", then=lambda: self.go(p, "social", 3), username=n))
+        else:
+            hidden = social.card_hidden(player.xuid)
+            lines = [social.card_text(str(player.xuid), player.name, player), "", "§7Friends " + ("§ccan't see§7" if hidden else "§acan see§7") + " your card."]
+            form.add_button("Show my card to friends" if hidden else "Hide my card from friends",
+                            on_click=lambda p: (social.set_card_hidden(p, not hidden), self.go(p, "social", 4)))
+        form.content = "\n".join(lines)
+        self.send(player, form)
+
+    def friend_menu(self, player, f):
+        st = self.state(player)
+        social = self.plugin.social
+        online = {x["xuid"]: p for x, p in social.online_friends(player)}
+        p_on = online.get(f.get("xuid"))
+        if p_on is not None and not social.card_hidden(f.get("xuid")):
+            body = social.card_text(f["xuid"], f["name"], p_on)
+        elif f.get("xuid") and not social.card_hidden(f["xuid"]):
+            body = social.card_text(f["xuid"], f["name"]) + "\n§8○ Offline"
+        else:
+            body = f"§l§f{f['name']}§r\n\n§7{'Online' if p_on else 'Offline'}"
+        form = ActionForm(title=f"{PAGE}{self.codes(st)}§l{f['name']}", content=body)
+        form.add_button("§l< Friends", on_click=lambda p: self.go(p, "social", 0))
+        if p_on is not None:
+            form.add_button("Teleport request", on_click=lambda p: self.friend_tpa(p, p_on.name))
+            if str(p_on.unique_id) not in social.party_of(str(player.unique_id)):
+                form.add_button("Invite to party", on_click=lambda p: (social.invite(p, p_on), self.go(p, "social", 2)))
+        form.add_button("Message", on_click=lambda p: social.ask_message(p, f["name"], then=lambda pl: self.go(pl, "social", 0)))
+        form.add_button("§cRemove friend", on_click=lambda p: social.act(p, "remove", then=lambda: self.go(p, "social", 0), userId=f["id"]))
+        self.send(player, form)
+
+    def friend_tpa(self, player, name):
+        tp = getattr(self.plugin, "teleports", None)
+        if tp is None:
+            return
+        st = self.state(player)
+        if st is not None and not st.get("reopened"):
+            # finish the join first (they'd otherwise be teleported while still on the Main Menu)
+            self.done(player)
+            try:
+                player.close_form()
+            except Exception:
+                pass
+        else:
+            self.open.pop(str(player.unique_id), None)
+            try:
+                player.close_form()
+            except Exception:
+                pass
+        tp.request(player, [name], "to")
+
+    def party_invite_menu(self, player):
+        st = self.state(player)
+        social = self.plugin.social
+        uid = str(player.unique_id)
+        party = social.party_of(uid)
+        friend_x = {f.get("xuid") for f in social.friends(player)}
+        others = [p for p in self.plugin.server.online_players if str(p.unique_id) != uid and str(p.unique_id) not in party]
+        others.sort(key=lambda p: (str(p.xuid) not in friend_x, p.name.lower()))
+        form = ActionForm(title=f"{PAGE}{self.codes(st)}§lInvite to Party", content="§7Who should play with you?" if others else "§7Nobody else is online right now.")
+        form.add_button("§l< Party", on_click=lambda p: self.go(p, "social", 2))
+        for o in others[:40]:
+            form.add_button(f"{'§a★ ' if str(o.xuid) in friend_x else ''}§f{o.name}", on_click=lambda p, o=o: (social.invite(p, o), self.go(p, "social", 2)))
+        self.send(player, form)
 
     # ---------- Featured Servers ----------
     def servers(self):
@@ -388,6 +616,9 @@ class Welcome:
 
         def finish(p):
             self.done(p, spot=spot, label=shown, action=action)
+            social = getattr(self.plugin, "social", None)
+            if social is not None and action != "soon":
+                social.follow_leader(p, spot=spot, label=shown)
             try:
                 p.close_form()
             except Exception:

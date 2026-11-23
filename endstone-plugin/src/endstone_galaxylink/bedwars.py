@@ -412,8 +412,8 @@ class Bedwars:
         if not self.party_of(uid):
             self.parties[uid] = []
         self.invites[target_uid] = (uid, now())
-        player.send_message(f"§aInvited {target.name} to your Bedwars party.")
-        target.send_message(f"§e{player.name} invited you to their Bedwars party. §7Type §f/bedwars party accept§7 or open /bedwars > Party.")
+        player.send_message(f"§aInvited {target.name} to your party.")
+        target.send_message(f"§e{player.name} invited you to their party. §7Type §f/party accept§7 or open §f/menu§7 > Social > Party.")
         self.sound(target, "note.pling", 0.8, 1.4)
 
     def party_accept(self, player):
@@ -431,7 +431,7 @@ class Bedwars:
         for m in self.party_of(uid):
             p = self.online(m)
             if p is not None:
-                p.send_message(f"§a{player.name} joined the Bedwars party.")
+                p.send_message(f"§a{player.name} joined the party.")
         lp = self.online(leader)
         if lp is not None and (leader in self.queue) and uid not in self.queue and uid not in self.players:
             self.join(player)  # the leader is already waiting: come along
@@ -447,7 +447,8 @@ class Bedwars:
                 if uid in members:
                     members.remove(uid)
                     break
-        self.parties = {k: v for k, v in self.parties.items() if v or k in self.invites.values()}
+        for k in [k for k, v in self.parties.items() if not v]:   # in place: the Social menu shares this dict
+            del self.parties[k]
         if not quiet:
             player.send_message("§7You left the party.")
 

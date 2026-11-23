@@ -120,8 +120,51 @@ export async function welcomeNews(sql) {
   return { title: n?.title || null, event: e?.title || null, when };
 }
 
+// Today's holiday for the Main Menu (the same days as the website's decorations and loading screen), or null.
+const HOLIDAY_GREETS = {
+  rosh: "Shanah Tovah!", sukkot: "Chag Sukkot Sameach!", chanukah: "Happy Chanukah!", tubishvat: "Happy Tu BiShvat!", purim: "Purim Sameach!",
+  pesach: "Chag Pesach Sameach!", lagbaomer: "Happy Lag BaOmer!", shavuot: "Chag Shavuot Sameach!", newyear: "Happy New Year!",
+  spring: "Happy first day of spring!", summer: "Happy first day of summer!", autumn: "Happy first day of autumn!", winter: "Happy first day of winter!",
+};
+export function holidayToday(now = new Date()) {
+  const ny = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const m = ny.getMonth() + 1, d = ny.getDate();
+  let id = null, night = null;
+  try {
+    const fmt = new Intl.DateTimeFormat("en-u-ca-hebrew", { day: "numeric", month: "long", timeZone: "America/New_York" });
+    const heb = (t) => { const o = {}; for (const p of fmt.formatToParts(t)) o[p.type] = p.value; return { day: Number(o.day), month: o.month || "" }; };
+    const h = heb(now), is = (mo, a, b = a) => h.month === mo && h.day >= a && h.day <= b;
+    if (is("Elul", 29) || is("Tishri", 1, 2)) id = "rosh";
+    else if (is("Tishri", 14, 23)) id = "sukkot";
+    else {
+      for (let k = 0; k < 8 && !id; k++) { const b = heb(new Date(now.getTime() - k * 864e5)); if (b.month === "Kislev" && b.day === 24) { id = "chanukah"; night = k + 1; } }
+      if (!id) {
+        if (is("Shevat", 14, 15)) id = "tubishvat";
+        else if (is("Adar", 13, 15) || is("Adar II", 13, 15)) id = "purim";
+        else if (is("Nisan", 14, 22)) id = "pesach";
+        else if (is("Iyar", 17, 18)) id = "lagbaomer";
+        else if (is("Sivan", 5, 7)) id = "shavuot";
+      }
+    }
+  } catch { /* no Hebrew calendar */ }
+  if (!id) {
+    if ((m === 12 && d === 31) || (m === 1 && d <= 2)) id = "newyear";
+    else if (m === 3 && (d === 20 || d === 21)) id = "spring";
+    else if (m === 6 && (d === 20 || d === 21)) id = "summer";
+    else if (m === 9 && (d === 22 || d === 23)) id = "autumn";
+    else if (m === 12 && (d === 21 || d === 22)) id = "winter";
+  }
+  return id ? { id, night, greet: id === "chanukah" ? `Happy Chanukah! Night ${night}` : HOLIDAY_GREETS[id] } : null;
+}
+
 export async function welcomeMessage(sql) {
-  return { type: "welcome", welcome: (await loadWelcome(sql)).welcome, news: await welcomeNews(sql) };
+  const news = await welcomeNews(sql);
+  try {
+    const { loadServerControl } = await import("./servercontrol.js");
+    const sc = await loadServerControl(sql);
+    news.holiday = sc.holidays?.on === false ? null : holidayToday();
+  } catch (e) { console.error("holiday check failed", e); }
+  return { type: "welcome", welcome: (await loadWelcome(sql)).welcome, news };
 }
 
 export async function adminGetWelcome(request, env) {

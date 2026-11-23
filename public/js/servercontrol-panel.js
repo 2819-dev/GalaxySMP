@@ -15,9 +15,34 @@ export function setupServerControl({ loaders, toast }) {
   loaders.serverctl = async () => {
     let d;
     try { d = await getJson("/api/panel/server-control"); } catch (e) { box.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
-    box.replaceChildren(lockdownPanel(d), h("div", { class: "sc-potm-slot" }), allowlistPanel(), goalPanel(), botPanel(), qotdPanel(), maintenancePanel(d), restartPanel(d), kitPanel(d), holidayPanel(d));
+    box.replaceChildren(lockdownPanel(d), h("div", { class: "sc-potm-slot" }), allowlistPanel(), goalPanel(), botPanel(), qotdPanel(), maintenancePanel(d), restartPanel(d), backupPanel(), kitPanel(d), holidayPanel(d));
     box.querySelector(".sc-potm-slot")?.replaceWith(potmPanel());
   };
+
+  // ---------- World backups ----------
+  function backupPanel() {
+    const wrap = h("section", { class: "panel sc-card" }, h("div", { class: "sc-head" }, h("h2", { text: "World backups" })), h("p", { class: "text-3", text: "Loading…" }));
+    const mb = (n) => (n >= 1073741824 ? `${(n / 1073741824).toFixed(1)} GB` : `${Math.max(1, Math.round(n / 1048576))} MB`);
+    const send = async (body) => { try { const r = await postJson("/api/panel/backups", body); toast(r.message); draw(); } catch (e) { toast(e.message); } };
+    async function draw() {
+      let d;
+      try { d = await getJson("/api/panel/backups"); } catch (e) { wrap.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
+      wrap.replaceChildren(...[
+        h("div", { class: "sc-head" }, h("h2", { text: "World backups" }),
+          h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Back up now", onclick: () => send({ action: "now" }) })),
+        h("p", { class: "text-2", text: "The server saves a copy of the world every night at 4 AM (New York time). The last 3 stay on the server and the last 3 are kept here, safe even if the server's disk fails." }),
+        d.restore ? h("p", { class: "text-3 small", text: `Restore asked for ${nice(d.restore.at)} by ${d.restore.by}: it's put back the next time the server restarts.` }) : null,
+        d.backups.length ? h("ul", { class: "bk-list" }, ...d.backups.map((b) => h("li", {},
+          h("div", {}, h("b", { text: nice(b.at) }), h("span", { class: "text-3 small", text: ` · ${mb(b.size)}` })),
+          h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Restore", onclick: () => openDialog({
+            title: "Put this backup back?",
+            body: h("p", { class: "text-2", style: "margin:0", text: `The world will go back to how it was on ${nice(b.at)}. The server downloads it now and swaps it in the next time it restarts (schedule a restart below, or restart from BisectHosting). The current world is kept as a copy, so nothing is lost for good.` }),
+            actions: [{ label: "Cancel" }, { label: "Restore", kind: "danger", onClick: () => send({ action: "restore", key: b.key }) }] }) }))))
+          : h("p", { class: "text-3", text: "No backups yet. The first one is made tonight, or press Back up now." })].filter(Boolean));
+    }
+    draw();
+    return wrap;
+  }
 
   // ---------- Player of the Month (Voting Computers in game) ----------
   function potmPanel() {

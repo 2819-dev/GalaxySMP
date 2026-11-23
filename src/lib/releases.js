@@ -745,6 +745,20 @@ Open the menu any time with **/menu**, with the new **GalaxySMP Menu** compass i
     title: "Main Menu: new backgrounds",
     body: `The Main Menu now shows official Minecraft artwork in the background: **The Copper Age**, **Wilderness Bound**, **Chaos Cubed** and **The Sift**, with a different one each time you join. The Featured Servers pictures use them too.`,
   },
+  {
+    id: "2026-11-23-social-backups",
+    title: "Social, parties and easy account linking",
+    body: `**Social** is now on the Main Menu (/menu):
+- **Friends:** see who's online and where they are, send a teleport request, invite them to your party, or send a message. Friends are shared with galaxymc.us.
+- **Requests:** accept or decline friend requests right in game.
+- **Parties** (up to 4): when the party leader joins a server from the Main Menu, everyone comes along. Party chat with **/p**. Parties also keep you on the same Bedwars team.
+- **Recent players:** people you played near lately, so you can add them as friends.
+- **My Card:** your rank, playtime, money and achievements, and you choose whether friends can see it.
+
+**Link Account:** not linked yet? The Main Menu shows a QR code. Scan it with your phone, pick a password, and you're done.
+
+Also new: holiday greetings and decorations on the Main Menu, a notice when a server restart is coming, and nightly world backups kept safe in two places.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

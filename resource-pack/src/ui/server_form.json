@@ -2,6 +2,8 @@
 //   §1 title screen (logo, splash, buttons, your character), §2 Featured Servers (list + sidebar: button 0 = Join Server
 //   with the selected server's banner, button 1 = ping/players line, the rest = the list), §3 info pages, §4 joining animation.
 //   §o§<1-3> picks the background wallpaper (none = Wilderness Bound), §m§<1-9,a> the joining block (none = grass).
+//   Title: button 0 = friends box (§j§f), button 1 = restart notice (§j§r); §h§<1-9,a-d> = holiday (tint, sparkles, emblem),
+//   §n§<1-8> = Chanukah night. Pages: button 0 §j§q = a QR code picture at the top of the left column.
 // Every other menu looks exactly like Minecraft's. Art: Mojang's official wallpapers (gsmp_bg_*), draw_join.py, draw_ui_icons.py.
 {
  "namespace": "server_form",
@@ -448,6 +450,799 @@
       }
      ]
     }
+   },
+   {
+    "holiday_rosh": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 4,
+     "clips_children": true,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§h§1') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "tint": {
+        "type": "image",
+        "texture": "textures/ui/White",
+        "color": [
+         0.95,
+         0.35,
+         0.35
+        ],
+        "alpha": 0.1,
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "layer": 1
+       }
+      },
+      {
+       "fall": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_sparkles",
+        "tiled": true,
+        "color": [
+         0.95,
+         0.35,
+         0.35
+        ],
+        "alpha": 0.85,
+        "size": [
+         "100%",
+         "200%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_fall_a",
+        "layer": 2
+       }
+      }
+     ]
+    }
+   },
+   {
+    "holiday_sukkot": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 4,
+     "clips_children": true,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§h§2') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "tint": {
+        "type": "image",
+        "texture": "textures/ui/White",
+        "color": [
+         0.6,
+         0.9,
+         0.4
+        ],
+        "alpha": 0.1,
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "layer": 1
+       }
+      },
+      {
+       "fall": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_sparkles",
+        "tiled": true,
+        "color": [
+         0.6,
+         0.9,
+         0.4
+        ],
+        "alpha": 0.85,
+        "size": [
+         "100%",
+         "200%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_fall_a",
+        "layer": 2
+       }
+      }
+     ]
+    }
+   },
+   {
+    "holiday_chanukah": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 4,
+     "clips_children": true,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§h§3') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "tint": {
+        "type": "image",
+        "texture": "textures/ui/White",
+        "color": [
+         0.45,
+         0.65,
+         1.0
+        ],
+        "alpha": 0.1,
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "layer": 1
+       }
+      },
+      {
+       "fall": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_sparkles",
+        "tiled": true,
+        "color": [
+         0.45,
+         0.65,
+         1.0
+        ],
+        "alpha": 0.85,
+        "size": [
+         "100%",
+         "200%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_fall_a",
+        "layer": 2
+       }
+      }
+     ]
+    }
+   },
+   {
+    "holiday_tubishvat": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 4,
+     "clips_children": true,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§h§4') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "tint": {
+        "type": "image",
+        "texture": "textures/ui/White",
+        "color": [
+         1.0,
+         0.6,
+         0.8
+        ],
+        "alpha": 0.1,
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "layer": 1
+       }
+      },
+      {
+       "fall": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_sparkles",
+        "tiled": true,
+        "color": [
+         1.0,
+         0.6,
+         0.8
+        ],
+        "alpha": 0.85,
+        "size": [
+         "100%",
+         "200%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_fall_a",
+        "layer": 2
+       }
+      }
+     ]
+    }
+   },
+   {
+    "holiday_purim": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 4,
+     "clips_children": true,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§h§5') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "tint": {
+        "type": "image",
+        "texture": "textures/ui/White",
+        "color": [
+         1.0,
+         0.45,
+         0.85
+        ],
+        "alpha": 0.1,
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "layer": 1
+       }
+      },
+      {
+       "fall": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_sparkles",
+        "tiled": true,
+        "color": [
+         1.0,
+         0.45,
+         0.85
+        ],
+        "alpha": 0.85,
+        "size": [
+         "100%",
+         "200%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_fall_a",
+        "layer": 2
+       }
+      }
+     ]
+    }
+   },
+   {
+    "holiday_pesach": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 4,
+     "clips_children": true,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§h§6') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "tint": {
+        "type": "image",
+        "texture": "textures/ui/White",
+        "color": [
+         1.0,
+         0.85,
+         0.55
+        ],
+        "alpha": 0.1,
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "layer": 1
+       }
+      },
+      {
+       "fall": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_sparkles",
+        "tiled": true,
+        "color": [
+         1.0,
+         0.85,
+         0.55
+        ],
+        "alpha": 0.85,
+        "size": [
+         "100%",
+         "200%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_fall_a",
+        "layer": 2
+       }
+      }
+     ]
+    }
+   },
+   {
+    "holiday_lagbaomer": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 4,
+     "clips_children": true,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§h§7') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "tint": {
+        "type": "image",
+        "texture": "textures/ui/White",
+        "color": [
+         1.0,
+         0.6,
+         0.25
+        ],
+        "alpha": 0.1,
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "layer": 1
+       }
+      },
+      {
+       "fall": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_sparkles",
+        "tiled": true,
+        "color": [
+         1.0,
+         0.6,
+         0.25
+        ],
+        "alpha": 0.85,
+        "size": [
+         "100%",
+         "200%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_fall_a",
+        "layer": 2
+       }
+      }
+     ]
+    }
+   },
+   {
+    "holiday_shavuot": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 4,
+     "clips_children": true,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§h§8') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "tint": {
+        "type": "image",
+        "texture": "textures/ui/White",
+        "color": [
+         0.95,
+         0.9,
+         0.5
+        ],
+        "alpha": 0.1,
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "layer": 1
+       }
+      },
+      {
+       "fall": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_sparkles",
+        "tiled": true,
+        "color": [
+         0.95,
+         0.9,
+         0.5
+        ],
+        "alpha": 0.85,
+        "size": [
+         "100%",
+         "200%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_fall_a",
+        "layer": 2
+       }
+      }
+     ]
+    }
+   },
+   {
+    "holiday_newyear": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 4,
+     "clips_children": true,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§h§9') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "tint": {
+        "type": "image",
+        "texture": "textures/ui/White",
+        "color": [
+         1.0,
+         0.85,
+         0.35
+        ],
+        "alpha": 0.1,
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "layer": 1
+       }
+      },
+      {
+       "fall": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_sparkles",
+        "tiled": true,
+        "color": [
+         1.0,
+         0.85,
+         0.35
+        ],
+        "alpha": 0.85,
+        "size": [
+         "100%",
+         "200%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_fall_a",
+        "layer": 2
+       }
+      }
+     ]
+    }
+   },
+   {
+    "holiday_spring": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 4,
+     "clips_children": true,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§h§a') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "tint": {
+        "type": "image",
+        "texture": "textures/ui/White",
+        "color": [
+         1.0,
+         0.65,
+         0.85
+        ],
+        "alpha": 0.1,
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "layer": 1
+       }
+      },
+      {
+       "fall": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_sparkles",
+        "tiled": true,
+        "color": [
+         1.0,
+         0.65,
+         0.85
+        ],
+        "alpha": 0.85,
+        "size": [
+         "100%",
+         "200%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_fall_a",
+        "layer": 2
+       }
+      }
+     ]
+    }
+   },
+   {
+    "holiday_summer": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 4,
+     "clips_children": true,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§h§b') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "tint": {
+        "type": "image",
+        "texture": "textures/ui/White",
+        "color": [
+         1.0,
+         0.85,
+         0.3
+        ],
+        "alpha": 0.1,
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "layer": 1
+       }
+      },
+      {
+       "fall": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_sparkles",
+        "tiled": true,
+        "color": [
+         1.0,
+         0.85,
+         0.3
+        ],
+        "alpha": 0.85,
+        "size": [
+         "100%",
+         "200%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_fall_a",
+        "layer": 2
+       }
+      }
+     ]
+    }
+   },
+   {
+    "holiday_autumn": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 4,
+     "clips_children": true,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§h§c') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "tint": {
+        "type": "image",
+        "texture": "textures/ui/White",
+        "color": [
+         1.0,
+         0.55,
+         0.2
+        ],
+        "alpha": 0.1,
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "layer": 1
+       }
+      },
+      {
+       "fall": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_sparkles",
+        "tiled": true,
+        "color": [
+         1.0,
+         0.55,
+         0.2
+        ],
+        "alpha": 0.85,
+        "size": [
+         "100%",
+         "200%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_fall_a",
+        "layer": 2
+       }
+      }
+     ]
+    }
+   },
+   {
+    "holiday_winter": {
+     "type": "panel",
+     "size": [
+      "100%",
+      "100%"
+     ],
+     "layer": 4,
+     "clips_children": true,
+     "bindings": [
+      {
+       "binding_name": "#title_text"
+      },
+      {
+       "binding_type": "view",
+       "source_property_name": "(not ((#title_text - '§h§d') = #title_text))",
+       "target_property_name": "#visible"
+      }
+     ],
+     "controls": [
+      {
+       "tint": {
+        "type": "image",
+        "texture": "textures/ui/White",
+        "color": [
+         0.75,
+         0.9,
+         1.0
+        ],
+        "alpha": 0.1,
+        "size": [
+         "100%",
+         "100%"
+        ],
+        "layer": 1
+       }
+      },
+      {
+       "fall": {
+        "type": "image",
+        "texture": "textures/ui/gsmp_sparkles",
+        "tiled": true,
+        "color": [
+         0.75,
+         0.9,
+         1.0
+        ],
+        "alpha": 0.85,
+        "size": [
+         "100%",
+         "200%"
+        ],
+        "anchor_from": "top_left",
+        "anchor_to": "top_left",
+        "offset": "@server_form.gsmp_fall_a",
+        "layer": 2
+       }
+      }
+     ]
+    }
    }
   ]
  },
@@ -481,6 +1276,18 @@
       }
      ]
     }
+   }
+  ],
+  "bindings": [
+   {
+    "binding_name": "#form_button_text",
+    "binding_type": "collection",
+    "binding_collection_name": "form_buttons"
+   },
+   {
+    "binding_type": "view",
+    "source_property_name": "((#form_button_text - '§j§') = #form_button_text)",
+    "target_property_name": "#visible"
    }
   ]
  },
@@ -602,14 +1409,372 @@
      "layer": 10,
      "controls": [
       {
-       "logo": {
-        "type": "image",
-        "texture": "textures/ui/galaxysmp_logo",
-        "bilinear": false,
-        "keep_ratio": true,
+       "logo_row": {
+        "type": "panel",
         "size": [
          "100%",
          46
+        ],
+        "controls": [
+         {
+          "logo": {
+           "type": "image",
+           "texture": "textures/ui/galaxysmp_logo",
+           "bilinear": false,
+           "keep_ratio": true,
+           "size": [
+            "100%",
+            "100%"
+           ]
+          }
+         },
+         {
+          "emblem": {
+           "type": "panel",
+           "size": [
+            48,
+            40
+           ],
+           "anchor_from": "right_middle",
+           "anchor_to": "left_middle",
+           "offset": [
+            -6,
+            0
+           ],
+           "controls": [
+            {
+             "emblem_rosh": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_rosh",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "(not ((#title_text - '§h§1') = #title_text))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            },
+            {
+             "emblem_sukkot": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_sukkot",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "(not ((#title_text - '§h§2') = #title_text))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            },
+            {
+             "emblem_chanukah_1": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_chanukah_1",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§1') = #title_text)))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            },
+            {
+             "emblem_chanukah_2": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_chanukah_2",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§2') = #title_text)))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            },
+            {
+             "emblem_chanukah_3": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_chanukah_3",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§3') = #title_text)))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            },
+            {
+             "emblem_chanukah_4": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_chanukah_4",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§4') = #title_text)))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            },
+            {
+             "emblem_chanukah_5": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_chanukah_5",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§5') = #title_text)))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            },
+            {
+             "emblem_chanukah_6": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_chanukah_6",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§6') = #title_text)))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            },
+            {
+             "emblem_chanukah_7": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_chanukah_7",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§7') = #title_text)))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            },
+            {
+             "emblem_chanukah_8": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_chanukah_8",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "((not ((#title_text - '§h§3') = #title_text)) and (not ((#title_text - '§n§8') = #title_text)))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            },
+            {
+             "emblem_tubishvat": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_tubishvat",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "(not ((#title_text - '§h§4') = #title_text))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            },
+            {
+             "emblem_purim": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_purim",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "(not ((#title_text - '§h§5') = #title_text))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            },
+            {
+             "emblem_pesach": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_pesach",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "(not ((#title_text - '§h§6') = #title_text))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            },
+            {
+             "emblem_lagbaomer": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_lagbaomer",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "(not ((#title_text - '§h§7') = #title_text))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            },
+            {
+             "emblem_shavuot": {
+              "type": "image",
+              "texture": "textures/ui/gsmp_hol_shavuot",
+              "bilinear": true,
+              "keep_ratio": true,
+              "size": [
+               48,
+               40
+              ],
+              "bindings": [
+               {
+                "binding_name": "#title_text"
+               },
+               {
+                "binding_type": "view",
+                "source_property_name": "(not ((#title_text - '§h§8') = #title_text))",
+                "target_property_name": "#visible"
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
         ]
        }
       },
@@ -669,6 +1834,30 @@
         "controls": [
          {
           "buttons@server_form.gsmp_mc_buttons": {}
+         }
+        ]
+       }
+      },
+      {
+       "friends_gap": {
+        "type": "panel",
+        "size": [
+         "100%",
+         4
+        ]
+       }
+      },
+      {
+       "friends_box": {
+        "type": "panel",
+        "size": [
+         210,
+         34
+        ],
+        "collection_name": "form_buttons",
+        "controls": [
+         {
+          "box@server_form.gsmp_friends_box": {}
          }
         ]
        }
@@ -746,6 +1935,52 @@
       -3
      ],
      "layer": 10
+    }
+   },
+   {
+    "restart_banner": {
+     "type": "panel",
+     "size": [
+      "60%",
+      20
+     ],
+     "anchor_from": "top_middle",
+     "anchor_to": "top_middle",
+     "offset": [
+      0,
+      6
+     ],
+     "layer": 12,
+     "collection_name": "form_buttons",
+     "controls": [
+      {
+       "label": {
+        "type": "label",
+        "text": "#form_button_text",
+        "shadow": true,
+        "color": [
+         1,
+         0.85,
+         0.35
+        ],
+        "text_alignment": "center",
+        "size": [
+         "100%",
+         "default"
+        ],
+        "anchor_from": "center",
+        "anchor_to": "center",
+        "collection_index": 1,
+        "bindings": [
+         {
+          "binding_name": "#form_button_text",
+          "binding_type": "collection",
+          "binding_collection_name": "form_buttons"
+         }
+        ]
+       }
+      }
+     ]
     }
    }
   ]
@@ -1317,28 +2552,119 @@
            ],
            "controls": [
             {
-             "scroll@common.scrolling_panel": {
+             "col": {
+              "type": "stack_panel",
+              "orientation": "vertical",
               "size": [
                "100%",
                "100%"
               ],
-              "$show_background": false,
-              "$scrolling_content": "server_form.gsmp_mc_buttons",
-              "$scroll_size": [
-               4,
-               "100% - 4px"
-              ],
-              "$scrolling_pane_size": [
-               "100% - 6px",
-               "100%"
-              ],
-              "$scrolling_pane_offset": [
-               0,
-               0
-              ],
-              "$scroll_bar_right_padding_size": [
-               0,
-               0
+              "collection_name": "form_buttons",
+              "controls": [
+               {
+                "qr_box": {
+                 "type": "panel",
+                 "size": [
+                  "100%",
+                  "100%x"
+                 ],
+                 "max_size": [
+                  "100%",
+                  "60%"
+                 ],
+                 "collection_index": 0,
+                 "bindings": [
+                  {
+                   "binding_name": "#form_button_text",
+                   "binding_type": "collection",
+                   "binding_collection_name": "form_buttons"
+                  },
+                  {
+                   "binding_type": "view",
+                   "source_property_name": "(not ((#form_button_text - '§j§q') = #form_button_text))",
+                   "target_property_name": "#visible"
+                  }
+                 ],
+                 "controls": [
+                  {
+                   "bg": {
+                    "type": "image",
+                    "texture": "textures/ui/White",
+                    "size": [
+                     "100% - 4px",
+                     "100% - 4px"
+                    ],
+                    "keep_ratio": true,
+                    "controls": [
+                     {
+                      "qr": {
+                       "type": "image",
+                       "size": [
+                        "100%",
+                        "100%"
+                       ],
+                       "keep_ratio": true,
+                       "bilinear": false,
+                       "collection_index": 0,
+                       "bindings": [
+                        {
+                         "binding_name": "#form_button_texture",
+                         "binding_name_override": "#texture",
+                         "binding_type": "collection",
+                         "binding_collection_name": "form_buttons"
+                        },
+                        {
+                         "binding_name": "#form_button_texture_file_system",
+                         "binding_name_override": "#texture_file_system",
+                         "binding_type": "collection",
+                         "binding_collection_name": "form_buttons"
+                        }
+                       ]
+                      }
+                     }
+                    ]
+                   }
+                  }
+                 ]
+                }
+               },
+               {
+                "rest": {
+                 "type": "panel",
+                 "size": [
+                  "100%",
+                  "fill"
+                 ],
+                 "controls": [
+                  {
+                   "scroll@common.scrolling_panel": {
+                    "size": [
+                     "100%",
+                     "100%"
+                    ],
+                    "$show_background": false,
+                    "$scrolling_content": "server_form.gsmp_mc_buttons",
+                    "$scroll_size": [
+                     4,
+                     "100% - 4px"
+                    ],
+                    "$scrolling_pane_size": [
+                     "100% - 6px",
+                     "100%"
+                    ],
+                    "$scrolling_pane_offset": [
+                     0,
+                     0
+                    ],
+                    "$scroll_bar_right_padding_size": [
+                     0,
+                     0
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
               ]
              }
             }
@@ -1870,6 +3196,87 @@
          "default"
         ]
        }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "gsmp_fall_a": {
+  "anim_type": "offset",
+  "easing": "linear",
+  "duration": 14,
+  "from": [
+   0,
+   "-100%"
+  ],
+  "to": [
+   0,
+   0
+  ],
+  "next": "@server_form.gsmp_fall_a"
+ },
+ "gsmp_friends_box@common.button": {
+  "$pressed_button_name": "button.form_button_click",
+  "size": [
+   "100%",
+   34
+  ],
+  "collection_index": 0,
+  "bindings": [
+   {
+    "binding_type": "collection_details",
+    "binding_collection_name": "form_buttons"
+   }
+  ],
+  "controls": [
+   {
+    "default@server_form.gsmp_friends_face": {
+     "$card_texture": "textures/ui/gsmp_card"
+    }
+   },
+   {
+    "hover@server_form.gsmp_friends_face": {
+     "$card_texture": "textures/ui/gsmp_card_hover"
+    }
+   },
+   {
+    "pressed@server_form.gsmp_friends_face": {
+     "$card_texture": "textures/ui/gsmp_card_pressed"
+    }
+   }
+  ]
+ },
+ "gsmp_friends_face": {
+  "type": "image",
+  "texture": "$card_texture",
+  "size": [
+   "100%",
+   "100%"
+  ],
+  "controls": [
+   {
+    "label": {
+     "type": "label",
+     "text": "#form_button_text",
+     "shadow": true,
+     "color": [
+      1,
+      1,
+      1
+     ],
+     "size": [
+      "100% - 10px",
+      "default"
+     ],
+     "anchor_from": "center",
+     "anchor_to": "center",
+     "text_alignment": "center",
+     "bindings": [
+      {
+       "binding_name": "#form_button_text",
+       "binding_type": "collection",
+       "binding_collection_name": "form_buttons"
       }
      ]
     }
