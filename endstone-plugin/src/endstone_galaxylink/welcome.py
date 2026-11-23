@@ -135,10 +135,24 @@ class Welcome:
         return {"screen": "title", "tab": 0, "sel": 0, "new": bool(brand_new), "reopened": reopened, "closes": 0, "after": [],
                 "scene": random.randrange(len(SCENES)), "splash": self.pick_splash(), "music": False}
 
+    def lock(self, player, on):
+        """Stops walking and looking around while the Main Menu is on its way (no walk_speed: that zooms the view)."""
+        server = self.plugin.server
+        name = player.name.replace('"', "")
+        for what in ("movement", "camera"):
+            try:
+                server.dispatch_command(server.command_sender, f'inputpermission set "{name}" {what} {"disabled" if on else "enabled"}')
+            except Exception:
+                pass
+
     def on_join(self, player, brand_new):
+        self.lock(player, False)   # in case they left while locked
         if not self.enabled() or self.in_minigame(player):
             return False
         self.open[str(player.unique_id)] = self.new_state(brand_new)
+        self.lock(player, True)
+        from endstone_galaxylink.safety import later
+        later(self.plugin, player, lambda p: self.lock(p, False), 20 * 180)   # never stuck for more than 3 minutes
         return True
 
     def open_menu(self, player):
@@ -258,10 +272,7 @@ class Welcome:
         form.add_button("Rules", on_click=lambda p: self.go(p, "rules"))
         form.add_button("What's New", on_click=lambda p: self.go(p, "news"))
         form.add_button("Store", on_click=lambda p: self.go(p, "store"))
-        form.add_button("Social", on_click=lambda p: self.go(p, "social"))
-        social = getattr(self.plugin, "social", None)
-        if social is not None and not social.linked(player):
-            form.add_button("§bLink Account", on_click=lambda p: self.go(p, "link"))
+        # Social and Link Account: the friends box at the bottom (it fits on phone screens this way)
         self.send(player, form)
         self.music(player, True)
 
@@ -483,18 +494,25 @@ class Welcome:
         form = ActionForm(title=f"{SERVERS}{self.codes(st)}§lFeatured Servers", content=self.details(s))
         # 0: the sidebar's Join Server button (with the banner), 1: the ping and players line, then the list
         form.add_button("§j§nJoin Server", icon=image_of(s), on_click=lambda p, i=sel: self.join(p, i))
-        form.add_button("§j§i" + self.stats_line(player, s), on_click=lambda p: self.show_servers(p))
+        # (this line isn't a button on screen, but if a phone reports the Join Server tap as this one, it joins too)
+        form.add_button("§j§i" + self.stats_line(player, s), on_click=lambda p, i=sel: self.join(p, i))
         for i, v in enumerate(servers):
             mark = "§q§s" if i == sel else ""
             status = "§eComing soon" if v.get("action") == "soon" else f"§a● §7{self.players_on(v)} playing"
+            if i == sel and v.get("action") != "soon":
+                status += "  §e» Tap to join"
             form.add_button(f"{mark}§l{v['name']}§r\n{status}", icon=image_of(v), on_click=lambda p, i=i: self.select(p, i))
         self.send(player, form)
 
     def select(self, player, i):
+        """Tap a server to see it in the sidebar; tap it again to join."""
         st = self.state(player)
-        if st is not None:
-            st["sel"] = i
-            self.show_servers(player)
+        if st is None:
+            return
+        if st["sel"] == i:
+            return self.join(player, i)
+        st["sel"] = i
+        self.show_servers(player)
 
     # ---------- pages ----------
     def page(self, player, title, tabs, tab, body):
@@ -575,7 +593,7 @@ class Welcome:
         if st is None or st["screen"] == "joining":
             return
         st["closes"] += 1
-        delay = 2 if st["screen"] != "title" else (20 if st["closes"] < 5 else 60)
+        delay = 2 if st["screen"] != "title" else 10   # the game was still loading: try again in half a second
         if st["screen"] == "title" and st.get("reopened"):
             # a menu opened later (from /menu) can simply be closed
             self.open.pop(str(player.unique_id), None)
@@ -617,11 +635,13 @@ class Welcome:
             if sift is None or not sift.built():
                 if sift is not None and not sift.building():
                     sift.start_build()
-                try:
-                    player.send_toast("§bAlmost ready", "The Sift is still being made. Try again in a few minutes!")
-                except Exception:
-                    pass
-                return self.show_servers(player) if not st.get("portal") else self.open.pop(str(player.unique_id), None)
+                if st.get("portal"):
+                    self.open.pop(str(player.unique_id), None)
+                    return player.send_message("§bThe Sift is still being made. §7Try again in a few minutes!")
+                done = len(self.plugin.economy.get_config("sift_tiles") or []) if sift is not None else 0
+                st["screen"] = "servers"
+                return self.page(player, "The Sift", ["< Back"], 0,
+                                 f"§l§bAlmost ready!§r\n\nThe Sift is still being built ({min(done, 9)}/9 pieces).\n§7Try again in a few minutes.")
             spot = sift.spot()
         theme = s.get("anim") if s.get("anim") in THEMES else "grass"
         if s.get("odds"):
@@ -655,6 +675,7 @@ class Welcome:
         st = self.open.pop(str(player.unique_id), None)
         if st is None:
             return
+        self.lock(player, False)
         self.music(player, False)
         if spot is None and st["new"]:
             spot = self.plugin.economy.get_config("spawn")   # brand-new players start at spawn

@@ -485,6 +485,17 @@ Your pets are yours alone: other players can't feed, ride or hurt them.`,
 - **Fits your screen:** the title screen is more compact, and its buttons scroll when there isn't enough room, so nothing is cut off or overlapping.
 - **Safer trips to the Sift:** if the Sift isn't finished yet when you arrive, you're brought straight back to spawn instead of falling.`,
   },
+  {
+    id: "2026-11-24-main-menu-fixes",
+    title: "Main Menu fixes",
+    body: `We've fixed several problems with the Main Menu.
+
+- **No more crashes when joining:** fixed a problem that could close Minecraft on some phones and tablets.
+- **Join Server works:** joining from Featured Servers is now reliable. You can also tap a server a second time to join it.
+- **The menu shows right away:** you can no longer walk around while the Main Menu is still loading.
+- **Simpler title screen:** Social and Link Account are now in the friends box at the bottom, so everything fits on smaller screens.
+- **The Sift:** if it's still being built, the menu now tells you instead of sending you back to the server list.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
