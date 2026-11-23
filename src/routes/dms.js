@@ -35,7 +35,7 @@ async function loadUser(sql, id) {
 const userOut = (u) => ({ id: Number(u.id), username: u.username, head: headUrlFor(u), inGame: Boolean(u.in_game) });
 
 // The one place every DM goes through (website and game).
-async function sendDm(env, sql, from, to, text, via, audioId = null, imageId = null) {
+async function sendDm(env, sql, from, to, text, via, audioId = null, imageId = null, formId = null) {
   if (!to || to.banned) throw new HttpError(404, "That member can't receive messages.");
   if (to.is_bot === true || (await sql`SELECT is_bot FROM users WHERE id = ${to.id}`)[0]?.is_bot) throw new HttpError(400, "GalaxySMP is the server's own account, so it can't read DMs. Open a ticket in #Support if you need help.");
   if (Number(from.id) === Number(to.id)) throw new HttpError(400, "You can't message yourself.");
@@ -78,12 +78,13 @@ async function sendDm(env, sql, from, to, text, via, audioId = null, imageId = n
     ON CONFLICT (user_a, user_b) DO UPDATE SET last_message_at = now(),
       a_unread = dm_threads.a_unread + ${fromIsA ? 0 : 1}, b_unread = dm_threads.b_unread + ${fromIsA ? 1 : 0}
     RETURNING id`;
-  const [msg] = await sql`INSERT INTO dm_messages (thread_id, sender_id, body, via, audio_id, image_id) VALUES (${thread.id}, ${from.id}, ${check.text}, ${via}, ${audioId}, ${imageId}) RETURNING id, created_at`;
+  const [msg] = await sql`INSERT INTO dm_messages (thread_id, sender_id, body, via, audio_id, image_id, form_id) VALUES (${thread.id}, ${from.id}, ${check.text}, ${via}, ${audioId}, ${imageId}, ${formId}) RETURNING id, created_at`;
   const [au] = audioId ? await sql`SELECT duration_ms FROM message_audio WHERE id = ${audioId}` : [];
   const [im] = imageId ? await sql`SELECT width, height FROM message_images WHERE id = ${imageId}` : [];
   const out = { id: Number(msg.id), threadId: Number(thread.id), from: Number(from.id), fromName: from.username, to: Number(to.id), body: check.text, at: msg.created_at, via,
     audio: au ? { id: Number(audioId), ms: Number(au.duration_ms) } : null,
-    image: im ? { id: Number(imageId), w: Number(im.width), h: Number(im.height) } : null };
+    image: im ? { id: Number(imageId), w: Number(im.width), h: Number(im.height) } : null,
+    form: formId ? { id: Number(formId) } : null };
   await notify(env, out);
   try { // phone/computer notification for the recipient, unless they have this conversation open right now
     const r = await hubStub(env).fetch(`https://hub/internal/viewing?user=${Number(to.id)}&view=dm:${Number(from.id)}`).then((x) => x.json()).catch(() => ({}));
@@ -91,7 +92,8 @@ async function sendDm(env, sql, from, to, text, via, audioId = null, imageId = n
   } catch { /* best effort */ }
   // in game: show it to the recipient if they're playing (the plugin delivers game-to-game DMs itself)
   if (via === "web" && to.xuid && (check.text || imageId)) {
-    const text = imageId ? `${check.text ? check.text + " " : ""}[sent a picture: see it on galaxymc.us]` : check.text;
+    const text = formId ? `${check.text} (open your DMs on galaxymc.us to answer it)`
+      : imageId ? `${check.text ? check.text + " " : ""}[sent a picture: see it on galaxymc.us]` : check.text;
     try { await toPlugin(env, { type: "dm", toXuid: String(to.xuid), from: from.username, text }); } catch { /* server offline */ }
   }
   return out;
@@ -134,13 +136,14 @@ export async function getConversation(request, env, ctx, url, params) {
   if (thread) {
     const before = Number(url.searchParams.get("before")) || null;
     const rows = await sql`
-      SELECT d.id, d.sender_id, d.body, d.via, d.created_at, d.read_at, d.edited_at, d.audio_id, a.duration_ms, d.image_id, i.width AS img_w, i.height AS img_h FROM dm_messages d
+      SELECT d.id, d.sender_id, d.body, d.via, d.created_at, d.read_at, d.edited_at, d.audio_id, a.duration_ms, d.image_id, i.width AS img_w, i.height AS img_h, d.form_id FROM dm_messages d
         LEFT JOIN message_audio a ON a.id = d.audio_id LEFT JOIN message_images i ON i.id = d.image_id
        WHERE d.thread_id = ${thread.id} AND (${before}::bigint IS NULL OR d.id < ${before})
        ORDER BY d.id DESC LIMIT 60`;
     messages = rows.reverse().map((m) => ({ id: Number(m.id), from: Number(m.sender_id), body: m.body, via: m.via, at: m.created_at,
       read: Boolean(m.read_at), editedAt: m.edited_at || null, audio: m.audio_id ? { id: Number(m.audio_id), ms: Number(m.duration_ms) } : null,
-      image: m.image_id ? { id: Number(m.image_id), w: Number(m.img_w), h: Number(m.img_h) } : null }));
+      image: m.image_id ? { id: Number(m.image_id), w: Number(m.img_w), h: Number(m.img_h) } : null,
+      form: m.form_id ? { id: Number(m.form_id) } : null }));
     // opening the conversation reads their messages: the sender can't edit them any more
     // (looking as this member with "Act as Member" doesn't mark their messages as read)
     const read = me.acting_by ? [] : await sql`UPDATE dm_messages SET read_at = now() WHERE thread_id = ${thread.id} AND sender_id <> ${me.id} AND read_at IS NULL RETURNING id`;
@@ -260,4 +263,103 @@ export async function editMessage(request, env, ctx, url, params) {
   const other = Number(m.user_a) === Number(me.id) ? Number(m.user_b) : Number(m.user_a);
   await notify(env, { type: "dm_edit", id: Number(m.id), body: check.text, editedAt: done.edited_at, from: Number(me.id), to: other });
   return json({ ok: true, body: check.text, editedAt: done.edited_at });
+}
+
+// ---------- secure forms (the owner only) ----------
+// The owner sends questions in a DM (e.g. "Full name"). The member answers in the conversation; the answers are
+// encrypted (AES-GCM, key derived from a server secret) and only the owner can read them, not even the member
+// afterwards. Answering is optional: the member can decline.
+async function formKey(env) {
+  const root = env.FORMS_KEY || env.VAPID_PRIVATE_KEY;   // a secret that only exists on Cloudflare (not in the plugin)
+  if (!root) throw new HttpError(503, "Secure forms aren't set up on this server.");
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(root)), "HKDF", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: new TextEncoder().encode("galaxysmp-dm-forms"), info: new Uint8Array() },
+    base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+const b64 = (u8) => btoa(String.fromCharCode(...u8));
+const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+async function seal(env, obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await formKey(env), new TextEncoder().encode(JSON.stringify(obj))));
+  return `v1.${b64(iv)}.${b64(ct)}`;
+}
+async function unseal(env, text) {
+  const [, iv, ct] = String(text).split(".");
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(iv) }, await formKey(env), unb64(ct));
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+function formOut(f, me, ownerView) {
+  return {
+    id: Number(f.id), title: f.title || "", questions: f.questions, status: f.status,
+    mine: Number(f.to_id) === Number(me.id),       // I'm the one asked to answer
+    sender: ownerView, createdAt: f.created_at, answeredAt: f.answered_at || null,
+  };
+}
+
+// POST /api/dm/forms { to: userId, title, questions: ["Full name", ...] }   (the owner)
+export async function createForm(request, env) {
+  const owner = await requireOwner(request, env);
+  const body = await readJson(request);
+  const questions = (Array.isArray(body.questions) ? body.questions : []).map((q) => String(q || "").replace(/\s+/g, " ").trim().slice(0, 120)).filter(Boolean);
+  if (!questions.length) throw new HttpError(400, "Add at least one question.");
+  if (questions.length > 8) throw new HttpError(400, "A form can have up to 8 questions.");
+  const title = String(body.title || "").replace(/\s+/g, " ").trim().slice(0, 80) || null;
+  const sql = getDb(env);
+  const from = { ...(await loadUser(sql, owner.id)), owner: true };
+  const to = await loadUser(sql, Number(body.to) || 0);
+  if (!to) throw new HttpError(404, "That member doesn't exist.");
+  const [f] = await sql`INSERT INTO dm_forms (from_id, to_id, title, questions) VALUES (${owner.id}, ${to.id}, ${title}, ${JSON.stringify(questions)}::jsonb) RETURNING id`;
+  const msg = await sendDm(env, sql, from, to, `🔒 Secure form${title ? `: ${title}` : ""}`, "web", null, null, Number(f.id));
+  await sql`INSERT INTO audit_log (actor_id, action, details) VALUES (${owner.id}, 'dm.form_sent', ${JSON.stringify({ to: to.username, questions: questions.length })}::jsonb)`;
+  return json({ ok: true, message: msg });
+}
+
+// GET /api/dm/forms/:id   (the member it was sent to, or the owner)
+export async function getForm(request, env, ctx, url, params) {
+  const me = await requireUser(request, env);
+  const sql = getDb(env);
+  const [f] = await sql`SELECT * FROM dm_forms WHERE id = ${Number(params.id) || 0}`;
+  const ownerView = Boolean(me.owner && !me.acting_by);
+  if (!f || (!ownerView && Number(f.to_id) !== Number(me.id))) throw new HttpError(404, "That form isn't available.");
+  const out = formOut(f, me, ownerView);
+  // only the owner sees the answers (decrypted here, on request)
+  if (ownerView && f.status === "answered" && f.answers) {
+    try { out.answers = await unseal(env, f.answers); } catch { out.answers = null; out.unreadable = true; }
+    await sql`INSERT INTO audit_log (actor_id, action, details) VALUES (${me.id}, 'dm.form_read', ${JSON.stringify({ form: Number(f.id) })}::jsonb)`;
+  }
+  return json({ ok: true, form: out });
+}
+
+// POST /api/dm/forms/:id/:action   answer { answers: [...] } | decline   (the member)   delete   (the owner)
+export async function formAction(request, env, ctx, url, params) {
+  const me = await requireUser(request, env);
+  const sql = getDb(env);
+  const [f] = await sql`SELECT * FROM dm_forms WHERE id = ${Number(params.id) || 0}`;
+  if (!f) throw new HttpError(404, "That form isn't available.");
+  const action = params.action;
+  if (action === "delete") {
+    if (!me.owner) throw new HttpError(403, "Only the owner can delete a form's answers.");
+    await sql`UPDATE dm_forms SET answers = NULL, status = 'deleted' WHERE id = ${f.id}`;
+    await notify(env, { type: "dm_form", id: Number(f.id), from: Number(f.from_id), to: Number(f.to_id) });
+    return json({ ok: true, message: "The answers were deleted." });
+  }
+  if (Number(f.to_id) !== Number(me.id)) throw new HttpError(403, "This form was sent to someone else.");
+  if (f.status !== "waiting") throw new HttpError(409, "This form was already answered.");
+  if (action === "decline") {
+    await sql`UPDATE dm_forms SET status = 'declined', answered_at = now() WHERE id = ${f.id} AND status = 'waiting'`;
+  } else if (action === "answer") {
+    const body = await readJson(request);
+    const answers = (Array.isArray(body.answers) ? body.answers : []).slice(0, f.questions.length).map((a) => String(a || "").replace(/\r/g, "").trim().slice(0, 500));
+    if (answers.length !== f.questions.length || answers.some((a) => !a)) throw new HttpError(400, "Answer every question, or tap Decline.");
+    const sealed = await seal(env, answers);
+    const [ok] = await sql`UPDATE dm_forms SET status = 'answered', answers = ${sealed}, answered_at = now() WHERE id = ${f.id} AND status = 'waiting' RETURNING id`;
+    if (!ok) throw new HttpError(409, "This form was already answered.");
+  } else throw new HttpError(400, "Unknown action.");
+  await notify(env, { type: "dm_form", id: Number(f.id), from: Number(f.from_id), to: Number(f.to_id) });
+  try {
+    await pushNotify(env, [Number(f.from_id)], "dms", { title: `${me.username} ${action === "answer" ? "answered" : "declined"} your secure form`,
+      body: action === "answer" ? "Open the conversation to read the answers." : "They chose not to answer.", url: "/community#messages", tag: `dm-form-${f.id}` });
+  } catch { /* best effort */ }
+  return json({ ok: true, message: action === "answer" ? "Sent securely. Only the owner can see your answers." : "You declined the form." });
 }

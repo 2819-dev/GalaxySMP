@@ -4785,3 +4785,19 @@ html[data-theme="light"] .mk-balance { color: rgb(160,110,8); }
 .dm-pic-pending { margin: 0 12px 8px; }
 .quiet-box { margin-top: 6px; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); }
 .quiet-title { margin: 0 0 8px; font-size: 1rem; }
+.dm-form { display: flex; flex-direction: column; gap: 8px; min-width: min(300px, 70vw); padding: 4px 0; }
+.sf-head { display: flex; align-items: center; gap: 6px; }
+.sf-head svg { width: 16px; height: 16px; color: var(--accent-text); }
+.dm-form .field { margin: 0; }
+.sf-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.sf-answers { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 10px; background: var(--surface); border: 1px dashed var(--border-strong); }
+.sf-a { display: flex; flex-direction: column; }
+.sf-questions { display: flex; flex-direction: column; gap: 6px; }
+.sf-q { display: flex; gap: 6px; align-items: center; }
+.sf-q .input { flex: 1; }
+/* secure forms on your own (blue) bubbles */
+.dm-msg.mine .dm-form, .dm-msg.mine .dm-form .text-3, .dm-msg.mine .dm-form .text-2 { color: rgba(255,255,255,.92); }
+.dm-msg.mine .sf-head svg { color: #fff; }
+.dm-msg.mine .dm-form .btn-ghost { color: #fff; border-color: rgba(255,255,255,.5); }
+.dm-msg.mine .sf-answers { background: rgba(255,255,255,.95); border-color: transparent; color: #1b2240; }
+.dm-msg.mine .sf-answers .text-3 { color: #5a6385; }

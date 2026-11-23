@@ -369,6 +369,12 @@ const PENDING = [
     "UPDATE channels SET topic = 'Use commands here: type / or tap + then Commands. Level-ups show here too.' WHERE slug = 'bot-commands'",
     "INSERT INTO schema_migrations (version) VALUES ('0087_chat_xp_log') ON CONFLICT DO NOTHING",
   ]],
+  ["0088_dm_forms", [
+    "CREATE TABLE IF NOT EXISTS dm_forms (id bigserial PRIMARY KEY, from_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE, to_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE, title text, questions jsonb NOT NULL, answers text, status text NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'answered', 'declined', 'deleted')), created_at timestamptz NOT NULL DEFAULT now(), answered_at timestamptz)",
+    "CREATE INDEX IF NOT EXISTS dm_forms_to_idx ON dm_forms (to_id, created_at DESC)",
+    "ALTER TABLE dm_messages ADD COLUMN IF NOT EXISTS form_id bigint REFERENCES dm_forms(id) ON DELETE SET NULL",
+    "INSERT INTO schema_migrations (version) VALUES ('0088_dm_forms') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

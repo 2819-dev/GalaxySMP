@@ -661,6 +661,11 @@ Try **/level**, **/top**, **/stats**, **/online**, **/status**, **/coinflip**, *
     title: "Quiet Mode for busy times",
     body: `Staff can now turn on **Quiet Mode** to keep the community calm during busy moments. While it's on, everyone can send one message every few minutes in each channel, and a note under the message box shows how long it lasts. When it ends, every channel goes back to normal by itself.`,
   },
+  {
+    id: "2026-11-23-secure-forms",
+    title: "Secure forms in direct messages",
+    body: `The GalaxySMP owner can now send a **secure form** in direct messages, for example to collect details needed to deliver a prize. Answering is always optional: you can tap **Decline**. Your answers are encrypted, and only the owner can read them.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

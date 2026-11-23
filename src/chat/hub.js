@@ -192,7 +192,7 @@ export class CommunityHub extends DurableObject {
       for (const ws of this.socketsFor(event.to)) { try { ws.send(text); } catch { /* gone */ } }
       return;
     }
-    if (event.type === "dm" || event.type === "dm_read" || event.type === "dm_edit") { // only the sender and the recipient get these
+    if (event.type === "dm" || event.type === "dm_read" || event.type === "dm_edit" || event.type === "dm_form") { // only the sender and the recipient get these
       const text = JSON.stringify(event);
       for (const id of [event.from, event.to]) for (const ws of this.socketsFor(id)) { try { ws.send(text); } catch { /* gone */ } }
       return;

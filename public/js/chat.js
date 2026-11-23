@@ -1481,6 +1481,7 @@ function handleEvent(data) {
       break;
     case "dm_read":
     case "dm_edit":
+    case "dm_form":
       dmEvent(data);
       break;
     case "dm": {

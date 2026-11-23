@@ -17,7 +17,75 @@ import { renderJobs } from "/js/community-jobs.js";
 import { renderFriends } from "/js/community-friends.js";
 import { micButton, voicePlayer } from "/js/chat-voice.js";
 
-let dmRights = null;   // what this member may upload (pictures in DMs: Galaxy Pro+ and the owner)
+let dmRights = null;
+
+// ---------- secure forms (the owner sends questions in a DM; only the owner can read the answers) ----------
+function formDialog(other, done) {
+  const title = h("input", { class: "input", id: "sf-title", maxlength: 80, placeholder: "e.g. Prize delivery details (optional)" });
+  const list = h("div", { class: "sf-questions" });
+  const addQ = (value = "") => {
+    if (list.children.length >= 8) return;
+    const q = h("input", { class: "input", maxlength: 120, placeholder: `Question ${list.children.length + 1}, e.g. Full name`, value });
+    const row = h("div", { class: "sf-q" }, q, h("button", { class: "icon-btn", type: "button", "aria-label": "Remove question", onclick: () => { if (list.children.length > 1) row.remove(); } }, iconEl("x")));
+    list.append(row);
+    q.focus();
+  };
+  addQ();
+  openDialog({
+    title: `Secure form for ${other.username}`,
+    body: h("div", { class: "form" },
+      h("p", { class: "text-2", style: "margin:0", text: `${other.username} answers in this conversation. Only you can read the answers (they're encrypted, and even ${other.username} can't see them again). Answering is optional: they can decline.` }),
+      field("Title", title), h("div", { class: "field" }, h("span", { class: "field-label", text: "Questions" }), list),
+      h("div", {}, h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "+ Add a question", onclick: () => addQ() }))),
+    actions: [{ label: "Cancel" }, { label: "Send form", kind: "primary", onClick: async () => {
+      const questions = [...list.querySelectorAll("input")].map((i) => i.value.trim()).filter(Boolean);
+      const r = await postJson("/api/dm/forms", { to: other.id, title: title.value, questions });
+      done(r.message);
+    } }],
+  });
+}
+
+async function drawForm(slot, id) {
+  let f;
+  try { f = (await getJson(`/api/dm/forms/${id}`)).form; } catch { slot.replaceChildren(h("p", { class: "text-3 small", text: "🔒 Secure form" })); return; }
+  const head = h("div", { class: "sf-head" }, iconEl("lock"), h("b", { text: f.title || "Secure form" }));
+  const kids = [head];
+  if (f.mine && f.status === "waiting") {
+    const inputs = f.questions.map((q, i) => h("input", { class: "input", id: `sf-${id}-${i}`, maxlength: 500, autocomplete: "off" }));
+    const err = h("p", { class: "form-error", role: "alert" });
+    const submit = h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Send securely" });
+    const decline = h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Decline" });
+    const act = async (action) => {
+      submit.disabled = decline.disabled = true;
+      try { await postJson(`/api/dm/forms/${id}/${action}`, action === "answer" ? { answers: inputs.map((i) => i.value) } : {}); drawForm(slot, id); }
+      catch (e) { err.textContent = e.message; submit.disabled = decline.disabled = false; }
+    };
+    submit.addEventListener("click", () => act("answer"));
+    decline.addEventListener("click", () => act("decline"));
+    kids.push(h("p", { class: "text-3 small", style: "margin:0", text: "Only the server owner can see your answers. You don't have to answer: tap Decline if you'd rather not." }),
+      ...f.questions.map((q, i) => h("label", { class: "field" }, h("span", { class: "field-label", text: q }), inputs[i])), err, h("div", { class: "sf-actions" }, submit, decline));
+  } else if (f.mine) {
+    kids.push(h("p", { class: "text-2 small", style: "margin:0", text: f.status === "answered" ? "✓ Sent securely. Only the owner can see your answers." : f.status === "declined" ? "You declined this form." : "This form is closed." }));
+  } else if (f.sender) {
+    if (f.status === "waiting") kids.push(h("p", { class: "text-3 small", style: "margin:0", text: `Waiting for an answer: ${f.questions.join(", ")}` }));
+    else if (f.status === "declined") kids.push(h("p", { class: "text-3 small", style: "margin:0", text: "They declined this form." }));
+    else if (f.status === "deleted") kids.push(h("p", { class: "text-3 small", style: "margin:0", text: "You deleted the answers." }));
+    else {
+      const box = h("div", { class: "sf-answers", hidden: true });
+      const show = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Show answers", onclick: () => {
+        box.hidden = !box.hidden; show.textContent = box.hidden ? "Show answers" : "Hide answers";
+      } });
+      if (f.answers) box.append(...f.questions.map((q, i) => h("div", { class: "sf-a" }, h("span", { class: "text-3 small", text: q }), h("b", { text: f.answers[i] || "" }))));
+      else box.append(h("p", { class: "text-3 small", text: f.unreadable ? "These answers can't be read any more." : "No answers." }));
+      const del = h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Delete answers", onclick: async () => {
+        if (!confirm("Delete these answers for good?")) return;
+        try { await postJson(`/api/dm/forms/${id}/delete`, {}); drawForm(slot, id); } catch (e) { alert(e.message); }
+      } });
+      kids.push(h("p", { class: "text-3 small", style: "margin:0", text: "✓ Answered. Only you can see the answers." }), h("div", { class: "sf-actions" }, show, del), box);
+    }
+  }
+  slot.replaceChildren(...kids);
+}   // what this member may upload (pictures in DMs: Galaxy Pro+ and the owner)
 
 const panel = () => document.getElementById("channel-panel");
 const voiceBox = () => document.getElementById("voice-embed");
@@ -294,7 +362,12 @@ function renderDMs(p) {
       const sender = chatState.members.get(m.from);
       const admin = (chatState.roles.get(sender?.role)?.power || 0) >= 100;   // headings and -# small text: Admins only
       text.replaceChildren(renderMarkdown(m.body || "", { channels: chatState.channels, noHeadings: !admin }));
-      text.hidden = !m.body && Boolean(m.audio || m.image);
+      text.hidden = (!m.body && Boolean(m.audio || m.image)) || Boolean(m.form);
+      if (m.form && !node.querySelector(".dm-form")) {
+        const slot = h("div", { class: "dm-form" }, h("p", { class: "text-3 small", text: "Loading the secure form…" }));
+        text.before(slot);
+        drawForm(slot, m.form.id);
+      }
       if (m.image && !node.querySelector(".dm-pic-link")) {
         const ratio = m.image.w && m.image.h ? m.image.h / m.image.w : 0.6;
         const width = Math.min(280, m.image.w || 280);
@@ -394,6 +467,12 @@ function renderDMs(p) {
       openPlusMenu(plusBtn, { items: [
         { icon: "smile", label: "Emojis", onClick: () => emojiMenu(plusBtn, input) },
         { icon: "gift", label: "Gift", onClick: () => giftDialog({ id: d.other.id, username: d.other.username, head: d.other.head }) },
+        ...(chatState.me?.owner ? [{ icon: "lock", label: "Secure form", onClick: () => formDialog(d.other, (msg) => {
+          if (!log.querySelector(`[data-id="${msg.id}"]`)) add(msg);
+          log.querySelector(".dm-start")?.remove();
+          log.scrollTop = log.scrollHeight;
+          loadList();
+        }) }] : []),
       ], photo: pickPhoto });
     });
     const composer = h("div", { class: "dm-composer" }, plusBtn, input, picFile);
@@ -447,6 +526,10 @@ function renderDMs(p) {
         for (const id of m.ids || []) { const x = msgs.get(id); if (x && !x.m.read) { x.m.read = true; x.node.querySelector(".dm-edit-wrap")?.remove(); x.node.querySelector(".dm-text").hidden = false; fill(x.node, x.m); } }
         return;
       }
+      if (m.type === "dm_form") {   // a secure form was answered, declined or its answers deleted
+        for (const x of msgs.values()) if (x.m.form?.id === m.id) { x.node.querySelector(".dm-form")?.remove(); fill(x.node, x.m); }
+        return;
+      }
       if (m.type === "dm_edit") {
         const x = msgs.get(m.id);
         if (x) { x.m.body = m.body; x.m.editedAt = m.editedAt; fill(x.node, x.m); }
@@ -479,7 +562,7 @@ function renderDMs(p) {
     setTimeout(() => search.focus(), 50);
   }
 
-  const onDm = (m) => { main.onDm?.(m); if (m.type === "dm_read" || m.type === "dm_edit") return; if (!current || ![m.from, m.to].includes(current)) loadList(); };
+  const onDm = (m) => { main.onDm?.(m); if (m.type === "dm_read" || m.type === "dm_edit" || m.type === "dm_form") return; if (!current || ![m.from, m.to].includes(current)) loadList(); };
   dmListeners.add(onDm);
   cleanup = () => dmListeners.delete(onDm);
   loadList();
