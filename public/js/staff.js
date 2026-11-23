@@ -390,8 +390,8 @@ const DESCRIBE = {
   "plan.give": (e) => [`gave ${e.details.player} ${e.details.plan}${e.details.days ? ` for ${e.details.days} days` : ""}`],
   "plan.remove": (e) => [`removed ${e.details.player}'s plan`],
   "help.reset": () => ["reset the in-game Help menu"],
-  "welcome.save": () => ["edited the welcome screen"],
-  "welcome.reset": () => ["reset the welcome screen"],
+  "welcome.save": () => ["edited the join screen"],
+  "welcome.reset": () => ["reset the join screen"],
   "filter.add": () => ["added a word to the filter"],
   "chatfilter.on": () => ["turned the in-game chat filter on"],
   "chatfilter.off": () => ["turned the in-game chat filter off"],
@@ -989,9 +989,51 @@ async function loadWelcome() {
   renderWelcome();
 }
 
+const SERVER_PICS = [["galaxysmp", "GalaxySMP"], ["event", "Event"], ["bedwars", "Bedwars"], ["parkour", "Parkour"], ["build", "Building"]];
+const SERVER_ACTIONS = [["play", "Play (main server)"], ["spawn", "Go to spawn"], ["warp", "Go to a warp"], ["minigames", "Open the Minigame Center"], ["soon", "Coming soon"]];
+
+function welcomeSelect(options, value, onChange) {
+  const el = h("select", { class: "input" }, ...options.map(([v, label]) => h("option", { value: v, text: label })));
+  el.value = value;
+  el.addEventListener("change", () => { onChange(el.value); welcomeChanged(); renderWelcome(); });
+  return el;
+}
+
+function renderServers() {
+  const list = $("welcome-servers");
+  list.replaceChildren();
+  welcomeData.servers.forEach((v, i) => {
+    const custom = !SERVER_PICS.some(([k]) => k === v.image);
+    const preview = h("img", { class: "srv-pic", alt: "", src: custom ? v.image : `/img/servers/${v.image}.png` });
+    const on = h("input", { type: "checkbox", checked: v.enabled !== false });
+    on.addEventListener("change", () => { v.enabled = on.checked; welcomeChanged(); });
+    list.append(h("div", { class: "help-block" },
+      h("div", { class: "srv-row" }, preview,
+        h("div", { class: "stack", style: "gap:6px;flex:1;min-width:0" },
+          h("label", { class: "small text-3" }, "Name", welcomeInput(v.name, { maxlength: 32 }, (x) => { v.name = x; })),
+          h("label", { class: "small text-3" }, "Description", welcomeInput(v.description, { maxlength: 90 }, (x) => { v.description = x; })))),
+      h("label", { class: "small text-3" }, "Activities (shown in blue, e.g. Survival · Plots)", welcomeInput(v.tags, { maxlength: 50 }, (x) => { v.tags = x; })),
+      h("label", { class: "small text-3" }, "Picture",
+        welcomeSelect([...SERVER_PICS, ["custom", "My own picture (link)"]], custom ? "custom" : v.image, (x) => { v.image = x === "custom" ? "https://" : x; })),
+      custom ? h("label", { class: "small text-3" }, "Picture link (https://..., a wide picture works best)", welcomeInput(v.image, { maxlength: 300 }, (x) => { v.image = x; preview.src = x; })) : null,
+      h("label", { class: "small text-3" }, "When picked", welcomeSelect(SERVER_ACTIONS, v.action || "play", (x) => { v.action = x; })),
+      v.action === "warp" ? h("label", { class: "small text-3" }, "Warp name", welcomeInput(v.warp, { maxlength: 16, placeholder: "e.g. EventArena" }, (x) => { v.warp = x; })) : null,
+      h("div", { class: "eco-head" },
+        h("label", { class: "check" }, on, "Shown"),
+        h("div", { class: "row-actions" },
+          h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": "Move up", text: "↑", disabled: i === 0,
+            onclick: () => { [welcomeData.servers[i - 1], welcomeData.servers[i]] = [welcomeData.servers[i], welcomeData.servers[i - 1]]; welcomeChanged(); renderWelcome(); } }),
+          h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: () => { welcomeData.servers.splice(i, 1); welcomeChanged(); renderWelcome(); } })))));
+  });
+  $("welcome-add-server").disabled = welcomeData.servers.length >= 10;
+}
+
 function renderWelcome() {
   $("welcome-enabled").checked = welcomeData.enabled !== false;
-  $("welcome-intro").replaceChildren(welcomeInput(welcomeData.intro, { rows: 5, maxlength: 1200, "aria-label": "Welcome text" }, (v) => { welcomeData.intro = v; }));
+  welcomeData.servers ||= [];
+  $("welcome-splash").replaceChildren(welcomeInput(welcomeData.splash, { maxlength: 60, placeholder: "e.g. Now with penguins!" }, (v) => { welcomeData.splash = v; }));
+  renderServers();
+  $("welcome-intro").replaceChildren(welcomeInput(welcomeData.intro, { rows: 4, maxlength: 1200, "aria-label": "How to Play overview" }, (v) => { welcomeData.intro = v; }));
   const list = $("welcome-tabs");
   list.replaceChildren();
   welcomeData.tabs.forEach((t, i) => {
@@ -1009,6 +1051,7 @@ function renderWelcome() {
 }
 
 $("welcome-enabled").addEventListener("change", () => { welcomeData.enabled = $("welcome-enabled").checked; welcomeChanged(); });
+$("welcome-add-server").addEventListener("click", () => { welcomeData.servers.push({ name: "New Event", description: "", tags: "Event", image: "event", action: "soon", warp: "", enabled: true }); welcomeChanged(); renderWelcome(); });
 $("welcome-add-tab").addEventListener("click", () => { welcomeData.tabs.push({ title: "New tab", text: "" }); welcomeChanged(); renderWelcome(); });
 $("welcome-save").addEventListener("click", async () => {
   $("welcome-save").disabled = true;
@@ -1020,11 +1063,11 @@ $("welcome-save").addEventListener("click", async () => {
   } catch (e) { toast(e.message); $("welcome-save").disabled = false; }
 });
 $("welcome-reset").addEventListener("click", () => openDialog({
-  title: "Go back to the built-in welcome screen?",
-  body: h("p", { class: "text-2", text: "This replaces the welcome text and tabs with the original ones." }),
+  title: "Go back to the built-in join screen?",
+  body: h("p", { class: "text-2", text: "This replaces the splash line, servers and How to Play tabs with the original ones." }),
   actions: [{ label: "Cancel" }, {
     label: "Reset", kind: "danger",
-    onClick: async () => { await postJson("/api/mod/welcome/reset", {}); welcomeDirty = false; toast("Welcome screen reset."); loadWelcome(); },
+    onClick: async () => { await postJson("/api/mod/welcome/reset", {}); welcomeDirty = false; toast("Join screen reset."); loadWelcome(); },
   }],
 }));
 

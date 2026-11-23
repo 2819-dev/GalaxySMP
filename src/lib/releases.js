@@ -712,6 +712,15 @@ Penguins and chips are super rare prizes in Galaxy Crates, and staff may hand th
 
 Use the tabs to learn the basics (Getting Started, Plots, Money & Store, Voice Chat, Minigames and Rules), then press **Continue** to start playing. New players are taken to spawn, and everyone else picks up right where they left off.`,
   },
+  {
+    id: "2026-11-23-title-screen",
+    title: "A brand-new title screen",
+    body: `The join screen has been rebuilt to feel like Minecraft's own title screen: the GalaxySMP logo over a slowly moving night landscape, with **Play**, **How to Play**, **Rules** and **What's New**.
+
+**Play** opens a Featured Servers list with a picture, description and player count for each server. Keep an eye on it: special event servers will appear there too.
+
+Also fixed: your view no longer looks zoomed in after joining.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).

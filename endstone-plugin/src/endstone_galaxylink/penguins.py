@@ -278,14 +278,8 @@ class Penguins:
             return False
 
     def apply_body(self, p, mine):
-        """Speed and extra hearts (only changed when they need to be)."""
-        try:
-            wl = getattr(self.plugin, "welcome", None)
-            want = 0.0 if wl is not None and wl.keep_frozen(p) else round(WALK * (1 + mine.get("speed", 0)), 3)
-            if abs(float(p.walk_speed) - want) > 0.001:
-                p.walk_speed = want
-        except Exception:
-            pass
+        """Extra hearts (only changed when they need to be). Speed is a hidden Speed effect (see speed_boost):
+        changing a player's walking speed directly also changes how zoomed-in their view is, so it's never used."""
         try:
             want = 20 + 2 * int(mine.get("hearts", 0))
             if int(p.max_health) != want:
@@ -295,9 +289,26 @@ class Penguins:
         except Exception:
             pass
 
+    def speed_boost(self, p, speed):
+        """Faster walking from a chip power or Penguin's Grace: a short Speed effect (no particles), refreshed while it lasts."""
+        amp = 0 if speed < 0.5 else 1 if speed < 0.9 else 2
+        name = p.name.replace('"', "")
+        try:
+            self.plugin.server.dispatch_command(self.plugin.server.command_sender, f'effect "{name}" speed 2 {amp} true')
+        except Exception:
+            pass
+
     def on_join(self, p):
-        """Back to normal speed and hearts (a power may have been on when the server restarted)."""
+        """Back to normal hearts (a power may have been on when the server restarted), and normal walking speed for
+        anyone an older version slowed down."""
         self.apply_body(p, self.perks(p))
+        try:
+            if abs(float(p.walk_speed) - WALK) > 0.001:
+                p.walk_speed = WALK
+        except Exception:
+            pass
+        # a 1-second Speed effect makes the game send the player's movement speed again, which fixes a zoomed-in view
+        self.speed_boost(p, 0.1)
 
     def on_quit(self, p):
         self.apply_body(p, {})
@@ -328,6 +339,8 @@ class Penguins:
                 self.powers.pop(uid, None)
             perks = self.perks(p, now)
             self.apply_body(p, perks)
+            if perks.get("speed") and self.ticks % 2 == 0:
+                self.speed_boost(p, perks["speed"])
             if perks.get("regen") and self.ticks % 4 == 0:
                 try:
                     if 0 < p.health < p.max_health:

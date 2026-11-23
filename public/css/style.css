@@ -4801,3 +4801,8 @@ html[data-theme="light"] .mk-balance { color: rgb(160,110,8); }
 .dm-msg.mine .dm-form .btn-ghost { color: #fff; border-color: rgba(255,255,255,.5); }
 .dm-msg.mine .sf-answers { background: rgba(255,255,255,.95); border-color: transparent; color: #1b2240; }
 .dm-msg.mine .sf-answers .text-3 { color: #5a6385; }
+
+/* Join screen editor: Featured Servers pictures */
+.srv-row { display: flex; gap: 12px; align-items: flex-start; }
+.srv-pic { width: 112px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; image-rendering: pixelated; background: var(--surface-2, #1b1f3a); flex: none; }
+@media (max-width: 480px) { .srv-row { flex-direction: column; } .srv-pic { width: 100%; } }

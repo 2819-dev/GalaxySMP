@@ -1,10 +1,21 @@
 {
  "enabled": true,
- "intro": "Welcome to **GalaxySMP**, a friendly survival server for everyone. Build, trade, play minigames and hang out with the community.\n\nTap a tab on the left to learn the basics, then press **Continue** to start playing.",
+ "splash": "Now with penguins!",
+ "intro": "Welcome to **GalaxySMP**, a friendly survival server for everyone. Build, trade, play minigames and hang out with the community.\n\nPick a topic on the left to learn the basics. When you're ready, go back and press **Play**.",
+ "servers": [
+  {
+   "name": "GalaxySMP",
+   "description": "Survival with plots, jobs, shops and a friendly community",
+   "tags": "Survival · Plots · Minigames",
+   "image": "galaxysmp",
+   "action": "play",
+   "warp": ""
+  }
+ ],
  "tabs": [
   {
    "title": "Getting Started",
-   "text": "**Your first steps**\n- Type **/daily** every day for free rewards.\n- **/quests** and **/achievements** give you money and goals.\n- **/spawn** takes you back here, **/rtp** sends you into the wild.\n- Save spots with **/sethome**, go back with **/home**.\n- Lost? **/guide** opens the full help menu."
+   "text": "**Your first steps**\n- Type **/daily** every day for free rewards.\n- **/quests** and **/achievements** give you money and goals.\n- **/spawn** takes you back to spawn, **/rtp** sends you into the wild.\n- Save spots with **/sethome**, go back with **/home**.\n- Lost? **/guide** opens the full help menu."
   },
   {
    "title": "Plots",
@@ -21,10 +32,6 @@
   {
    "title": "Minigames",
    "text": "**Play together**\n- Type **/minigames** for Bedwars, Parkour and the Build Contest.\n- Win to climb the leaderboards on the website."
-  },
-  {
-   "title": "Rules",
-   "text": "**Keep it fun for everyone**\n- Be kind. No bullying, hate or spam.\n- No griefing, stealing or cheating.\n- Keep chat friendly for all ages.\n\nNeed help? Type **/support** to reach staff. Full rules: **galaxymc.us/rules**"
   }
  ]
 }

@@ -79,18 +79,34 @@ export async function adminHelpAction(request, env, ctx, url, params) {
 // ---------- the in-game welcome screen (full screen on every join; text edited here, next to the Help menu) ----------
 export async function loadWelcome(sql) {
   const rows = await sql`SELECT value, updated_at, updated_by FROM economy_config WHERE key = 'welcome'`;
-  return rows[0] ? { welcome: rows[0].value, custom: true, updated: { at: rows[0].updated_at, by: rows[0].updated_by } } : { welcome: DEFAULT_WELCOME, custom: false, updated: null };
+  return rows[0] ? { welcome: { ...DEFAULT_WELCOME, ...rows[0].value }, custom: true, updated: { at: rows[0].updated_at, by: rows[0].updated_by } } : { welcome: DEFAULT_WELCOME, custom: false, updated: null };
 }
+
+const SERVER_IMAGES = ["galaxysmp", "event", "bedwars", "parkour", "build"];
+const SERVER_ACTIONS = ["play", "spawn", "warp", "minigames", "soon"];
 
 function validWelcome(body) {
   const intro = clean(body?.intro, 1200);
-  if (!intro) throw new HttpError(400, "The welcome text can't be empty.");
+  if (!intro) throw new HttpError(400, "The How to Play overview can't be empty.");
   const tabs = (Array.isArray(body?.tabs) ? body.tabs : []).slice(0, 8).map((t, i) => {
     const title = clean(t?.title, 24);
     if (!title) throw new HttpError(400, `Tab ${i + 1} needs a name.`);
     return { title, text: clean(t?.text, 1500) };
   });
-  return { enabled: body?.enabled !== false, intro, tabs };
+  const servers = (Array.isArray(body?.servers) ? body.servers : []).slice(0, 10).map((v, i) => {
+    const name = clean(v?.name, 32);
+    if (!name) throw new HttpError(400, `Server ${i + 1} needs a name.`);
+    let image = String(v?.image || "galaxysmp").trim();
+    if (!SERVER_IMAGES.includes(image)) {
+      if (!/^https:\/\/[^\s"'<>]{4,300}$/.test(image)) throw new HttpError(400, `Server ${i + 1}: pick a picture, or paste a link that starts with https://`);
+    }
+    const action = SERVER_ACTIONS.includes(v?.action) ? v.action : "play";
+    const warp = clean(v?.warp, 16);
+    if (action === "warp" && !/^[A-Za-z0-9_-]{3,16}$/.test(warp)) throw new HttpError(400, `Server ${i + 1}: type the name of the warp it sends players to.`);
+    return { name, description: clean(v?.description, 90), tags: clean(v?.tags, 50), image, action, warp: action === "warp" ? warp : "", enabled: v?.enabled !== false };
+  });
+  if (!servers.some((v) => v.enabled && v.action === "play")) throw new HttpError(400, "Keep at least one server that's switched on and set to \"Play\" (the main server).");
+  return { enabled: body?.enabled !== false, splash: clean(body?.splash, 60), intro, tabs, servers };
 }
 
 // The latest news and the next event, shown as live info on the welcome screen.
