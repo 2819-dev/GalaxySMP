@@ -1,0 +1,30 @@
+{
+ "enabled": true,
+ "intro": "Welcome to **GalaxySMP**, a friendly survival server for everyone. Build, trade, play minigames and hang out with the community.\n\nTap a tab on the left to learn the basics, then press **Continue** to start playing.",
+ "tabs": [
+  {
+   "title": "Getting Started",
+   "text": "**Your first steps**\n- Type **/daily** every day for free rewards.\n- **/quests** and **/achievements** give you money and goals.\n- **/spawn** takes you back here, **/rtp** sends you into the wild.\n- Save spots with **/sethome**, go back with **/home**.\n- Lost? **/guide** opens the full help menu."
+  },
+  {
+   "title": "Plots",
+   "text": "**Your own plot**\n- Type **/plot** to claim a plot near spawn. Only you (and the friends you add) can build there.\n- **/plot upgrade** makes it bigger.\n- You can sell or rent out your plot with **/plot sell** and **/plot rent**."
+  },
+  {
+   "title": "Money & Store",
+   "text": "**Earning money**\n- Pick a job with **/jobs** and get paid for mining, farming and more.\n- Sell items with **/sell**, or list them on the Auction House with **/ah sell <price>**.\n- Pay friends with **/pay**.\n\n**The Store**\nPlans, crate keys and more are on **galaxymc.us/store**."
+  },
+  {
+   "title": "Voice Chat",
+   "text": "**Talk while you play**\n1. Go to **galaxymc.us** and sign in.\n2. Get your code and type **/link <code>** here.\n3. Open the Voice page on the website. People near you in game hear you."
+  },
+  {
+   "title": "Minigames",
+   "text": "**Play together**\n- Type **/minigames** for Bedwars, Parkour and the Build Contest.\n- Win to climb the leaderboards on the website."
+  },
+  {
+   "title": "Rules",
+   "text": "**Keep it fun for everyone**\n- Be kind. No bullying, hate or spam.\n- No griefing, stealing or cheating.\n- Keep chat friendly for all ages.\n\nNeed help? Type **/support** to reach staff. Full rules: **galaxymc.us/rules**"
+  }
+ ]
+}

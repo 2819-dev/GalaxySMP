@@ -390,6 +390,8 @@ const DESCRIBE = {
   "plan.give": (e) => [`gave ${e.details.player} ${e.details.plan}${e.details.days ? ` for ${e.details.days} days` : ""}`],
   "plan.remove": (e) => [`removed ${e.details.player}'s plan`],
   "help.reset": () => ["reset the in-game Help menu"],
+  "welcome.save": () => ["edited the welcome screen"],
+  "welcome.reset": () => ["reset the welcome screen"],
   "filter.add": () => ["added a word to the filter"],
   "chatfilter.on": () => ["turned the in-game chat filter on"],
   "chatfilter.off": () => ["turned the in-game chat filter off"],
@@ -901,6 +903,7 @@ function textInput(value, attrs, onInput) {
 }
 
 loaders.help = async () => {
+  loadWelcome().catch((e) => toast(e.message));
   if (helpDirty) return;
   const data = await getJson("/api/mod/help");
   helpData = structuredClone(data.help);
@@ -958,6 +961,70 @@ $("help-reset").addEventListener("click", () => openDialog({
   actions: [{ label: "Cancel" }, {
     label: "Reset", kind: "danger",
     onClick: async () => { await postJson("/api/mod/help/reset", {}); helpDirty = false; toast("Help menu reset."); loaders.help(); },
+  }],
+}));
+
+// ---------- Welcome screen (inside the Help menu tab) ----------
+let welcomeData = null;
+let welcomeDirty = false;
+
+function welcomeChanged() {
+  welcomeDirty = true;
+  $("welcome-save").disabled = false;
+  $("welcome-status").textContent = "Unsaved changes";
+}
+
+function welcomeInput(value, attrs, onInput) {
+  const el = h(attrs.rows ? "textarea" : "input", { class: "input", ...attrs });
+  el.value = value ?? "";
+  el.addEventListener("input", () => { onInput(el.value); welcomeChanged(); });
+  return el;
+}
+
+async function loadWelcome() {
+  if (welcomeDirty) return;
+  const data = await getJson("/api/mod/welcome");
+  welcomeData = structuredClone(data.welcome);
+  $("welcome-status").textContent = data.custom ? `Last changed by ${data.updated.by} on ${fmt(data.updated.at)}` : "Using the built-in text";
+  renderWelcome();
+}
+
+function renderWelcome() {
+  $("welcome-enabled").checked = welcomeData.enabled !== false;
+  $("welcome-intro").replaceChildren(welcomeInput(welcomeData.intro, { rows: 5, maxlength: 1200, "aria-label": "Welcome text" }, (v) => { welcomeData.intro = v; }));
+  const list = $("welcome-tabs");
+  list.replaceChildren();
+  welcomeData.tabs.forEach((t, i) => {
+    list.append(h("div", { class: "help-block" },
+      h("div", { class: "eco-head" },
+        h("label", { class: "small text-3" }, "Tab name", welcomeInput(t.title, { maxlength: 24 }, (v) => { t.title = v; })),
+        h("div", { class: "row-actions" },
+          h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": "Move up", text: "↑", disabled: i === 0,
+            onclick: () => { [welcomeData.tabs[i - 1], welcomeData.tabs[i]] = [welcomeData.tabs[i], welcomeData.tabs[i - 1]]; welcomeChanged(); renderWelcome(); } }),
+          h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: () => { welcomeData.tabs.splice(i, 1); welcomeChanged(); renderWelcome(); } }))),
+      h("label", { class: "small text-3" }, "Text", welcomeInput(t.text, { rows: 5, maxlength: 1500 }, (v) => { t.text = v; }))));
+  });
+  $("welcome-add-tab").disabled = welcomeData.tabs.length >= 8;
+  $("welcome-save").disabled = !welcomeDirty;
+}
+
+$("welcome-enabled").addEventListener("change", () => { welcomeData.enabled = $("welcome-enabled").checked; welcomeChanged(); });
+$("welcome-add-tab").addEventListener("click", () => { welcomeData.tabs.push({ title: "New tab", text: "" }); welcomeChanged(); renderWelcome(); });
+$("welcome-save").addEventListener("click", async () => {
+  $("welcome-save").disabled = true;
+  try {
+    const res = await postJson("/api/mod/welcome/save", { welcome: welcomeData });
+    welcomeDirty = false;
+    toast(res.sent ? "Saved. Players see it the next time they join." : "Saved. The server gets it when it's online.");
+    loadWelcome();
+  } catch (e) { toast(e.message); $("welcome-save").disabled = false; }
+});
+$("welcome-reset").addEventListener("click", () => openDialog({
+  title: "Go back to the built-in welcome screen?",
+  body: h("p", { class: "text-2", text: "This replaces the welcome text and tabs with the original ones." }),
+  actions: [{ label: "Cancel" }, {
+    label: "Reset", kind: "danger",
+    onClick: async () => { await postJson("/api/mod/welcome/reset", {}); welcomeDirty = false; toast("Welcome screen reset."); loadWelcome(); },
   }],
 }));
 

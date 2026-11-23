@@ -280,7 +280,8 @@ class Penguins:
     def apply_body(self, p, mine):
         """Speed and extra hearts (only changed when they need to be)."""
         try:
-            want = round(WALK * (1 + mine.get("speed", 0)), 3)
+            wl = getattr(self.plugin, "welcome", None)
+            want = 0.0 if wl is not None and wl.keep_frozen(p) else round(WALK * (1 + mine.get("speed", 0)), 3)
             if abs(float(p.walk_speed) - want) > 0.001:
                 p.walk_speed = want
         except Exception:

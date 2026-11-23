@@ -596,6 +596,8 @@ export async function tick(env) {
   await import("./sessions.js").then((m) => m.tick(env)).catch((e) => console.error("play sessions tick failed", e));
   await import("./giveaways.js").then((m) => m.tick(env)).catch((e) => console.error("giveaways tick failed", e));
   await import("./quiet.js").then((m) => m.tick(env)).catch((e) => console.error("quiet mode tick failed", e));
+  // the welcome screen's live info (latest news, next event) stays fresh in game
+  await import("./help.js").then(async (m) => (await import("./economy.js")).toPlugin(env, await m.welcomeMessage(sql))).catch((e) => console.error("welcome news failed", e));
   await sql`DELETE FROM filter_blocks WHERE created_at < now() - interval '7 days'`.catch(() => {});  // the blocked-messages log keeps 7 days
   // server diagnostics: the console and health readings keep 3 days; errors and start/stop events 30 days
   await sql`DELETE FROM server_console WHERE at < now() - interval '3 days'`.catch(() => {});

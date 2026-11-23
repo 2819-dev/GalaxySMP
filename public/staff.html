@@ -265,6 +265,20 @@
             </div>
             <p class="text-3 small" style="margin:0">Players open it in game with <code>/guide</code>. It has three pages: Server Information, Rules and Commands. Put <code>**two stars**</code> around words to make them bold. The website's Rules page shows the same rules. <span id="help-status"></span></p>
           </div>
+          <div class="panel" style="margin-bottom:16px" id="welcome-panel">
+            <div class="voice-head">
+              <h2>Welcome screen</h2>
+              <div class="row-actions">
+                <button class="btn btn-ghost btn-sm" type="button" id="welcome-reset">Reset</button>
+                <button class="btn btn-primary btn-sm" type="button" id="welcome-save" disabled>Save</button>
+              </div>
+            </div>
+            <p class="text-3 small" style="margin:0 0 10px">Fills the screen every time someone joins: the logo, galaxymc.us, players online, their money, the latest news and the next event, then the text and tabs below. Players can't move until they press Continue; brand-new players then go to spawn. Put <code>**two stars**</code> around words to make them bold. <span id="welcome-status"></span></p>
+            <label class="check" style="margin-bottom:10px"><input type="checkbox" id="welcome-enabled"> Show the welcome screen when players join</label>
+            <label class="small text-3">Welcome text (first page)<div id="welcome-intro"></div></label>
+            <div class="voice-head" style="margin-top:12px"><h3 style="margin:0">Tabs</h3><button class="btn btn-secondary btn-sm" type="button" id="welcome-add-tab">Add tab</button></div>
+            <div id="welcome-tabs" class="stack"></div>
+          </div>
           <div class="panel" style="margin-bottom:16px">
             <div class="voice-head"><h2>Server Information</h2></div>
             <p class="text-3 small" style="margin:0 0 10px">Shown under the GalaxySMP logo.</p>

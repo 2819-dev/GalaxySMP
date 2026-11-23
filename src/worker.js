@@ -426,6 +426,8 @@ const routes = [
   ["POST", "/api/mod/tickets/:id/update", support.updateTicket],
   ["GET", "/api/mod/help", help.adminGetHelp],
   ["POST", "/api/mod/help/:action", help.adminHelpAction],
+  ["GET", "/api/mod/welcome", help.adminGetWelcome],
+  ["POST", "/api/mod/welcome/:action", help.adminWelcomeAction],
 ];
 
 function matchPath(pattern, pathname) {

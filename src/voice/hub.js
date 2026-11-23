@@ -17,7 +17,7 @@ import { checkMessage, compileWordList } from "../lib/filter.js";
 import { sha256 } from "../lib/crypto.js";
 import { loadRanksState, recordPlayers } from "../routes/ranks.js";
 import { loadShop, recordBalances } from "../routes/economy.js";
-import { loadHelp } from "../routes/help.js";
+import { loadHelp, welcomeMessage } from "../routes/help.js";
 import { planMessage } from "../routes/plans.js";
 import { pluginMessage as serverControlMessage } from "../routes/servercontrol.js";
 import { hubStub } from "../routes/chat.js";
@@ -854,6 +854,7 @@ export class VoiceHub extends DurableObject {
       const sql = getDb(this.env);
       this.send(plugin, { type: "shop", shop: await loadShop(sql) });
       this.send(plugin, { type: "help", help: (await loadHelp(sql)).help });
+      this.send(plugin, await welcomeMessage(sql));   // the welcome screen's text, latest news and next event
       this.send(plugin, await planMessage(sql));
       this.send(plugin, await serverControlMessage(this.env, sql));  // maintenance, scheduled restart, welcome kit
       await this.sendWords();

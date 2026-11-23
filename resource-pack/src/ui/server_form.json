@@ -1,0 +1,263 @@
+{
+  "namespace": "server_form",
+
+  // GalaxySMP welcome screen: a menu (ActionForm) whose title contains the hidden marker §g§s§m§p fills the whole
+  // screen: galaxy background, the GalaxySMP logo, tab buttons on the left, the text on the right and Continue.
+  // Every other menu looks exactly like Minecraft's (Mojang's long_form, copied below as gsmp_vanilla_long_form).
+  // The plugin sends it on every join (endstone-plugin/src/endstone_galaxylink/welcome.py).
+
+  "main_screen_content": {
+    "type": "panel",
+    "size": [ "100%", "100%" ],
+    "controls": [
+      {
+        "server_form_factory": {
+          "type": "factory",
+          "control_ids": {
+            "long_form": "@server_form.long_form",
+            "custom_form": "@server_form.custom_form"
+          }
+        }
+      }
+    ]
+  },
+
+  "long_form": {
+    "type": "panel",
+    "size": [ "100%", "100%" ],
+    "controls": [
+      {
+        "vanilla@server_form.gsmp_vanilla_long_form": {
+          "bindings": [
+            { "binding_name": "#title_text" },
+            {
+              "binding_type": "view",
+              "source_property_name": "((#title_text - '§g§s§m§p') = #title_text)",
+              "target_property_name": "#visible"
+            }
+          ]
+        }
+      },
+      {
+        "welcome@server_form.gsmp_welcome": {
+          "bindings": [
+            { "binding_name": "#title_text" },
+            {
+              "binding_type": "view",
+              "source_property_name": "(not ((#title_text - '§g§s§m§p') = #title_text))",
+              "target_property_name": "#visible"
+            }
+          ]
+        }
+      }
+    ]
+  },
+
+  // Mojang's long_form, unchanged
+  "gsmp_vanilla_long_form@common_dialogs.main_panel_no_buttons": {
+    "$title_panel": "common_dialogs.standard_title_label",
+    "$title_size": [ "100% - 15px", 10 ],
+    "$title_max_size": [ "100% - 15px", 10 ],
+    "size": [ 225, 200 ],
+    "$text_name": "#title_text",
+    "$title_text_binding_type": "none",
+    "$child_control": "server_form.long_form_panel",
+    "layer": 2
+  },
+
+  // ---------- the welcome screen ----------
+  "gsmp_welcome": {
+    "type": "panel",
+    "size": [ "100%", "100%" ],
+    "layer": 2,
+    "controls": [
+      {
+        "backdrop": {
+          "type": "image",
+          "texture": "textures/ui/gsmp_nebula",
+          "bilinear": true,
+          "size": [ "100%", "100%" ],
+          "layer": 1
+        }
+      },
+      {
+        "stars": {
+          "type": "image",
+          "texture": "textures/ui/gsmp_stars",
+          "tiled": true,
+          "bilinear": false,
+          "size": [ "100%", "100%" ],
+          "layer": 2
+        }
+      },
+      {
+        "page": {
+          "type": "stack_panel",
+          "orientation": "vertical",
+          "size": [ "100% - 24px", "100% - 12px" ],
+          "anchor_from": "center",
+          "anchor_to": "center",
+          "layer": 5,
+          "controls": [
+            {
+              "logo": {
+                "type": "panel",
+                "size": [ "100%", 34 ],
+                "controls": [
+                  {
+                    "image": {
+                      "type": "image",
+                      "texture": "textures/ui/galaxysmp_logo",
+                      "bilinear": false,
+                      "keep_ratio": true,
+                      "size": [ "100%", "100%" ],
+                      "anchor_from": "center",
+                      "anchor_to": "center"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "site": {
+                "type": "label",
+                "text": "§bgalaxymc.us",
+                "shadow": true,
+                "text_alignment": "center",
+                "size": [ "100%", 12 ]
+              }
+            },
+            {
+              "divider": {
+                "type": "image",
+                "texture": "textures/ui/gsmp_divider",
+                "size": [ "100%", 3 ]
+              }
+            },
+            { "gap": { "type": "panel", "size": [ "100%", 5 ] } },
+            {
+              "body": {
+                "type": "stack_panel",
+                "orientation": "horizontal",
+                "size": [ "100%", "fill" ],
+                "controls": [
+                  {
+                    "menu": {
+                      "type": "panel",
+                      "size": [ "32%", "100%" ],
+                      "controls": [
+                        {
+                          "scroll@common.scrolling_panel": {
+                            "size": [ "100%", "100%" ],
+                            "$show_background": false,
+                            "$scrolling_content": "server_form.gsmp_buttons",
+                            "$scroll_size": [ 4, "100% - 4px" ],
+                            "$scrolling_pane_size": [ "100% - 6px", "100%" ],
+                            "$scrolling_pane_offset": [ 0, 0 ],
+                            "$scroll_bar_right_padding_size": [ 0, 0 ]
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  { "gap": { "type": "panel", "size": [ 6, "100%" ] } },
+                  {
+                    "text_box": {
+                      "type": "image",
+                      "texture": "textures/ui/gsmp_box",
+                      "size": [ "fill", "100%" ],
+                      "controls": [
+                        {
+                          "scroll@common.scrolling_panel": {
+                            "size": [ "100% - 8px", "100% - 8px" ],
+                            "anchor_from": "center",
+                            "anchor_to": "center",
+                            "$show_background": false,
+                            "$scrolling_content": "server_form.gsmp_text",
+                            "$scroll_size": [ 4, "100% - 4px" ],
+                            "$scrolling_pane_size": [ "100% - 6px", "100%" ],
+                            "$scrolling_pane_offset": [ 2, 0 ],
+                            "$scroll_bar_right_padding_size": [ 0, 0 ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+
+  "gsmp_text": {
+    "type": "panel",
+    "size": [ "100%", "100%c + 6px" ],
+    "controls": [
+      {
+        "label": {
+          "type": "label",
+          "text": "#form_text",
+          "color": [ 0.93, 0.95, 1.0 ],
+          "shadow": true,
+          "size": [ "100% - 6px", "default" ],
+          "offset": [ 3, 3 ],
+          "anchor_from": "top_left",
+          "anchor_to": "top_left"
+        }
+      }
+    ]
+  },
+
+  "gsmp_buttons": {
+    "type": "stack_panel",
+    "orientation": "vertical",
+    "size": [ "100%", "100%c" ],
+    "factory": {
+      "name": "buttons",
+      "control_ids": {
+        "button": "@server_form.gsmp_button"
+      }
+    },
+    "collection_name": "form_buttons",
+    "bindings": [
+      {
+        "binding_name": "#form_button_contents",
+        "binding_name_override": "#collection_length"
+      }
+    ]
+  },
+
+  "gsmp_button": {
+    "type": "panel",
+    "size": [ "100%", 30 ],
+    "controls": [
+      {
+        "button@common_buttons.light_text_button": {
+          "$pressed_button_name": "button.form_button_click",
+          "size": [ "100%", 27 ],
+          "anchor_from": "top_left",
+          "anchor_to": "top_left",
+          "$button_text": "#form_button_text",
+          "$button_text_binding_type": "collection",
+          "$button_text_grid_collection_name": "form_buttons",
+          "$button_text_max_size": [ "100% - 6px", 20 ],
+          "$default_button_texture": "textures/ui/gsmp_button",
+          "$hover_button_texture": "textures/ui/gsmp_button_hover",
+          "$pressed_button_texture": "textures/ui/gsmp_button_pressed",
+          "$default_text_color": [ 0.93, 0.95, 1.0 ],
+          "$hover_text_color": [ 0.75, 0.96, 1.0 ],
+          "$pressed_text_color": [ 0.6, 0.78, 1.0 ],
+          "bindings": [
+            {
+              "binding_type": "collection_details",
+              "binding_collection_name": "form_buttons"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

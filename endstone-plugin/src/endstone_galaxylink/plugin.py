@@ -44,6 +44,7 @@ from endstone_galaxylink import ranks as ranks_module
 from endstone_galaxylink.progress import HOSTILE, short as short_id
 from endstone_galaxylink.economy import HUD_TICKS, Economy
 from endstone_galaxylink.helpmenu import HelpMenu
+from endstone_galaxylink.welcome import Welcome
 from endstone_galaxylink.npc import HOLD_TICKS, NpcManager
 from endstone_galaxylink.plans import CHECK_TICKS, Plans
 from endstone_galaxylink.minigames import STAFF_PERMISSION, Minigames
@@ -53,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.71.0"
+VERSION = "2.72.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -268,6 +269,7 @@ class GalaxyLink(Plugin):
         self.servercontrol = ServerControl(self)  # maintenance mode, scheduled restart, welcome kit (website)
         self.crates = Crates(self)
         self.penguins = Penguins(self)  # penguins (tamed with fish, Penguin's Grace) and potato chips
+        self.welcome = Welcome(self)  # full-screen welcome screen on every join
         self.elevators = Elevators(self)
         from endstone_galaxylink.potm import PlayerOfTheMonth
         self.potm = PlayerOfTheMonth(self)  # Player of the Month: Voting Computers
@@ -430,9 +432,19 @@ class GalaxyLink(Plugin):
             return
         brand_new = self.progress.load(player.xuid) is None
         self.server.scheduler.run_task(self, lambda: self.penguins.on_join(player) if player.is_valid else None, delay=40)  # normal speed and hearts
-        self.server.scheduler.run_task(self, lambda: self.support.on_join(player) if player.is_valid else None, delay=60)  # staff answers to /support
-        self.server.scheduler.run_task(self, lambda: self.market.on_join(player) if player.is_valid else None, delay=80)  # items from buy orders
-        self.server.scheduler.run_task(self, lambda: self.visits.on_join(player) if player.is_valid else None, delay=100)  # Visit picked on the website
+        welcomed = False
+        try:
+            welcomed = self.welcome.on_join(player, brand_new)  # full-screen welcome screen; frozen until Continue
+        except Exception as e:
+            self.logger.warning(f"Welcome screen failed: {e}")
+        if welcomed:
+            later(self, player, self.welcome.show, 50)
+            for fn in (self.support.on_join, self.market.on_join, self.visits.on_join):
+                self.welcome.after(player, fn)   # once they press Continue
+        else:
+            self.server.scheduler.run_task(self, lambda: self.support.on_join(player) if player.is_valid else None, delay=60)  # staff answers to /support
+            self.server.scheduler.run_task(self, lambda: self.market.on_join(player) if player.is_valid else None, delay=80)  # items from buy orders
+            self.server.scheduler.run_task(self, lambda: self.visits.on_join(player) if player.is_valid else None, delay=100)  # Visit picked on the website
         pending = self._pending_ops()
         if str(player.xuid) in pending:
             try:
@@ -453,8 +465,11 @@ class GalaxyLink(Plugin):
             self.packs.on_join(player)
         except Exception as e:
             self.logger.warning(f"Packs on join failed: {e}")
-        if brand_new:  # very first join: welcome kit
-            later(self, player, self.servercontrol.welcome, 40)
+        if brand_new:  # very first join: welcome kit (after the welcome screen)
+            if welcomed:
+                self.welcome.after(player, self.servercontrol.welcome)
+            else:
+                later(self, player, self.servercontrol.welcome, 40)
         self.shopchests.on_join(player)
         self.elevators.check_tool(player)
         self.cosmetics.on_join(player)
@@ -472,7 +487,7 @@ class GalaxyLink(Plugin):
         p = event.player
         # each one on its own, so one problem doesn't stop the others
         for part in ("ranks.forget", "plates.on_quit", "galaxymap.on_quit", "parkour.on_quit", "collection.on_quit",
-                     "teleports.on_quit", "progress.on_quit", "bedwars.on_quit", "penguins.on_quit"):
+                     "teleports.on_quit", "progress.on_quit", "bedwars.on_quit", "penguins.on_quit", "welcome.on_quit"):
             obj, fn = part.split(".")
             try:
                 getattr(getattr(self, obj), fn)(p)
@@ -547,6 +562,8 @@ class GalaxyLink(Plugin):
 
     @event_handler
     def on_actor_damage(self, event: ActorDamageEvent):
+        if self.welcome.on_damage(event):  # nobody gets hurt on the welcome screen
+            return
         if self.bedwars.on_damage(event):  # Bedwars deaths, teams and the waiting room
             return
         if self.penguins.on_damage(event):  # only a penguin's owner can hurt it

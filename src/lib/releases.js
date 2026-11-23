@@ -705,6 +705,13 @@ Penguins and chips are super rare prizes in Galaxy Crates, and staff may hand th
     body: `- **Pets wait outside spawn.** Tamed-type animals (wolves, cats, parrots, horses, penguins and more) no longer follow you into spawn, where they wouldn't survive. They wait just outside the edge until you come back.
 - **Chip powers now show.** The power name, time left and Penguin's Grace now appear under your money above the hotbar, instead of being covered by it.`,
   },
+  {
+    id: "2026-11-23-welcome-screen",
+    title: "A new welcome screen",
+    body: `Every time you join, a full-screen welcome screen now greets you with the GalaxySMP logo, the website, who's online, your money, the latest news and the next event.
+
+Use the tabs to learn the basics (Getting Started, Plots, Money & Store, Voice Chat, Minigames and Rules), then press **Continue** to start playing. New players are taken to spawn, and everyone else picks up right where they left off.`,
+  },
 ];
 
 // Official posts come from the GalaxySMP member account (or the owner, if it doesn't exist yet).
