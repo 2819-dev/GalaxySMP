@@ -348,7 +348,7 @@ export class CommunityHub extends DurableObject {
     // isn't banned or muted and is allowed to post in this channel.
     const rows = await sql`
       WITH who AS (
-        SELECT u.id, u.banned, u.muted_until, r.power
+        SELECT u.id, u.banned, u.muted_until, u.mute_shown, r.power
           FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ${user.id}
       ), ch AS (
         SELECT id, min_post_power FROM channels WHERE id = ${channelId} AND kind = 'text' AND NOT hidden
@@ -372,13 +372,14 @@ export class CommunityHub extends DurableObject {
       SELECT (SELECT id FROM ins) AS id,
              (SELECT banned FROM who) AS banned,
              (SELECT muted_until FROM who) AS muted_until,
+             (SELECT mute_shown FROM who) AS mute_shown,
              (SELECT power FROM who) AS power,
              (SELECT min_post_power FROM ch) AS min_post_power`;
     const r = rows[0];
     if (!r.id) {
       if (r.banned) return reject("Your account has been banned.");
       if (r.muted_until && new Date(r.muted_until) > new Date()) {
-        return reject(`You are muted until ${new Date(r.muted_until).toUTCString().replace(" GMT", " UTC")}.`);
+        return reject(`You are muted until ${new Date(r.muted_until).toUTCString().replace(" GMT", " UTC")}.${r.mute_shown ? ` Reason: ${r.mute_shown}` : ""}`);
       }
       if (r.min_post_power == null) return reject("Unknown channel.");
       return reject("Your rank can't post in this channel.");

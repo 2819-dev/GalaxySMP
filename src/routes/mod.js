@@ -139,12 +139,14 @@ export async function mute(request, env, ctx, url, params) {
   const sql = getDb(env);
   const target = await loadTarget(sql, Number(params.id));
   assertCanAct(env, actor, target);
-  const reason = cleanReason(body.reason);
+  const reason = cleanReason(body.reason);          // staff note (only staff see it)
+  const shown = cleanReason(body.shownReason);      // shown to the member
   await sql.transaction([
-    sql`UPDATE users SET muted_until = now() + make_interval(mins => ${minutes}), mute_reason = ${reason || null} WHERE id = ${target.id}`,
-    audit(sql, actor.id, "user.mute", { userId: target.id, details: { minutes, reason } }),
+    sql`UPDATE users SET muted_until = now() + make_interval(mins => ${minutes}), mute_reason = ${reason || null}, mute_shown = ${shown || null} WHERE id = ${target.id}`,
+    audit(sql, actor.id, "user.mute", { userId: target.id, details: { minutes, reason, shown } }),
   ]);
   await memberUpdated(env, sql, target.id);
+  await tellMember(env, target.id, "You've been muted", `You can't send messages for ${muteLength(minutes)}.${shown ? ` Reason: ${shown}` : ""}`);
   return json({ ok: true });
 }
 
@@ -154,7 +156,7 @@ export async function unmute(request, env, ctx, url, params) {
   const target = await loadTarget(sql, Number(params.id));
   assertCanAct(env, actor, target);
   await sql.transaction([
-    sql`UPDATE users SET muted_until = NULL, mute_reason = NULL WHERE id = ${target.id}`,
+    sql`UPDATE users SET muted_until = NULL, mute_reason = NULL, mute_shown = NULL WHERE id = ${target.id}`,
     audit(sql, actor.id, "user.unmute", { userId: target.id }),
   ]);
   await memberUpdated(env, sql, target.id);
@@ -168,13 +170,15 @@ export async function ban(request, env, ctx, url, params) {
   const target = await loadTarget(sql, Number(params.id));
   assertCanAct(env, actor, target);
   const reason = cleanReason(body.reason);
-  if (!reason) throw new HttpError(400, "Please give a reason for the ban.");
+  const shown = cleanReason(body.shownReason);
+  if (!reason && !shown) throw new HttpError(400, "Please give a reason for the ban.");
   await sql.transaction([
-    sql`UPDATE users SET banned = true, ban_reason = ${reason} WHERE id = ${target.id}`,
+    sql`UPDATE users SET banned = true, ban_reason = ${reason || shown}, ban_shown = ${shown || null} WHERE id = ${target.id}`,
     sql`DELETE FROM sessions WHERE user_id = ${target.id}`,
-    audit(sql, actor.id, "user.ban", { userId: target.id, details: { reason } }),
+    audit(sql, actor.id, "user.ban", { userId: target.id, details: { reason, shown } }),
   ]);
-  await hubBroadcast(env, { type: "kick", userId: Number(target.id), reason: "Your account has been banned from the community. You can appeal at galaxymc.us/appeal." });
+  await hubBroadcast(env, { type: "kick", userId: Number(target.id),
+    reason: `Your account has been banned from the community.${shown ? ` Reason: ${shown}` : ""} You can appeal at galaxymc.us/appeal.` });
   await voiceEvent(env, { type: "banned", userId: Number(target.id) });
   await hubBroadcast(env, { type: "member_removed", userId: Number(target.id) });
   return json({ ok: true });
@@ -186,7 +190,7 @@ export async function unban(request, env, ctx, url, params) {
   const target = await loadTarget(sql, Number(params.id));
   assertCanAct(env, actor, target);
   await sql.transaction([
-    sql`UPDATE users SET banned = false, ban_reason = NULL WHERE id = ${target.id}`,
+    sql`UPDATE users SET banned = false, ban_reason = NULL, ban_shown = NULL WHERE id = ${target.id}`,
     audit(sql, actor.id, "user.unban", { userId: target.id }),
   ]);
   return json({ ok: true });
@@ -203,7 +207,7 @@ export async function searchMembers(request, env, ctx, url) {
   const filter = url.searchParams.get("filter") || "all";
   const sql = getDb(env);
   const rows = await sql`
-    SELECT u.id, u.username, u.platform, u.banned, u.ban_reason, u.muted_until, u.mute_reason,
+    SELECT u.id, u.username, u.platform, u.banned, u.ban_reason, u.ban_shown, u.muted_until, u.mute_reason, u.mute_shown,
            u.voice_muted_until, u.voice_mute_reason, u.global_mic,
            u.created_at, u.last_seen_at, r.key AS role, r.power,
            pl.xuid, rk.id AS rank_id, rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color,
@@ -240,6 +244,8 @@ export async function searchMembers(request, env, ctx, url) {
       banReason: u.ban_reason,
       mutedUntil: u.muted_until && new Date(u.muted_until) > new Date() ? u.muted_until : null,
       muteReason: u.mute_reason,
+      muteShown: u.mute_shown || null,
+      banShown: u.ban_shown || null,
       voiceMutedUntil: u.voice_muted_until && new Date(u.voice_muted_until) > new Date() ? u.voice_muted_until : null,
       voiceMuteReason: u.voice_mute_reason,
       globalMic: Boolean(u.global_mic),
@@ -261,12 +267,14 @@ export async function voiceMute(request, env, ctx, url, params) {
   const target = await loadTarget(sql, Number(params.id));
   assertCanAct(env, actor, target);
   const reason = cleanReason(body.reason);
+  const shown = cleanReason(body.shownReason);
   const rows = await sql.transaction([
-    sql`UPDATE users SET voice_muted_until = now() + make_interval(mins => ${minutes}), voice_mute_reason = ${reason || null}
+    sql`UPDATE users SET voice_muted_until = now() + make_interval(mins => ${minutes}), voice_mute_reason = ${reason || null}, voice_mute_shown = ${shown || null}
          WHERE id = ${target.id} RETURNING voice_muted_until`,
-    audit(sql, actor.id, "voice.mute", { userId: target.id, details: { minutes, reason } }),
+    audit(sql, actor.id, "voice.mute", { userId: target.id, details: { minutes, reason, shown } }),
   ]);
-  await voiceEvent(env, { type: "voice_mute", userId: Number(target.id), until: rows[0][0].voice_muted_until, reason });
+  await voiceEvent(env, { type: "voice_mute", userId: Number(target.id), until: rows[0][0].voice_muted_until, reason: shown });
+  await tellMember(env, target.id, "You've been muted in voice", `Nobody can hear you in voice for ${muteLength(minutes)}.${shown ? ` Reason: ${shown}` : ""}`);
   return json({ ok: true });
 }
 
@@ -276,7 +284,7 @@ export async function voiceUnmute(request, env, ctx, url, params) {
   const target = await loadTarget(sql, Number(params.id));
   assertCanAct(env, actor, target);
   await sql.transaction([
-    sql`UPDATE users SET voice_muted_until = NULL, voice_mute_reason = NULL WHERE id = ${target.id}`,
+    sql`UPDATE users SET voice_muted_until = NULL, voice_mute_reason = NULL, voice_mute_shown = NULL WHERE id = ${target.id}`,
     audit(sql, actor.id, "voice.unmute", { userId: target.id }),
   ]);
   await voiceEvent(env, { type: "voice_unmute", userId: Number(target.id) });
@@ -291,7 +299,8 @@ export async function voiceKick(request, env, ctx, url, params) {
   assertCanAct(env, actor, target);
   const reason = cleanReason(body.reason);
   await audit(sql, actor.id, "voice.kick", { userId: target.id, details: { reason } });
-  await voiceEvent(env, { type: "voice_kick", userId: Number(target.id), reason: reason ? `Removed from voice by staff: ${reason}` : "" });
+  const shown = cleanReason(body.shownReason);
+  await voiceEvent(env, { type: "voice_kick", userId: Number(target.id), reason: shown ? `Removed from voice by staff: ${shown}` : "" });
   return json({ ok: true });
 }
 
@@ -526,4 +535,24 @@ export async function logBlock(env, { userId, place, content, reason, detail }) 
     await getDb(env)`INSERT INTO filter_blocks (user_id, place, content, reason, detail)
                      VALUES (${userId || null}, ${String(place).slice(0, 40)}, ${String(content || "").slice(0, 500)}, ${String(reason || "").slice(0, 30)}, ${detail ? String(detail).slice(0, 200) : null})`;
   } catch (e) { console.error("filter log failed", e); }
+}
+
+// ---------- telling the member (a notification in their inbox, and on their phone when they allow it) ----------
+function muteLength(minutes) {
+  if (minutes >= 1440 * 365) return "a very long time";
+  if (minutes >= 1440) return `${Math.round(minutes / 1440)} day${Math.round(minutes / 1440) === 1 ? "" : "s"}`;
+  if (minutes >= 60) return `${Math.round(minutes / 60)} hour${Math.round(minutes / 60) === 1 ? "" : "s"}`;
+  return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+}
+
+async function tellMember(env, userId, title, body) {
+  try {
+    const { notify } = await import("./notify.js");
+    await notify(env, [Number(userId)], "community", { title, body: body.slice(0, 200), url: "/community", tag: `mod-${userId}-${Date.now()}` });
+  } catch (e) { console.error("couldn't tell the member", e); }
+}
+
+// "You are muted ..." with the reason staff chose to show (chat and DMs).
+export function mutedText(until, shown) {
+  return `You are muted until ${new Date(until).toUTCString().replace(" GMT", " UTC")}.${shown ? ` Reason: ${shown}` : ""}`;
 }

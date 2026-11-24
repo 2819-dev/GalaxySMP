@@ -25,7 +25,7 @@ async function notify(env, payload) {
 
 async function loadUser(sql, id) {
   const [u] = await sql`
-    SELECT u.id, u.username, u.platform, u.banned, u.muted_until, r.power, p.xuid, p.head_at, p.gamerpic_at,
+    SELECT u.id, u.username, u.platform, u.banned, u.muted_until, u.mute_shown, r.power, p.xuid, p.head_at, p.gamerpic_at,
            (p.online_at > now() - interval '150 seconds') AS in_game
       FROM users u JOIN roles r ON r.id = u.role_id LEFT JOIN players p ON p.uuid = u.mc_uuid
      WHERE u.id = ${id}`;
@@ -40,7 +40,7 @@ async function sendDm(env, sql, from, to, text, via, audioId = null, imageId = n
   if (to.is_bot === true || (await sql`SELECT is_bot FROM users WHERE id = ${to.id}`)[0]?.is_bot) throw new HttpError(400, "GalaxySMP is the server's own account, so it can't read DMs. Open a ticket in #Support if you need help.");
   if (Number(from.id) === Number(to.id)) throw new HttpError(400, "You can't message yourself.");
   if (from.banned) throw new HttpError(403, "Your account has been banned.");
-  if (from.muted_until && new Date(from.muted_until) > new Date()) throw new HttpError(403, "You're muted, so you can't send messages right now.");
+  if (from.muted_until && new Date(from.muted_until) > new Date()) throw new HttpError(403, "You're muted, so you can't send messages right now." + (from.mute_shown ? ` Reason: ${from.mute_shown}` : ""));
   const body = clean(text);
   if (!body && !audioId && !imageId) throw new HttpError(400, "Type a message first.");
   const words = compileWordList(await sql`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`);

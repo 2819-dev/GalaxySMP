@@ -103,7 +103,7 @@ export async function login(request, env) {
   const candidates = [...forms].flatMap((f) => [f, "." + f]);
   const sql = getDb(env);
   const rows = await sql`
-    SELECT id, username_lower, banned, ban_reason,
+    SELECT id, username_lower, banned, ban_reason, ban_shown,
            coalesce(locked_until > now(), false) AS locked,
            password_hash = crypt(${password}, password_hash) AS ok
       FROM users WHERE username_lower = ANY(${candidates}) AND NOT is_bot`;  // nobody can sign in as GalaxySMP
@@ -121,7 +121,7 @@ export async function login(request, env) {
     throw new HttpError(401, wrong);
   }
   if (user.banned) {
-    throw new HttpError(403, "This account has been banned from the community." + (user.ban_reason ? ` Reason: ${user.ban_reason}` : "") + " You can appeal at galaxymc.us/appeal.");
+    throw new HttpError(403, "This account has been banned from the community." + (user.ban_shown ? ` Reason: ${user.ban_shown}` : "") + " You can appeal at galaxymc.us/appeal.");
   }
   await sql`UPDATE users SET failed_logins = 0, locked_until = NULL, last_seen_at = now() WHERE id = ${user.id}`;
   // two-step sign-in on: the code from their authenticator app comes next (POST /api/auth/login/2fa)

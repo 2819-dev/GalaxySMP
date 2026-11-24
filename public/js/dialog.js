@@ -114,25 +114,31 @@ export function field(label, control, hint) {
 // Shared staff actions, used by both the chat and the Staff page.
 export function muteDialog(member, onDone) {
   const len = select("mute-len", Object.entries(MUTE_LABELS), 60);
-  const reason = h("input", { class: "input", id: "mute-reason", maxlength: 300, placeholder: "Optional, shown in the audit log" });
+  const shown = h("input", { class: "input", id: "mute-shown", maxlength: 300, placeholder: "e.g. Spamming in #chat" });
+  const reason = h("input", { class: "input", id: "mute-reason", maxlength: 300, placeholder: "Optional" });
   openDialog({
     title: `Mute ${member.username}`,
-    body: h("div", { class: "form" }, h("p", { class: "text-2", text: "Muted members can still read chat, but can't send messages until the mute ends." }), field("Length", len), field("Reason", reason)),
+    body: h("div", { class: "form" }, h("p", { class: "text-2", text: "Muted members can still read chat, but can't send messages until the mute ends." }), field("Length", len),
+      field("Reason shown to them", shown, "They see this in a notification and when they try to send a message."),
+      field("Staff note", reason, "Only staff see this (in the audit log).")),
     actions: [
       { label: "Cancel" },
-      { label: "Mute", kind: "primary", onClick: async () => { await postJson(`/api/mod/members/${member.id}/mute`, { minutes: Number(len.value), reason: reason.value }); onDone?.("Member muted."); } },
+      { label: "Mute", kind: "primary", onClick: async () => { await postJson(`/api/mod/members/${member.id}/mute`, { minutes: Number(len.value), shownReason: shown.value, reason: reason.value }); onDone?.("Member muted."); } },
     ],
   });
 }
 
 export function banDialog(member, onDone) {
-  const reason = h("input", { class: "input", id: "ban-reason", maxlength: 300, required: true, placeholder: "Required" });
+  const shown = h("input", { class: "input", id: "ban-shown", maxlength: 300, placeholder: "e.g. Repeated harassment" });
+  const reason = h("input", { class: "input", id: "ban-reason", maxlength: 300, placeholder: "Optional" });
   openDialog({
     title: `Ban ${member.username}`,
-    body: h("div", { class: "form" }, h("p", { class: "text-2", text: "Banned members are signed out immediately and can't use the community until an Admin unbans them." }), field("Reason", reason)),
+    body: h("div", { class: "form" }, h("p", { class: "text-2", text: "Banned members are signed out immediately and can't use the community until an Admin unbans them." }),
+      field("Reason shown to them", shown, "They see this when they're signed out and when they try to sign in."),
+      field("Staff note", reason, "Only staff see this (in the audit log). Fill in at least one of the two.")),
     actions: [
       { label: "Cancel" },
-      { label: "Ban member", kind: "danger", onClick: async () => { await postJson(`/api/mod/members/${member.id}/ban`, { reason: reason.value }); onDone?.("Member banned."); } },
+      { label: "Ban member", kind: "danger", onClick: async () => { await postJson(`/api/mod/members/${member.id}/ban`, { shownReason: shown.value, reason: reason.value }); onDone?.("Member banned."); } },
     ],
   });
 }
@@ -151,13 +157,16 @@ export function roleDialog(member, onDone) {
 
 export function voiceMuteDialog(member, onDone) {
   const len = select("vmute-len", Object.entries(MUTE_LABELS), 60);
-  const reason = h("input", { class: "input", id: "vmute-reason", maxlength: 300, placeholder: "Optional, shown in the audit log" });
+  const shown = h("input", { class: "input", id: "vmute-shown", maxlength: 300, placeholder: "e.g. Loud noises" });
+  const reason = h("input", { class: "input", id: "vmute-reason", maxlength: 300, placeholder: "Optional" });
   openDialog({
     title: `Mute ${member.username} in voice`,
-    body: h("div", { class: "form" }, h("p", { class: "text-2", text: "They can still listen in voice, but nobody will hear them until the mute ends." }), field("Length", len), field("Reason", reason)),
+    body: h("div", { class: "form" }, h("p", { class: "text-2", text: "They can still listen in voice, but nobody will hear them until the mute ends." }), field("Length", len),
+      field("Reason shown to them", shown, "They see this in voice and in a notification."),
+      field("Staff note", reason, "Only staff see this (in the audit log).")),
     actions: [
       { label: "Cancel" },
-      { label: "Mute in voice", kind: "primary", onClick: async () => { await postJson(`/api/mod/members/${member.id}/voice-mute`, { minutes: Number(len.value), reason: reason.value }); onDone?.("Muted in voice."); } },
+      { label: "Mute in voice", kind: "primary", onClick: async () => { await postJson(`/api/mod/members/${member.id}/voice-mute`, { minutes: Number(len.value), shownReason: shown.value, reason: reason.value }); onDone?.("Muted in voice."); } },
     ],
   });
 }

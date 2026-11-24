@@ -593,6 +593,12 @@ The bigger Sift is built in the background after the update, which takes about h
 - You can now share **galaxymc.us** (and pages on it) in chat and DMs.
 - Real links from other websites are still blocked, as before.`,
   },
+  {
+    id: "2026-11-24-mod-reasons",
+    title: "Clearer reasons for mutes and bans",
+    body: `- When staff mute or ban a member on the website, they can now add a reason that the member sees. Muted members see it in a notification and when they try to send a message. Banned members see it when they try to sign in.
+- Staff can also add a separate note that only staff can see.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

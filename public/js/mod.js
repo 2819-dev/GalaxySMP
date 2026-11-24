@@ -109,7 +109,7 @@ async function memberDialog(m) {
     } else {
       if (detail) {
         body.append(h("p", { class: "text-3 small", text: `Joined ${new Date(detail.joined).toLocaleDateString()} · ${detail.messages} message${detail.messages === 1 ? "" : "s"} · reported ${detail.reported} time${detail.reported === 1 ? "" : "s"}` }));
-        if (detail.mutedUntil) body.append(h("p", { class: "note small", text: `Muted until ${new Date(detail.mutedUntil).toLocaleString()}${detail.muteReason ? ` (${detail.muteReason})` : ""}` }));
+        if (detail.mutedUntil) body.append(h("p", { class: "note small", text: `Muted until ${new Date(detail.mutedUntil).toLocaleString()}${detail.muteShown ? `. Shown to them: "${detail.muteShown}"` : ""}${detail.muteReason ? `. Staff note: ${detail.muteReason}` : ""}` }));
       }
       const done = (msg) => { toast(msg); };
       if (!has("mute_members")) { /* their rank can't mute */ } else if (detail?.mutedUntil) {

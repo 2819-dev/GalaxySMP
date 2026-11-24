@@ -380,6 +380,12 @@ const PENDING = [
     "CREATE INDEX IF NOT EXISTS game_link_codes_uuid_idx ON game_link_codes (mc_uuid) WHERE used_at IS NULL",
     "INSERT INTO schema_migrations (version) VALUES ('0089_game_link_codes') ON CONFLICT DO NOTHING",
   ]],
+  ["0090_shown_reasons", [
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS mute_shown text",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_shown text",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_mute_shown text",
+    "INSERT INTO schema_migrations (version) VALUES ('0090_shown_reasons') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;
