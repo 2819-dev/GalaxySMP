@@ -545,6 +545,11 @@ Staff can also now name world borders and teleport to them.`,
     body: `- **See the border:** a blue striped wall now appears when you get close to the edge of a world.
 - **One-tap joining:** tap any server in the Featured Servers list to join it right away.`,
   },
+  {
+    id: "2026-11-24-smoother-sift-build",
+    title: "Smoother server while the Sift is built",
+    body: `The Sift is now built in the background more gently, so the server stays smooth and responsive while it's being made. It takes about 10 minutes after a restart.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

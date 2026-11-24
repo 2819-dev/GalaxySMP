@@ -3,7 +3,7 @@
 A round valley about 220 blocks across, closed in by tall banded red cliffs so it feels like its own world:
 salmon-pink ground with mossy flower meadows, tall spiky pink grass, pale weeping trees with long white curtains,
 and huge red rock pillars with flat, tree-covered tops. While you're inside, the sky turns teal (a fog from the pack).
-The plugin builds it once by itself, a 64 x 64 piece at a time (about 5 minutes), and checks each piece really built.
+The plugin builds it once by itself, a 64 x 64 piece at a time (about 10 minutes), and checks each piece really built.
 Wild Dumplings and Blubs are spawned by the plugin near players in the Sift.
 
 Get there: the "The Sift" card on the Main Menu, a Sift portal (Portal Axe), or /sift (staff).
@@ -12,6 +12,7 @@ Get there: the "The Sift" card on the Main Menu, a Sift portal (Portal Axe), or 
 import math
 import random
 import time
+from collections import deque
 
 CX, CZ = 50000, 50000   # middle of the Sift
 BASE = 68               # ground height
@@ -21,7 +22,9 @@ R = 112                 # radius of the valley (red cliffs all around the edge)
 TILE = 64
 TILES = [(tx, tz) for tx in range(-128, 128, TILE) for tz in range(-128, 128, TILE)]   # 16 pieces
 SEED = 2027
-PER_TICK = 150          # commands per tick while building
+PER_TICK = 120          # at most this many commands per tick while building...
+BUDGET = 0.010          # ...and at most 10 ms of each tick (a tick is 50 ms), so the server stays smooth
+BUSY_MSPT = 40          # if the server is already slow (ms per tick), wait instead of building
 AREA = "gsmp_sift_build"
 VERSION = 2             # bump to rebuild the Sift after a redesign
 UNDER = "minecraft:red_terracotta"
@@ -286,18 +289,28 @@ class Sift:
         done = set(map(tuple, self.plugin.economy.get_config(PIECES) or []))
         self.todo = [t for t in TILES if t not in done]
         self.sender = sender
+        self.cmd(f"tickingarea remove {AREA}")   # a leftover from an older version
         self.plugin.logger.info(f"The Sift: building {len(self.todo)} pieces...")
         self.next_tile()
         return True
 
     def cmd(self, c):
+        """Runs a command quietly (building runs hundreds of thousands; they shouldn't flood the console)."""
+        server = self.plugin.server
         try:
-            return self.plugin.server.dispatch_command(self.plugin.server.command_sender, c)
+            if getattr(self, "quiet", None) is None:
+                try:
+                    from endstone.command import CommandSenderWrapper
+                    self.quiet = CommandSenderWrapper(server.command_sender, on_message=lambda m: None, on_error=lambda m: None)
+                except Exception:
+                    self.quiet = server.command_sender
+            return server.dispatch_command(self.quiet, c)
         except Exception:
             return False
 
     def next_tile(self):
-        self.cmd(f"tickingarea remove {AREA}")
+        # each piece gets its own loading-area name (removing one finishes a moment later, so a reused name clashes)
+        self.cmd(f"tickingarea remove {getattr(self, 'area', AREA)}")
         if not self.todo:
             self.tile = None
             if getattr(self, "incomplete", False):
@@ -314,8 +327,9 @@ class Sift:
             return
         self.tile = self.todo.pop(0)
         tx, tz = self.tile
-        self.queue = tile_commands(tx, tz)
-        self.cmd(f"tickingarea add {CX + tx} {BASE} {CZ + tz} {CX + tx + TILE - 1} {BASE} {CZ + tz + TILE - 1} {AREA} true")
+        self.queue = deque(tile_commands(tx, tz))
+        self.area = f"{AREA}_{(tx + 128) // TILE}{(tz + 128) // TILE}"
+        self.cmd(f"tickingarea add {CX + tx} {BASE} {CZ + tz} {CX + tx + TILE - 1} {BASE} {CZ + tz + TILE - 1} {self.area} true")
         self.wait = 100   # let the chunks load
 
     def build_tick(self):
@@ -331,10 +345,16 @@ class Sift:
                 self.wait = 20
                 return
         self.waited = 0
+        try:
+            if float(self.plugin.server.current_mspt) > BUSY_MSPT:
+                return   # the server is busy right now: build a little later
+        except Exception:
+            pass
+        start = time.perf_counter()
         for _ in range(PER_TICK):
-            if not self.queue:
+            if not self.queue or time.perf_counter() - start > BUDGET:
                 break
-            self.cmd(self.queue.pop(0))
+            self.cmd(self.queue.popleft())
         if self.queue:
             return
         tx, tz = self.tile
@@ -483,7 +503,7 @@ class Sift:
             if len(args) > 1 and args[1].lower() == "again":
                 self.plugin.economy.set_config(PIECES, [])
                 self.plugin.economy.set_config(BUILT, False)
-            sender.send_message("§bBuilding the Sift... §7(about 5 minutes)" if self.start_build(sender) else "§eIt's already being built.")
+            sender.send_message("§bBuilding the Sift... §7(about 10 minutes)" if self.start_build(sender) else "§eIt's already being built.")
             return True
         if sub == "status" and sender.is_op:
             done = len(self.plugin.economy.get_config(PIECES) or [])
