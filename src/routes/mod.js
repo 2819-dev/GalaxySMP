@@ -583,3 +583,60 @@ export async function muteFromGame(env, sql, xuid, minutes, reason) {
   }
   await memberUpdated(env, sql, u.id);
 }
+
+// ---------- Member card: staff notes and the full punishment history ----------
+const RECORD_ACTIONS = ["user.mute", "user.unmute", "user.ban", "user.unban", "voice.mute", "voice.unmute", "voice.kick", "message.delete"];
+const LABELS = { "user.mute": "Muted", "user.unmute": "Unmuted", "user.ban": "Banned", "user.unban": "Unbanned", "voice.mute": "Muted in voice",
+  "voice.unmute": "Unmuted in voice", "voice.kick": "Removed from voice", "message.delete": "Message deleted",
+  warn: "Warned in game", mute: "Muted in game", unmute: "Unmuted in game", kick: "Kicked from the game", ban: "Banned from the game", unban: "Unbanned from the game" };
+
+// GET /api/mod/members/:id/record -> { notes, history }  (staff)
+export async function memberRecord(request, env, ctx, url, params) {
+  await requireStaff(request, env);
+  const sql = getDb(env);
+  const id = Number(params.id);
+  const [u] = await sql`SELECT u.id, pl.xuid FROM users u LEFT JOIN players pl ON pl.uuid = u.mc_uuid WHERE u.id = ${id}`;
+  if (!u) throw new HttpError(404, "That member doesn't exist.");
+  const [notes, web, game] = await Promise.all([
+    sql`SELECT n.id, n.body, n.created_at, a.username AS author, n.author_id FROM staff_notes n LEFT JOIN users a ON a.id = n.author_id
+         WHERE n.user_id = ${id} ORDER BY n.created_at DESC LIMIT 100`,
+    sql`SELECT l.action, l.details, l.created_at, a.username AS actor FROM audit_log l LEFT JOIN users a ON a.id = l.actor_id
+         WHERE l.target_user_id = ${id} AND l.action = ANY(${RECORD_ACTIONS}) ORDER BY l.created_at DESC LIMIT 100`,
+    u.xuid ? sql`SELECT kind, reason, minutes, by_name, created_at FROM game_punishments WHERE xuid = ${u.xuid} ORDER BY created_at DESC LIMIT 100` : [],
+  ]);
+  const len = (m) => (!m ? "" : m >= 525600 ? "permanent" : m >= 1440 ? `${Math.round(m / 1440)} day${Math.round(m / 1440) === 1 ? "" : "s"}`
+    : m >= 60 ? `${Math.round(m / 60)} hour${Math.round(m / 60) === 1 ? "" : "s"}` : `${m} min`);
+  const history = [
+    ...web.map((r) => ({ where: "website", what: LABELS[r.action] || r.action, at: r.created_at, by: r.actor || "Staff",
+      length: len(Number(r.details?.minutes) || 0), shown: r.details?.shown || "", note: r.details?.reason || "" })),
+    ...game.map((r) => ({ where: "game", what: LABELS[r.kind] || r.kind, at: r.created_at, by: String(r.by_name || "Staff").replace(/ \(in game\)$/, ""),
+      length: len(Number(r.minutes) || 0), shown: r.reason || "", note: "" })),
+  ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 150);
+  return json({ ok: true,
+    notes: notes.map((n) => ({ id: Number(n.id), body: n.body, at: n.created_at, author: n.author || "Staff", authorId: n.author_id ? Number(n.author_id) : null })),
+    history });
+}
+
+// POST /api/mod/members/:id/notes { body }  (staff)
+export async function addStaffNote(request, env, ctx, url, params) {
+  const actor = await requireStaff(request, env);
+  const b = await readJson(request);
+  const body = String(b.body || "").replace(/\r/g, "").trim().slice(0, 1000);
+  if (!body) throw new HttpError(400, "Write a note first.");
+  const sql = getDb(env);
+  const [u] = await sql`SELECT id FROM users WHERE id = ${Number(params.id)}`;
+  if (!u) throw new HttpError(404, "That member doesn't exist.");
+  await sql`INSERT INTO staff_notes (user_id, author_id, body) VALUES (${u.id}, ${actor.id}, ${body})`;
+  return json({ ok: true });
+}
+
+// POST /api/mod/notes/:id/delete  (the note's author, or an Admin who can ban)
+export async function deleteStaffNote(request, env, ctx, url, params) {
+  const actor = await requireStaff(request, env);
+  const sql = getDb(env);
+  const [n] = await sql`SELECT id, author_id FROM staff_notes WHERE id = ${Number(params.id)}`;
+  if (!n) throw new HttpError(404, "That note is already gone.");
+  if (Number(n.author_id) !== Number(actor.id) && !can(actor, "ban_members")) throw new HttpError(403, "You can only delete your own notes.");
+  await sql`DELETE FROM staff_notes WHERE id = ${n.id}`;
+  return json({ ok: true });
+}

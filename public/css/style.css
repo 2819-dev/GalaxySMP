@@ -4820,3 +4820,22 @@ html[data-theme="light"] .mk-balance { color: rgb(160,110,8); }
 /* #Meet The Team: one section per rank, in rank order */
 .tm-groups { display: flex; flex-direction: column; gap: 22px; }
 .tm-group-h { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 1rem; }
+
+/* Control Panel > Ranks: the badge exactly as the game draws it, on a chat-like background */
+.rank-game-preview { background: #1d1e26; border-radius: 10px; padding: 10px 12px; color: #fff; display: flex; flex-direction: column; gap: 6px; }
+.rank-game-preview .rgp-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: #9aa0b4; }
+.rank-game-preview .rgp-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rank-game-preview canvas { display: block; max-width: 100%; }
+.rank-game-preview .rgp-name { font-family: "Minecraft", ui-monospace, monospace; font-size: 15px; text-shadow: 2px 2px 0 #3f3f3f; }
+.rank-game-preview .rgp-msg { font-family: "Minecraft", ui-monospace, monospace; font-size: 15px; text-shadow: 2px 2px 0 #3f3f3f; }
+
+/* Member card: staff notes and history */
+.mr-box { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border, rgba(255,255,255,.08)); padding-top: 10px; }
+.mr-h { margin: 6px 0 0; font-size: .9rem; }
+.mr-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.mr-item { background: var(--surface-2, rgba(255,255,255,.04)); border-radius: 8px; padding: 7px 10px; }
+.mr-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mr-top .btn { margin-left: auto; }
+.mr-body { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; }
+.mr-where { font-size: .7rem; padding: 1px 6px; border-radius: 999px; background: rgba(120,140,255,.18); }
+.mr-where.game { background: rgba(80,200,120,.18); }

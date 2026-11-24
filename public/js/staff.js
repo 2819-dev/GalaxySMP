@@ -13,7 +13,8 @@ import { setupPayments } from "/js/payments-panel.js";
 import { setupJoins } from "/js/joins-panel.js";
 import { setupServerControl } from "/js/servercontrol-panel.js";
 import { setupMyPresence } from "/js/presence-panel.js";
-import { MC_COLORS, hexOf, GRADIENTS, paint, gradientCss, rankTag } from "/js/rank-paint.js";
+import { MC_COLORS, hexOf, GRADIENTS, GRADIENT_HEX, paint, gradientCss, rankTag } from "/js/rank-paint.js";
+import { badgeCanvas } from "/js/badge-pixels.js";
 
 const $ = (id) => document.getElementById(id);
 const ROLE_NAMES = { member: "Member", vip: "VIP", moderator: "Moderator", admin: "Admin" };
@@ -674,8 +675,15 @@ function rankDialog(rank) {
   const orderList = rankOrderList(rank ? `rank:${rank.id}` : "new", Object.assign(() => name.value.trim() || "New rank", { prefix: () => prefix.value.trim() || "NEW" }));
   const advanced = h("input", { class: "input", id: "rank-other", placeholder: "someplugin.permission, another.one", value: other.join(", ") });
   const preview = h("div", { class: "rank-preview-box" });
+  const gamePreview = h("div", { class: "rank-game-preview", "aria-label": "How the badge looks in game" });
   const update = () => {
     preview.replaceChildren(rankPreview(prefix.value || "PREFIX", color.value(), "VisionDevs", icon.value(), "hello!", gradient.value()));
+    // exactly what the game draws (the same pixels as the in-game badge picture), on a chat-colored background
+    const g = gradient.value();
+    const stops = g && GRADIENT_HEX[g] ? GRADIENT_HEX[g] : [hexOf(color.value() || "f")];
+    gamePreview.replaceChildren(h("span", { class: "rgp-label", text: "In game" }),
+      h("div", { class: "rgp-line" }, badgeCanvas(prefix.value || "PREFIX", stops, icon.value() || null, 3), h("span", { class: "rgp-name", text: "VisionDevs" })),
+      h("div", { class: "rgp-msg", text: "hello!" }));
   };
   [name, prefix, color.el, gradient.el, icon.el].forEach((el) => el.addEventListener("input", update));
   if (!rank) [name, prefix].forEach((el) => el.addEventListener("input", orderList.redraw));
@@ -683,7 +691,7 @@ function rankDialog(rank) {
   openDialog({
     title: rank ? `Edit ${rank.name}` : "New rank",
     body: h("div", { class: "form" },
-      preview,
+      preview, gamePreview,
       field("Rank name", name),
       field("Prefix", prefix, "The name on the rank badge, in chat and above heads."),
       h("div", { class: "field" }, h("span", { class: "field-label", text: "Rank order" }), orderList.el,

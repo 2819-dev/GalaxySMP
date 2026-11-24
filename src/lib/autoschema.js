@@ -390,6 +390,11 @@ const PENDING = [
     "CREATE TABLE IF NOT EXISTS game_pets (xuid text NOT NULL, pet_id text NOT NULL, kind text NOT NULL, name text, color text, tamed_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (xuid, pet_id))",
     "INSERT INTO schema_migrations (version) VALUES ('0091_game_pets') ON CONFLICT DO NOTHING",
   ]],
+  ["0092_staff_notes", [
+    "CREATE TABLE IF NOT EXISTS staff_notes (id bigserial PRIMARY KEY, user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE, author_id bigint REFERENCES users(id) ON DELETE SET NULL, body text NOT NULL, created_at timestamptz NOT NULL DEFAULT now())",
+    "CREATE INDEX IF NOT EXISTS staff_notes_user_idx ON staff_notes (user_id, created_at DESC)",
+    "INSERT INTO schema_migrations (version) VALUES ('0092_staff_notes') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

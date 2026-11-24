@@ -128,7 +128,45 @@ async function memberDialog(m) {
       if (has("ban_members")) actions.push({ label: "Ban", kind: "danger", onClick: () => { setTimeout(() => banDialog(m, done)); } });
     }
   }
+  if (has("mod_panel") && m.id !== state.me.id) body.append(memberRecordBox(m));
   openDialog({ title: m.username, body, actions });
+}
+
+// Staff notes (private) and every mute, ban, warning and kick, from the website and the game, newest first.
+function memberRecordBox(m) {
+  const notesList = h("div", { class: "mr-list" });
+  const histList = h("div", { class: "mr-list" });
+  const input = h("textarea", { class: "input", rows: 2, maxlength: 1000, placeholder: "Add a note only staff can see (e.g. warned about spam twice)" });
+  const add = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Add note" });
+  const box = h("div", { class: "mr-box" },
+    h("h4", { class: "mr-h", text: "Staff notes" }), notesList, input, h("div", { class: "row-actions" }, add),
+    h("h4", { class: "mr-h", text: "History" }), histList);
+  const when = (at) => new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  async function load() {
+    let d;
+    try { d = await getJson(`/api/mod/members/${m.id}/record`); } catch (e) { histList.replaceChildren(h("p", { class: "text-3 small", text: e.message })); return; }
+    notesList.replaceChildren(...(d.notes.length ? d.notes.map((n) => {
+      const del = (n.authorId === state.me.id || has("ban_members"))
+        ? h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Delete", onclick: async () => {
+          try { await postJson(`/api/mod/notes/${n.id}/delete`); load(); } catch (e) { toast(e.message); } } }) : null;
+      return h("div", { class: "mr-item" }, h("div", { class: "mr-top" }, h("b", { text: n.author }), h("span", { class: "text-3 small", text: when(n.at) }), del),
+        h("p", { class: "mr-body", text: n.body }));
+    }) : [h("p", { class: "text-3 small", text: "No notes yet." })]));
+    histList.replaceChildren(...(d.history.length ? d.history.map((x) => h("div", { class: "mr-item" },
+      h("div", { class: "mr-top" }, h("b", { text: x.what }), h("span", { class: `mr-where ${x.where}`, text: x.where === "game" ? "In game" : "Website" }),
+        h("span", { class: "text-3 small", text: `${when(x.at)} · by ${x.by}${x.length ? ` · ${x.length}` : ""}` })),
+      x.shown ? h("p", { class: "mr-body", text: `Shown to them: "${x.shown}"` }) : null,
+      x.note ? h("p", { class: "mr-body text-3", text: `Staff note: ${x.note}` }) : null))
+      : [h("p", { class: "text-3 small", text: "Nothing yet: no mutes, bans, warnings or kicks." })]));
+  }
+  add.addEventListener("click", async () => {
+    if (!input.value.trim()) return;
+    add.disabled = true;
+    try { await postJson(`/api/mod/members/${m.id}/notes`, { body: input.value }); input.value = ""; load(); } catch (e) { toast(e.message); }
+    add.disabled = false;
+  });
+  load();
+  return box;
 }
 
 // Admins: give a member ranks (the same ranks as in game).
