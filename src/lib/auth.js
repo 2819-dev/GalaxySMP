@@ -60,6 +60,7 @@ export async function getUser(request, env) {
   const sql = getDb(env);
   const rows = await sql`
     SELECT u.id, u.username, u.platform, u.banned, u.ban_reason, u.muted_until, u.mute_reason, s.acting_by, s.owner_as, u.is_bot,
+           s.token_hash AS session_hash, s.last_used_at AS session_used,
            (SELECT username FROM users a WHERE a.id = coalesce(s.acting_by, s.owner_as)) AS acting_by_name,
            r.key AS role_key, r.name AS role_name, r.color AS role_color, r.power AS role_power,
            (SELECT coalesce(array_agg(DISTINCT pm), '{}') FROM players pl JOIN player_ranks x ON x.xuid = pl.xuid JOIN ranks rk ON rk.id = x.rank_id,
@@ -70,6 +71,11 @@ export async function getUser(request, env) {
      WHERE s.token_hash = ${await sha256(token)} AND s.expires_at > now()`;
   const u = rows[0];
   if (!u || u.banned) return null;
+  // Account settings > Signed-in devices: remember the browser and when this sign-in was last used (at most every 10 minutes)
+  if (!u.session_used || Date.now() - new Date(u.session_used).getTime() > 600000) {
+    const ua = String(request.headers.get("user-agent") || "").slice(0, 300);
+    await sql`UPDATE sessions SET last_used_at = now(), user_agent = coalesce(user_agent, ${ua || null}) WHERE token_hash = ${u.session_hash}`.catch(() => {});
+  }
   // Website permissions come from the member's ranks (the owner has all). role_power is worked out from them
   // (Admin Panel = 100, Mod Panel = 50) so every page agrees with the ranks.
   u.owner = isOwner(env, u.username, u.platform === "bedrock");

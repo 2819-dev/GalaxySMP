@@ -91,6 +91,8 @@ const routes = [
   ["POST", "/api/auth/login/2fa", (req, env) => import("./routes/twostep.js").then((m) => m.finishLogin(req, env))],
   ["GET", "/api/account/2fa", (req, env) => import("./routes/twostep.js").then((m) => m.status(req, env))],
   ["POST", "/api/account/2fa", (req, env) => import("./routes/twostep.js").then((m) => m.action(req, env))],
+  ["GET", "/api/account/devices", (req, env) => account.listDevices(req, env)],
+  ["POST", "/api/account/devices/sign-out", (req, env) => account.signOutDevices(req, env)],
   ["POST", "/api/auth/logout", (req, env) => logout(req, env)],
   ["POST", "/api/act-as/stop", (req, env) => actas.stopActingRoute(req, env)],
   ["POST", "/api/mod/act-as/:id", actas.startActing],

@@ -128,3 +128,44 @@ export async function setRealNameVisibility(request, env) {
   await sql`UPDATE users SET real_name_hidden = ${Boolean(body.hidden)} WHERE id = ${user.id}`;
   return json({ ok: true, hidden: Boolean(body.hidden) });
 }
+
+// ---------- Signed-in devices (Account settings) ----------
+// A readable name for a browser: "Chrome on Windows", "Safari on iPhone"...
+function deviceName(ua) {
+  ua = String(ua || "");
+  const os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android" : /Windows/.test(ua) ? "Windows"
+    : /Mac OS X|Macintosh/.test(ua) ? "Mac" : /CrOS/.test(ua) ? "Chromebook" : /Xbox/.test(ua) ? "Xbox" : /Linux/.test(ua) ? "Linux" : "";
+  const br = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Firefox\//.test(ua) ? "Firefox" : /SamsungBrowser/.test(ua) ? "Samsung Internet"
+    : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "";
+  if (!br && !os) return "Unknown device";
+  return br && os ? `${br} on ${os}` : br || os;
+}
+const deviceKind = (ua) => (/iPhone|Android.*Mobile|Mobile/.test(ua || "") ? "phone" : /iPad|Tablet/.test(ua || "") ? "tablet" : "computer");
+
+// GET /api/account/devices
+export async function listDevices(request, env) {
+  const me = await requireUser(request, env);
+  const sql = getDb(env);
+  const rows = await sql`SELECT token_hash, user_agent, created_at, last_used_at FROM sessions
+                          WHERE user_id = ${me.id} AND expires_at > now() AND acting_by IS NULL AND owner_as IS NULL
+                          ORDER BY coalesce(last_used_at, created_at) DESC LIMIT 50`;
+  return json({ ok: true, devices: rows.map((r) => ({ id: r.token_hash.slice(0, 16), name: deviceName(r.user_agent), kind: deviceKind(r.user_agent),
+    signedIn: r.created_at, lastUsed: r.last_used_at || r.created_at, current: r.token_hash === me.session_hash })) });
+}
+
+// POST /api/account/devices/sign-out { id } (one device) or { others: true } (everywhere except here)
+export async function signOutDevices(request, env) {
+  const me = await requireUser(request, env);
+  if (me.acting_by || me.owner_as) throw new HttpError(403, "You can't do that while looking at the site as someone else.");
+  const b = await readJson(request);
+  const sql = getDb(env);
+  if (b.others) {
+    const r = await sql`DELETE FROM sessions WHERE user_id = ${me.id} AND token_hash <> ${me.session_hash} AND acting_by IS NULL AND owner_as IS NULL RETURNING 1`;
+    return json({ ok: true, count: r.length });
+  }
+  const id = String(b.id || "");
+  if (!/^[0-9a-f]{16}$/.test(id)) throw new HttpError(400, "Pick a device.");
+  if (me.session_hash.startsWith(id)) throw new HttpError(400, "That's this device. Use Sign out instead.");
+  await sql`DELETE FROM sessions WHERE user_id = ${me.id} AND left(token_hash, 16) = ${id} AND acting_by IS NULL AND owner_as IS NULL`;
+  return json({ ok: true });
+}

@@ -342,14 +342,10 @@ const SECTIONS = {
       } catch (e2) { err.textContent = e2.message; }
       btn.disabled = false;
     });
-    const others = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Sign out of other devices", onclick: async () => {
-      try { const r = await postJson("/api/account/signout-others", {}); toast(r.signedOut ? `Signed out of ${r.signedOut} other device${r.signedOut === 1 ? "" : "s"}.` : "You're not signed in anywhere else."); load("security"); }
-      catch (e) { toast(e.message); }
-    } });
     return [
       card("Password", "Use it to sign in on galaxymc.us. Forgot it? Make a new account code in game with /link to set a new one.", form),
       twoStepCard(),
-      card("Signed-in devices", `You're signed in on ${data.sessions} device${data.sessions === 1 ? "" : "s"} (including this one).`, h("div", { class: "acc-card-foot" }, others)),
+      devicesCard(),
     ];
   },
 
@@ -508,6 +504,36 @@ function twoStepCard() {
     });
     setTimeout(() => code.focus(), 50);
   }
+  draw();
+  return box;
+}
+
+// ---------- Signed-in devices (Security) ----------
+function devicesCard() {
+  const list = h("div", { class: "dv-list" }, h("p", { class: "text-3", style: "margin:0", text: "Loading…" }));
+  const others = h("button", { class: "btn btn-secondary btn-sm", type: "button", text: "Sign out everywhere else" });
+  const box = card("Signed-in devices", "Where your account is signed in right now. If you don't recognize one, sign it out (and change your password).",
+    h("div", { class: "stack", style: "gap:10px" }, list, h("div", { class: "row-actions" }, others)));
+  const ago = (t) => {
+    const s = Math.max(0, (Date.now() - new Date(t).getTime()) / 1000);
+    return s < 600 ? "Active now" : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : new Date(t).toLocaleDateString();
+  };
+  async function draw() {
+    let d;
+    try { d = await getJson("/api/account/devices"); } catch (e) { list.replaceChildren(h("p", { class: "form-error", text: e.message })); return; }
+    others.disabled = d.devices.length < 2;
+    list.replaceChildren(...d.devices.map((x) => h("div", { class: "dv-row" },
+      h("span", { class: "dv-ic", "aria-hidden": "true", text: x.kind === "phone" ? "📱" : x.kind === "tablet" ? "📲" : "💻" }),
+      h("div", { class: "dv-text" }, h("b", { text: x.name }),
+        h("span", { class: "text-3 small", text: `${x.current ? "This device · " : ""}${ago(x.lastUsed)} · signed in ${new Date(x.signedIn).toLocaleDateString()}` })),
+      x.current ? h("span", { class: "dv-here", text: "You're here" })
+        : h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Sign out", onclick: async () => {
+          try { await postJson("/api/account/devices/sign-out", { id: x.id }); toast(`Signed out ${x.name}.`); draw(); } catch (e) { toast(e.message); } } }))));
+  }
+  others.addEventListener("click", async () => {
+    try { const r = await postJson("/api/account/devices/sign-out", { others: true }); toast(`Signed out ${r.count} other device${r.count === 1 ? "" : "s"}.`); draw(); }
+    catch (e) { toast(e.message); }
+  });
   draw();
   return box;
 }

@@ -395,6 +395,11 @@ const PENDING = [
     "CREATE INDEX IF NOT EXISTS staff_notes_user_idx ON staff_notes (user_id, created_at DESC)",
     "INSERT INTO schema_migrations (version) VALUES ('0092_staff_notes') ON CONFLICT DO NOTHING",
   ]],
+  ["0093_session_devices", [
+    "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS user_agent text",
+    "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_used_at timestamptz",
+    "INSERT INTO schema_migrations (version) VALUES ('0093_session_devices') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;
