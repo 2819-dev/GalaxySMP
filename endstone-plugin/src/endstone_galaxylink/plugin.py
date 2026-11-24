@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.78.5"
+VERSION = "2.79.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -97,6 +97,7 @@ class GalaxyLink(Plugin):
         "party": _cmd("Your party: invite players, accept an invite, or leave. Party chat: /p <message>.", "/party [accept|leave|invite <player>]", "galaxylink.command.party"),
         "p": _cmd("Party chat.", "/p <message: message>", "galaxylink.command.party", ["pc"]),
         "sift": _cmd("Staff: go to the Sift, or build it (/sift build, /sift status).", "/sift [build|status]", "galaxylink.command.sift"),
+        "border": _cmd("World borders: list them, get the Border Axe, or reset to the defaults.", "/border [list|axe|reset]", "galaxylink.command.border"),
         "portal": _cmd("Picture portals: get the Portal Axe, list or remove portals.", "/portal [axe|list|remove <id>]", "galaxylink.command.portal"),
         "menu": _cmd("The GalaxySMP Main Menu: Featured Servers, How to Play, Rules, What's New and Store.", "/menu", "galaxylink.command.menu", ["mainmenu", "hub"]),
         "tpa": _cmd("Ask to teleport to a player.", "/tpa <player: player>", "galaxylink.command.tpa"),
@@ -168,6 +169,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.shopnpc": _perm("Allows /shopnpc and editing NPCs (server operators).", "op"),
         "galaxylink.command.guide": _perm("Allows /guide.", True),
         "galaxylink.command.menu": _perm("Allows /menu.", True),
+        "galaxylink.command.border": _perm("Allows /border (server operators).", "op"),
         "galaxylink.command.sift": _perm("Allows /sift (server operators).", "op"),
         "galaxylink.command.portal": _perm("Allows /portal (server operators).", "op"),
         "galaxylink.command.party": _perm("Allows /party and /p.", True),
@@ -295,6 +297,8 @@ class GalaxyLink(Plugin):
         self.sift = Sift(self)  # the Sift: a sky island far away, its mobs and fireflies
         from endstone_galaxylink.portals import Portals
         self.portals = Portals(self)  # picture portals made with the Portal Axe
+        from endstone_galaxylink.borders import Borders
+        self.borders = Borders(self)  # a border for every server; only the owner can go outside
         from endstone_galaxylink.social import Social
         self.social = Social(self)  # Main Menu > Social: friends, parties, recent players, profile card
         self.elevators = Elevators(self)
@@ -341,6 +345,7 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self._safe("penguins.tick", self.penguins.tick), delay=40, period=10)
         self.server.scheduler.run_task(self, self._safe("pets.tick", self.pets.tick), delay=40, period=3)
         self.server.scheduler.run_task(self, self._safe("portals.tick", self.portals.tick), delay=40, period=4)
+        self.server.scheduler.run_task(self, self._safe("borders.tick", self.borders.tick), delay=60, period=5)
         self.server.scheduler.run_task(self, self._safe("sift.build_tick", self.sift.build_tick), delay=20, period=1)
         self.server.scheduler.run_task(self, self._safe("sift.tick", self.sift.tick), delay=200, period=100)
         if not self.sift.built():  # build the Sift once, a minute after the first start
@@ -528,7 +533,7 @@ class GalaxyLink(Plugin):
         # each one on its own, so one problem doesn't stop the others
         for part in ("ranks.forget", "plates.on_quit", "galaxymap.on_quit", "parkour.on_quit", "collection.on_quit",
                      "teleports.on_quit", "progress.on_quit", "bedwars.on_quit", "penguins.on_quit", "welcome.on_quit", "social.on_quit",
-                     "pets.on_quit", "portals.on_quit"):
+                     "pets.on_quit", "portals.on_quit", "sift.on_quit", "borders.on_quit"):
             obj, fn = part.split(".")
             try:
                 getattr(getattr(self, obj), fn)(p)
@@ -658,6 +663,8 @@ class GalaxyLink(Plugin):
         if event.has_item and self.welcome.on_use(event):  # the GalaxySMP Menu compass
             return
         if event.has_item and self.portals.on_interact(event):  # the Portal Axe
+            return
+        if event.has_item and self.borders.on_interact(event):  # the Border Axe
             return
         if self.buildcontest.on_interact(event):  # no ender chests while building
             return
@@ -915,6 +922,7 @@ class GalaxyLink(Plugin):
             "menu": lambda: self.welcome.open_menu(sender),
             "sift": lambda: self.sift.command(sender, args),
             "portal": lambda: self.portals.command(sender, args),
+            "border": lambda: self.borders.command(sender, args),
             "party": lambda: self._party(sender, args),
             "p": lambda: self.social.party_chat(sender, " ".join(args).strip()) if args else sender.send_message("§eUsage: /p <message>"),
             "tpa": lambda: tp.request(sender, args, "to"),

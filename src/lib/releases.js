@@ -519,6 +519,19 @@ If a trip ever can't be completed, you'll now see a message instead of nothing h
 
 We've also simplified the Sift's wildlife: for now, Dumplings and Blubs are the creatures you'll find there. The Sift itself is getting a full redesign soon.`,
   },
+  {
+    id: "2026-11-24-sift-redesign-borders",
+    title: "The Sift, reimagined, and world borders",
+    body: `**The Sift has been completely rebuilt.** It's now a dreamy valley surrounded by tall red cliffs:
+
+- **Salmon-pink ground** with mossy meadows full of blue, purple and yellow flowers, and fireflies at night.
+- **Huge red rock pillars** with wide, flat tops covered in white weeping trees.
+- **White weeping trees** with long hanging curtains, and **tall pink grass** everywhere.
+- **A teal sky** while you're inside.
+- Dumplings and Blubs live there. Pick **The Sift** on the Main Menu to visit.
+
+**World borders.** Each server now has its own border, and the Sift and other servers sit outside the main world. Use the Main Menu to travel between them. If you reach a border, a glowing wall appears and you'll be gently moved back inside.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

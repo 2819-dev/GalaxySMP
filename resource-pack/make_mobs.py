@@ -374,6 +374,24 @@ for i in range(11):
 d.polygon([(9, 1), (14, 2), (15, 6), (12, 7), (9, 4)], fill=(150, 90, 230, 255))                           # head
 d.line([(10, 2), (14, 3)], fill=(110, 220, 255, 255)); d.point((13, 5), fill=(255, 255, 255, 255))
 im.save(os.path.join(RP, "textures", "items", "galaxysmp_portal_axe.png"))
+
+# the Border Axe (operators draw world borders with it)
+write(os.path.join(BP, "items", "border_axe.json"), {"format_version": "1.21.40", "minecraft:item": {
+    "description": {"identifier": "galaxysmp:border_axe", "menu_category": {"category": "equipment", "is_hidden_in_commands": False}},
+    "components": {"minecraft:icon": {"textures": {"default": "galaxysmp_border_axe"}}, "minecraft:display_name": {"value": "§bBorder Axe"},
+                   "minecraft:max_stack_size": 1, "minecraft:hand_equipped": True, "minecraft:glint": True}}})
+im = Image.new("RGBA", (16, 16)); d = ImageDraw.Draw(im)
+for i in range(11):
+    d.point((3 + i, 13 - i), fill=(110, 75, 45, 255)); d.point((4 + i, 13 - i), fill=(80, 55, 35, 255))
+d.polygon([(9, 1), (14, 2), (15, 6), (12, 7), (9, 4)], fill=(40, 150, 230, 255))
+d.line([(10, 2), (14, 3)], fill=(150, 240, 255, 255)); d.point((13, 5), fill=(255, 255, 255, 255))
+im.save(os.path.join(RP, "textures", "items", "galaxysmp_border_axe.png"))
+
+# the Sift's teal sky (the plugin turns this fog on while you're in the Sift)
+write(os.path.join(RP, "fogs", "galaxysmp_sift.json"), {"format_version": "1.16.100", "minecraft:fog_settings": {
+    "description": {"identifier": "galaxysmp:sift"},
+    "distance": {"air": {"fog_start": 0.25, "fog_end": 1.0, "fog_color": "#5ED6C6", "render_distance_type": "render"},
+                 "weather": {"fog_start": 0.2, "fog_end": 0.9, "fog_color": "#5ED6C6", "render_distance_type": "render"}}}})
 entity("portal_screen", {
     "minecraft:type_family": {"family": ["inanimate", "galaxysmp_portal"]},
     "minecraft:collision_box": {"width": 0.01, "height": 0.01},
@@ -408,11 +426,12 @@ for k, v in NAMES.items():
     lines.append(f"entity.galaxysmp:{k}.name={v}")
     if k != "portal_screen":
         lines.append(f"item.spawn_egg.entity.galaxysmp:{k}.name={v} Spawn Egg")
-lines += ["item.galaxysmp:dumpling_treat=Dumpling Treat", "item.galaxysmp:portal_axe=Portal Axe"]
+lines += ["item.galaxysmp:dumpling_treat=Dumpling Treat", "item.galaxysmp:portal_axe=Portal Axe", "item.galaxysmp:border_axe=Border Axe"]
 open(lang, "w").write("\n".join(lines) + "\n")
 it = json.load(open(os.path.join(RP, "textures", "item_texture.json")))
 it["texture_data"]["galaxysmp_dumpling_treat"] = {"textures": "textures/items/galaxysmp_dumpling_treat"}
 it["texture_data"]["galaxysmp_portal_axe"] = {"textures": "textures/items/galaxysmp_portal_axe"}
+it["texture_data"]["galaxysmp_border_axe"] = {"textures": "textures/items/galaxysmp_border_axe"}
 json.dump(it, open(os.path.join(RP, "textures", "item_texture.json"), "w"), indent=1)
 for k in REMOVED:
     for f in (os.path.join(BP, "entities", f"{k}.json"), os.path.join(RP, "entity", f"{k}.entity.json"),

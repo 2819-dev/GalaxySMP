@@ -22,6 +22,9 @@
   },
   "galaxysmp_portal_axe": {
    "textures": "textures/items/galaxysmp_portal_axe"
+  },
+  "galaxysmp_border_axe": {
+   "textures": "textures/items/galaxysmp_border_axe"
   }
  }
 }
