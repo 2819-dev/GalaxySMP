@@ -198,6 +198,7 @@ function renderHeader() {
         <div class="nav-actions">${chip}<a class="btn btn-primary btn-sm" href="/community">Community</a></div>
       </nav>
       <a class="btn btn-primary btn-sm nav-community" href="/community">Community</a>
+      <button class="qj-btn" type="button" aria-label="Quick jump (Ctrl+K)" title="Quick jump (Ctrl+K)">${icon("search")}</button>
       <div class="acct-slot" id="acct-slot"></div>
     </div>
   </header>
@@ -229,6 +230,15 @@ function renderHeader() {
   drawer.querySelector(".drawer-close").addEventListener("click", () => { setOpen(false); toggle.focus(); });
   backdrop.addEventListener("click", () => setOpen(false));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && drawer.classList.contains("open")) { setOpen(false); toggle.focus(); } });
+  // Quick jump: Ctrl+K / Cmd+K anywhere, or the search button
+  const quick = () => import("/js/quick-jump.js").then((m) => m.openQuickJump()).catch(() => {});
+  document.querySelector(".qj-btn")?.addEventListener("click", quick);
+  document.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== "k") return;
+    const chat = document.getElementById("view-chat");
+    if (chat && !chat.hidden) return;   // in Community chat, Ctrl+K opens its own channel switcher
+    e.preventDefault(); quick();
+  });
 }
 
 function renderFooter() {

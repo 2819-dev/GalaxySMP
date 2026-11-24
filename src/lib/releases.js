@@ -634,6 +634,14 @@ The bigger Sift is built in the background after the update, which takes about h
     title: "17 new rank gradients",
     body: `Ranks can now use 17 new gradient colors: Mint, Magma, Neon, Cotton Candy, Toxic, Midnight, Peach, Emerald, Diamond, Amethyst, Copper, Netherite, Sunrise, Sky, Ruby, Tropical and Nebula. They show on rank badges in game and on the website.`,
   },
+  {
+    id: "2026-11-24-quick-jump-link-cards",
+    title: "Quick jump, link previews and signed-in devices",
+    body: `- **Quick jump:** press **Ctrl+K** (or tap the search button at the top) and type a few letters to jump to any page, channel or player profile.
+- **Link previews:** links to galaxymc.us in chat and DMs now show a small card. Player profiles show the player's head, rank and whether they're playing. Links to the Store, Map, Leaderboards and other pages show a card with a button. You can type galaxymc.us links without "https://" too.
+- **Signed-in devices:** Account settings now lists every device you're signed in on, so you can sign out of any one of them, or everywhere else at once.
+- **For staff:** the rank editor shows the badge exactly as it looks in game, and each member's card has private staff notes and their full history of mutes, bans, warnings and kicks from the website and the game.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
