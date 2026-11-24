@@ -629,6 +629,11 @@ The bigger Sift is built in the background after the update, which takes about h
     body: `- **Rank badges** (the icon and rank name on a colored pill) now show in game chat and above players' heads.
 - **Names** are now shown in regular white text next to the badge, instead of in the rank's color.`,
   },
+  {
+    id: "2026-11-24-more-gradients",
+    title: "17 new rank gradients",
+    body: `Ranks can now use 17 new gradient colors: Mint, Magma, Neon, Cotton Candy, Toxic, Midnight, Peach, Emerald, Diamond, Amethyst, Copper, Netherite, Sunrise, Sky, Ruby, Tropical and Nebula. They show on rank badges in game and on the website.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
