@@ -78,3 +78,23 @@ test("punctuation next to bad words", () => {
   ok("wow!! nice build!");
   ok("class!");
 });
+
+test("sentences with a full stop are not links", () => {
+  ok("help. me...");
+  ok("The bot is off. One sec…");
+  ok("You spawn on a team of 2... or 3 or 4 or 5 etc. And the terrain is rough with destroyed buildings. One person has a jet.");
+  ok("I'm done. Co-op later?");
+  ok("visit us at galaxy mc dot us");
+  ok("go to galaxymc.us/map to see it");
+});
+
+test("real links are still blocked", () => {
+  no("check out google.com", "link");
+  no("northdraft.northwork.app", "link");
+  no("join discord.gg/abc", "link");
+  no("my site is cool .com", "link");
+  no("evil (dot) com", "link");
+  no("evil dot com", "link");
+  no("https://example.org", "link");
+  no("www.example.org", "link");
+});

@@ -102,7 +102,7 @@ export function findProfanity(text, compiled) {
 }
 
 // Our own server address may be shared; everything else that looks like a link is blocked.
-const OWN_ADDRESSES = [config.javaAddress, config.bedrockAddress]
+const OWN_ADDRESSES = [config.javaAddress, config.bedrockAddress, "galaxymc.us", "galaxymc dot us", "galaxy mc dot us", "galaxymc (dot) us"]
   .filter((a) => a && a !== "your.server.ip")
   .map((a) => a.toLowerCase());
 
@@ -110,7 +110,10 @@ const TLDS = "com|net|org|gg|io|co|me|tv|xyz|ly|us|uk|ca|de|ru|info|biz|app|dev|
 const LINK_RES = [
   /\b(?:https?|ftp):\/\//i,
   /\bwww\s*\./i,
-  new RegExp(`\\b[a-z0-9-]{2,}\\s*(?:\\.|\\(\\s*dot\\s*\\)|\\[\\s*dot\\s*\\]|\\s+dot\\s+)\\s*(?:${TLDS})\\b`, "i"),
+  // name.com (a real dot right before the ending, so normal sentences like "help. me" or "buildings. One" aren't links)
+  new RegExp(`\\b[a-z0-9-]{2,} ?\\.(?:${TLDS})\\b`, "i"),
+  // spelled-out tricks: name (dot) com, name [dot] com, name dot com
+  new RegExp(`\\b[a-z0-9-]{2,}\\s*(?:\\(\\s*dot\\s*\\)|\\[\\s*dot\\s*\\]|\\s+dot\\s+)\\s*(?:${TLDS})\\b`, "i"),
   /\bdiscord(?:app)?\s*(?:\.|dot)?\s*(?:gg|com\/invite)\b/i,
   /\b(?:bit\.ly|tinyurl|t\.me)\b/i,
 ];

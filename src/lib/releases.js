@@ -586,6 +586,13 @@ The bigger Sift is built in the background after the update, which takes about h
     body: `- **Picture cards:** in **Play > Servers**, each server's activities now show as big cards with a picture, a name, a subtitle and a short description.
 - GalaxySMP shows Survival, Plots, Jobs & Shops and Minigames. The Sift shows Adventure and Pets.`,
   },
+  {
+    id: "2026-11-24-chat-link-fix",
+    title: "Fewer messages blocked as links",
+    body: `- Normal sentences are no longer mistaken for links. Messages like "help. me" or "...buildings. One person..." now send as usual.
+- You can now share **galaxymc.us** (and pages on it) in chat and DMs.
+- Real links from other websites are still blocked, as before.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
