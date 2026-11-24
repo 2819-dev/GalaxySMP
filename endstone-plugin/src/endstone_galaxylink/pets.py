@@ -9,6 +9,7 @@
 
 import re
 import time
+import uuid
 
 from endstone_galaxylink.penguins import OWNABLE, OWNER_TAG, NAME_TAG, owner_of, type_of
 from endstone_galaxylink.floating import dim_cmd
@@ -17,6 +18,7 @@ NAME_MAX = 20
 BOUNCE_COOLDOWN = 1.2   # seconds between bounces for one player
 SAFE_LANDING = 4.0      # seconds without fall damage after a bounce
 LIFT_TAG = "gsmp_lift"
+PID_TAG = "gsmp_pid_"   # + a short id, so the same pet keeps its entry in My Pets
 
 
 def clean_name(text):
@@ -37,6 +39,46 @@ class Pets:
         self.landing = {}    # player uuid -> no fall damage until
         self.on_shoulder = {}  # player uuid -> blub actor id
         self.waiting = []    # pets that just spawned: (time, actor) checked for babies
+        self.db = plugin.economy.db
+        self.db.execute("CREATE TABLE IF NOT EXISTS pet_book (pet_id TEXT PRIMARY KEY, xuid TEXT, kind TEXT, name TEXT, tamed REAL)")
+        self.db.commit()
+
+    # ---------- My Pets (in game on the Profile page, and on galaxymc.us profiles) ----------
+    @staticmethod
+    def pet_id(actor):
+        try:
+            for t in actor.scoreboard_tags:
+                if str(t).startswith(PID_TAG):
+                    return str(t)[len(PID_TAG):]
+            pid = uuid.uuid4().hex[:12]
+            actor.add_scoreboard_tag(PID_TAG + pid)
+            return pid
+        except Exception:
+            return None
+
+    def remember(self, actor, xuid, what, name=None):
+        """A pet was tamed, born or named: keep it in the owner's pet list."""
+        pid = self.pet_id(actor)
+        if not pid or not xuid:
+            return
+        kind = str(what).lower()
+        row = self.db.execute("SELECT name, tamed FROM pet_book WHERE pet_id = ?", (pid,)).fetchone()
+        self.db.execute("INSERT OR REPLACE INTO pet_book (pet_id, xuid, kind, name, tamed) VALUES (?,?,?,?,?)",
+                        (pid, str(xuid), kind, name if name is not None else (row[0] if row else None), row[1] if row else time.time()))
+        self.db.commit()
+        self.sync(xuid)
+
+    def of(self, xuid):
+        rows = self.db.execute("SELECT pet_id, kind, name, tamed FROM pet_book WHERE xuid = ? ORDER BY tamed", (str(xuid),)).fetchall()
+        return [{"id": r[0], "kind": r[1], "name": r[2] or "", "tamed": r[3]} for r in rows]
+
+    def sync(self, xuid):
+        voice = getattr(self.plugin, "_voice", None)
+        try:
+            if voice is not None and getattr(voice, "ws", None):
+                voice.send_json({"type": "pets", "xuid": str(xuid), "pets": self.of(xuid)[:60]})
+        except Exception:
+            pass
 
     # ---------- names ----------
     def ask_name(self, player, actor, what, baby=False):
@@ -84,6 +126,7 @@ class Pets:
             actor.name_tag = name
         except Exception:
             return
+        self.remember(actor, player.xuid, what, name)
         player.send_message(f"§aSay hi to §f{name}§a, your {what.lower()}!")
 
     # ---------- babies ----------
@@ -121,6 +164,7 @@ class Pets:
                         baby.add_scoreboard_tag(OWNER_TAG + xuid)
                         baby.add_scoreboard_tag(NAME_TAG + (names[0] or "").replace(" ", "_"))
                         self.plugin.penguins.hearts(baby)
+                        self.remember(baby, xuid, OWNABLE[kind][0])
                         owner = next((p for p in self.plugin.server.online_players if str(p.xuid) == xuid), None)
                         if owner is not None:
                             what = OWNABLE[kind][0]

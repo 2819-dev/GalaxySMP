@@ -138,6 +138,7 @@ class Penguins:
                 self.hearts(actor)
                 pets = getattr(self.plugin, "pets", None)
                 if pets is not None:
+                    pets.remember(actor, player.xuid, what)
                     pets.ask_name(player, actor, what)   # "What would you like to name your Dumpling?"
             return False
         if owner != str(player.xuid) and not player.is_op:

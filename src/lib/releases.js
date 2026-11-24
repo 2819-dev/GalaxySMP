@@ -599,6 +599,17 @@ The bigger Sift is built in the background after the update, which takes about h
     body: `- When staff mute or ban a member on the website, they can now add a reason that the member sees. Muted members see it in a notification and when they try to send a message. Banned members see it when they try to sign in.
 - Staff can also add a separate note that only staff can see.`,
   },
+  {
+    id: "2026-11-24-menu-settings-pets",
+    title: "Settings, home icons, My Pets and more",
+    body: `- **Settings** in the Main Menu: turn the menu music on or off, pick your favorite wallpaper, and choose whether the Main Menu opens when you join.
+- **Home icons:** give each home in **Play > Homes** its own icon, like a bed, a farm or a diamond.
+- **Popular warps:** the most-visited warps this week are marked "Popular this week" in **Play > Warps**.
+- **Profile:** the in-game Profile now shows your rank, your top achievements and your pets.
+- **My Pets:** the Dumplings, Blubs and Penguins you tame now show on your galaxymc.us profile, with their names.
+- **Back online alerts:** if the server stops suddenly, players who were online get a notification when it's back.
+- **One mute everywhere:** a mute now applies in game and on the website, including DMs.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

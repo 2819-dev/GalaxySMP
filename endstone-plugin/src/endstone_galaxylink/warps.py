@@ -19,7 +19,21 @@ class Warps:
         self.db = plugin.economy.db
         self.db.execute("CREATE TABLE IF NOT EXISTS warps (owner TEXT PRIMARY KEY, owner_name TEXT, name TEXT UNIQUE COLLATE NOCASE, "
                         "data TEXT, created REAL, visits INTEGER DEFAULT 0)")
+        self.db.execute("CREATE TABLE IF NOT EXISTS warp_visits (owner TEXT, t REAL)")
         self.db.commit()
+
+    # ---------- popular this week ----------
+    def log_visit(self, owner):
+        self.db.execute("UPDATE warps SET visits = visits + 1 WHERE owner = ?", (owner,))
+        self.db.execute("INSERT INTO warp_visits (owner, t) VALUES (?, ?)", (owner, time.time()))
+        self.db.execute("DELETE FROM warp_visits WHERE t < ?", (time.time() - 8 * 86400,))
+        self.db.commit()
+
+    def popular(self, top=3, least=2):
+        """The most-visited warps in the last 7 days (owners), at least `least` visits each."""
+        rows = self.db.execute("SELECT owner, COUNT(*) AS n FROM warp_visits WHERE t > ? GROUP BY owner HAVING n >= ? ORDER BY n DESC LIMIT ?",
+                               (time.time() - 7 * 86400, least, top)).fetchall()
+        return {r[0]: r[1] for r in rows}
 
     # ---------- reading ----------
     def all(self):
@@ -46,8 +60,7 @@ class Warps:
         w = self.find(name)
         if w is None:
             return player.send_message(f"§cThere's no warp called {name}. §7Type /warp to see them all.")
-        self.db.execute("UPDATE warps SET visits = visits + 1 WHERE owner = ?", (w["owner"],))
-        self.db.commit()
+        self.log_visit(w["owner"])
         self.plugin.teleports.go(player, lambda: (self.find(w["name"]) or {}).get("spot"), f"{w['ownerName']}'s warp {w['name']}")
 
     def menu(self, player):

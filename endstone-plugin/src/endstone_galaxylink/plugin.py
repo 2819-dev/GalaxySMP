@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.82.0"
+VERSION = "2.83.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -478,6 +478,8 @@ class GalaxyLink(Plugin):
         try:
             self.social.on_join(player)   # friends and link status from the website (in the background)
             self.mail.on_join(player)     # unread messages and notifications for the Mail button
+            if getattr(self, "pets", None) is not None:
+                self.pets.sync(player.xuid)   # My Pets on their website profile
         except Exception as e:
             self.logger.warning(f"Social on join failed: {e}")
         try:

@@ -173,6 +173,10 @@ export async function pluginPunish(request, env) {
                 ${b.at ? new Date(Number(b.at) * 1000).toISOString() : new Date().toISOString()}::timestamptz)`,
     audit(sql, await actorFor(sql, xuidOf(b.byXuid)), `game.${kind}`, { by, player: name, reason, minutes }),
   ]);
+  if ((kind === "mute" || kind === "unmute") && xuidOf(b.xuid) && !b.fromWebsite) {   // one mute everywhere: also on the website
+    await import("./mod.js").then((m) => m.muteFromGame(env, sql, xuidOf(b.xuid), kind === "mute" ? Math.max(1, minutes || 0) : 0, reason))
+      .catch((e) => console.error("website mute from game failed", e));
+  }
   return json({ ok: true });
 }
 

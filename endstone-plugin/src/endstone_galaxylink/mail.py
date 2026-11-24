@@ -29,6 +29,12 @@ class Mail:
 
         def done(res):
             if res and res.get("ok"):
+                mod = getattr(self.plugin, "moderation", None)
+                if mod is not None and res.get("linked") and player.is_valid:
+                    try:
+                        mod.check_web_mute(player, res.get("muted"))
+                    except Exception as e:
+                        self.plugin.logger.warning(f"Website mute check failed: {e}")
                 self.box[uid] = {"linked": bool(res.get("linked")), "threads": res.get("threads") or [],
                                  "notifications": res.get("notifications") or [], "unread": int(res.get("unread") or 0)}
             if then:

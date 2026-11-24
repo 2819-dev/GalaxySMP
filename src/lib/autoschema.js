@@ -386,6 +386,10 @@ const PENDING = [
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_mute_shown text",
     "INSERT INTO schema_migrations (version) VALUES ('0090_shown_reasons') ON CONFLICT DO NOTHING",
   ]],
+  ["0091_game_pets", [
+    "CREATE TABLE IF NOT EXISTS game_pets (xuid text NOT NULL, pet_id text NOT NULL, kind text NOT NULL, name text, color text, tamed_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (xuid, pet_id))",
+    "INSERT INTO schema_migrations (version) VALUES ('0091_game_pets') ON CONFLICT DO NOTHING",
+  ]],
 ];
 
 let ready = null;

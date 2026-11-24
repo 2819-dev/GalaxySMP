@@ -111,6 +111,13 @@ export function field(label, control, hint) {
   return h("div", { class: "field" }, h("label", { class: "field-label", for: control.id, text: label }), control, hint ? h("p", { class: "hint", text: hint }) : null);
 }
 
+// One-tap reasons that fill in "Reason shown to them" (staff can still change the text)
+const QUICK_REASONS = ["Spam", "Bad language", "Harassment", "Griefing", "Advertising", "Inappropriate content", "Breaking the rules"];
+function quickReasons(input) {
+  return h("div", { class: "chip-row", style: "display:flex;flex-wrap:wrap;gap:6px;margin-top:6px" },
+    ...QUICK_REASONS.map((r) => h("button", { class: "btn btn-ghost btn-sm", type: "button", text: r, onclick: () => { input.value = r; input.focus(); } })));
+}
+
 // Shared staff actions, used by both the chat and the Staff page.
 export function muteDialog(member, onDone) {
   const len = select("mute-len", Object.entries(MUTE_LABELS), 60);
@@ -119,7 +126,7 @@ export function muteDialog(member, onDone) {
   openDialog({
     title: `Mute ${member.username}`,
     body: h("div", { class: "form" }, h("p", { class: "text-2", text: "Muted members can still read chat, but can't send messages until the mute ends." }), field("Length", len),
-      field("Reason shown to them", shown, "They see this in a notification and when they try to send a message."),
+      field("Reason shown to them", shown, "They see this in a notification and when they try to send a message."), quickReasons(shown),
       field("Staff note", reason, "Only staff see this (in the audit log).")),
     actions: [
       { label: "Cancel" },
@@ -134,7 +141,7 @@ export function banDialog(member, onDone) {
   openDialog({
     title: `Ban ${member.username}`,
     body: h("div", { class: "form" }, h("p", { class: "text-2", text: "Banned members are signed out immediately and can't use the community until an Admin unbans them." }),
-      field("Reason shown to them", shown, "They see this when they're signed out and when they try to sign in."),
+      field("Reason shown to them", shown, "They see this when they're signed out and when they try to sign in."), quickReasons(shown),
       field("Staff note", reason, "Only staff see this (in the audit log). Fill in at least one of the two.")),
     actions: [
       { label: "Cancel" },
@@ -162,7 +169,7 @@ export function voiceMuteDialog(member, onDone) {
   openDialog({
     title: `Mute ${member.username} in voice`,
     body: h("div", { class: "form" }, h("p", { class: "text-2", text: "They can still listen in voice, but nobody will hear them until the mute ends." }), field("Length", len),
-      field("Reason shown to them", shown, "They see this in voice and in a notification."),
+      field("Reason shown to them", shown, "They see this in voice and in a notification."), quickReasons(shown),
       field("Staff note", reason, "Only staff see this (in the audit log).")),
     actions: [
       { label: "Cancel" },

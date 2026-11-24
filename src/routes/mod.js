@@ -146,6 +146,7 @@ export async function mute(request, env, ctx, url, params) {
     audit(sql, actor.id, "user.mute", { userId: target.id, details: { minutes, reason, shown } }),
   ]);
   await memberUpdated(env, sql, target.id);
+  await muteInGame(env, sql, target.id, minutes, shown);
   await tellMember(env, target.id, "You've been muted", `You can't send messages for ${muteLength(minutes)}.${shown ? ` Reason: ${shown}` : ""}`);
   return json({ ok: true });
 }
@@ -160,6 +161,7 @@ export async function unmute(request, env, ctx, url, params) {
     audit(sql, actor.id, "user.unmute", { userId: target.id }),
   ]);
   await memberUpdated(env, sql, target.id);
+  await muteInGame(env, sql, target.id, 0, "");
   return json({ ok: true });
 }
 
@@ -555,4 +557,29 @@ async function tellMember(env, userId, title, body) {
 // "You are muted ..." with the reason staff chose to show (chat and DMs).
 export function mutedText(until, shown) {
   return `You are muted until ${new Date(until).toUTCString().replace(" GMT", " UTC")}.${shown ? ` Reason: ${shown}` : ""}`;
+}
+
+// One mute everywhere: a website mute also mutes them in game (chat, /tell, /dm), right away when the server is online.
+// (The game also asks on join, so a mute made while the server was off still counts.)
+async function muteInGame(env, sql, userId, minutes, shown) {
+  try {
+    const [p] = await sql`SELECT p.xuid, p.gamertag FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE u.id = ${userId}`;
+    if (!p?.xuid) return;
+    const { toPlugin } = await import("./economy.js");
+    await toPlugin(env, { type: "web_mute", xuid: String(p.xuid), name: p.gamertag, until: minutes ? Date.now() + minutes * 60000 : 0, reason: shown || "" });
+  } catch (e) { console.error("couldn't mute in game", e); }
+}
+
+// A game mute (/mod) also mutes their linked website account (chat and DMs), and unmute lifts both.
+export async function muteFromGame(env, sql, xuid, minutes, reason) {
+  const [u] = await sql`SELECT u.id FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE p.xuid = ${xuid}`;
+  if (!u) return;
+  if (minutes > 0) {
+    await sql`UPDATE users SET muted_until = now() + make_interval(mins => ${minutes}), mute_shown = ${reason || null},
+                               mute_reason = coalesce(mute_reason, 'Muted in game') WHERE id = ${u.id}`;
+    await tellMember(env, u.id, "You've been muted", `You can't send messages for ${muteLength(minutes)}.${reason ? ` Reason: ${reason}` : ""}`);
+  } else {
+    await sql`UPDATE users SET muted_until = NULL, mute_reason = NULL, mute_shown = NULL WHERE id = ${u.id}`;
+  }
+  await memberUpdated(env, sql, u.id);
 }

@@ -372,8 +372,9 @@ export async function pluginMail(request, env) {
   const uuid = String(b.uuid || "");
   if (!/^[0-9a-f-]{36}$/i.test(uuid)) return json({ ok: false, error: "Bad player id." });
   const sql = getDb(env);
-  const [me] = await sql`SELECT id FROM users WHERE mc_uuid = ${uuid}::uuid AND NOT is_bot AND NOT banned`;
+  const [me] = await sql`SELECT id, muted_until, mute_shown FROM users WHERE mc_uuid = ${uuid}::uuid AND NOT is_bot AND NOT banned`;
   if (!me) return json({ ok: true, linked: false, threads: [], notifications: [], unread: 0 });
+  const muted = me.muted_until && new Date(me.muted_until) > new Date() ? { until: new Date(me.muted_until).getTime(), reason: me.mute_shown || "" } : null;
   const threads = await sql`
     SELECT t.id, t.last_message_at,
            CASE WHEN t.user_a = ${me.id} THEN t.a_unread ELSE t.b_unread END AS unread,
@@ -390,7 +391,7 @@ export async function pluginMail(request, env) {
     await sql`UPDATE notifications SET read_at = now() WHERE user_id = ${me.id} AND read_at IS NULL`;
   }
   return json({
-    ok: true, linked: true, unread,
+    ok: true, linked: true, unread, muted,
     threads: threads.map((t) => ({ id: Number(t.id), with: t.other, at: t.last_message_at, unread: Number(t.unread) || 0,
       last: String(t.last_body || "").slice(0, 160), mine: !!t.last_mine })),
     notifications: notes.map((n) => ({ id: Number(n.id), title: String(n.title || "").slice(0, 80), body: String(n.body || "").slice(0, 200),

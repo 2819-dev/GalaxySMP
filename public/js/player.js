@@ -201,7 +201,9 @@ async function load() {
   const charts = section("Activity", h("p", { class: "text-3 small", style: "margin:0", text: "Loading…" }));
   loadCharts(p.name, charts);
   const collection = section("Collection book", h("p", { class: "text-3 small", style: "margin:0", text: "Loading…" }));
+  const petsBox = section("My Pets", h("p", { class: "text-3 small", style: "margin:0", text: "Loading…" }));
   loadCollection(p.name, collection, social?.isMe);
+  loadPets(p.name, petsBox, social?.isMe);
   const screens = section("Loading screens", h("p", { class: "text-3 small", style: "margin:0", text: "Loading…" }));
   loadScreens(p.name, screens, social?.isMe);
 
@@ -258,7 +260,24 @@ async function load() {
       social.isMe ? h("p", { class: "text-3 small", style: "margin:10px 0 0", text: social.wishlistHidden ? "Only you can see your wishlist. Change this in Account settings." : "Everyone signed in can see this. You can hide it in Account settings." }) : null);
   }
 
-  box.replaceChildren(...[hero, showcase].filter(Boolean), h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, streakBox, stats, bedwars, charts), h("div", { class: "pp-col" }, wishlist, achievements, collection, screens)));
+  box.replaceChildren(...[hero, showcase].filter(Boolean), h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, streakBox, stats, bedwars, charts), h("div", { class: "pp-col" }, wishlist, achievements, petsBox, collection, screens)));
+}
+
+// The Dumplings, Blubs and Penguins they've tamed in game (named in the popup when they tame them)
+const PET_LOOK = { dumpling: ["🥟", "Dumpling"], blub: ["🫧", "Blub"], penguin: ["🐧", "Penguin"] };
+async function loadPets(name, box, isMe) {
+  let d;
+  try { d = await (await fetch(`/api/players/${encodeURIComponent(name)}/pets`)).json(); } catch { d = null; }
+  if (!d?.ok || (!d.pets.length && !isMe)) { box.remove(); return; }
+  const cards = d.pets.map((p) => {
+    const [emoji, kind] = PET_LOOK[p.kind] || ["🐾", "Pet"];
+    return h("div", { class: "pp-pet" }, h("span", { class: "pp-pet-ic", text: emoji, "aria-hidden": "true" }),
+      h("div", {}, h("b", { text: p.name || `Unnamed ${kind.toLowerCase()}` }),
+        h("div", { class: "text-3 small", text: `${p.color ? `${p.color[0].toUpperCase()}${p.color.slice(1)} ` : ""}${kind} · tamed ${new Date(p.tamed).toLocaleDateString()}` })));
+  });
+  box.replaceChildren(h("h2", { class: "pp-h2", text: `My Pets${d.pets.length ? ` (${d.pets.length})` : ""}` }),
+    d.pets.length ? h("div", { class: "pp-pets" }, ...cards)
+      : h("p", { class: "text-3 small", style: "margin:0", text: "No pets yet. Tame a Dumpling or Blub in the Sift, or a Penguin, and give it a name." }));
 }
 
 // Every kind of item they've had in their inventory, out of all the items in the game

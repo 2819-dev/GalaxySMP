@@ -317,6 +317,7 @@ const routes = [
   ["GET", "/api/players/:name/social", progress.socialProfile],
   ["GET", "/api/players/:name/history", progress.playerHistory],
   ["GET", "/api/players/:name/collection", progress.playerCollection],
+  ["GET", "/api/players/:name/pets", progress.playerPets],
   ["GET", "/api/players/:name/loading-screens", progress.playerLoadingScreens],
   ["POST", "/api/me/loading-screens", (req, env) => progress.sawLoadingScreen(req, env)],
   ["GET", "/api/timeline", progress.timeline],

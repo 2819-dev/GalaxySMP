@@ -152,6 +152,20 @@ export class VoiceHub extends DurableObject {
     if (plugin) this.send(plugin, { type: "active", on: this.voiceSockets().length > 0 });
   }
 
+  // The server stopped suddenly and is back: tell the linked players who were online then (a notification + phone alert).
+  async backOnline(names) {
+    try {
+      names = (names || []).map((n) => String(n).toLowerCase()).filter(Boolean);
+      if (!names.length) return;
+      const sql = getDb(this.env);
+      const rows = await sql`SELECT u.id FROM users u JOIN players p ON p.uuid = u.mc_uuid WHERE lower(p.gamertag) = ANY(${names}) AND NOT u.banned`;
+      if (!rows.length) return;
+      const { notify } = await import("../routes/notify.js");
+      await notify(this.env, rows.map((r) => Number(r.id)), "community", {
+        title: "GalaxySMP is back online!", body: "Sorry about that. The server is running again, jump back in!", url: "/status", tag: "server-back" });
+    } catch (e) { console.error("back online alert failed", e); }
+  }
+
   async wordList() {
     if (this.words && Date.now() - this.wordsAt < 60_000) return this.words;
     const rows = await getDb(this.env)`SELECT word, match FROM filter_words WHERE NOT EXISTS (SELECT 1 FROM economy_config WHERE key = 'chatfilter_off')`;
@@ -436,6 +450,7 @@ export class VoiceHub extends DurableObject {
         traceback: (Array.isArray(msg.traceback) ? msg.traceback : []).slice(0, 80).map((l) => clip(l, 300)),
         memory: Object.fromEntries(Object.entries(msg.memory && typeof msg.memory === "object" ? msg.memory : {}).slice(0, 8).map(([k, v]) => [clip(k, 20), Number(v) || 0])),
       };
+      this.backOnline(details.players);   // (in the background; it catches its own errors)
       return getDb(this.env)`INSERT INTO audit_log (actor_id, action, details) VALUES (NULL, 'server.crash', ${JSON.stringify(details)}::jsonb)`
         .catch((e) => console.error("crash report failed", e));
     }
@@ -536,6 +551,9 @@ export class VoiceHub extends DurableObject {
         shop: Boolean(p.shop), dim: String(p.dim || "").slice(0, 20), x: Number(p.x) || 0, z: Number(p.z) || 0, w: Number(p.w) || 0, l: Number(p.l) || 0, h: Number(p.h) || 0,
         type: p.type === "rent" ? "rent" : "sell", price: Number(p.price) || 0, maxDays: Number(p.maxDays) || 1, rentedUntil: Number(p.rentedUntil) || null }));
       return this.ctx.storage.put("plot_listings", { plots, at: Date.now() });
+    }
+    if (msg.type === "pets") {  // a player's tamed pets (My Pets on profiles)
+      return import("../routes/progress.js").then((m) => m.petsFromGame(this.env, msg)).catch((e) => console.error("pets save failed", e));
     }
     if (msg.type === "collection") {  // new item types a player collected (Collection book on profiles)
       return import("../routes/progress.js").then((m) => m.collectionFromGame(this.env, msg)).catch((e) => console.error("collection save failed", e));

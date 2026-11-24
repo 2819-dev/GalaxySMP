@@ -27,6 +27,7 @@ REPORT_REASONS = ["Cheating or hacking", "Griefing", "Stealing", "Bad language",
 MUTE_CHOICES = [(10, "10 minutes"), (60, "1 hour"), (1440, "1 day"), (10080, "7 days"), (43200, "30 days")]
 BAN_CHOICES = [(1440, "1 day"), (10080, "7 days"), (43200, "30 days"), (None, "Permanent")]
 REPORT_COOLDOWN = 60
+QUICK_REASONS = ["Spam", "Bad language", "Harassment", "Griefing", "Advertising", "Inappropriate content", "Breaking the rules"]
 MOD_PERMISSION = "galaxylink.command.mod"
 BAN_PERMISSION = "galaxylink.command.modban"
 CHAT_COMMANDS = {"msg", "tell", "w", "whisper", "me", "say", "tellraw"}
@@ -278,6 +279,33 @@ class Moderation:
         self.record("mute", xuid, name, actor, reason, minutes)
         actor.send_message(f"§aMuted {name} {length_text(minutes)}.")
 
+    # ---------- one mute everywhere: mutes made on the website ----------
+    def web_mute(self, msg):
+        """The website muted (until > 0) or unmuted (until 0) a linked player: game chat, /tell and /dm follow it."""
+        xuid = str(msg.get("xuid") or "")
+        if not xuid:
+            return
+        until = float(msg.get("until") or 0) / 1000
+        p = self.online(xuid)
+        if until > time.time():
+            self.mutes[xuid] = {"until": until, "reason": str(msg.get("reason") or "")[:300], "by": "Website", "name": msg.get("name") or xuid, "web": True}
+            if p:
+                p.send_message(f"§cYou have been muted {length_text(round((until - time.time()) / 60))}.{' Reason: ' + self.mutes[xuid]['reason'] if self.mutes[xuid]['reason'] else ''}")
+        elif self.mutes.pop(xuid, None) is not None and p:
+            p.send_message("§aYou have been unmuted.")
+        self.eco.set_config("mutes", self.mutes)
+
+    def check_web_mute(self, player, muted):
+        """On join (from the website's Mail answer): a website mute made while they were away, or one that was lifted."""
+        xuid = str(player.xuid)
+        cur = self.mutes.get(xuid)
+        if muted and float(muted.get("until") or 0) / 1000 > time.time():
+            if not cur or cur.get("until", 0) < float(muted["until"]) / 1000:
+                self.web_mute({"xuid": xuid, "name": player.name, "until": muted["until"], "reason": muted.get("reason") or ""})
+        elif cur and cur.get("web"):
+            self.mutes.pop(xuid, None)
+            self.eco.set_config("mutes", self.mutes)
+
     def unmute(self, actor, xuid, name):
         if self.mutes.pop(str(xuid), None) is None:
             return actor.send_message(f"§7{name} isn't muted.")
@@ -470,18 +498,26 @@ class Moderation:
                 then(clean(json.loads(data)[0], 300))
             except (ValueError, IndexError):
                 pass
-        player.send_form(ModalForm(title=title, controls=[TextInput("Reason (the player sees it)", "e.g. Spamming chat", "")],
-                                   submit_button="Confirm", on_submit=submit))
+        def submit2(p, data):
+            try:
+                v = json.loads(data)
+                then(clean(v[1], 300) or (QUICK_REASONS[int(v[0]) - 1] if int(v[0]) > 0 else ""))
+            except (ValueError, IndexError, TypeError):
+                pass
+        player.send_form(ModalForm(title=title, controls=[Dropdown("Quick reason", ["(none, or type below)"] + QUICK_REASONS, 0),
+                                                          TextInput("Or type a reason (the player sees it)", "e.g. Spamming chat", "")],
+                                   submit_button="Confirm", on_submit=submit2))
 
     def length_form(self, player, title, choices, then):
         def submit(p, data):
             try:
                 v = json.loads(data)
-                then(choices[int(v[0])][0], clean(v[1], 300))
-            except (ValueError, IndexError):
+                then(choices[int(v[0])][0], clean(v[2], 300) or (QUICK_REASONS[int(v[1]) - 1] if int(v[1]) > 0 else ""))
+            except (ValueError, IndexError, TypeError):
                 pass
         player.send_form(ModalForm(title=title, controls=[Dropdown("How long?", [c[1] for c in choices], 1),
-                                                          TextInput("Reason (the player sees it)", "e.g. Bad language", "")],
+                                                          Dropdown("Quick reason", ["(none, or type below)"] + QUICK_REASONS, 0),
+                                                          TextInput("Or type a reason (the player sees it)", "e.g. Bad language", "")],
                                    submit_button="Confirm", on_submit=submit))
 
     def ban_form(self, player, xuid, name):

@@ -399,6 +399,33 @@ export async function playerCollection(request, env, ctx, url, params) {
     missing: ((got) => ITEMS.filter((i) => !got.has(i.id)).map((i) => i.name))(new Set(have.map((r) => r.item_id))) });
 }
 
+// ---------- My Pets (Dumplings, Blubs and Penguins tamed in game) ----------
+const PET_KINDS = ["dumpling", "blub", "penguin"];
+export async function petsFromGame(env, msg) {
+  const xuid = String(msg.xuid || "");
+  if (!/^\d{1,20}$/.test(xuid)) return;
+  const sql = getDb(env);
+  const pets = (Array.isArray(msg.pets) ? msg.pets : []).slice(0, 60).filter((p) => PET_KINDS.includes(p?.kind) && /^[\w-]{1,40}$/.test(String(p?.id)));
+  for (const p of pets) {
+    await sql`INSERT INTO game_pets (xuid, pet_id, kind, name, color, tamed_at)
+              VALUES (${xuid}, ${String(p.id)}, ${p.kind}, ${String(p.name || "").slice(0, 24) || null}, ${String(p.color || "").slice(0, 16) || null},
+                      ${p.tamed ? new Date(Number(p.tamed) * 1000).toISOString() : new Date().toISOString()}::timestamptz)
+              ON CONFLICT (xuid, pet_id) DO UPDATE SET name = EXCLUDED.name, color = EXCLUDED.color, updated_at = now()`;
+  }
+  for (const id of (Array.isArray(msg.gone) ? msg.gone : []).slice(0, 60)) {
+    await sql`DELETE FROM game_pets WHERE xuid = ${xuid} AND pet_id = ${String(id).slice(0, 40)}`;
+  }
+}
+
+// GET /api/players/:name/pets
+export async function playerPets(request, env, ctx, url, params) {
+  await requireUser(request, env);
+  const rows = await getDb(env)`
+    SELECT g.kind, g.name, g.color, g.tamed_at FROM game_pets g JOIN players p ON p.xuid = g.xuid
+     WHERE lower(p.gamertag) = lower(${String(params.name).replace(/^\./, "").slice(0, 32)}) ORDER BY g.tamed_at LIMIT 60`;
+  return json({ ok: true, pets: rows.map((r) => ({ kind: r.kind, name: r.name || "", color: r.color || "", tamed: r.tamed_at })) });
+}
+
 // ---------- Loading screens collection ----------
 export const LOADING_SCREENS = ["grass", "diamond", "gold", "emerald", "netherite", "amethyst", "lava", "ice", "galaxy", "ender", "rainbow",
   "rosh", "sukkot", "chanukah", "tubishvat", "purim", "pesach", "lagbaomer", "shavuot", "newyear", "spring", "summer", "autumn", "winter"];

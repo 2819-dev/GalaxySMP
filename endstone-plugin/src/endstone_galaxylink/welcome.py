@@ -43,6 +43,12 @@ MENU_ITEM = "galaxysmp:menu"
 HOLIDAY_CODES = {"rosh": "1", "sukkot": "2", "chanukah": "3", "tubishvat": "4", "purim": "5", "pesach": "6", "lagbaomer": "7", "shavuot": "8",
                  "newyear": "9", "spring": "a", "summer": "b", "autumn": "c", "winter": "d"}
 JOIN_TICKS = 50          # the joining animation (about 2.5 seconds)
+# Home icons (Play > Homes): name and the picture shown in the list
+HOME_ICONS = [("House", "textures/ui/gsmp_icon_home"), ("Bed", "textures/items/bed_red"), ("Diamond", "textures/items/diamond"),
+              ("Farm", "textures/items/wheat"), ("Mine", "textures/items/iron_pickaxe"), ("Shop", "textures/items/emerald"),
+              ("Base", "textures/items/diamond_sword"), ("Food", "textures/items/apple"), ("Library", "textures/items/book_normal"),
+              ("Gold", "textures/items/gold_ingot"), ("Door", "textures/items/door_wood")]
+SCENE_NAMES = ["Wilderness", "Copper", "The Sift", "Chaos"]
 
 # small icons from the resource pack (glyph_F7.png)
 PING = ["", "", "", ""]
@@ -127,6 +133,23 @@ class Welcome:
         self.news = {}            # from the website: {"title": ..., "event": ..., "when": ...}
         self.open = {}            # player uuid -> state while the menu is open
         self.joined = {}          # player uuid -> name of the server they picked (players count for event servers)
+        self.db = plugin.economy.db
+        self.db.execute("CREATE TABLE IF NOT EXISTS menu_prefs (xuid TEXT PRIMARY KEY, music INTEGER DEFAULT 1, scene INTEGER DEFAULT -1, skip INTEGER DEFAULT 0)")
+        self.db.commit()
+
+    # ---------- Settings (per player) ----------
+    def prefs(self, player):
+        try:
+            r = self.db.execute("SELECT music, scene, skip FROM menu_prefs WHERE xuid = ?", (str(player.xuid),)).fetchone()
+        except Exception:
+            r = None
+        return {"music": bool(r[0]) if r else True, "scene": int(r[1]) if r else -1, "skip": bool(r[2]) if r else False}
+
+    def set_pref(self, player, **kw):
+        p = dict(self.prefs(player), **kw)
+        self.db.execute("INSERT OR REPLACE INTO menu_prefs (xuid, music, scene, skip) VALUES (?,?,?,?)",
+                        (str(player.xuid), int(p["music"]), int(p["scene"]), int(p["skip"])))
+        self.db.commit()
 
     @staticmethod
     def fill(data):
@@ -159,9 +182,14 @@ class Welcome:
         except Exception:
             return False
 
-    def new_state(self, brand_new, reopened=False):
+    def new_state(self, brand_new, reopened=False, player=None):
+        scene = random.randrange(len(SCENES))
+        if player is not None:
+            fav = self.prefs(player)["scene"]
+            if 0 <= fav < len(SCENES):
+                scene = fav
         return {"screen": "title", "tab": 0, "sel": 0, "new": bool(brand_new), "reopened": reopened, "closes": 0, "after": [],
-                "scene": random.randrange(len(SCENES)), "splash": self.pick_splash(), "music": False}
+                "scene": scene, "splash": self.pick_splash(), "music": False}
 
     def lock(self, player, on):
         """Stops walking and looking around while the Main Menu is on its way (no walk_speed: that zooms the view)."""
@@ -177,7 +205,9 @@ class Welcome:
         self.lock(player, False)   # in case they left while locked
         if not self.enabled() or self.in_minigame(player):
             return False
-        self.open[str(player.unique_id)] = self.new_state(brand_new)
+        if not brand_new and self.prefs(player)["skip"]:
+            return False   # Settings: "Show the Main Menu when I join" is off (/menu still opens it)
+        self.open[str(player.unique_id)] = self.new_state(brand_new, player=player)
         self.lock(player, True)
         from endstone_galaxylink.safety import later
         later(self.plugin, player, lambda p: self.lock(p, False), 20 * 180)   # never stuck for more than 3 minutes
@@ -188,7 +218,7 @@ class Welcome:
         if self.in_minigame(player):
             return player.send_message("§cThe Main Menu isn't available during a minigame.")
         if not self.waiting(player):
-            self.open[str(player.unique_id)] = self.new_state(False, reopened=True)
+            self.open[str(player.unique_id)] = self.new_state(False, reopened=True, player=player)
         self.show(player)
 
     def travel(self, player, name):
@@ -248,7 +278,7 @@ class Welcome:
         name = player.name.replace('"', "")
         server = self.plugin.server
         try:
-            if on and st is not None and not st["music"]:
+            if on and st is not None and not st["music"] and self.prefs(player)["music"]:
                 st["music"] = True
                 server.dispatch_command(server.command_sender, f'playsound music.menu "{name}" ~ ~ ~ 0.6')
             elif not on:
@@ -549,10 +579,33 @@ class Welcome:
         out = []
         for name, data in rows:
             try:
-                out.append({"name": name, "spot": json.loads(data)})
+                spot = json.loads(data)
+                out.append({"name": name, "spot": spot, "icon": self.home_icon(spot.get("icon"))})
             except Exception:
                 pass
         return out
+
+    @staticmethod
+    def home_icon(key):
+        return next((tex for n, tex in HOME_ICONS if n == key), HOME_ICONS[0][1])
+
+    def set_home_icon(self, player, name, icon):
+        tp = getattr(self.plugin, "teleports", None)
+        r = tp.db.execute("SELECT data FROM homes WHERE xuid = ? AND name = ?", (str(player.xuid), name)).fetchone() if tp else None
+        if not r:
+            return
+        spot = json.loads(r[0])
+        spot["icon"] = icon
+        tp.db.execute("UPDATE homes SET data = ? WHERE xuid = ? AND name = ?", (json.dumps(spot), str(player.xuid), name))
+        tp.db.commit()
+
+    def icon_key_of(self, player, name):
+        tp = getattr(self.plugin, "teleports", None)
+        r = tp.db.execute("SELECT data FROM homes WHERE xuid = ? AND name = ?", (str(player.xuid), name)).fetchone() if tp else None
+        try:
+            return json.loads(r[0]).get("icon") or HOME_ICONS[0][0]
+        except Exception:
+            return HOME_ICONS[0][0]
 
     def featured(self):
         return [str(n) for n in (self.plugin.economy.get_config("featured_warps") or []) if n]
@@ -602,7 +655,7 @@ class Welcome:
                           lambda p: self.home_name_form(p)))
             for i, h in enumerate(homes):
                 mark = "§e» " if i == sel else ""
-                items.append((f"{mark}§l{h['name']}§r\n{self.spot_line(h['spot'])}", "textures/ui/gsmp_icon_home",
+                items.append((f"{mark}§l{h['name']}§r\n{self.spot_line(h['spot'])}", h["icon"],
                               lambda p, i=i: self.play_select(p, i)))
             if homes:
                 h = homes[min(sel, len(homes) - 1)]
@@ -621,6 +674,10 @@ class Welcome:
         elif tab == 1:
             rows = self.warp_rows(player)
             warps_list = [r[1] for r in rows if r[0] == "warp"]
+            try:
+                hot = self.plugin.warps.popular()
+            except Exception:
+                hot = {}
             k = 0
             chosen = None
             for kind, v in rows:
@@ -635,7 +692,8 @@ class Welcome:
                         chosen = v
                     mark = "§e» " if k == sel else ""
                     star = "§e★ " if v["name"].lower() in [n.lower() for n in self.featured()] else ""
-                    items.append((f"{mark}{star}§l{v['name']}§r\n§7by {v['ownerName']} · {v['visits']} visit{'s' if v['visits'] != 1 else ''}",
+                    pop = "  §6Popular this week" if v["owner"] in hot else ""
+                    items.append((f"{mark}{star}§l{v['name']}§r\n§7by {v['ownerName']} · {v['visits']} visit{'s' if v['visits'] != 1 else ''}{pop}",
                                   "textures/ui/gsmp_icon_warp", lambda p, k=k: self.play_select(p, k)))
                     k += 1
             if chosen is None and warps_list:
@@ -652,7 +710,8 @@ class Welcome:
                     acts.append(("textures/ui/gsmp_icon_move", lambda p, n=w["name"]: self.move_warp(p, n)))
                 featured = w["name"].lower() in [n.lower() for n in self.featured()]
                 view.update(pic="textures/ui/gsmp_bg_copper", name=f"§l{w['name']}", go_text="WARP",
-                            strip=f"§7by §f{w['ownerName']}  §7{w['visits']} visit{'s' if w['visits'] != 1 else ''}" + ("  §e★ Featured" if featured else ""),
+                            strip=f"§7by §f{w['ownerName']}  §7{w['visits']} visit{'s' if w['visits'] != 1 else ''}" + ("  §e★ Featured" if featured else "")
+                                  + (f"  §6Popular: {hot[w['owner']]} this week" if w["owner"] in hot else ""),
                             go=lambda p, n=w["name"]: self.warp_to(p, n), acts=acts,
                             text=(f"§l§f{w['name']}§r\n§7A warp by §f{w['ownerName']}§7.\n\n§7Anyone can visit with §e/warp {w['name']}§7."
                                   + ("\n\n§e★§7 Tap the star to feature it (or take it off Featured)." if self.can_feature(player) else "")))
@@ -741,23 +800,36 @@ class Welcome:
             return self.show(player)
         default = rename or ("home" if "home" not in homes else f"home{len(homes) + 1}")
 
+        cur_icon = self.icon_key_of(player, rename) if rename else HOME_ICONS[0][0]
+        icon_names = [n for n, _ in HOME_ICONS]
+
         def submit(p, data):
             try:
-                name = tp.home_name([str(json.loads(data)[0] or "")])
+                vals = json.loads(data)
             except Exception:
-                name = default
+                vals = [default, 0]
+            name = tp.home_name([str(vals[0] or "")]) if vals else default
+            try:
+                icon = icon_names[int(vals[1])]
+            except Exception:
+                icon = cur_icon
+            final = name
             if rename is None:
                 tp.set_home(p, [name])
             elif name != rename:
                 if name in [h["name"] for h in self.homes_of(p)]:
                     p.send_message(f"§cYou already have a home called {name}.")
+                    final = rename
                 else:
                     tp.db.execute("UPDATE homes SET name = ? WHERE xuid = ? AND name = ?", (name, str(p.xuid), rename))
                     tp.db.commit()
                     p.send_message(f"§aRenamed your home to §f{name}§a.")
+            self.set_home_icon(p, final, icon)
             self.show(p)
-        self.subform(player, ModalForm(title="§lRename home" if rename else "§lNew home",
-                                       controls=[TextInput("Home name (letters and numbers)", "e.g. base", default)],
+        from endstone.form import Dropdown
+        self.subform(player, ModalForm(title="§lEdit home" if rename else "§lNew home",
+                                       controls=[TextInput("Home name (letters and numbers)", "e.g. base", default),
+                                                 Dropdown("Icon", icon_names, icon_names.index(cur_icon) if cur_icon in icon_names else 0)],
                                        submit_button="Save", on_submit=submit))
 
     def confirm(self, player, title, text, yes, then):
@@ -775,8 +847,9 @@ class Welcome:
                      lambda p: (tp.del_home(p, [name]), self.state(p) and self.state(p).setdefault("psel", {}).update({0: 0})))
 
     def move_home(self, player, name):
+        icon = self.icon_key_of(player, name)
         self.confirm(player, "§lMove home?", f"Move your home §f{name}§r to where you are standing now?", "§aMove it",
-                     lambda p: self.plugin.teleports.set_home(p, [name]))
+                     lambda p: (self.plugin.teleports.set_home(p, [name]), self.set_home_icon(p, name, icon)))
 
     def warp_to(self, player, name):
         warps = getattr(self.plugin, "warps", None)
@@ -784,8 +857,7 @@ class Welcome:
         if w is None:
             player.send_message("§cThat warp doesn't exist any more.")
             return self.show(player)
-        warps.db.execute("UPDATE warps SET visits = visits + 1 WHERE owner = ?", (w["owner"],))
-        warps.db.commit()
+        warps.log_visit(w["owner"])
         self.leave_to(player, w["spot"], f"{w['ownerName']}'s warp {w['name']}")
 
     def warp_name_form(self, player):
@@ -840,7 +912,40 @@ class Welcome:
         self.send(player, form)
 
     def show_settings(self, player):
-        self.page(player, "Settings", ["Settings"], 0, "§l§bComing Soon...§r\n\n§7Settings for the Main Menu, sounds and more are on the way.")
+        st = self.state(player)
+        pr = self.prefs(player)
+        scene = SCENE_NAMES[pr["scene"]] if 0 <= pr["scene"] < len(SCENE_NAMES) else "Random"
+        body = ("§l§fSettings§r\n\n"
+                f"§fMenu music: {'§aOn' if pr['music'] else '§cOff'}\n§7The music that plays while the Main Menu is open.\n\n"
+                f"§fWallpaper: §b{scene}\n§7The picture behind the Main Menu. Random picks a new one every time.\n\n"
+                f"§fMain Menu when I join: {'§cSkip' if pr['skip'] else '§aShow'}\n§7Skip it to go straight into the game. "
+                "§e/menu§7 and the menu compass still open it.\n\n§7Tap a button on the left to change a setting.")
+        form = ActionForm(title=f"{PAGE}{self.codes(st)}§lSettings", content=body)
+
+        def music(p):
+            on = not self.prefs(p)["music"]
+            self.set_pref(p, music=on)
+            if not on:
+                self.music(p, False)
+                s = self.state(p)
+                if s is not None:
+                    s["music"] = False
+            self.show(p)
+
+        def wallpaper(p):
+            cur = self.prefs(p)["scene"]
+            nxt = cur + 1 if cur + 1 < len(SCENES) else -1
+            self.set_pref(p, scene=nxt)
+            s = self.state(p)
+            if s is not None:
+                s["scene"] = nxt if nxt >= 0 else random.randrange(len(SCENES))
+            self.show(p)
+
+        form.add_button(f"§e§lMenu music: {'On' if pr['music'] else 'Off'}", on_click=music)
+        form.add_button(f"Wallpaper: {scene}", on_click=wallpaper)
+        form.add_button(f"On join: {'Skip menu' if pr['skip'] else 'Show menu'}",
+                        on_click=lambda p: (self.set_pref(p, skip=not self.prefs(p)["skip"]), self.show(p)))
+        self.send(player, form)
 
     GUIDE_TABS = ["Tutorial", "Commands", "Rules", "What's New", "Store"]
 
@@ -1049,8 +1154,31 @@ class Welcome:
         except Exception:
             money = ""
         lines = [card, ""]
+        ranks = getattr(self.plugin, "ranks", None)
+        try:
+            rank = ranks.rank_names(player.xuid) if ranks is not None else ""
+        except Exception:
+            rank = ""
+        if rank and rank != "No rank":
+            lines.append(f"§dRank: §f{rank}")
         if money:
             lines.append(f"§eMoney: §f{money}")
+        try:   # the 3 best achievements they have (the biggest rewards)
+            from endstone_galaxylink.progress import ACHIEVEMENTS
+            got = set(self.plugin.progress.stats(player).get("achievements") or [])
+            best = sorted([a for a in ACHIEVEMENTS if a[0] in got], key=lambda a: -a[4])[:3]
+            lines += ["", f"§l§fTop achievements§r §7({len(got)}/{len(ACHIEVEMENTS)})"] + ([f"§6★ §f{a[1]}§7: {a[2]}" for a in best] or ["§7None yet. Type /achievements to see them."])
+        except Exception:
+            pass
+        pets = getattr(self.plugin, "pets", None)
+        try:
+            mine = pets.of(player.xuid) if pets is not None else []
+        except Exception:
+            mine = []
+        lines += ["", f"§l§fMy Pets§r §7({len(mine)})"] + ([f"§b• §f{p['name'] or 'Unnamed'} §7({p['kind'].title()})" for p in mine[:8]]
+                                                         + ([f"§7and {len(mine) - 8} more"] if len(mine) > 8 else [])
+                                                         or ["§7No pets yet. Tame a Dumpling or Blub in the Sift, or a Penguin."])
+        lines.append("")
         lines += ["§7Friends " + ("§ccan't see§7" if hidden else "§acan see§7") + " your card.",
                   "§aYour account is linked." if linked else "§7Link your account to chat, add friends and see your stats on §bgalaxymc.us§7."]
         form = ActionForm(title=f"{PAGE}{self.codes(st)}§lProfile", content="\n".join(lines))
