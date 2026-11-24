@@ -347,8 +347,8 @@ def glyph_conflicts():
     return sorted(set(found))
 
 
-def signature(item):
-    return json.dumps([FORMAT, "badge", item.get("prefix", ""), item.get("stops"), item.get("icon")], separators=(",", ":"))
+def signature(item, fmt=None):
+    return json.dumps([FORMAT if fmt is None else fmt, "badge", item.get("prefix", ""), item.get("stops"), item.get("icon")], separators=(",", ":"))
 
 
 class RankTags:
@@ -358,6 +358,8 @@ class RankTags:
         cfg = self.eco.get_config("ranktags") or {}
         self.enabled = cfg.get("enabled", True)
         self.chat_pictures = cfg.get("chat", True)    # Discord-style chat: a picture name line, then the message in normal font
+        if not cfg.get("chat_on_2_85"):                # 2.85.0: rank badge pictures in chat for everyone (once; /ranktags chat off still works)
+            self.chat_pictures = True
         self.version = cfg.get("version", 0)
         self.built = cfg.get("built") or {}           # signature -> glyph string, in the pack file on disk
         self.history = cfg.get("history") or {}       # pack version -> its glyphs (the last few builds)
@@ -368,6 +370,8 @@ class RankTags:
             self.ensure_installed()       # the newest build is in place for the next start
         except Exception as e:
             plugin.logger.warning(f"Couldn't install the rank badge pack: {e}")
+        if not cfg.get("chat_on_2_85"):
+            self.save()                   # remember that chat pictures were switched on once
 
     def pick_active(self):
         """The picture map for the pack the server REALLY loaded. The version number in the world's pack
@@ -392,7 +396,7 @@ class RankTags:
         keep = sorted(self.history, key=int)[-12:]
         self.history = {k: self.history[k] for k in keep}
         self.eco.set_config("ranktags", {"enabled": self.enabled, "chat": self.chat_pictures, "version": self.version,
-                                         "built": self.built, "history": self.history})
+                                         "built": self.built, "history": self.history, "chat_on_2_85": True})
 
     def pack_path(self):
         folder = Path(self.plugin.data_folder)
@@ -472,6 +476,13 @@ class RankTags:
         if not self.enabled or not tag or not tag.get("prefix") or not tag.get("stops"):
             return None
         found = self.active.get(signature(tag))
+        if not found:
+            # a newer drawing is waiting for the next restart: until then, the pictures the world loaded
+            # (an earlier drawing of the same badge) still show, instead of plain colored text
+            for old in range(FORMAT - 1, max(0, FORMAT - 4), -1):
+                found = self.active.get(signature(tag, old))
+                if found:
+                    break
         return found if isinstance(found, str) and found else None
 
     # ---------- building the pack ----------

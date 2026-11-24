@@ -623,6 +623,12 @@ The bigger Sift is built in the background after the update, which takes about h
     body: `- **#Meet The Team** is now organized by rank, in the same order as our rank list: Ownership first, then Admins, then Moderators.
 - Each rank has its own heading with its badge and how many members it has.`,
   },
+  {
+    id: "2026-11-24-rank-badges-in-game",
+    title: "Rank badges in game, regular names",
+    body: `- **Rank badges** (the icon and rank name on a colored pill) now show in game chat and above players' heads.
+- **Names** are now shown in regular white text next to the badge, instead of in the rank's color.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

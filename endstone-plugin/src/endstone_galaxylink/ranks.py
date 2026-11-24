@@ -197,8 +197,9 @@ def tag_text(rank):
 
 
 def name_text(player_name, rank, bold=False):
-    """A player's name in game: one color, their rank's main color (the badge carries the gradient)."""
-    return paint(player_name, solid(rank) if rank else None, bold)
+    """A player's name in game: always the regular white name. The rank shows as its badge picture
+    (icon and name on a colored pill) next to it, so the name itself stays plain."""
+    return f"§f{'§l' if bold else ''}{player_name}"
 
 
 class RankManager:
@@ -334,7 +335,7 @@ class RankManager:
         (it uses a small fallback font for a whole message as soon as it contains any picture)."""
         style = self.display_tag(player)
         tags = [tag_text(style)] if style else []
-        name = name_text(player.name, style, bold=True) if style else f"§f§l{player.name}"
+        name = name_text(player.name, style)
         return self.team_tag(player) + ("§r ".join(tags) + "§r " if tags else "") + name + "§r"
 
     def team_tag(self, player):
@@ -354,7 +355,7 @@ class RankManager:
         # and only the one tag with the best priority shows.
         style = solid(self.display_tag(player))
         prefix = paint(f"[{style['prefix']}]", style) + "§r " if style else ""
-        name = paint("\x00", style, True) if style else "§f§l\x00"  # placeholder for {0}
+        name = "§f\x00"  # placeholder for {0}: the regular name (the rank shows as the tag before it)
         fmt = (self.team_tag(player) + prefix + name).replace("{", "{{").replace("}", "}}").replace("\x00", "{0}")
         return fmt + "§r§7:§r {1}"
 
