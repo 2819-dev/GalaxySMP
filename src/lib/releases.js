@@ -532,6 +532,13 @@ We've also simplified the Sift's wildlife: for now, Dumplings and Blubs are the 
 
 **World borders.** Each server now has its own border, and the Sift and other servers sit outside the main world. Use the Main Menu to travel between them. If you reach a border, a glowing wall appears and you'll be gently moved back inside.`,
   },
+  {
+    id: "2026-11-24-sift-build-fix",
+    title: "The Sift: building fixed",
+    body: `We fixed a problem that stopped the Sift from being built, so it can now be visited from the Main Menu once it's ready.
+
+Staff can also now name world borders and teleport to them.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

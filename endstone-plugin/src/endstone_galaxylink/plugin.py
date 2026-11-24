@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.79.0"
+VERSION = "2.79.1"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -97,7 +97,7 @@ class GalaxyLink(Plugin):
         "party": _cmd("Your party: invite players, accept an invite, or leave. Party chat: /p <message>.", "/party [accept|leave|invite <player>]", "galaxylink.command.party"),
         "p": _cmd("Party chat.", "/p <message: message>", "galaxylink.command.party", ["pc"]),
         "sift": _cmd("Staff: go to the Sift, or build it (/sift build, /sift status).", "/sift [build|status]", "galaxylink.command.sift"),
-        "border": _cmd("World borders: list them, get the Border Axe, or reset to the defaults.", "/border [list|axe|reset]", "galaxylink.command.border"),
+        "border": _cmd("World borders: a menu of them, teleport to one, get the Border Axe, or reset.", "/border [tp|list|axe|reset] [name: message]", "galaxylink.command.border"),
         "portal": _cmd("Picture portals: get the Portal Axe, list or remove portals.", "/portal [axe|list|remove <id>]", "galaxylink.command.portal"),
         "menu": _cmd("The GalaxySMP Main Menu: Featured Servers, How to Play, Rules, What's New and Store.", "/menu", "galaxylink.command.menu", ["mainmenu", "hub"]),
         "tpa": _cmd("Ask to teleport to a player.", "/tpa <player: player>", "galaxylink.command.tpa"),

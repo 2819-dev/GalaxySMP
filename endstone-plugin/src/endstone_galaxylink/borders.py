@@ -49,11 +49,11 @@ class Borders:
         out = []
         spawn = self.plugin.economy.get_config("spawn") or {}
         sx, sz = float(spawn.get("x", 0)), float(spawn.get("z", 0))
-        out.append({"id": "main", "server": MAIN, "dim": "overworld", "shape": "box",
+        out.append({"id": "main", "server": MAIN, "name": "Main World", "dim": "overworld", "shape": "box",
                     "x1": int(sx - MAIN_HALF), "z1": int(sz - MAIN_HALF), "x2": int(sx + MAIN_HALF), "z2": int(sz + MAIN_HALF)})
         try:
             from endstone_galaxylink import sift as S
-            out.append({"id": "sift", "server": "The Sift", "dim": "overworld", "shape": "circle", "cx": S.CX, "cz": S.CZ, "r": int(S.R * 0.8)})
+            out.append({"id": "sift", "server": "The Sift", "name": "The Sift", "dim": "overworld", "shape": "circle", "cx": S.CX, "cz": S.CZ, "r": int(S.R * 0.8)})
         except Exception:
             pass
         return out
@@ -228,26 +228,108 @@ class Borders:
         return True
 
     def pick(self, p, box):
-        from endstone.form import ModalForm, Dropdown
+        from endstone.form import ModalForm, Dropdown, TextInput
         names = self.servers()
 
         def submit(pl, data):
             import json
             try:
-                i = int(json.loads(data)[0])
+                v = json.loads(data)
+                i = int(v[1])
+                name = clean(v[0]) or names[i]
             except Exception:
                 return
-            self.set_border(pl, box, names[i])
+            self.set_border(pl, box, names[i], name)
         size = f"{box['x2'] - box['x1'] + 1} x {box['z2'] - box['z1'] + 1} blocks"
-        p.send_form(ModalForm(title="New Border", controls=[Dropdown(f"Whose border is this? ({size})", names, 0)],
-                              submit_button="Save border", on_submit=submit))
+        p.send_form(ModalForm(title="New Border", controls=[
+            TextInput(f"Name this border ({size})", "e.g. Main World", ""),
+            Dropdown("Whose border is this?", names, 0)],
+            submit_button="Save border", on_submit=submit))
 
-    def set_border(self, p, box, server):
+    def set_border(self, p, box, server, name=None):
         """A server has one border per dimension: a new one replaces the old one."""
+        name = name or server
         items = [b for b in self.borders() if not (b["server"] == server and b["dim"] == box["dim"])]
-        items.append(dict(box, id=f"{server.lower().replace(' ', '_')}_{box['dim']}", server=server))
+        items.append(dict(box, id=f"{server.lower().replace(' ', '_')}_{box['dim']}", server=server, name=name))
         self.save(items)
-        p.send_message(f"§aBorder saved for §f{server}§a ({box['x2'] - box['x1'] + 1} x {box['z2'] - box['z1'] + 1} blocks).")
+        p.send_message(f"§aBorder §f{name}§a saved for §f{server}§a ({box['x2'] - box['x1'] + 1} x {box['z2'] - box['z1'] + 1} blocks). "
+                       f"§7/border tp {name} §7to go there.")
+
+    # ---------- going to a border ----------
+    @staticmethod
+    def label(b):
+        return b.get("name") or b["server"]
+
+    def find(self, text):
+        t = str(text).strip().lower()
+        items = self.borders()
+        return (next((b for b in items if self.label(b).lower() == t), None) or
+                next((b for b in items if b["server"].lower() == t), None) or
+                next((b for b in items if self.label(b).lower().startswith(t)), None))
+
+    def center(self, b):
+        if b.get("shape") == "circle":
+            return b["cx"], b["cz"]
+        return (b["x1"] + b["x2"]) // 2, (b["z1"] + b["z2"]) // 2
+
+    def teleport(self, p, b):
+        """Takes you to the middle of a border, standing on the ground."""
+        sift = getattr(self.plugin, "sift", None)
+        if b["server"] == "The Sift" and sift is not None and sift.built():
+            sift.go(p)
+            return
+        x, z = self.center(b)
+        server = self.plugin.server
+        where = {"overworld": "overworld", "nether": "nether", "the_end": "the_end"}.get(b["dim"], "overworld")
+        name = p.name.replace('"', "")
+        # spreadplayers loads the land and puts you on top of it
+        server.dispatch_command(server.command_sender, f'execute in {where} run spreadplayers {x} {z} 0 1 "{name}"')
+        p.send_message(f"§bTeleported to §f{self.label(b)}§b.")
+
+    def menu(self, p):
+        from endstone.form import ActionForm
+        items = self.borders()
+        form = ActionForm(title="World Borders", content="§7Tap a border to go there or change it. §f/border axe§7 makes a new one.\n"
+                                                          "§7Only the owner can go outside the borders.")
+        for b in items:
+            form.add_button(f"§l{self.label(b)}§r\n§7{b['server']} · {b['dim']}", on_click=lambda pl, b=b: self.border_menu(pl, b))
+        form.add_button("§bGet the Border Axe", on_click=lambda pl: self.command(pl, ["axe"]))
+        p.send_form(form)
+
+    def border_menu(self, p, b):
+        from endstone.form import ActionForm
+        form = ActionForm(title=self.label(b), content=self.describe(b))
+        form.add_button("§aTeleport there", on_click=lambda pl: self.teleport(pl, b))
+        form.add_button("Rename", on_click=lambda pl: self.ask_rename(pl, b))
+        form.add_button("§cRemove this border", on_click=lambda pl: self.remove(pl, b["id"]))
+        form.add_button("< Back", on_click=self.menu)
+        p.send_form(form)
+
+    def ask_rename(self, p, b):
+        from endstone.form import ModalForm, TextInput
+
+        def submit(pl, data):
+            import json
+            try:
+                name = clean(json.loads(data)[0])
+            except Exception:
+                return
+            if not name:
+                return
+            items = self.borders()
+            for x in items:
+                if x["id"] == b["id"]:
+                    x["name"] = name
+            self.save(items)
+            pl.send_message(f"§aRenamed to §f{name}§a.")
+        p.send_form(ModalForm(title="Rename border", controls=[TextInput("New name", self.label(b), self.label(b))],
+                              submit_button="Save", on_submit=submit))
+
+    def describe(self, b):
+        if b.get("shape") == "circle":
+            return f"§f{b['server']}§r\n§7A circle {b['r'] * 2} blocks across, around {b['cx']} {b['cz']}"
+        return (f"§f{b['server']}§r\n§7{b['x2'] - b['x1'] + 1} x {b['z2'] - b['z1'] + 1} blocks, "
+                f"from {b['x1']} {b['z1']} to {b['x2']} {b['z2']}")
 
     def ask_remove(self, p, b):
         from endstone.form import ActionForm
@@ -255,7 +337,8 @@ class Borders:
             where = f"a circle {b['r'] * 2} blocks across"
         else:
             where = f"{b['x2'] - b['x1'] + 1} x {b['z2'] - b['z1'] + 1} blocks, from {b['x1']} {b['z1']} to {b['x2']} {b['z2']}"
-        form = ActionForm(title=f"{b['server']} border", content=f"§f{where}§r\n\n§7Make a new one with the Border Axe to replace it.")
+        form = ActionForm(title=f"{self.label(b)} border", content=f"§f{where}§r\n\n§7Make a new one with the Border Axe to replace it.")
+        form.add_button("§aTeleport to the middle", on_click=lambda pl: self.teleport(pl, b))
         form.add_button("§cRemove this border", on_click=lambda pl: self.remove(pl, b["id"]))
         form.add_button("Keep it")
         p.send_form(form)
@@ -271,24 +354,39 @@ class Borders:
         if not sender.is_op:
             sender.send_message("§cOnly operators can manage borders.")
             return True
-        sub = args[0].lower() if args else "list"
+        sub = args[0].lower() if args else ("menu" if hasattr(sender, "xuid") else "list")
+        if sub == "menu":
+            self.menu(sender)
+            return True
         if sub == "axe":
             if hasattr(sender, "xuid"):
                 server = self.plugin.server
                 server.dispatch_command(server.command_sender, f'give "{sender.name}" {AXE} 1')
-                sender.send_message("§bBorder Axe: §ftap one corner, then the opposite corner, then pick whose border it is.")
+                sender.send_message("§bBorder Axe: §ftap one corner, then the opposite corner, then name it and pick whose border it is.")
+            return True
+        if sub == "tp":
+            if not hasattr(sender, "xuid"):
+                sender.send_message("Players only.")
+                return True
+            b = self.find(" ".join(args[1:])) if len(args) > 1 else None
+            if b is None:
+                sender.send_message("§cNo border with that name. §7/border list shows them.")
+                return True
+            self.teleport(sender, b)
             return True
         if sub == "list":
             for b in self.borders():
-                if b.get("shape") == "circle":
-                    sender.send_message(f"§b{b['server']} §7({b['dim']}): circle around {b['cx']} {b['cz']}, {b['r']} blocks out")
-                else:
-                    sender.send_message(f"§b{b['server']} §7({b['dim']}): {b['x1']} {b['z1']} to {b['x2']} {b['z2']}")
-            sender.send_message("§7Only the owner can go outside the borders. §f/border axe§7 to change them.")
+                sender.send_message(f"§b{self.label(b)} §7- {self.describe(b).splitlines()[-1][2:]} ({b['server']}, {b['dim']})")
+            sender.send_message("§7/border tp <name> to go there. Only the owner can go outside the borders.")
             return True
         if sub == "reset":
             self.plugin.economy.set_config("borders", None)
             sender.send_message("§eBorders reset to the defaults (main world + the Sift).")
             return True
-        sender.send_message("§7/border list | /border axe | /border reset")
+        sender.send_message("§7/border | /border tp <name> | /border list | /border axe | /border reset")
         return True
+
+
+def clean(text):
+    import re
+    return re.sub(r"\s+", " ", re.sub(r"§.|[^\w '\-!&.]", "", str(text or ""))).strip()[:32]

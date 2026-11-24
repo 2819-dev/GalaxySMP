@@ -25,6 +25,7 @@ PER_TICK = 150          # commands per tick while building
 AREA = "gsmp_sift_build"
 VERSION = 2             # bump to rebuild the Sift after a redesign
 UNDER = "minecraft:red_terracotta"
+# note: on Bedrock, plain terracotta is "hardened_clay" and the snow block is "snow"
 LEAF = 'minecraft:cherry_leaves["persistent_bit"=true]'
 PALE_LEAF = 'minecraft:pale_oak_leaves["persistent_bit"=true]'
 
@@ -86,8 +87,8 @@ def column(dx, dz):
     return top, c, surf
 
 
-BANDS = [UNDER, UNDER, "minecraft:terracotta", UNDER, "minecraft:pink_terracotta", UNDER]
-WHITE = ["minecraft:snow_block", "minecraft:snow_block", "minecraft:snow_block", "minecraft:white_concrete_powder", PALE_LEAF]
+BANDS = [UNDER, UNDER, "minecraft:hardened_clay", UNDER, "minecraft:pink_terracotta", UNDER]
+WHITE = ["minecraft:snow", "minecraft:snow", "minecraft:snow", "minecraft:white_concrete_powder", PALE_LEAF]
 MINT = "minecraft:waxed_oxidized_copper"   # the mint-teal shading under the white trees
 FLOWERS = ["minecraft:blue_orchid", "minecraft:blue_orchid", "minecraft:cornflower", "minecraft:torchflower", "minecraft:firefly_bush",
            "minecraft:short_grass", "minecraft:short_grass", "minecraft:allium", "minecraft:pink_tulip", "minecraft:dandelion",
@@ -145,7 +146,7 @@ def tile_commands(tx, tz):
                     y = y2 + 1
             else:
                 out.append(f"fill {x} {LOW} {z} {x} {top - 3} {z} {UNDER}")
-                out.append(f"fill {x} {top - 2} {z} {x} {top - 1} {z} minecraft:terracotta")
+                out.append(f"fill {x} {top - 2} {z} {x} {top - 1} {z} minecraft:hardened_clay")
             out.append(f"setblock {x} {top} {z} {surf}")
             out.append(f"fill {x} {top + 1} {z} {x} {CLEAR_TO} {z} air")
     # the rock pillars in this piece
@@ -238,7 +239,7 @@ def pink_grass(rng, x, y, z, cols, dx, dz):
 
 def rock(rng, x, y, z):
     r = rng.randint(1, 2)
-    return [f"fill {x - r} {y - 1} {z - r} {x + r} {y + r - 1} {z + r} {UNDER}", f"setblock {x} {y + r} {z} minecraft:terracotta"]
+    return [f"fill {x - r} {y - 1} {z - r} {x + r} {y + r - 1} {z + r} {UNDER}", f"setblock {x} {y + r} {z} minecraft:hardened_clay"]
 
 
 def probes(tx, tz):
@@ -299,6 +300,10 @@ class Sift:
         self.cmd(f"tickingarea remove {AREA}")
         if not self.todo:
             self.tile = None
+            if getattr(self, "incomplete", False):
+                self.incomplete = False
+                self.plugin.logger.warning("The Sift: some pieces didn't build; it will try again after the next restart (or /sift build).")
+                return
             self.plugin.economy.set_config(BUILT, True)
             self.plugin.logger.info("The Sift is ready.")
             if self.sender is not None:
@@ -320,6 +325,12 @@ class Sift:
         if self.wait > 0:
             self.wait -= 1
             return
+        if not self.loaded():
+            self.waited = getattr(self, "waited", 0) + 20
+            if self.waited < 1800:   # up to 90 seconds for the land to load
+                self.wait = 20
+                return
+        self.waited = 0
         for _ in range(PER_TICK):
             if not self.queue:
                 break
@@ -334,6 +345,8 @@ class Sift:
             self.plugin.logger.warning(f"The Sift: piece {self.tile} didn't build, try {tries}")
             if tries < 4:
                 self.todo.insert(0, self.tile)
+            else:
+                self.incomplete = True
             self.next_tile()
             self.wait = 200 * tries
             return
@@ -344,6 +357,19 @@ class Sift:
 
     def building(self):
         return self.tile is not None
+
+    def loaded(self):
+        """True once every chunk of the piece being built is loaded (new land far away takes a while)."""
+        try:
+            from endstone_galaxylink.safety import loaded_chunks
+            dim = self.plugin.server.level.get_dimension("Overworld")
+            have = loaded_chunks(dim, max_age=0)
+            tx, tz = self.tile
+            need = {(cx, cz) for cx in range((CX + tx) >> 4, ((CX + tx + TILE - 1) >> 4) + 1)
+                    for cz in range((CZ + tz) >> 4, ((CZ + tz + TILE - 1) >> 4) + 1)}
+            return need <= have
+        except Exception:
+            return True
 
     # ---------- going there ----------
     def go(self, player):
