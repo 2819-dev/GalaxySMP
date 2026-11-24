@@ -281,15 +281,20 @@ t = Tex(64, 32)
 rnd = random.Random("blub")
 mid = lambda: rnd.choice(["#5487b6", "#5286b5", "#4f86b5", "#5689b6", "#5387b7"])
 light = lambda: rnd.choice(["#5d90c0", "#5b8fbd", "#5f92c1"])
-W, H, D = 12, 7, 10   # a longer, rectangular body
+W, H, D = 10, 10, 12   # a square face, and a body just a little longer from the side
 front = [["#7193b8"] * (W - 1) + ["#8fa4b3"]]
-for r in range(3):   # blue, with a slightly lighter patch in the middle
-    front.append(["#7193b8"] + [light() if r <= 1 and 2 <= x <= W - 5 else mid() for x in range(W - 2)] + ["#7495b8"])
-front.append(["#4b9cb1", "#4f95b5", "#333367", "#333367", "#5286b5", "#5387b5", "#5286b5", "#5387b5", "#353365", "#353567", "#4f95b5", "#4fa1b4"])
-front.append(["#60a4b1", "#4a9cb1", "#4590b0", "#4690b3", "#4690b3", "#4a4a80", "#4a4a80", "#4690b3", "#4690b3", "#4ea0b3", "#57a2b1", "#63a6b5"])
-front.append(["#60a2b2", "#60a2b2", "#60a1b2", "#459caf", "#479eb2", "#469db1", "#479cb1", "#469db1", "#60a3b3", "#61a3b2", "#61a3b1", "#63a3b1"])
-side = ["#54769a", "#436e98", "#456f99", "#476f99", "#3d7a92", "#3e7d90", "#4b8495"]
-back = ["#5a84ad", "#4f80ad", "#4f80ad", "#4f80ad", "#4590a8", "#4a98ad", "#55a0b0"]
+for r in range(H - 5):   # blue, with a slightly lighter patch in the middle
+    front.append(["#7193b8"] + [light() if 1 <= r <= 3 and 2 <= x <= W - 5 else mid() for x in range(W - 2)] + ["#7495b8"])
+eyes = ["#4b9cb1"] + ["#5286b5"] * (W - 2) + ["#4fa1b4"]
+eyes[1] = eyes[2] = "#333367"; eyes[W - 3] = eyes[W - 2] = "#353365"
+front.append(eyes)
+mouth = ["#60a4b1"] + ["#4690b3"] * (W - 2) + ["#63a6b5"]
+mouth[W // 2 - 1] = mouth[W // 2] = "#4a4a80"
+front.append(mouth)
+front.append(["#60a2b2", "#60a2b2", "#60a1b2", "#459caf", "#479eb2", "#469db1", "#479cb1", "#60a3b3", "#61a3b2", "#63a3b1"])
+front.append(["#5ea0b0", "#4a98ad", "#479cb1", "#459caf", "#469db1", "#479eb2", "#459caf", "#479cb1", "#4a98ad", "#5ea0b0"])
+side = ["#54769a", "#436e98", "#456f99", "#476f99", "#456f99", "#436e98", "#3d7a92", "#3e7d90", "#4b8495", "#3e7d90"]
+back = ["#5a84ad", "#4f80ad", "#4f80ad", "#4f80ad", "#4f80ad", "#4f80ad", "#4590a8", "#4a98ad", "#55a0b0", "#4a98ad"]
 paint(t, 0, 0, W, H, D, "north", front)
 paint(t, 0, 0, W, H, D, "west", side)
 paint(t, 0, 0, W, H, D, "east", side)
@@ -307,17 +312,17 @@ paint(t, EU, 0, 3, 5, 2, "top", ["#95a8bb"])
 paint(t, EU, 0, 3, 5, 2, "bottom", ["#5283b0"])
 for f, c in (("north", [["#5ba3af", "#5ca0ae", "#2f5c74"], ["#5a8895", "#5a8895", "#245b70"]]), ("south", ["#214f66"]), ("west", ["#4d808f", "#2f5c74"]),
              ("east", ["#1e5772", "#18465c"]), ("top", ["#3e7d90"]), ("bottom", ["#18465c"])):
-    paint(t, EU, 10, 3, 2, 3, f, c)
+    paint(t, EU, 12, 3, 2, 3, f, c)
 t.save("galaxysmp_blub")
 geo("blub", 64, 32, [
     bone("root"),
-    bone("body", "root", (0, 2, 0), [cube([-6, 2, -5], [W, H, D], [0, 0])]),
-    bone("ear1", "body", (-3, 9, 0), [cube([-4.5, 9, -1], [3, 5, 2], [EU, 0])]),
-    bone("ear2", "body", (3, 9, 0), [cube([1.5, 9, -1], [3, 5, 2], [EU, 0])]),
-    bone("leg1", "root", (-4, 2, -3), [cube([-5.5, 0, -4.5], [3, 2, 3], [EU, 10])]),
-    bone("leg2", "root", (4, 2, -3), [cube([2.5, 0, -4.5], [3, 2, 3], [EU, 10])]),
-    bone("leg3", "root", (-4, 2, 3), [cube([-5.5, 0, 1.5], [3, 2, 3], [EU, 10])]),
-    bone("leg4", "root", (4, 2, 3), [cube([2.5, 0, 1.5], [3, 2, 3], [EU, 10])]),
+    bone("body", "root", (0, 2, 0), [cube([-W / 2, 2, -D / 2], [W, H, D], [0, 0])]),
+    bone("ear1", "body", (-2.5, 2 + H, 0), [cube([-4, 2 + H, -1], [3, 5, 2], [EU, 0])]),
+    bone("ear2", "body", (2.5, 2 + H, 0), [cube([1, 2 + H, -1], [3, 5, 2], [EU, 0])]),
+    bone("leg1", "root", (-3, 2, -4), [cube([-4.5, 0, -5.5], [3, 2, 3], [EU, 12])]),
+    bone("leg2", "root", (3, 2, -4), [cube([1.5, 0, -5.5], [3, 2, 3], [EU, 12])]),
+    bone("leg3", "root", (-3, 2, 4), [cube([-4.5, 0, 2.5], [3, 2, 3], [EU, 12])]),
+    bone("leg4", "root", (3, 2, 4), [cube([1.5, 0, 2.5], [3, 2, 3], [EU, 12])]),
 ], bounds=(1.5, 1.5))
 legwalk = lambda s: [f"{s}math.cos(query.modified_distance_moved * 60) * 40 * query.modified_move_speed", 0, 0]
 anims("blub", {
@@ -339,7 +344,7 @@ bgroups = pet_groups(["minecraft:glow_berries"], "blub", 6, extra_tame=["parrot_
 entity("blub", {
     **COMMON,
     "minecraft:type_family": {"family": ["blub", "galaxysmp_pet", "mob"]},
-    "minecraft:collision_box": {"width": 0.75, "height": 0.6},
+    "minecraft:collision_box": {"width": 0.7, "height": 0.75},
     "minecraft:health": {"value": 10, "max": 10},
     "minecraft:movement": {"value": 0.3},
     "minecraft:movement.skip": {}, "minecraft:jump.dynamic": {},

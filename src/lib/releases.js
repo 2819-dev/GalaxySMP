@@ -555,6 +555,14 @@ Staff can also now name world borders and teleport to them.`,
     title: "/party works again",
     body: `We fixed a problem that stopped the **/party** command from working in game. You can use **/party invite <player>**, **/party accept** and **/party leave** again, as well as **/p <message>** for party chat.`,
   },
+  {
+    id: "2026-11-24-bigger-sift",
+    title: "The Sift is now much bigger",
+    body: `- **A huge valley:** the Sift is now about 600 blocks across, with over 40 giant red rock pillars, endless meadows and tall cliffs all around.
+- **Rounder Blubs:** Blubs now have a square face and a slightly longer body.
+
+The bigger Sift is built in the background after the update, which takes about half an hour.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

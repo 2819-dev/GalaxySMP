@@ -1,9 +1,9 @@
 """The Sift: a dreamy valley of its own, far out at x/z 50000 (Bedrock add-ons can't add new dimensions).
 
-A round valley about 220 blocks across, closed in by tall banded red cliffs so it feels like its own world:
+A round valley about 600 blocks across, closed in by tall banded red cliffs so it feels like its own world:
 salmon-pink ground with mossy flower meadows, tall spiky pink grass, pale weeping trees with long white curtains,
 and huge red rock pillars with flat, tree-covered tops. While you're inside, the sky turns teal (a fog from the pack).
-The plugin builds it once by itself, a 64 x 64 piece at a time (about 10 minutes), and checks each piece really built.
+The plugin builds it once by itself, a 64 x 64 piece at a time (about half an hour), and checks each piece really built.
 Wild Dumplings and Blubs are spawned by the plugin near players in the Sift.
 
 Get there: the "The Sift" card on the Main Menu, a Sift portal (Portal Axe), or /sift (staff).
@@ -18,15 +18,15 @@ CX, CZ = 50000, 50000   # middle of the Sift
 BASE = 68               # ground height
 LOW = 52                # the Sift's ground is solid from here up
 CLEAR_TO = 240          # everything above the ground is cleared up to here (old trees, hills, the old sky island)
-R = 112                 # radius of the valley (red cliffs all around the edge)
+R = 300                 # radius of the valley: 600 x 600 blocks, red cliffs all around the edge
 TILE = 64
-TILES = [(tx, tz) for tx in range(-128, 128, TILE) for tz in range(-128, 128, TILE)]   # 16 pieces
+TILES = [(tx, tz) for tx in range(-320, 320, TILE) for tz in range(-320, 320, TILE)]   # 100 pieces
 SEED = 2027
 PER_TICK = 120          # at most this many commands per tick while building...
 BUDGET = 0.010          # ...and at most 10 ms of each tick (a tick is 50 ms), so the server stays smooth
 BUSY_MSPT = 40          # if the server is already slow (ms per tick), wait instead of building
 AREA = "gsmp_sift_build"
-VERSION = 2             # bump to rebuild the Sift after a redesign
+VERSION = 3             # bump to rebuild the Sift after a redesign (3: 600 x 600)
 UNDER = "minecraft:red_terracotta"
 # note: on Bedrock, plain terracotta is "hardened_clay" and the snow block is "snow"
 LEAF = 'minecraft:cherry_leaves["persistent_bit"=true]'
@@ -57,17 +57,20 @@ def noise(x, z, scale, salt):
 
 def edge(dx, dz):
     """0 in the middle, 1 at the outer edge of the cliffs (wobbly)."""
-    return math.hypot(dx, dz) / (R * (0.88 + 0.12 * noise(dx, dz, 26, 3)))
+    return math.hypot(dx, dz) / (R * (0.88 + 0.12 * noise(dx, dz, 60, 3)))
+
+
+CLIFF_START = 1 - 44 / R   # the cliffs rise over the outer ~40 blocks
 
 
 def cliff(dx, dz):
     """How high the red cliffs rise here (0 inside the valley)."""
     e = edge(dx, dz)
-    if e < 0.78:
+    if e < CLIFF_START:
         return 0
-    t = min(1.0, (e - 0.78) / 0.17)
+    t = min(1.0, (e - CLIFF_START) / (0.97 - CLIFF_START))
     t = t * t * (3 - 2 * t)
-    return int(t * (24 + noise(dx, dz, 12, 8) * 18 + noise(dx, dz, 5, 9) * 4))
+    return int(t * (26 + noise(dx, dz, 14, 8) * 22 + noise(dx, dz, 5, 9) * 4))
 
 
 def column(dx, dz):
@@ -106,12 +109,12 @@ def spires():
         for _ in range(6):
             cap = rng.randint(6, 10)
             dx, dz = tx + rng.randint(cap + 2, TILE - cap - 3), tz + rng.randint(cap + 2, TILE - cap - 3)
-            if edge(dx, dz) > 0.74 or math.hypot(dx, dz) < 26:
+            if edge(dx, dz) > CLIFF_START - 0.06 or math.hypot(dx, dz) < 26 or rng.random() < 0.3:
                 continue
             if any(math.hypot(dx - a, dz - b) < cap + c + 8 for a, b, r, h, c in out):
                 continue
             out.append((dx, dz, rng.randint(3, 5), rng.randint(18, 36), cap))
-            if len([1 for a, b, *_ in out if tx <= a < tx + TILE and tz <= b < tz + TILE]) >= 2:
+            if len([1 for a, b, *_ in out if tx <= a < tx + TILE and tz <= b < tz + TILE]) >= 1:
                 break
     return out
 
@@ -503,7 +506,7 @@ class Sift:
             if len(args) > 1 and args[1].lower() == "again":
                 self.plugin.economy.set_config(PIECES, [])
                 self.plugin.economy.set_config(BUILT, False)
-            sender.send_message("§bBuilding the Sift... §7(about 10 minutes)" if self.start_build(sender) else "§eIt's already being built.")
+            sender.send_message("§bBuilding the Sift... §7(about half an hour)" if self.start_build(sender) else "§eIt's already being built.")
             return True
         if sub == "status" and sender.is_op:
             done = len(self.plugin.economy.get_config(PIECES) or [])

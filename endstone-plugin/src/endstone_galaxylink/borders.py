@@ -45,7 +45,11 @@ class Borders:
         """Every border: {id, server, dim, shape: box|circle, x1, z1, x2, z2 | cx, cz, r}."""
         saved = self.plugin.economy.get_config("borders")
         if saved is not None:
-            return list(saved)
+            items = list(saved)
+            for b in items:   # the Sift grew: its border follows its (wavy) valley edge now
+                if b.get("id") == "sift" and b.get("shape") == "circle":
+                    b["shape"] = "sift"
+            return items
         out = []
         spawn = self.plugin.economy.get_config("spawn") or {}
         sx, sz = float(spawn.get("x", 0)), float(spawn.get("z", 0))
@@ -53,18 +57,40 @@ class Borders:
                     "x1": int(sx - MAIN_HALF), "z1": int(sz - MAIN_HALF), "x2": int(sx + MAIN_HALF), "z2": int(sz + MAIN_HALF)})
         try:
             from endstone_galaxylink import sift as S
-            out.append({"id": "sift", "server": "The Sift", "name": "The Sift", "dim": "overworld", "shape": "circle", "cx": S.CX, "cz": S.CZ, "r": int(S.R * 0.8)})
+            out.append({"id": "sift", "server": "The Sift", "name": "The Sift", "dim": "overworld", "shape": "sift", "cx": S.CX, "cz": S.CZ, "r": self.sift_r()})
         except Exception:
             pass
         return out
+
+    @staticmethod
+    def sift_r():
+        """The Sift's border: just inside where its cliffs begin."""
+        try:
+            from endstone_galaxylink import sift as S
+            return int(S.R * 0.88 * S.CLIFF_START) - 4
+        except Exception:
+            return 220
 
     def save(self, items):
         self.plugin.economy.set_config("borders", items)
 
     @staticmethod
+    def sift_edge(b, x, z):
+        """For the Sift's border (which follows its wavy valley): (how far inside, the border's radius here)."""
+        from endstone_galaxylink import sift as S
+        dx, dz = x - b["cx"], z - b["cz"]
+        d = math.hypot(dx, dz)
+        limit = S.CLIFF_START + 0.015   # a few blocks up the bottom of the cliffs
+        e = S.edge(dx, dz)
+        r_here = d * limit / e if e > 0.001 else S.R * limit
+        return r_here - d, r_here
+
+    @staticmethod
     def inside(b, dim, x, z, pad=0.0):
         if b["dim"] != dim:
             return False
+        if b.get("shape") == "sift":
+            return Borders.sift_edge(b, x, z)[0] >= pad
         if b.get("shape") == "circle":
             return math.hypot(x - b["cx"], z - b["cz"]) <= b["r"] - pad
         return b["x1"] + pad <= x <= b["x2"] + 1 - pad and b["z1"] + pad <= z <= b["z2"] + 1 - pad
@@ -72,6 +98,8 @@ class Borders:
     @staticmethod
     def to_edge(b, x, z):
         """How far inside the border a spot is (negative = outside)."""
+        if b.get("shape") == "sift":
+            return Borders.sift_edge(b, x, z)[0]
         if b.get("shape") == "circle":
             return b["r"] - math.hypot(x - b["cx"], z - b["cz"])
         return min(x - b["x1"], b["x2"] + 1 - x, z - b["z1"], b["z2"] + 1 - z)
@@ -152,12 +180,18 @@ class Borders:
         from endstone_galaxylink.floating import dim_cmd
         l = p.location
         walls = []   # (x, z, particle): particle "x" is a wall along x (facing z), "z" a wall along z (facing x)
-        if b.get("shape") == "circle":
+        if b.get("shape") in ("circle", "sift"):
             a0 = math.atan2(l.z - b["cz"], l.x - b["cx"])
+            radius = self.sift_edge(b, l.x, l.z)[1] if b.get("shape") == "sift" else b["r"]
             for k in range(-4, 5):
-                a = a0 + k * 2.0 / b["r"]
+                a = a0 + k * 2.0 / radius
+                if b.get("shape") == "sift":
+                    px, pz = b["cx"] + math.cos(a) * radius, b["cz"] + math.sin(a) * radius
+                    radius_k = self.sift_edge(b, px, pz)[1]
+                else:
+                    radius_k = radius
                 tx, tz = -math.sin(a), math.cos(a)   # the direction the wall runs here
-                walls.append((b["cx"] + math.cos(a) * b["r"], b["cz"] + math.sin(a) * b["r"], "x" if abs(tx) >= abs(tz) else "z"))
+                walls.append((b["cx"] + math.cos(a) * radius_k, b["cz"] + math.sin(a) * radius_k, "x" if abs(tx) >= abs(tz) else "z"))
         else:
             span = [l.x + k * 2 for k in range(-4, 5)], [l.z + k * 2 for k in range(-4, 5)]
             if l.x - b["x1"] < WARN:
@@ -270,7 +304,7 @@ class Borders:
                 next((b for b in items if self.label(b).lower().startswith(t)), None))
 
     def center(self, b):
-        if b.get("shape") == "circle":
+        if b.get("shape") in ("circle", "sift"):
             return b["cx"], b["cz"]
         return (b["x1"] + b["x2"]) // 2, (b["z1"] + b["z2"]) // 2
 
@@ -355,6 +389,8 @@ class Borders:
                               submit_button="Save", on_submit=submit))
 
     def describe(self, b):
+        if b.get("shape") == "sift":
+            return f"§f{b['server']}§r\n§7Follows the Sift's valley, inside its cliffs (about 600 blocks across)"
         if b.get("shape") == "circle":
             return f"§f{b['server']}§r\n§7A circle {b['r'] * 2} blocks across, around {b['cx']} {b['cz']}"
         return (f"§f{b['server']}§r\n§7{b['x2'] - b['x1'] + 1} x {b['z2'] - b['z1'] + 1} blocks, "
@@ -362,7 +398,9 @@ class Borders:
 
     def ask_remove(self, p, b):
         from endstone.form import ActionForm
-        if b.get("shape") == "circle":
+        if b.get("shape") == "sift":
+            where = "the Sift's valley, inside its cliffs"
+        elif b.get("shape") == "circle":
             where = f"a circle {b['r'] * 2} blocks across"
         else:
             where = f"{b['x2'] - b['x1'] + 1} x {b['z2'] - b['z1'] + 1} blocks, from {b['x1']} {b['z1']} to {b['x2']} {b['z2']}"
