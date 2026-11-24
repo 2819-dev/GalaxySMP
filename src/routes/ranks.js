@@ -24,7 +24,9 @@ export const ICONS = ["crown", "star", "shield", "sword", "gem", "heart", "hamme
                        "mushroom", "flower", "moon", "sun", "snowflake", "skull", "ghost", "eye", "coin", "moneybag", "gift", "cake",
                        "cookie", "apple", "bell", "lightbulb", "magnet", "compass", "clock", "hourglass", "flag", "anchor", "feather", "droplet",
                        "tree", "cactus", "cloud", "rainbow", "cat", "slime", "dice", "gamepad", "redstone", "diamond", "emerald", "netherite",
-                       "goldingot", "ironingot", "amethyst", "lapis", "shootingstar", "wingeddiamond"];
+                       "goldingot", "ironingot", "amethyst", "lapis", "shootingstar", "wingeddiamond",
+                       // staff icons
+                       "banhammer", "gavel", "helmet", "badge", "siren", "handcuffs", "ban", "scales", "lock", "wrench", "headset", "megaphone", "verified"];
 
 // Gradients (one color per letter). Same keys as the plugin (endstone_galaxylink/ranks.py).
 export const GRADIENTS = ["galaxy", "gold", "sunset", "fire", "ocean", "forest", "royal", "ice", "shadow", "rainbow", "aurora", "cherry", "ember"];

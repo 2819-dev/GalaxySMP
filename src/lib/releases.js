@@ -610,6 +610,13 @@ The bigger Sift is built in the background after the update, which takes about h
 - **Back online alerts:** if the server stops suddenly, players who were online get a notification when it's back.
 - **One mute everywhere:** a mute now applies in game and on the website, including DMs.`,
   },
+  {
+    id: "2026-11-24-staff-rank-icons",
+    title: "New staff rank icons",
+    body: `- **A new shield:** the shield icon has been redrawn as a proper knight's shield with a gold rim and a gold star.
+- **13 new staff icons** for ranks: Ban Hammer, Gavel, Knight Helmet, Sheriff Badge, Siren, Handcuffs, Ban Sign, Scales of Justice, Padlock, Wrench, Headset, Megaphone and Verified Shield.
+- They show in chat, on rank badges in game and on the website.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

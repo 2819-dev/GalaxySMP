@@ -30,7 +30,11 @@ ICONS = ["crown", "star", "shield", "sword", "gem", "heart", "hammer", "flame", 
            "cookie", "apple", "bell", "lightbulb", "magnet", "compass", "clock", "hourglass", "flag", "anchor", "feather", "droplet",
            "tree", "cactus", "cloud", "rainbow", "cat", "slime", "dice", "gamepad", "redstone", "diamond", "emerald", "netherite",
            "goldingot", "ironingot", "amethyst", "lapis", "shootingstar", "wingeddiamond"]
+# Staff icons (ban hammer, gavel...): U+F760 onward (row 6 of glyph_F7.png), so the first set keeps its places.
+MOD_ICONS = ['banhammer', 'gavel', 'helmet', 'badge', 'siren', 'handcuffs', 'ban', 'scales', 'lock', 'wrench', 'headset', 'megaphone', 'verified']
 GLYPHS = {name: chr(0xF710 + i) for i, name in enumerate(ICONS)}
+GLYPHS.update({name: chr(0xF760 + i) for i, name in enumerate(MOD_ICONS)})
+ICONS = ICONS + MOD_ICONS
 
 # Typed command names -> permission nodes. Same rules as the website (src/routes/ranks.js).
 ENDSTONE_COMMANDS = {"ban", "banip", "banlist", "plugins", "reload", "seed", "status", "unban", "unbanip", "version"}

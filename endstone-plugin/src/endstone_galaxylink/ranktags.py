@@ -24,7 +24,7 @@ MODULE_UUID = "d2b6f7a3-8c4e-4fab-9a32-6e7d8c9bae12"
 PAGES = [0xE9, 0xEA, 0xEB]         # badge pictures (F7, F8 = GalaxySMP Icons)
 CELL = 16                          # 256x256 pages, 16 pixels per picture: 1 picture pixel = 1 text pixel (512 pages show twice as big)
 FILE = "GalaxySMP_RankTags.mcpack"
-FORMAT = 8                         # bump when the drawing changes, so everything is rebuilt
+FORMAT = 9                         # bump when the drawing changes, so everything is rebuilt
 CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789[]+-_.!?&'"
 
 # A 5x7 pixel font in the style of Minecraft's (# = pixel). Width = longest row.

@@ -53,13 +53,6 @@ def star():
     im, d = new()
     d.polygon([(8,1),(10,6),(15,6),(11,9),(13,14),(8,11),(3,14),(5,9),(1,6),(6,6)], fill=(255,225,70,255))
     return im
-def shield():
-    im, d = new()
-    d.polygon([(2,2),(14,2),(14,8),(8,14),(2,8)], fill=(255,200,40,255))      # gold rim
-    d.polygon([(4,4),(12,4),(12,8),(8,12),(4,8)], fill=(70,130,255,255))      # blue face
-    d.polygon([(8,4),(12,4),(12,8),(8,12)], fill=(45,95,215,255))             # right half in shadow
-    d.ellipse((6,6,10,10), fill=(255,200,40,255))                             # gold boss
-    return im
 def sword():
     im, d = new(); blade = (215,225,240,255)
     for i in range(7): d.point((13-i, 2+i), fill=blade); d.point((12-i, 2+i), fill=blade)
@@ -402,6 +395,278 @@ def wingeddiamond():
     d.polygon([(8,4),(8,8),(5,8)], fill=(160,245,250,255)); d.polygon([(8,8),(11,8),(8,13)], fill=(35,160,185,255))
     d.line((6,1,10,1), fill=(255,215,80,255)); d.point((5,2), fill=(255,215,80,255)); d.point((11,2), fill=(255,215,80,255))
     return im
+# ---------- drawn from a text grid (one letter per pixel) ----------
+def grid(rows, pal):
+    assert len(rows) == 16 and all(len(r) == 16 for r in rows), [len(r) for r in rows]
+    im, d = new()
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            if ch in pal:
+                im.putpixel((x, y), pal[ch])
+    return im
+
+GOLD, GOLD_D = (255, 200, 40, 255), (205, 145, 20, 255)
+STEEL, STEEL_L, STEEL_D = (175, 185, 205, 255), (225, 232, 245, 255), (110, 118, 140, 255)
+RED, RED_D = (230, 50, 60, 255), (160, 25, 40, 255)
+BLUE, BLUE_L = (50, 100, 220, 255), (95, 155, 255, 255)
+WOOD, WOOD_D = (160, 105, 55, 255), (110, 70, 35, 255)
+DARK = (44, 46, 62, 255)
+
+SHIELD_ROWS = [
+    "................",
+    "..GGGGGGGGGGGGG.",
+    "..GccccccbbbbbG.",
+    "..GcccccYbbbbbG.",
+    "..GccccYYYbbbbG.",
+    "..GccYYYYYYYbbG.",
+    "..GcccYYYYYbbbG.",
+    "..GccccYYYbbbbG.",
+    "..GcccYYbYYbbbG.",
+    "..GcccYcbbYbbbG.",
+    "...GccccbbbbbG..",
+    "....GcccbbbbG...",
+    ".....GccbbbG....",
+    "......GcbbG.....",
+    ".......GGG......",
+    "................"]
+
+def shield():
+    """A heraldic shield: gold rim, two-tone blue field and a gold star (the Moderator look)."""
+    return grid(SHIELD_ROWS, {"G": GOLD, "c": BLUE_L, "b": BLUE, "Y": (255, 236, 140, 255)})
+
+def verified():
+    """A green shield with a white check mark."""
+    rows = [r.replace("Y", "c" if i < 8 else "b") for i, r in enumerate(SHIELD_ROWS)]
+    im = grid(rows, {"G": (235, 245, 255, 255), "c": (70, 200, 110, 255), "b": (40, 160, 80, 255)})
+    for x, y in [(5, 7), (6, 8), (7, 9), (8, 8), (9, 7), (10, 6), (11, 5)]:
+        im.putpixel((x, y), (255, 255, 255, 255))
+    for x, y in [(5, 6), (6, 7), (7, 8), (8, 7), (9, 6), (10, 5), (11, 4)]:
+        im.putpixel((x, y), (255, 255, 255, 255))
+    return im
+
+def banhammer():
+    return grid([
+        "................",
+        "................",
+        "..lLLLLrrLLLLl..",
+        "..LSSSSRRSSSSL..",
+        "..SSSSSRRSSSSS..",
+        "..SSSSSRRSSSSS..",
+        "..BBBBBRRBBBBB..",
+        "..lBBBBrrBBBBl..",
+        ".......WW.......",
+        "......WWw.......",
+        ".....WWw........",
+        "....WWw.........",
+        "...WWw..........",
+        "..GGw...........",
+        "..GG............",
+        "................"], {"l": STEEL_D, "L": STEEL_L, "S": STEEL, "B": STEEL_D, "R": RED, "r": RED_D, "W": WOOD, "w": WOOD_D, "G": GOLD})
+
+def gavel():
+    """A judge's gavel at an angle, over its sound block."""
+    im, d = new()
+    for y in range(16):
+        for x in range(16):
+            a, b = x + y, x - y
+            if 5 <= a <= 9 and -5 <= b <= 5 and y <= 9:          # the head (a thick bar, tilted)
+                band = b in (-3, 3)
+                end = b in (-5, 5)
+                im.putpixel((x, y), GOLD if band else WOOD_D if end else WOOD)
+            elif abs(b) <= 0 and 10 <= a <= 22:                  # the handle, down to the right
+                im.putpixel((x, y), (190, 130, 70, 255))
+            elif abs(b - 1) <= 0 and 10 <= a <= 21:
+                im.putpixel((x, y), WOOD_D)
+    for x in range(2, 9):                                         # the sound block
+        im.putpixel((x, 13), WOOD)
+        im.putpixel((x, 14), WOOD_D)
+    return im
+
+def helmet():
+    return grid([
+        "................",
+        ".......RRR......",
+        ".....SSSSSS.....",
+        "....SLLSSSSS....",
+        "...SLSSSSSSSS...",
+        "...SSSSSSSSSS...",
+        "...SvvvvvvvvS...",
+        "...SSSSvSSSSS...",
+        "...SSSvSvSSSS...",
+        "...SSSSSSSSSS...",
+        "...BSSSSSSSSB...",
+        "....BBBBBBBB....",
+        "................",
+        "................",
+        "................",
+        "................"], {"R": RED, "S": STEEL, "L": STEEL_L, "B": STEEL_D, "v": DARK})
+
+def badge():
+    return grid([
+        "................",
+        ".......Y........",
+        "......YYY.......",
+        "..YYYYYYYYYYY...",
+        "...YYYYYYYYY....",
+        "....YYYbYYY.....",
+        "....YYbbbYY.....",
+        "....YYYbYYY.....",
+        "...YYYYYYYYY....",
+        "..YYYYYYYYYYY...",
+        "......YYY.......",
+        ".......Y........",
+        "................",
+        "................",
+        "................",
+        "................"], {"Y": GOLD, "b": BLUE_L})
+
+def siren():
+    return grid([
+        "................",
+        "................",
+        "................",
+        ".r.....WW.....b.",
+        "......RRBB......",
+        ".....RRRBBB.....",
+        "....RRRRBBBB....",
+        "....RRRRBBBB....",
+        "....RRRRBBBB....",
+        "...SSSSSSSSSS...",
+        "...SSSSSSSSSS...",
+        "..dddddddddddd..",
+        "................",
+        "................",
+        "................",
+        "................"], {"W": (255, 255, 255, 255), "R": RED, "r": RED, "B": BLUE_L, "b": BLUE_L, "S": STEEL, "d": DARK})
+
+def handcuffs():
+    """Two thick steel cuffs joined by a short chain."""
+    im, d = new()
+    for cx in (3.5, 11.5):
+        for y in range(16):
+            for x in range(16):
+                r = ((x - cx) ** 2 + (y - 8.5) ** 2) ** 0.5
+                if 1.7 <= r <= 3.3:
+                    im.putpixel((x, y), STEEL_L if y < 8 else STEEL)
+    for x, y in [(7, 8), (8, 8)]:
+        im.putpixel((x, y), STEEL_D)
+    for x, y in [(2, 4), (3, 4), (11, 4), (12, 4)]:                # the lock tabs on top
+        im.putpixel((x, y), STEEL_D)
+    return im
+
+def ban():
+    """A red "no" sign (a circle with a slash)."""
+    im, d = new()
+    for y in range(16):
+        for x in range(16):
+            dx, dy = x - 7.5, y - 7.5
+            r = (dx * dx + dy * dy) ** 0.5
+            if 5.0 <= r <= 7.0 or (r < 5.0 and abs(dx - dy) <= 1.0):
+                im.putpixel((x, y), RED)
+            elif r < 5.0:
+                im.putpixel((x, y), (255, 255, 255, 255))
+    return im
+
+def scales():
+    return grid([
+        "................",
+        ".......G........",
+        ".......G........",
+        "..GGGGGGGGGGG...",
+        "..G....G....G...",
+        "..G....G....G...",
+        ".GGG...G...GGG..",
+        "..g....G....g...",
+        ".......G........",
+        ".......G........",
+        ".......G........",
+        ".......G........",
+        ".....GGGGG......",
+        "....GGGGGGG.....",
+        "................",
+        "................"], {"G": GOLD, "g": GOLD_D})
+
+def lock():
+    return grid([
+        "................",
+        "................",
+        ".....SSSSS......",
+        "....S.....S.....",
+        "....S.....S.....",
+        "....S.....S.....",
+        "...YYYYYYYYY....",
+        "...YYYYYYYYY....",
+        "...YYYYdYYYY....",
+        "...YYYdddYYY....",
+        "...YYYYdYYYY....",
+        "...YYYYYYYYY....",
+        "...yyyyyyyyy....",
+        "................",
+        "................",
+        "................"], {"S": STEEL, "Y": GOLD, "y": GOLD_D, "d": DARK})
+
+def wrench():
+    return grid([
+        "................",
+        "..........SS.SS.",
+        "..........SS.SS.",
+        "..........SSSSS.",
+        ".........SSSSS..",
+        "........SSSS....",
+        ".......SSS......",
+        "......SSS.......",
+        ".....SSS........",
+        "....SSS.........",
+        "...SSS..........",
+        "..SSS...........",
+        ".SSS............",
+        ".SS.............",
+        "................",
+        "................"], {"S": STEEL})
+
+def headset():
+    return grid([
+        "................",
+        "................",
+        ".....SSSSSS.....",
+        "....S......S....",
+        "...S........S...",
+        "...S........S...",
+        "..BBB......BBB..",
+        "..BBB......BBB..",
+        "..BBB......BBB..",
+        "..BBB......BBB..",
+        "...S............",
+        "....S...........",
+        ".....SSDD.......",
+        "................",
+        "................",
+        "................"], {"S": STEEL_D, "B": BLUE_L, "D": RED})
+
+def megaphone():
+    return grid([
+        "................",
+        "................",
+        "................",
+        "...........RR...",
+        ".........RRRR...",
+        "...WW..RRRRRR...",
+        "..WWWRRRRRRRR.Y.",
+        "..WWWRRRRRRRR.Y.",
+        "..WWWRRRRRRRR...",
+        "...WW..RRRRRR...",
+        ".........RRRR...",
+        "...........RR...",
+        "....HH..........",
+        "....HH..........",
+        "................",
+        "................"], {"R": RED, "W": (240, 240, 250, 255), "Y": GOLD, "H": DARK})
+
+# Staff icons: in-game glyphs U+F760 onward (row 6 of glyph_F7.png), after the first set.
+MOD_ICONS = [("banhammer", banhammer), ("gavel", gavel), ("helmet", helmet), ("badge", badge), ("siren", siren),
+             ("handcuffs", handcuffs), ("ban", ban), ("scales", scales), ("lock", lock), ("wrench", wrench),
+             ("headset", headset), ("megaphone", megaphone), ("verified", verified)]
+
 ICONS = [("crown", crown), ("star", star), ("shield", shield), ("sword", sword), ("gem", gem), ("heart", heart),
          ("hammer", hammer), ("flame", flame), ("bolt", bolt), ("rocket", rocket), ("planet", planet), ("leaf", leaf),
          ("pickaxe", pickaxe), ("axe", axe), ("bow", bow), ("potion", potion), ("book", book), ("key", key),
@@ -419,7 +684,9 @@ ICONS = [("crown", crown), ("star", star), ("shield", shield), ("sword", sword),
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     prev = Image.new("RGBA", (len(ICONS) * 72, 72), (60, 60, 60, 255))
-    for i, (name, fn) in enumerate(ICONS):
+    ALL = ICONS + MOD_ICONS
+    prev = Image.new("RGBA", (len(ALL) * 72, 72), (60, 60, 60, 255))
+    for i, (name, fn) in enumerate(ALL):
         im = outline(fn()); im.save(os.path.join(OUT, f"rank_{name}.png"))
         big = im.resize((64, 64), Image.NEAREST); prev.paste(big, (i * 72 + 4, 4), big)
     prev.save(os.path.join(OUT, "_rank_preview.png"))
@@ -434,9 +701,37 @@ def add_to_sheet(sheet_path):
         x, y = (i % 16) * 16, (1 + i // 16) * 16
         sheet.paste(Image.new("RGBA", (16, 16)), (x, y))
         sheet.paste(im, (x, y), im)
+    for j, (name, fn) in enumerate(MOD_ICONS):   # staff icons: U+F760 onward
+        im = outline(fn())
+        x, y = (j % 16) * 16, (6 + j // 16) * 16
+        sheet.paste(Image.new("RGBA", (16, 16)), (x, y))
+        sheet.paste(im, (x, y), im)
     sheet.save(sheet_path)
     print("added rank icons to", sheet_path)
 
 
 if __name__ == "__main__" and len(sys.argv) > 2:
     add_to_sheet(sys.argv[2])
+
+
+def light(im):
+    """Light mode: the dark outline becomes a darker shade of the color next to it (softer on white pages)."""
+    px = im.load(); out = im.copy(); po = out.load()
+    for y in range(16):
+        for x in range(16):
+            if px[x, y] != K:
+                continue
+            near = [px[x + dx, y + dy] for dx in (-1, 0, 1) for dy in (-1, 0, 1)
+                    if 0 <= x + dx < 16 and 0 <= y + dy < 16 and px[x + dx, y + dy][3] and px[x + dx, y + dy] != K]
+            if near:
+                c = tuple(sum(n[i] for n in near) // len(near) for i in range(3))
+                po[x, y] = tuple(int(v * 0.55) for v in c) + (255,)
+    return out
+
+
+if __name__ == "__main__" and len(sys.argv) > 3:   # python3 draw_rank_icons.py OUT SHEET LIGHT_DIR [names...]
+    names = set(sys.argv[4:]) or {n for n, _ in ICONS + MOD_ICONS}
+    for name, fn in ICONS + MOD_ICONS:
+        if name in names:
+            light(outline(fn())).save(os.path.join(sys.argv[3], f"rank_{name}.png"))
+    print("light icons:", sorted(names))
