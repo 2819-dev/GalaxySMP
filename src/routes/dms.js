@@ -363,3 +363,58 @@ export async function formAction(request, env, ctx, url, params) {
   } catch { /* best effort */ }
   return json({ ok: true, message: action === "answer" ? "Sent securely. Only the owner can see your answers." : "You declined the form." });
 }
+
+// ---------- the game: Mail on the Main Menu ----------
+// POST /api/plugin/mail { uuid, markRead }  -> your latest conversations and notifications, for the in-game Mail page.
+export async function pluginMail(request, env) {
+  await checkPlugin(request, env);
+  const b = await readJson(request);
+  const uuid = String(b.uuid || "");
+  if (!/^[0-9a-f-]{36}$/i.test(uuid)) return json({ ok: false, error: "Bad player id." });
+  const sql = getDb(env);
+  const [me] = await sql`SELECT id FROM users WHERE mc_uuid = ${uuid}::uuid AND NOT is_bot AND NOT banned`;
+  if (!me) return json({ ok: true, linked: false, threads: [], notifications: [], unread: 0 });
+  const threads = await sql`
+    SELECT t.id, t.last_message_at,
+           CASE WHEN t.user_a = ${me.id} THEN t.a_unread ELSE t.b_unread END AS unread,
+           o.username AS other,
+           (SELECT m.body FROM dm_messages m WHERE m.thread_id = t.id ORDER BY m.id DESC LIMIT 1) AS last_body,
+           (SELECT (m.sender_id = ${me.id}) FROM dm_messages m WHERE m.thread_id = t.id ORDER BY m.id DESC LIMIT 1) AS last_mine
+      FROM dm_threads t JOIN users o ON o.id = CASE WHEN t.user_a = ${me.id} THEN t.user_b ELSE t.user_a END
+     WHERE (t.user_a = ${me.id} OR t.user_b = ${me.id}) AND t.last_message_at IS NOT NULL
+     ORDER BY t.last_message_at DESC LIMIT 12`;
+  const notes = await sql`SELECT id, title, body, created_at, read_at FROM notifications
+                           WHERE user_id = ${me.id} ORDER BY created_at DESC LIMIT 15`;
+  const unread = threads.reduce((n, t) => n + (Number(t.unread) > 0 ? 1 : 0), 0) + notes.filter((n) => !n.read_at).length;
+  if (b.markRead) {
+    await sql`UPDATE notifications SET read_at = now() WHERE user_id = ${me.id} AND read_at IS NULL`;
+  }
+  return json({
+    ok: true, linked: true, unread,
+    threads: threads.map((t) => ({ id: Number(t.id), with: t.other, at: t.last_message_at, unread: Number(t.unread) || 0,
+      last: String(t.last_body || "").slice(0, 160), mine: !!t.last_mine })),
+    notifications: notes.map((n) => ({ id: Number(n.id), title: String(n.title || "").slice(0, 80), body: String(n.body || "").slice(0, 200),
+      at: n.created_at, unread: !n.read_at })),
+  });
+}
+
+// POST /api/plugin/mail/thread { uuid, id } -> the last messages of one conversation (marks it read).
+export async function pluginMailThread(request, env) {
+  await checkPlugin(request, env);
+  const b = await readJson(request);
+  const uuid = String(b.uuid || "");
+  if (!/^[0-9a-f-]{36}$/i.test(uuid)) return json({ ok: false, error: "Bad player id." });
+  const sql = getDb(env);
+  const [me] = await sql`SELECT id FROM users WHERE mc_uuid = ${uuid}::uuid AND NOT is_bot AND NOT banned`;
+  if (!me) return json({ ok: false, error: "Link your account first." });
+  const [t] = await sql`SELECT id, user_a, user_b FROM dm_threads WHERE id = ${Number(b.id) || 0} AND (user_a = ${me.id} OR user_b = ${me.id})`;
+  if (!t) return json({ ok: false, error: "That conversation doesn't exist." });
+  const rows = await sql`SELECT m.body, m.image_id, m.audio_id, m.created_at, u.username, (m.sender_id = ${me.id}) AS mine
+                           FROM dm_messages m LEFT JOIN users u ON u.id = m.sender_id
+                          WHERE m.thread_id = ${t.id} ORDER BY m.id DESC LIMIT 15`;
+  await sql`UPDATE dm_messages SET read_at = now() WHERE thread_id = ${t.id} AND sender_id <> ${me.id} AND read_at IS NULL`;
+  if (Number(t.user_a) === Number(me.id)) await sql`UPDATE dm_threads SET a_unread = 0 WHERE id = ${t.id}`;
+  else await sql`UPDATE dm_threads SET b_unread = 0 WHERE id = ${t.id}`;
+  return json({ ok: true, messages: rows.reverse().map((m) => ({ from: m.username || "?", mine: !!m.mine, at: m.created_at,
+    body: String(m.body || (m.image_id ? "📷 Picture" : m.audio_id ? "🎤 Voice message" : "")).slice(0, 300) })) });
+}

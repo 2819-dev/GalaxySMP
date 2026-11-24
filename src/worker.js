@@ -432,6 +432,8 @@ const routes = [
   ["GET", "/api/mod/dms", dms.ownerThreads],
   ["GET", "/api/mod/dms/:id", dms.ownerThread],
   ["POST", "/api/plugin/dm", (req, env) => dms.pluginDm(req, env)],
+  ["POST", "/api/plugin/mail", (req, env) => dms.pluginMail(req, env)],
+  ["POST", "/api/plugin/mail/thread", (req, env) => dms.pluginMailThread(req, env)],
   ["GET", "/api/mod/overview", (req, env) => panel.overview(req, env)],
   ["POST", "/api/mod/announce", (req, env) => panel.announce(req, env)],
   ["GET", "/api/mod/players", panel.searchPlayers],

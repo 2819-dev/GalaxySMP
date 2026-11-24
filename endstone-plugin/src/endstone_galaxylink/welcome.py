@@ -2,11 +2,15 @@
 hotbar slot, or Main Menu in /guide).
 
   Title screen       a wallpaper (a different one each join), the GalaxySMP logo, a random splash line, your character,
-                     and Play, How to Play, Rules, What's New and Store. Minecraft's menu music plays while it's open.
-  Featured Servers   the server list on the left; the selected server (the first one to start with) in a sidebar:
-                     its banner, ping and players next to a Join Server button, then its name, description and activities
+                     Play, Settings, Tutorial & Commands and Help; Social in the top-right corner, Mail and Profile in the
+                     bottom-left corner. Minecraft's menu music plays while it's open.
+  Play               tabs Homes (your /sethome homes: teleport, delete, rename, move), Warps (My / Featured / All Warps;
+                     the owner features warps with the star) and Servers (the Featured Servers: picture, ping and
+                     players, PLAY, description and activities)
   Joining            the server's block (grass, diamond, lava...) shakes, cracks and bursts, then its name glows in
-  How to Play / Rules / What's New / Store    pages with tabs
+  Tutorial & Commands    Tutorial, your commands, Rules, What's New and the Store
+  Mail / Profile / Help  website messages and notifications (mail.py), your card, a message to staff
+  Settings           Coming Soon...
 
 Nobody can get hurt while it's open; closing it (Back) goes back to the title screen. Brand-new players start at spawn,
 everyone else carries on where they logged off. Event servers send players to a warp, spawn or the Minigame Center.
@@ -199,8 +203,11 @@ class Welcome:
         st = self.state(player)
         if st is None:
             return
-        {"servers": self.show_servers, "howto": self.show_howto, "rules": self.show_rules, "news": self.show_news,
-         "store": self.show_store, "social": self.show_social, "link": self.show_link}.get(st["screen"], self.show_title)(player)
+        if st["screen"] == "servers":   # (older name) the Servers tab of Play
+            st["screen"], st["tab"] = "play", 2
+        {"play": self.show_play, "guide": self.show_guide, "settings": self.show_settings,
+         "mail": self.show_mail, "profile": self.show_profile, "social": self.show_social,
+         "link": self.show_link}.get(st["screen"], self.show_title)(player)
 
     def go(self, player, screen, tab=0):
         st = self.state(player)
@@ -258,6 +265,19 @@ class Welcome:
         names = ", ".join(p.name for f, p in online[:3]) + (f" +{len(online) - 3}" if len(online) > 3 else "")
         return f"{top}§r\n§7{names or 'Tap to see your friends and party'}"
 
+    def social_label(self, player):
+        social = getattr(self.plugin, "social", None)
+        if social is None or not social.linked(player):
+            return "§lSocial"
+        online = len(social.online_friends(player))
+        reqs = len((social.state.get(str(player.unique_id)) or {}).get("incoming") or [])
+        return "§lSocial" + (f" §e({reqs})" if reqs else f" §a({online})" if online else "")
+
+    def mail_label(self, player):
+        mail = getattr(self.plugin, "mail", None)
+        n = mail.unread(player) if mail is not None else 0
+        return "§lMail" + (f" §c({n})" if n else "")
+
     def show_title(self, player):
         st = self.state(player)
         splash = st["splash"]
@@ -266,14 +286,15 @@ class Welcome:
             splash = h["greet"]
         form = ActionForm(title=f"{TITLE}{self.codes(st)}{self.holiday_codes()}§lGalaxySMP", content=splash)
         st["shown"] = True
-        form.add_button("§j§f" + self.friends_line(player), on_click=lambda p: self.go(p, "social"))   # the friends box
-        form.add_button("§j§r" + self.restart_line(), on_click=lambda p: self.show(p))                 # the restart notice
-        form.add_button("§lPlay", on_click=lambda p: self.go(p, "servers"))
-        form.add_button("How to Play", on_click=lambda p: self.go(p, "howto"))
-        form.add_button("Rules", on_click=lambda p: self.go(p, "rules"))
-        form.add_button("What's New", on_click=lambda p: self.go(p, "news"))
-        form.add_button("Store", on_click=lambda p: self.go(p, "store"))
-        # Social and Link Account: the friends box at the bottom (it fits on phone screens this way)
+        # 0-2: the corner buttons (Social top right; Mail and Profile bottom left), 3: the restart notice, 4+: the main buttons
+        form.add_button("§j§c§f" + self.social_label(player), on_click=lambda p: self.go(p, "social"))
+        form.add_button("§j§c§f" + self.mail_label(player), on_click=lambda p: self.go(p, "mail"))
+        form.add_button("§j§c§f§lProfile", on_click=lambda p: self.go(p, "profile"))
+        form.add_button("§j§r" + self.restart_line(), on_click=lambda p: self.show(p))
+        form.add_button("§lPlay", on_click=lambda p: self.go(p, "play", st.get("ptab", 2)))
+        form.add_button("Settings", on_click=lambda p: self.go(p, "settings"))
+        form.add_button("Tutorial & Commands", on_click=lambda p: self.go(p, "guide"))
+        form.add_button("Help", on_click=lambda p: self.ask_help(p))
         self.send(player, form)
         self.music(player, True)
 
@@ -487,34 +508,297 @@ class Welcome:
             lines += ["", "§fActivities"] + [f"{activity_icon(a)} §b{a}" for a in acts]
         return "\n".join(lines)
 
-    def show_servers(self, player):
+    # ---------- Play: Homes / Warps / Servers ----------
+    # The layout (resource pack): 0-2 the tabs, 3 the big green button (its icon is the big picture), 4 the dark strip
+    # under the picture, 5 the name, 6-8 small icon buttons, 9+ the list on the left. "§j§-" hides a slot, "§j§h" list
+    # items are section headers, "§q§s" marks the chosen tab.
+    PLAY_TABS = ("homes", "warps", "servers")
+    HIDE = "§j§-"
+
+    def homes_of(self, player):
+        tp = getattr(self.plugin, "teleports", None)
+        if tp is None:
+            return []
+        try:
+            rows = tp.db.execute("SELECT name, data FROM homes WHERE xuid = ? ORDER BY name", (str(player.xuid),)).fetchall()
+        except Exception:
+            return []
+        out = []
+        for name, data in rows:
+            try:
+                out.append({"name": name, "spot": json.loads(data)})
+            except Exception:
+                pass
+        return out
+
+    def featured(self):
+        return [str(n) for n in (self.plugin.economy.get_config("featured_warps") or []) if n]
+
+    def warp_rows(self, player):
+        """The Warps list: My Warps, Featured Warps (set by the owner with the star) and All Warps."""
+        warps = getattr(self.plugin, "warps", None)
+        if warps is None:
+            return []
+        every = warps.all()
+        mine = [w for w in every if w["owner"] == str(player.xuid)]
+        feat = [w for n in self.featured() for w in every if w["name"].lower() == n.lower()]
+        rows = [("head", "My Warps")] + [("warp", w) for w in mine]
+        if not mine:
+            rows.append(("setwarp", None))
+        rows += [("head", "Featured Warps")] + ([("warp", w) for w in feat] or [("none", "No featured warps yet")])
+        rows += [("head", "All Warps")] + ([("warp", w) for w in every[:40]] or [("none", "No warps yet")])
+        return rows
+
+    @staticmethod
+    def spot_line(spot):
+        dim = {"Overworld": "Overworld", "Nether": "Nether", "TheEnd": "The End"}.get(str(spot.get("dim")), str(spot.get("dim") or ""))
+        return f"§f{int(spot.get('x', 0))} {int(spot.get('y', 0))} {int(spot.get('z', 0))}  §7{dim}"
+
+    def can_feature(self, player):
+        return bool(player.is_op)
+
+    def show_play(self, player):
         st = self.state(player)
-        servers = self.servers() or [{"name": "GalaxySMP", "description": "Survival", "action": "play", "image": "galaxysmp"}]
-        sel = min(st["sel"], len(servers) - 1)
-        s = servers[sel]
-        form = ActionForm(title=f"{SERVERS}{self.codes(st)}§lFeatured Servers", content=self.details(s))
-        # 0: the sidebar's Join Server button (with the banner), 1: the ping and players line, then the list
-        form.add_button("§j§nJoin Server", icon=image_of(s), on_click=lambda p, i=sel: self.join(p, i))
-        # (this line isn't a button on screen, but if a phone reports the Join Server tap as this one, it joins too)
-        form.add_button("§j§i" + self.stats_line(player, s), on_click=lambda p, i=sel: self.join(p, i))
-        # a plain Join button at the top of the list too (the same kind of button as the server cards)
-        if s.get("action") != "soon":
-            form.add_button(f"§a§l» Join {s['name']}§r\n§7Tap to play", icon=image_of(s), on_click=lambda p, i=sel: self.join(p, i))
-        for i, v in enumerate(servers):
-            # one tap joins (the same kind of button as the Join button above, which works on every device)
-            status = "§eComing soon" if v.get("action") == "soon" else f"§a● §7{self.players_on(v)} playing  §e» Tap to join"
-            form.add_button(f"§l{v['name']}§r\n{status}", icon=image_of(v), on_click=lambda p, i=i: self.join(p, i))
+        tab = max(0, min(int(st.get("tab") or 0), 2))
+        st["ptab"] = tab
+        sel = st.setdefault("psel", {}).get(tab, 0)
+        homes = self.homes_of(player)
+        tp = getattr(self.plugin, "teleports", None)
+        try:
+            limit = tp.max_homes(player)
+        except Exception:
+            limit = 1
+        tabs = [f"Homes ({len(homes)})", "Warps", "Servers"]
+        bg = f"textures/ui/gsmp_bg_{SCENES[st['scene']]}"
+        # what's shown on the right: picture, strip, name, green button, small buttons, description
+        view = {"pic": bg, "strip": "", "name": "", "go": None, "go_text": "", "acts": [], "text": ""}
+        items = []   # (button text, icon, on_click)
+        if tab == 0:
+            items.append(("§l+ Set a home here§r\n§7" + (f"{len(homes)}/{limit} homes" if homes else "Save this spot"), "textures/ui/gsmp_icon_add",
+                          lambda p: self.home_name_form(p)))
+            for i, h in enumerate(homes):
+                mark = "§e» " if i == sel else ""
+                items.append((f"{mark}§l{h['name']}§r\n{self.spot_line(h['spot'])}", "textures/ui/gsmp_icon_home",
+                              lambda p, i=i: self.play_select(p, i)))
+            if homes:
+                h = homes[min(sel, len(homes) - 1)]
+                view.update(name=f"§l{h['name']}", strip=self.spot_line(h["spot"]), go_text="TELEPORT",
+                            go=lambda p, h=h: self.leave_to(p, h["spot"], f"Home {h['name']}"),
+                            acts=[("textures/ui/gsmp_icon_trash", lambda p, n=h["name"]: self.confirm_delete_home(p, n)),
+                                  ("textures/ui/gsmp_icon_rename", lambda p, n=h["name"]: self.home_name_form(p, rename=n)),
+                                  ("textures/ui/gsmp_icon_move", lambda p, n=h["name"]: self.move_home(p, n))],
+                            text=(f"§l§fHome: {h['name']}§r\n\n§7Teleport takes you straight there.\n\n"
+                                  f"§c■§7 Delete  §e■§7 Rename  §b■§7 Move it to where you are now\n\n"
+                                  f"§7You have §f{len(homes)}/{limit}§7 homes. §8You can also use /home {h['name']}."))
+            else:
+                view.update(name="§lNo homes yet", strip="§7Tap §a+ Set a home here§7 or type /sethome",
+                            text=f"§l§fHomes§r\n\n§7Save the places you like and come back any time.\n\nYou can have §f{limit}§7 home"
+                                 f"{'s' if limit != 1 else ''}." + ("" if limit >= 10 else " §7More come with §dGalaxy+§7 and §dPro+§7."))
+        elif tab == 1:
+            rows = self.warp_rows(player)
+            warps_list = [r[1] for r in rows if r[0] == "warp"]
+            k = 0
+            chosen = None
+            for kind, v in rows:
+                if kind == "head":
+                    items.append((f"§j§h§l{v}", "", lambda p: self.show(p)))
+                elif kind == "none":
+                    items.append((f"§7{v}", "", lambda p: self.show(p)))
+                elif kind == "setwarp":
+                    items.append(("§l+ Set your warp here§r\n§7Galaxy Pro+", "textures/ui/gsmp_icon_add", lambda p: self.warp_name_form(p)))
+                else:
+                    if k == sel:
+                        chosen = v
+                    mark = "§e» " if k == sel else ""
+                    star = "§e★ " if v["name"].lower() in [n.lower() for n in self.featured()] else ""
+                    items.append((f"{mark}{star}§l{v['name']}§r\n§7by {v['ownerName']} · {v['visits']} visit{'s' if v['visits'] != 1 else ''}",
+                                  "textures/ui/gsmp_icon_warp", lambda p, k=k: self.play_select(p, k)))
+                    k += 1
+            if chosen is None and warps_list:
+                chosen = warps_list[0]
+            if chosen is not None:
+                w = chosen
+                staff = player.is_op or self.plugin.moderation.is_staff(player)
+                acts = []
+                if self.can_feature(player):
+                    acts.append(("textures/ui/gsmp_icon_star", lambda p, n=w["name"]: self.toggle_featured(p, n)))
+                if w["owner"] == str(player.xuid) or staff:
+                    acts.append(("textures/ui/gsmp_icon_trash", lambda p, n=w["name"]: self.confirm_delete_warp(p, n)))
+                if w["owner"] == str(player.xuid):
+                    acts.append(("textures/ui/gsmp_icon_move", lambda p, n=w["name"]: self.move_warp(p, n)))
+                featured = w["name"].lower() in [n.lower() for n in self.featured()]
+                view.update(pic="textures/ui/gsmp_bg_copper", name=f"§l{w['name']}", go_text="WARP",
+                            strip=f"§7by §f{w['ownerName']}  §7{w['visits']} visit{'s' if w['visits'] != 1 else ''}" + ("  §e★ Featured" if featured else ""),
+                            go=lambda p, n=w["name"]: self.warp_to(p, n), acts=acts,
+                            text=(f"§l§f{w['name']}§r\n§7A warp by §f{w['ownerName']}§7.\n\n§7Anyone can visit with §e/warp {w['name']}§7."
+                                  + ("\n\n§e★§7 Tap the star to feature it (or take it off Featured)." if self.can_feature(player) else "")))
+            else:
+                view.update(name="§lNo warps yet", strip="§dGalaxy Pro+§7 members can make one",
+                            text="§l§fWarps§r\n\n§7Warps are public places players made: shops, builds, farms.\n\n"
+                                 "§dGalaxy Pro+§7 members can set one with §e/setwarp <name>§7.")
+        else:
+            servers = self.servers() or [{"name": "GalaxySMP", "description": "Survival", "action": "play", "image": "galaxysmp"}]
+            sel = min(sel, len(servers) - 1)
+            s = servers[sel]
+            for i, v in enumerate(servers):
+                status = "§eComing soon" if v.get("action") == "soon" else f"§a● §7{self.players_on(v)} playing"
+                mark = "§e» " if i == sel else ""
+                items.append((f"{mark}§l{v['name']}§r\n{status}", image_of(v), lambda p, i=i: self.play_select(p, i, join=True)))
+            soon = s.get("action") == "soon"
+            view.update(pic=image_of(s), strip=self.stats_line(player, s), name=f"§l{s['name']}", go_text="SOON" if soon else "PLAY",
+                        go=(lambda p, i=sel: self.join(p, i)), text=self.details(s))
+        form = ActionForm(title=f"{SERVERS}{self.codes(st)}§lPlay", content=view["text"])
+        for i, label in enumerate(tabs):
+            form.add_button(f"§j§t{'§q§s' if i == tab else ''}§f{label}", on_click=lambda p, i=i: self.go(p, "play", i))
+        go = view["go"]
+        form.add_button(f"§j§g§f§l{view['go_text']}" if go else f"{self.HIDE}", icon=view["pic"],
+                        on_click=go or (lambda p: self.show(p)))
+        form.add_button(f"§j§i{view['strip']}", on_click=lambda p: self.show(p))
+        form.add_button(f"§j§n§f{view['name']}", on_click=lambda p: self.show(p))
+        acts = view["acts"][:3]
+        for k in range(3):
+            if k < len(acts):
+                form.add_button("§j§a", icon=acts[k][0], on_click=acts[k][1])
+            else:
+                form.add_button(self.HIDE, on_click=lambda p: self.show(p))
+        for text, icon, click in items:
+            if icon:
+                form.add_button(text, icon=icon, on_click=click)
+            else:
+                form.add_button(text, on_click=click)
         self.send(player, form)
 
-    def select(self, player, i):
-        """Tap a server to see it in the sidebar; tap it again to join."""
+    def play_select(self, player, i, join=False):
+        """Tap an item to see it on the right; tap a server again to join it."""
         st = self.state(player)
         if st is None:
             return
-        if st["sel"] == i:
+        tab = st.get("ptab", 2)
+        if join and st.setdefault("psel", {}).get(tab, 0) == i:
             return self.join(player, i)
-        st["sel"] = i
-        self.show_servers(player)
+        st.setdefault("psel", {})[tab] = i
+        st["screen"], st["tab"] = "play", tab
+        self.show_play(player)
+
+    def leave_to(self, player, spot, label):
+        """Close the menu and go to a home or warp."""
+        st = self.state(player)
+        if st is None:
+            return
+        if self.in_minigame(player):
+            return player.send_message("§cYou can't teleport during a minigame.")
+        self.done(player, spot=spot, label=label, greet=False)
+        try:
+            player.close_form()
+        except Exception:
+            pass
+
+    def subform(self, player, form):
+        """A popup on top of the menu (name a home, confirm a delete...): closing it goes back to the menu."""
+        form.on_close = lambda p: self.show(p)
+        player.send_form(form)
+
+    def home_name_form(self, player, rename=None):
+        from endstone.form import ModalForm, TextInput
+        tp = getattr(self.plugin, "teleports", None)
+        if tp is None:
+            return
+        homes = [h["name"] for h in self.homes_of(player)]
+        if rename is None and len(homes) >= tp.max_homes(player):
+            limit = tp.max_homes(player)
+            player.send_message(f"§cYou can have up to {limit} home{'s' if limit != 1 else ''}. §7Delete one first (the trash can).")
+            return self.show(player)
+        default = rename or ("home" if "home" not in homes else f"home{len(homes) + 1}")
+
+        def submit(p, data):
+            try:
+                name = tp.home_name([str(json.loads(data)[0] or "")])
+            except Exception:
+                name = default
+            if rename is None:
+                tp.set_home(p, [name])
+            elif name != rename:
+                if name in [h["name"] for h in self.homes_of(p)]:
+                    p.send_message(f"§cYou already have a home called {name}.")
+                else:
+                    tp.db.execute("UPDATE homes SET name = ? WHERE xuid = ? AND name = ?", (name, str(p.xuid), rename))
+                    tp.db.commit()
+                    p.send_message(f"§aRenamed your home to §f{name}§a.")
+            self.show(p)
+        self.subform(player, ModalForm(title="§lRename home" if rename else "§lNew home",
+                                       controls=[TextInput("Home name (letters and numbers)", "e.g. base", default)],
+                                       submit_button="Save", on_submit=submit))
+
+    def confirm(self, player, title, text, yes, then):
+        from endstone.form import MessageForm
+
+        def answer(p, choice):
+            if choice == 0:
+                then(p)
+            self.show(p)
+        self.subform(player, MessageForm(title=title, content=text, button1=yes, button2="Cancel", on_submit=answer))
+
+    def confirm_delete_home(self, player, name):
+        tp = self.plugin.teleports
+        self.confirm(player, "§lDelete home?", f"Delete your home §f{name}§r? This can't be undone.", "§cDelete",
+                     lambda p: (tp.del_home(p, [name]), self.state(p) and self.state(p).setdefault("psel", {}).update({0: 0})))
+
+    def move_home(self, player, name):
+        self.confirm(player, "§lMove home?", f"Move your home §f{name}§r to where you are standing now?", "§aMove it",
+                     lambda p: self.plugin.teleports.set_home(p, [name]))
+
+    def warp_to(self, player, name):
+        warps = getattr(self.plugin, "warps", None)
+        w = warps.find(name) if warps is not None else None
+        if w is None:
+            player.send_message("§cThat warp doesn't exist any more.")
+            return self.show(player)
+        warps.db.execute("UPDATE warps SET visits = visits + 1 WHERE owner = ?", (w["owner"],))
+        warps.db.commit()
+        self.leave_to(player, w["spot"], f"{w['ownerName']}'s warp {w['name']}")
+
+    def warp_name_form(self, player):
+        from endstone.form import ModalForm, TextInput
+        warps = self.plugin.warps
+        if not warps.is_pro(player) and not player.is_op:
+            player.send_message("§cWarps are a §dGalaxy Pro+§c perk. §7See galaxymc.us/store.")
+            return self.show(player)
+
+        def submit(p, data):
+            try:
+                name = str(json.loads(data)[0] or "")
+            except Exception:
+                name = ""
+            warps.set_warp(p, [name])
+            self.show(p)
+        self.subform(player, ModalForm(title="§lYour warp", controls=[TextInput("Warp name (3-16 letters, numbers, - or _)", "e.g. MyShop", player.name[:16])],
+                                       submit_button="Save", on_submit=submit))
+
+    def move_warp(self, player, name):
+        self.confirm(player, "§lMove warp?", f"Move your warp §f{name}§r to where you are standing now?", "§aMove it",
+                     lambda p: self.plugin.warps.set_warp(p, [name]))
+
+    def confirm_delete_warp(self, player, name):
+        def gone(p):
+            self.plugin.warps.del_warp(p, [name])
+            self.plugin.economy.set_config("featured_warps", [n for n in self.featured() if n.lower() != name.lower()])
+            st = self.state(p)
+            if st is not None:
+                st.setdefault("psel", {})[1] = 0
+        self.confirm(player, "§lDelete warp?", f"Delete the warp §f{name}§r? This can't be undone.", "§cDelete", gone)
+
+    def toggle_featured(self, player, name):
+        if not self.can_feature(player):
+            return self.show(player)
+        cur = self.featured()
+        if name.lower() in [n.lower() for n in cur]:
+            cur = [n for n in cur if n.lower() != name.lower()]
+            player.send_message(f"§7Took §f{name}§7 off Featured Warps.")
+        else:
+            cur.append(name)
+            player.send_message(f"§e★ §f{name}§a is now a Featured Warp.")
+        self.plugin.economy.set_config("featured_warps", cur[:12])
+        self.show(player)
 
     # ---------- pages ----------
     def page(self, player, title, tabs, tab, body):
@@ -524,30 +808,52 @@ class Welcome:
             form.add_button(f"§e§l{label}" if i == tab else label, on_click=lambda p, i=i, scr=st["screen"]: self.go(p, scr, i))
         self.send(player, form)
 
-    def show_howto(self, player):
-        st = self.state(player)
-        tabs = [t for t in (self.data.get("tabs") or []) if t.get("title")][:8]
-        labels = ["Overview"] + [t["title"] for t in tabs]
-        tab = min(st["tab"], len(labels) - 1)
-        if tab == 0:
-            body = f"§l§fWelcome, {player.name}!§r\n\n{bold(self.data.get('intro'))}"
-        else:
-            body = f"§l§b{tabs[tab - 1]['title']}§r\n\n{bold(tabs[tab - 1].get('text'))}"
-        self.page(player, "How to Play", labels, tab, body)
+    def show_settings(self, player):
+        self.page(player, "Settings", ["Settings"], 0, "§l§bComing Soon...§r\n\n§7Settings for the Main Menu, sounds and more are on the way.")
 
-    def show_rules(self, player):
+    GUIDE_TABS = ["Tutorial", "Commands", "Rules", "What's New", "Store"]
+
+    def show_guide(self, player):
+        """Tutorial & Commands: the tutorial (How to Play), your commands, the rules, what's new and the Store."""
         st = self.state(player)
+        tab = max(0, min(int(st.get("tab") or 0), len(self.GUIDE_TABS) - 1))
+        body = [self.tutorial_text, self.commands_text, self.rules_text, self.news_text, self.store_text][tab](player)
+        self.page(player, "Tutorial & Commands", self.GUIDE_TABS, tab, body)
+
+    def tutorial_text(self, player):
+        lines = [f"§l§fWelcome, {player.name}!§r", "", bold(self.data.get("intro"))]
+        for t in [t for t in (self.data.get("tabs") or []) if t.get("title")][:8]:
+            lines += ["", f"§l§b{t['title']}§r", bold(t.get("text"))]
+        return "\n".join(lines)
+
+    def commands_text(self, player):
+        cmds = getattr(self.plugin, "commands", None) or {}
+        rows = []
+        for name in sorted(cmds):
+            c = cmds[name]
+            perm = (c.get("permissions") or [None])[0]
+            try:
+                if perm and not player.has_permission(perm):
+                    continue
+            except Exception:
+                continue
+            usage = (c.get("usages") or [f"/{name}"])[0]
+            usage = re.sub(r"<(\w+): \w+>", r"<\1>", usage)
+            usage = re.sub(r"\[(\w+): \w+\]", r"[\1]", usage)
+            rows.append(f"§e{usage}§r\n§7{c.get('description') or ''}")
+        head = "§l§fYour commands§r\n§7Type them in chat. <these> are needed, [these] are optional.\n"
+        return head + "\n" + ("\n".join(rows) if rows else "§7No commands.")
+
+    def rules_text(self, player):
         help_data = getattr(getattr(self.plugin, "help", None), "data", None) or {}
         sections = [s for s in (help_data.get("rules") or []) if s.get("title")][:10]
-        if not sections:
-            return self.page(player, "Rules", ["Rules"], 0, "§7Full rules: §bgalaxymc.us/rules")
-        tab = min(st["tab"], len(sections) - 1)
-        sec = sections[tab]
-        lines = [f"§l§6{sec['title']}§r", ""] + [f"§7•§r {bold(x)}" for x in sec.get("items") or []]
-        lines += ["", "§7Full rules: §bgalaxymc.us/rules"]
-        self.page(player, "Rules", [re.sub(r"^\d+\.\s*", "", s["title"]) for s in sections], tab, "\n".join(lines))
+        lines = []
+        for sec in sections:
+            lines += [f"§l§6{sec['title']}§r"] + [f"§7•§r {bold(x)}" for x in sec.get("items") or []] + [""]
+        lines.append("§7Full rules: §bgalaxymc.us/rules")
+        return "\n".join(lines)
 
-    def show_news(self, player):
+    def news_text(self, player):
         server = self.plugin.server
         lines = ["§l§dWhat's New§r", ""]
         if self.news.get("title"):
@@ -565,29 +871,165 @@ class Welcome:
         except Exception:
             pass
         lines += ["", "§7Read everything on §bgalaxymc.us§7: news, events, chat and voice."]
-        self.page(player, "What's New", ["What's New"], 0, "\n".join(lines))
+        return "\n".join(lines)
 
-    def show_store(self, player):
-        st = self.state(player)
+    def store_text(self, player):
         info = plans_info()
         keys = [k for k in ("free", "plus", "pro") if k in info]
-        if not keys:
-            return self.page(player, "Store", ["Store"], 0, "§7Plans, crate keys and more: §bgalaxymc.us/store")
-        tab = min(st["tab"], len(keys) - 1)
-        plan = info[keys[tab]]
         mine = None
         try:
             mine = self.plugin.plans.plan_key(player)
         except Exception:
             pass
-        price = plan.get("price") or 0
-        lines = [f"§l§d{plan.get('name', keys[tab])}§r  " + ("§aFree" if not price else f"§f${price}§7/month")]
-        if (mine or "free") == keys[tab]:
-            lines.append("§a✔ Your plan")
-        lines.append("")
-        lines += [f"§7•§r {p}" for p in (plan.get("perks") or [])[:12]]
-        lines += ["", "§7Get it on §bgalaxymc.us/store§7 (plans, crate keys, gift cards and more)."]
-        self.page(player, "Store", [info[k].get("name", k) for k in keys], tab, "\n".join(lines))
+        lines = []
+        for k in keys:
+            plan = info[k]
+            price = plan.get("price") or 0
+            lines.append(f"§l§d{plan.get('name', k)}§r  " + ("§aFree" if not price else f"§f${price}§7/month")
+                         + ("  §a✔ Your plan" if (mine or "free") == k else ""))
+            lines += [f"§7•§r {p}" for p in (plan.get("perks") or [])[:12]] + [""]
+        lines.append("§7Get it on §bgalaxymc.us/store§7 (plans, crate keys, gift cards and more).")
+        return "\n".join(lines)
+
+    # ---------- Help: message the staff ----------
+    def ask_help(self, player):
+        from endstone.form import ModalForm, TextInput
+        support = getattr(self.plugin, "support", None)
+        if support is None:
+            return self.show(player)
+
+        def submit(p, data):
+            try:
+                text = str(json.loads(data)[0] or "").strip()[:500]
+            except Exception:
+                text = ""
+            if text:
+                support.send(p, text)
+            self.show(p)
+        self.subform(player, ModalForm(title="§l§bAsk staff for help",
+                                       controls=[TextInput("Tell staff what you need. They'll see it on the website and in game, and reply to you.",
+                                                           "e.g. My items disappeared after I died", "")],
+                                       submit_button="Send to staff", on_submit=submit))
+
+    # ---------- Mail: your website messages and notifications ----------
+    def show_mail(self, player):
+        st = self.state(player)
+        mail = getattr(self.plugin, "mail", None)
+        social = getattr(self.plugin, "social", None)
+        if mail is None:
+            return self.show_title(player)
+        if social is not None and not social.linked(player):
+            form = ActionForm(title=f"{PAGE}{self.codes(st)}§lMail", content=(
+                "§l§fMail§r\n\n§7Your messages and notifications from §bgalaxymc.us§7 show up here.\n\n"
+                "Link your account first. It only takes a minute."))
+            form.add_button("§e§lMail", on_click=lambda p: self.show(p))
+            form.add_button("Link Account", on_click=lambda p: self.go(p, "link"))
+            return self.send(player, form)
+        if not st.get("mail_loaded"):
+            st["mail_loaded"] = True
+            mail.refresh(player, then=lambda: self.show(player) if self.state(player) and self.state(player)["screen"] == "mail" else None)
+        box = mail.of(player) or {"threads": [], "notifications": []}
+        threads, notes = box.get("threads") or [], box.get("notifications") or []
+        tab = int(st.get("tab") or 0)   # 0 messages, 1 notifications, 2+ a conversation
+        unread_notes = sum(1 for n in notes if n.get("unread"))
+        form = ActionForm(title=f"{PAGE}{self.codes(st)}§lMail", content="")
+        labels = [f"Messages ({sum(1 for t in threads if t.get('unread'))})" if any(t.get("unread") for t in threads) else "Messages",
+                  f"Notifications ({unread_notes})" if unread_notes else "Notifications"]
+        for i, label in enumerate(labels):
+            form.add_button(f"§e§l{label}" if i == tab else label, on_click=lambda p, i=i: self.go(p, "mail", i))
+        if tab == 0:
+            body = ["§l§fMessages§r", ""]
+            for t in threads:
+                body.append(f"{'§c● ' if t.get('unread') else ''}§l§f{t['with']}§r\n§7{'You: ' if t.get('mine') else ''}{t.get('last') or ''}")
+                body.append("")
+            if not threads:
+                body.append("§7No messages yet. Tap §fWrite a message§7 to start one.")
+            form.content = "\n".join(body)
+            form.add_button("§a+ Write a message", on_click=lambda p: self.write_mail(p))
+            for k, t in enumerate(threads):
+                form.add_button(f"{'§c● ' if t.get('unread') else ''}{t['with']}", on_click=lambda p, k=k: self.go(p, "mail", 2 + k))
+        elif tab == 1:
+            body = ["§l§fNotifications§r", ""]
+            for n in notes:
+                body.append(f"{'§c● ' if n.get('unread') else ''}§l§f{n.get('title') or ''}§r\n§7{n.get('body') or ''}")
+                body.append("")
+            if not notes:
+                body.append("§7Nothing new.")
+            form.content = "\n".join(body)
+            if unread_notes:
+                form.add_button("Mark all as read", on_click=lambda p: mail.refresh(p, then=lambda: self.go(p, "mail", 1), mark_read=True))
+        else:
+            k = tab - 2
+            if k >= len(threads):
+                return self.go(player, "mail", 0)
+            t = threads[k]
+            msgs = st.setdefault("mail_thread", {}).get(t["id"])
+            if msgs is None:
+                st["mail_thread"][t["id"]] = []
+                mail.thread(player, t["id"], then=lambda m: (st["mail_thread"].update({t["id"]: m}),
+                                                            self.show(player) if self.state(player) and self.state(player)["screen"] == "mail" else None))
+                msgs = []
+                body = [f"§l§f{t['with']}§r", "", "§7Loading..."]
+            else:
+                body = [f"§l§f{t['with']}§r", ""] + [f"{'§b' if m.get('mine') else '§e'}{'You' if m.get('mine') else m.get('from')}§7: §f{m.get('body')}"
+                                                       for m in msgs]
+            form.content = "\n".join(body)
+            form.add_button(f"§a§lReply to {t['with']}", on_click=lambda p, t=t: self.write_mail(p, to=t["with"], back=tab))
+        self.send(player, form)
+
+    def write_mail(self, player, to=None, back=0):
+        from endstone.form import ModalForm, TextInput
+        dms = getattr(self.plugin, "dms", None)
+        if dms is None:
+            return self.show(player)
+        controls = ([] if to else [TextInput("To (their name)", "e.g. Steve", "")]) + [TextInput("Message", "Say hi!", "")]
+
+        def submit(p, data):
+            try:
+                vals = [str(v or "").strip() for v in json.loads(data)]
+            except Exception:
+                vals = []
+            who, text = (to, vals[0] if vals else "") if to else ((vals + ["", ""])[0], (vals + ["", ""])[1])
+            st = self.state(p)
+            if who and text:
+                dms.send(p, who, text[:500])
+                if st is not None:
+                    st.pop("mail_thread", None)
+                    st["mail_loaded"] = False
+            if st is not None:
+                st["screen"], st["tab"] = "mail", back
+            from endstone_galaxylink.safety import later
+            later(self.plugin, p, self.show, 20)   # after the message has gone
+        self.subform(player, ModalForm(title=f"§lMessage {to}" if to else "§lNew message", controls=controls,
+                                       submit_button="Send", on_submit=submit))
+
+    # ---------- Profile ----------
+    def show_profile(self, player):
+        st = self.state(player)
+        social = getattr(self.plugin, "social", None)
+        linked = social is not None and social.linked(player)
+        try:
+            card = social.card_text(str(player.xuid), player.name, player) if social is not None else f"§l{player.name}"
+        except Exception:
+            card = f"§l{player.name}"
+        hidden = social.card_hidden(player.xuid) if social is not None else False
+        try:
+            money = self.plugin.economy.balance_text(player)
+        except Exception:
+            money = ""
+        lines = [card, ""]
+        if money:
+            lines.append(f"§eMoney: §f{money}")
+        lines += ["§7Friends " + ("§ccan't see§7" if hidden else "§acan see§7") + " your card.",
+                  "§aYour account is linked." if linked else "§7Link your account to chat, add friends and see your stats on §bgalaxymc.us§7."]
+        form = ActionForm(title=f"{PAGE}{self.codes(st)}§lProfile", content="\n".join(lines))
+        form.add_button("§e§lProfile", on_click=lambda p: self.show(p))
+        if social is not None:
+            form.add_button("Show my card to friends" if hidden else "Hide my card from friends",
+                            on_click=lambda p: (social.set_card_hidden(p, not hidden), self.show(p)))
+        if not linked:
+            form.add_button("Link Account", on_click=lambda p: self.go(p, "link"))
+        self.send(player, form)
 
     def closed(self, player):
         """Closed (Back, or the game was still loading): back to the title screen."""
@@ -618,7 +1060,7 @@ class Welcome:
                 player.send_toast("§eComing soon", f"{s['name']} isn't open yet.")
             except Exception:
                 pass
-            return self.show_servers(player)
+            return self.show_play(player)
         spot = None
         if action == "warp":
             warps = getattr(self.plugin, "warps", None)
@@ -628,7 +1070,7 @@ class Welcome:
                     player.send_toast("§cNot available", f"{s['name']} isn't open right now.")
                 except Exception:
                     pass
-                return self.show_servers(player)
+                return self.show_play(player)
             spot = w["spot"]
         elif action == "spawn":
             spot = self.plugin.economy.get_config("spawn")
@@ -640,10 +1082,12 @@ class Welcome:
                 if st.get("portal"):
                     self.open.pop(str(player.unique_id), None)
                     return player.send_message("§bThe Sift is still being made. §7Try again in a few minutes!")
-                done = len(self.plugin.economy.get_config("sift_tiles") or []) if sift is not None else 0
-                st["screen"] = "servers"
+                from endstone_galaxylink import sift as SF
+                done = len(self.plugin.economy.get_config(SF.PIECES) or []) if sift is not None else 0
+                total = len(SF.TILES)
+                st["screen"], st["tab"] = "play", 2
                 return self.page(player, "The Sift", ["< Back"], 0,
-                                 f"§l§bAlmost ready!§r\n\nThe Sift is still being built ({min(done, 9)}/9 pieces).\n§7Try again in a few minutes.")
+                                 f"§l§bAlmost ready!§r\n\nThe Sift is still being built ({min(done, total)}/{total} pieces).\n§7Try again in a few minutes.")
             spot = sift.spot()
         theme = s.get("anim") if s.get("anim") in THEMES else "grass"
         if s.get("odds"):
@@ -673,7 +1117,7 @@ class Welcome:
                 pass
         later(self.plugin, player, finish, JOIN_TICKS)
 
-    def done(self, player, spot=None, label=None, action="play"):
+    def done(self, player, spot=None, label=None, action="play", greet=True):
         st = self.open.pop(str(player.unique_id), None)
         if st is None:
             return
@@ -693,10 +1137,10 @@ class Welcome:
         except Exception:
             pass
         try:
-            player.send_title(f"§b§l{label or 'GalaxySMP'}", "§7Have fun!", 5, 40, 15)
+            player.send_title(f"§b§l{label or 'GalaxySMP'}", "§7Have fun!" if greet else "", 5, 40, 15)
         except Exception:
             pass
-        if not st.get("reopened"):
+        if not st.get("reopened") and greet:
             player.send_message(f"§d✦ §fWelcome to {label or 'GalaxySMP'}! §7Type §e/menu§7 for the Main Menu, §e/guide§7 for help.")
         if action == "minigames":
             mg = getattr(self.plugin, "minigames", None)

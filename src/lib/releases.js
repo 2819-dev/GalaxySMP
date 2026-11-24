@@ -563,6 +563,18 @@ Staff can also now name world borders and teleport to them.`,
 
 The bigger Sift is built in the background after the update, which takes about half an hour.`,
   },
+  {
+    id: "2026-11-24-new-main-menu",
+    title: "A brand-new Main Menu",
+    body: `The Main Menu has a fresh new layout.
+
+- **Play:** three tabs in one place. **Homes** lists your homes, so you can teleport, rename, move or delete them with one tap. **Warps** shows My Warps, Featured Warps and All Warps. **Servers** shows each server with its picture, ping, players and a big Play button.
+- **Mail:** your website messages and notifications, right in the game. Open a conversation and reply without leaving the menu.
+- **Profile:** your player card, money and privacy setting.
+- **Tutorial & Commands:** the tutorial, the commands you can use, the rules, what's new and the Store, all in one page.
+- **Help:** send a message to staff from the menu.
+- **Social** is now in the top-right corner. Settings are coming soon.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

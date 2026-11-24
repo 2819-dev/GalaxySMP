@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.80.0"
+VERSION = "2.81.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -301,6 +301,8 @@ class GalaxyLink(Plugin):
         self.borders = Borders(self)  # a border for every server; only the owner can go outside
         from endstone_galaxylink.social import Social
         self.social = Social(self)  # Main Menu > Social: friends, parties, recent players, profile card
+        from endstone_galaxylink.mail import Mail
+        self.mail = Mail(self)  # Main Menu > Mail: website messages and notifications
         self.elevators = Elevators(self)
         from endstone_galaxylink.potm import PlayerOfTheMonth
         self.potm = PlayerOfTheMonth(self)  # Player of the Month: Voting Computers
@@ -475,6 +477,7 @@ class GalaxyLink(Plugin):
         welcomed = False
         try:
             self.social.on_join(player)   # friends and link status from the website (in the background)
+            self.mail.on_join(player)     # unread messages and notifications for the Mail button
         except Exception as e:
             self.logger.warning(f"Social on join failed: {e}")
         try:
@@ -532,7 +535,7 @@ class GalaxyLink(Plugin):
         p = event.player
         # each one on its own, so one problem doesn't stop the others
         for part in ("ranks.forget", "plates.on_quit", "galaxymap.on_quit", "parkour.on_quit", "collection.on_quit",
-                     "teleports.on_quit", "progress.on_quit", "bedwars.on_quit", "penguins.on_quit", "welcome.on_quit", "social.on_quit",
+                     "teleports.on_quit", "progress.on_quit", "bedwars.on_quit", "penguins.on_quit", "welcome.on_quit", "social.on_quit", "mail.on_quit",
                      "pets.on_quit", "portals.on_quit", "sift.on_quit", "borders.on_quit"):
             obj, fn = part.split(".")
             try:
