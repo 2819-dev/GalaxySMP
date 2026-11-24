@@ -4,6 +4,7 @@ import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 import { ticketChat, newTicketDialog, onTicketEvent, chip, when, LABELS } from "/js/tickets.js";
 import { iconEl } from "/js/site.js";
 import { renderMarkdown } from "/js/markdown.js";
+import { linkCards } from "/js/link-cards.js";
 import { faceSvg } from "/js/face.js";
 import * as extra from "/js/community-extra.js";
 import { sendTyping, emojiMenu, chatState, channelChoices } from "/js/chat.js";
@@ -362,6 +363,8 @@ function renderDMs(p) {
       const sender = chatState.members.get(m.from);
       const admin = (chatState.roles.get(sender?.role)?.power || 0) >= 100;   // headings and -# small text: Admins only
       text.replaceChildren(renderMarkdown(m.body || "", { channels: chatState.channels, noHeadings: !admin }));
+      const cards = linkCards(m.body);
+      if (cards) text.append(cards);
       text.hidden = (!m.body && Boolean(m.audio || m.image)) || Boolean(m.form);
       if (m.form && !node.querySelector(".dm-form")) {
         const slot = h("div", { class: "dm-form" }, h("p", { class: "text-3 small", text: "Loading the secure form…" }));

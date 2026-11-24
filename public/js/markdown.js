@@ -117,6 +117,7 @@ const RULES = [
   } },
   { re: /\[([^\]\n]{1,100})\]\((https?:\/\/[^\s)]+)\)/, make: (m) => link(m[2], m[1]) },
   { re: /\b(?:https?:\/\/|www\.)[^\s<>"]+[^\s<>".,!?:;)\]]/, make: (m) => link(/^https?:/i.test(m[0]) ? m[0] : `https://${m[0]}`, m[0]) },
+  { re: /\bgalaxymc\.us(?:\/[^\s<>"]*[^\s<>".,!?:;)\]])?/i, make: (m) => link(`https://${m[0]}`, m[0]) },   // our own site, typed without https://
   { re: /\*\*\*([^*\n](?:[\s\S]*?[^*\n])?)\*\*\*/, make: (m, ctx) => wrap("strong", wrap("em", inline(m[1], ctx))) },
   { re: /\*\*([^*\n](?:[\s\S]*?[^*\n])?)\*\*/, make: (m, ctx) => wrap("strong", inline(m[1], ctx)) },
   { re: /__([^_\n](?:[\s\S]*?[^_\n])?)__/, make: (m, ctx) => wrap("u", inline(m[1], ctx)) },

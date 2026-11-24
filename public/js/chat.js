@@ -8,6 +8,7 @@ import { paint, rankTag, roleIcon, rankCss } from "/js/rank-paint.js";
 import { showPanel, hidePanel, dmEvent } from "/js/community-panels.js";
 import { ticketEvent } from "/js/tickets.js";
 import { renderMarkdown, plainText, setCustomEmoji, customEmoji, emojiNode } from "/js/markdown.js";
+import { linkCards } from "/js/link-cards.js";
 import { setupMentions } from "/js/mentions.js";
 import { faceSvg } from "/js/face.js";
 import { openDialog, h } from "/js/dialog.js";
@@ -895,6 +896,8 @@ function renderMessage(m, prev, opts = {}) {
   const text = el("div", "msg-text");
   // # / ## / ### headings and -# small text only work in messages from Admins
   text.append(renderMarkdown(m.content, { ...mdContext(), noHeadings: !m.bot && !m.author?.bot && roleOf(state.members.get(m.author?.id)?.role || m.author?.role).power < 100 }));
+  const cards = linkCards(m.content);   // previews for links to galaxymc.us (profiles, Store, Map...)
+  if (cards) text.append(cards);
   if (m.editedAt) {
     const ed = el("span", "msg-edited", "(edited)");
     ed.title = `Edited ${new Date(m.editedAt).toLocaleString()}`;
