@@ -261,34 +261,71 @@ pe["minecraft:entity_born"] = {"add": {"component_groups": ["galaxysmp:baby", "g
 pe["galaxysmp:grow_up"] = {"remove": {"component_groups": ["galaxysmp:baby"]}, "add": {"component_groups": ["galaxysmp:adult"]}}
 json.dump(pen, open(pp, "w"), indent=1)
 
-# ================================================================== BLUB
+# ================================================================== BLUB (blue cube with bunny ears, teal belly, stubby feet)
+def hx(c):
+    c = c.lstrip("#"); return tuple(int(c[i:i + 2], 16) for i in (0, 2, 4)) + (255,)
+
+
+def paint(t, u, v, w, h, d, face, rows):
+    """Paints one face of a box-UV cube from rows of colors (each row a list, or a single color for the whole row)."""
+    ox, oy, fw, fh = {"top": (u + d, v, w, d), "bottom": (u + d + w, v, w, d), "west": (u, v + d, d, h),
+                      "north": (u + d, v + d, w, h), "east": (u + d + w, v + d, d, h), "south": (u + 2 * d + w, v + d, w, h)}[face]
+    for y in range(fh):
+        row = rows[min(y, len(rows) - 1)]
+        for x in range(fw):
+            c = row[min(x, len(row) - 1)] if isinstance(row, list) else row
+            t.im.putpixel((ox + x, oy + y), hx(c))
+
+
 t = Tex(64, 32)
-ice = (190, 232, 245); ice2 = (160, 214, 236); dark = (110, 40, 50, 255)
-t.box(0, 0, 8, 7, 8, ice, top=(214, 242, 250))       # body 8x7x8
-t.speckle(0, 0, 8, 7, 8, ice2 + (255,), 30, "blub")
-fx, fy = Tex.front(0, 0, 8, 7, 8)
-t.d.rectangle([fx + 1, fy + 2, fx + 2, fy + 3], fill=dark); t.d.rectangle([fx + 5, fy + 2, fx + 6, fy + 3], fill=dark)
-t.d.rectangle([fx + 3, fy + 5, fx + 4, fy + 5], fill=dark)
-t.box(32, 0, 2, 3, 2, (205, 238, 248))                 # ear spike 2x3x2
-t.box(32, 8, 2, 2, 2, ice2)                            # leg 2x2x2
+rnd = random.Random("blub")
+mid = lambda: rnd.choice(["#5487b6", "#5286b5", "#4f86b5", "#5689b6", "#5387b7"])
+light = lambda: rnd.choice(["#5d90c0", "#5b8fbd", "#5f92c1"])
+W, H, D = 12, 7, 10   # a longer, rectangular body
+front = [["#7193b8"] * (W - 1) + ["#8fa4b3"]]
+for r in range(3):   # blue, with a slightly lighter patch in the middle
+    front.append(["#7193b8"] + [light() if r <= 1 and 2 <= x <= W - 5 else mid() for x in range(W - 2)] + ["#7495b8"])
+front.append(["#4b9cb1", "#4f95b5", "#333367", "#333367", "#5286b5", "#5387b5", "#5286b5", "#5387b5", "#353365", "#353567", "#4f95b5", "#4fa1b4"])
+front.append(["#60a4b1", "#4a9cb1", "#4590b0", "#4690b3", "#4690b3", "#4a4a80", "#4a4a80", "#4690b3", "#4690b3", "#4ea0b3", "#57a2b1", "#63a6b5"])
+front.append(["#60a2b2", "#60a2b2", "#60a1b2", "#459caf", "#479eb2", "#469db1", "#479cb1", "#469db1", "#60a3b3", "#61a3b2", "#61a3b1", "#63a3b1"])
+side = ["#54769a", "#436e98", "#456f99", "#476f99", "#3d7a92", "#3e7d90", "#4b8495"]
+back = ["#5a84ad", "#4f80ad", "#4f80ad", "#4f80ad", "#4590a8", "#4a98ad", "#55a0b0"]
+paint(t, 0, 0, W, H, D, "north", front)
+paint(t, 0, 0, W, H, D, "west", side)
+paint(t, 0, 0, W, H, D, "east", side)
+paint(t, 0, 0, W, H, D, "south", back)
+paint(t, 0, 0, W, H, D, "top", [[rnd.choice(["#7193b8", "#7a9bbd", "#7596ba"]) for _ in range(W)] for _ in range(D)])
+paint(t, 0, 0, W, H, D, "bottom", ["#2f6a80"])
+ear_front = [["#92a4b8", "#93a4b7", "#869fbe"], ["#8da2b9", "#839eb9", "#7898ba"], ["#809bb8", "#5484b4", "#6792b7"],
+             ["#7193b8", "#5583b7", "#4b96b5"], ["#6e91b7", "#5287b6", "#509cb4"]]
+EU = 2 * D + 2 * W   # ears and feet go to the right of the body on the texture
+paint(t, EU, 0, 3, 5, 2, "north", ear_front)
+paint(t, EU, 0, 3, 5, 2, "south", ["#7e98b5", "#6a8cb3", "#5f8ab3", "#5583b0", "#5283b0"])
+paint(t, EU, 0, 3, 5, 2, "west", ["#8ea3b8", "#7193b8", "#6e91b7", "#5f88b3", "#5a86b2"])
+paint(t, EU, 0, 3, 5, 2, "east", ["#70849d", "#6a88a6", "#56759f", "#4a6e95", "#3d7692"])
+paint(t, EU, 0, 3, 5, 2, "top", ["#95a8bb"])
+paint(t, EU, 0, 3, 5, 2, "bottom", ["#5283b0"])
+for f, c in (("north", [["#5ba3af", "#5ca0ae", "#2f5c74"], ["#5a8895", "#5a8895", "#245b70"]]), ("south", ["#214f66"]), ("west", ["#4d808f", "#2f5c74"]),
+             ("east", ["#1e5772", "#18465c"]), ("top", ["#3e7d90"]), ("bottom", ["#18465c"])):
+    paint(t, EU, 10, 3, 2, 3, f, c)
 t.save("galaxysmp_blub")
 geo("blub", 64, 32, [
     bone("root"),
-    bone("body", "root", (0, 2, 0), [cube([-4, 2, -4], [8, 7, 8], [0, 0])]),
-    bone("ear1", "body", (-2.5, 9, -1), [cube([-3.5, 9, -2], [2, 3, 2], [32, 0])], rotation=[0, 0, 12]),
-    bone("ear2", "body", (0, 9, 1), [cube([-1, 9, 0], [2, 3, 2], [32, 0])]),
-    bone("ear3", "body", (2.5, 9, -1), [cube([1.5, 9, -2], [2, 3, 2], [32, 0])], rotation=[0, 0, -12]),
-    bone("leg1", "root", (-2.5, 2, -2.5), [cube([-3.5, 0, -3.5], [2, 2, 2], [32, 8])]),
-    bone("leg2", "root", (2.5, 2, -2.5), [cube([1.5, 0, -3.5], [2, 2, 2], [32, 8])]),
-    bone("leg3", "root", (-2.5, 2, 2.5), [cube([-3.5, 0, 1.5], [2, 2, 2], [32, 8])]),
-    bone("leg4", "root", (2.5, 2, 2.5), [cube([1.5, 0, 1.5], [2, 2, 2], [32, 8])]),
+    bone("body", "root", (0, 2, 0), [cube([-6, 2, -5], [W, H, D], [0, 0])]),
+    bone("ear1", "body", (-3, 9, 0), [cube([-4.5, 9, -1], [3, 5, 2], [EU, 0])]),
+    bone("ear2", "body", (3, 9, 0), [cube([1.5, 9, -1], [3, 5, 2], [EU, 0])]),
+    bone("leg1", "root", (-4, 2, -3), [cube([-5.5, 0, -4.5], [3, 2, 3], [EU, 10])]),
+    bone("leg2", "root", (4, 2, -3), [cube([2.5, 0, -4.5], [3, 2, 3], [EU, 10])]),
+    bone("leg3", "root", (-4, 2, 3), [cube([-5.5, 0, 1.5], [3, 2, 3], [EU, 10])]),
+    bone("leg4", "root", (4, 2, 3), [cube([2.5, 0, 1.5], [3, 2, 3], [EU, 10])]),
 ], bounds=(1.5, 1.5))
 legwalk = lambda s: [f"{s}math.cos(query.modified_distance_moved * 60) * 40 * query.modified_move_speed", 0, 0]
 anims("blub", {
     "animation.galaxysmp_blub.move": {"loop": True, "bones": {"leg1": {"rotation": legwalk("")}, "leg4": {"rotation": legwalk("")},
                                                                "leg2": {"rotation": legwalk("-")}, "leg3": {"rotation": legwalk("-")}}},
     "animation.galaxysmp_blub.idle": {"loop": True, "bones": {
-        "ear1": {"rotation": [0, 0, "12 + math.sin(query.life_time * 150) * 8"]}, "ear3": {"rotation": [0, 0, "-12 - math.sin(query.life_time * 150) * 8"]},
+        "ear1": {"rotation": ["math.sin(query.life_time * 150) * 6", 0, "math.max(0, math.sin(query.life_time * 40)) * 10"]},
+        "ear2": {"rotation": ["math.sin(query.life_time * 150 + 40) * 6", 0, 0]},
         "body": {"scale": [1, "1 + math.sin(query.life_time * 180) * 0.03", 1]}}},
     "animation.galaxysmp_blub.air": {"loop": True, "bones": {"body": {"scale": [0.92, 1.12, 0.92]}, "leg1": {"rotation": [-40, 0, 0]}, "leg2": {"rotation": [-40, 0, 0]},
                                                               "leg3": {"rotation": [40, 0, 0]}, "leg4": {"rotation": [40, 0, 0]}}},
@@ -297,12 +334,12 @@ anims("blub", {
 client("blub", {"default": "textures/entity/galaxysmp_blub"}, "blub",
        {"move": "animation.galaxysmp_blub.move", "idle": "animation.galaxysmp_blub.idle", "air": "animation.galaxysmp_blub.air", "sit": "animation.galaxysmp_blub.sit"},
        ["idle", {"move": "query.is_on_ground && !query.is_sitting"}, {"air": "!query.is_on_ground && !query.is_riding"}, {"sit": "query.is_sitting"}],
-       egg=("#bee8f5", "#6e2832"))
+       egg=("#5487b6", "#60a2b2"))
 bgroups = pet_groups(["minecraft:glow_berries"], "blub", 6, extra_tame=["parrot_tame"])
 entity("blub", {
     **COMMON,
     "minecraft:type_family": {"family": ["blub", "galaxysmp_pet", "mob"]},
-    "minecraft:collision_box": {"width": 0.5, "height": 0.6},
+    "minecraft:collision_box": {"width": 0.75, "height": 0.6},
     "minecraft:health": {"value": 10, "max": 10},
     "minecraft:movement": {"value": 0.3},
     "minecraft:movement.skip": {}, "minecraft:jump.dynamic": {},
@@ -312,206 +349,6 @@ entity("blub", {
     "minecraft:behavior.breed": {"priority": 2, "speed_multiplier": 1.0},
     "minecraft:behavior.random_stroll": {"priority": 7, "speed_multiplier": 1.0},
 }, bgroups, pet_events())
-
-# ================================================================== SEEDLING (tiny plant critter, runs from players)
-t = Tex(32, 16)
-t.box(0, 0, 4, 4, 4, (110, 190, 90), top=(140, 215, 110))
-fx, fy = Tex.front(0, 0, 4, 4, 4)
-t.d.point((fx + 1, fy + 1), fill=(30, 40, 30, 255)); t.d.point((fx + 2, fy + 1), fill=(30, 40, 30, 255))
-t.d.rectangle([18, 0, 20, 1], fill=(90, 220, 120, 255)); t.d.rectangle([21, 0, 23, 1], fill=(70, 190, 100, 255))
-t.box(16, 4, 1, 1, 1, (70, 120, 60))                 # leg
-t.save("galaxysmp_seedling")
-geo("seedling", 32, 16, [
-    bone("root"),
-    bone("body", "root", (0, 1, 0), [cube([-2, 1, -2], [4, 4, 4], [0, 0])]),
-    bone("leaf1", "body", (0, 5, 0), [cube([0, 5, -1], [3, 0, 2], [16, 0])], rotation=[0, 0, -30]),
-    bone("leaf2", "body", (0, 5, 0), [cube([-3, 5, -1], [3, 0, 2], [16, 0])], rotation=[0, 0, 30]),
-    bone("legl", "root", (-1, 1, 0), [cube([-1.5, 0, -0.5], [1, 1, 1], [16, 4])]),
-    bone("legr", "root", (1, 1, 0), [cube([0.5, 0, -0.5], [1, 1, 1], [16, 4])]),
-], bounds=(1, 1))
-anims("seedling", {
-    "animation.galaxysmp_seedling.walk": {"loop": True, "bones": {"legl": {"rotation": legwalk("")}, "legr": {"rotation": legwalk("-")},
-                                                                   "body": {"position": [0, "math.abs(math.sin(query.modified_distance_moved * 60)) * 0.6", 0]}}},
-    "animation.galaxysmp_seedling.idle": {"loop": True, "bones": {"leaf1": {"rotation": [0, 0, "-30 - math.sin(query.life_time * 160) * 10"]},
-                                                                   "leaf2": {"rotation": [0, 0, "30 + math.sin(query.life_time * 160) * 10"]}}},
-})
-client("seedling", {"default": "textures/entity/galaxysmp_seedling"}, "seedling",
-       {"walk": "animation.galaxysmp_seedling.walk", "idle": "animation.galaxysmp_seedling.idle"}, ["walk", "idle"], egg=("#6ebe5a", "#5adc78"))
-entity("seedling", {
-    **COMMON,
-    "minecraft:type_family": {"family": ["seedling", "sift_wildlife", "mob"]},
-    "minecraft:collision_box": {"width": 0.35, "height": 0.4},
-    "minecraft:health": {"value": 4, "max": 4},
-    "minecraft:movement": {"value": 0.3},
-    "minecraft:movement.basic": {}, "minecraft:navigation.walk": {"avoid_water": True},
-    "minecraft:behavior.avoid_mob_type": {"priority": 1, "entity_types": [{"filters": {"test": "is_family", "subject": "other", "value": "player"}, "max_dist": 6, "walk_speed_multiplier": 1.2, "sprint_speed_multiplier": 1.6}]},
-    "minecraft:behavior.random_stroll": {"priority": 6, "speed_multiplier": 0.8},
-    "minecraft:loot": {"table": "loot_tables/entities/galaxysmp_seedling.json"},
-}, spawnable=True)
-write(os.path.join(BP, "loot_tables", "entities", "galaxysmp_seedling.json"), {"pools": [{"rolls": 1, "entries": [{"type": "item", "name": "minecraft:wheat_seeds", "weight": 1,
-                                                                                                                     "functions": [{"function": "set_count", "count": {"min": 1, "max": 3}}]}]}]})
-
-# ================================================================== TRILL (little blue songbird, flies in flocks)
-t = Tex(64, 32)
-blue = (70, 120, 230); cyan = (110, 220, 250)
-t.box(0, 0, 4, 4, 6, blue, front=cyan)          # body 4x4x6
-t.box(0, 10, 4, 4, 4, (90, 145, 240))           # head 4x4x4
-fx, fy = Tex.front(0, 10, 4, 4, 4)
-t.d.point((fx, fy + 1), fill=(20, 20, 30, 255)); t.d.point((fx + 3, fy + 1), fill=(20, 20, 30, 255))
-t.box(20, 0, 1, 1, 2, (250, 200, 80))           # beak 1x1x2
-t.box(20, 4, 1, 3, 5, (50, 95, 200))            # wing 1x3x5
-t.box(20, 13, 2, 1, 3, (40, 80, 180))           # tail 2x1x3
-t.save("galaxysmp_trill")
-geo("trill", 64, 32, [
-    bone("root"),
-    bone("body", "root", (0, 2, 0), [cube([-2, 2, -3], [4, 4, 6], [0, 0])]),
-    bone("head", "body", (0, 6, -2), [cube([-2, 5, -5], [4, 4, 4], [0, 10])]),
-    bone("beak", "head", (0, 6, -5), [cube([-0.5, 6, -7], [1, 1, 2], [20, 0])]),
-    bone("wingl", "body", (2, 6, 0), [cube([2, 3, -2], [1, 3, 5], [20, 4])]),
-    bone("wingr", "body", (-2, 6, 0), [cube([-3, 3, -2], [1, 3, 5], [20, 4])]),
-    bone("tail", "body", (0, 4, 3), [cube([-1, 3, 3], [2, 1, 3], [20, 13])]),
-], bounds=(1, 1))
-anims("trill", {
-    "animation.galaxysmp_trill.fly": {"loop": True, "bones": {"wingl": {"rotation": [0, 0, "-math.sin(query.life_time * 1300) * 55"]},
-                                                               "wingr": {"rotation": [0, 0, "math.sin(query.life_time * 1300) * 55"]}}},
-    "animation.galaxysmp_trill.perch": {"loop": True, "bones": {"head": {"rotation": ["math.sin(query.life_time * 240) * 8", 0, 0]}}},
-})
-client("trill", {"default": "textures/entity/galaxysmp_trill"}, "trill",
-       {"fly": "animation.galaxysmp_trill.fly", "perch": "animation.galaxysmp_trill.perch"},
-       [{"fly": "!query.is_on_ground"}, {"perch": "query.is_on_ground"}], egg=("#4678e6", "#6edcfa"))
-entity("trill", {
-    **COMMON,
-    "minecraft:type_family": {"family": ["trill", "sift_wildlife", "mob"]},
-    "minecraft:collision_box": {"width": 0.4, "height": 0.5},
-    "minecraft:health": {"value": 6, "max": 6},
-    "minecraft:movement": {"value": 0.2}, "minecraft:flying_speed": {"value": 0.35},
-    "minecraft:can_fly": {}, "minecraft:movement.basic": {},
-    "minecraft:navigation.fly": {"can_path_from_air": True, "can_path_over_water": True},
-    "minecraft:damage_sensor": {"triggers": [{"cause": "fall", "deals_damage": False}]},
-    "minecraft:behavior.random_fly": {"priority": 3, "xz_dist": 10, "y_dist": 5, "y_offset": 0, "speed_multiplier": 1.0, "can_land_on_trees": True},
-    "minecraft:behavior.panic": {"priority": 1, "speed_multiplier": 1.4},
-})
-
-# ================================================================== HOSTILE SIFTERS
-def sifter_tex(name, base, accent, w, h, dp, legs=True):
-    t = Tex(64, 64)
-    t.box(0, 0, w, h, dp, base)
-    t.speckle(0, 0, w, h, dp, tuple(int(c * 0.8) for c in base) + (255,), 60, name)
-    fx, fy = Tex.front(0, 0, w, h, dp)
-    glow = accent + (255,)
-    t.d.rectangle([fx + 1, fy + 1, fx + 2, fy + 2], fill=glow); t.d.rectangle([fx + w - 3, fy + 1, fx + w - 2, fy + 2], fill=glow)
-    t.d.rectangle([fx + 1, fy + h - 2, fx + w - 2, fy + h - 1], fill=(30, 10, 15, 255))
-    for x in range(fx + 1, fx + w - 1, 2):
-        t.d.point((x, fy + h - 2), fill=(235, 230, 220, 255))     # teeth
-    return t
-
-# Baby Sifter: small biter
-t = sifter_tex("baby_sifter", (150, 60, 70), (90, 240, 230), 6, 5, 6)
-t.box(32, 0, 2, 2, 2, (110, 45, 55))
-t.box(32, 8, 1, 2, 1, (90, 240, 230))     # little glowing spike
-t.save("galaxysmp_baby_sifter")
-geo("baby_sifter", 64, 64, [
-    bone("root"),
-    bone("body", "root", (0, 2, 0), [cube([-3, 2, -3], [6, 5, 6], [0, 0])]),
-    bone("spike", "body", (0, 7, 0), [cube([-0.5, 7, -0.5], [1, 2, 1], [32, 8])]),
-    *[bone(f"leg{i}", "root", (x, 2, z), [cube([x - 1, 0, z - 1], [2, 2, 2], [32, 0])]) for i, (x, z) in enumerate([(-2, -2), (2, -2), (-2, 2), (2, 2)])],
-], bounds=(1, 1))
-
-# Bearded Sifter: tall, shoots tracking blue orbs from its beard
-t = sifter_tex("bearded_sifter", (120, 70, 110), (110, 190, 255), 8, 10, 6)
-t.box(32, 0, 7, 6, 6, (140, 85, 125))
-hx, hy = Tex.front(32, 0, 7, 6, 6)
-t.d.rectangle([hx + 1, hy + 2, hx + 2, hy + 3], fill=(110, 190, 255, 255)); t.d.rectangle([hx + 4, hy + 2, hx + 5, hy + 3], fill=(110, 190, 255, 255))
-t.box(0, 20, 2, 8, 2, (90, 50, 80))       # leg 2x8x2
-t.box(16, 20, 1, 6, 1, (80, 150, 240))    # beard tentacle 1x6x1
-t.save("galaxysmp_bearded_sifter")
-geo("bearded_sifter", 64, 64, [
-    bone("root"),
-    bone("body", "root", (0, 8, 0), [cube([-4, 8, -3], [8, 10, 6], [0, 0])]),
-    bone("head", "body", (0, 18, 0), [cube([-3.5, 18, -3], [7, 6, 6], [32, 0])]),
-    *[bone(f"beard{i}", "head", (x, 18, -3), [cube([x - 0.5, 12, -3.5], [1, 6, 1], [16, 20])]) for i, x in enumerate([-2, -0.7, 0.7, 2])],
-    bone("legl", "root", (-2, 8, 0), [cube([-3, 0, -1], [2, 8, 2], [0, 20])]),
-    bone("legr", "root", (2, 8, 0), [cube([1, 0, -1], [2, 8, 2], [0, 20])]),
-], bounds=(1.5, 2.5))
-
-# Nester: lean pouncer
-t = sifter_tex("nester", (95, 80, 65), (255, 170, 60), 10, 6, 14)
-t.box(0, 40, 6, 6, 7, (115, 95, 75))
-nx, ny = Tex.front(0, 40, 6, 6, 7)
-t.d.rectangle([nx + 1, ny + 2, nx + 1, ny + 2], fill=(255, 170, 60, 255)); t.d.rectangle([nx + 4, ny + 2, nx + 4, ny + 2], fill=(255, 170, 60, 255))
-t.box(48, 0, 3, 8, 3, (80, 65, 55))
-t.box(48, 20, 1, 3, 1, (230, 220, 200))   # spike
-t.save("galaxysmp_nester")
-geo("nester", 64, 64, [
-    bone("root"),
-    bone("body", "root", (0, 8, 0), [cube([-5, 8, -7], [10, 6, 14], [0, 0])]),
-    bone("head", "body", (0, 12, -7), [cube([-3, 9, -14], [6, 6, 7], [0, 40])]),
-    *[bone(f"spike{i}", "body", (0, 14, z), [cube([-0.5, 14, z], [1, 3, 1], [48, 20])]) for i, z in enumerate([-5, -2, 1, 4])],
-    *[bone(f"leg{i}", "root", (x, 8, z), [cube([x - 1.5, 0, z - 1.5], [3, 8, 3], [48, 0])]) for i, (x, z) in enumerate([(-3.5, -5), (3.5, -5), (-3.5, 5), (3.5, 5)])],
-], bounds=(2, 2))
-walk4 = {f"leg{i}": {"rotation": [f"{'' if i in (0, 3) else '-'}math.cos(query.modified_distance_moved * 38) * 35 * query.modified_move_speed", 0, 0]} for i in range(4)}
-anims("sifters", {
-    "animation.galaxysmp_baby_sifter.walk": {"loop": True, "bones": {**walk4, "body": {"rotation": [0, 0, "math.sin(query.life_time * 500) * 4"]}}},
-    "animation.galaxysmp_bearded_sifter.walk": {"loop": True, "bones": {
-        "legl": {"rotation": ["math.cos(query.modified_distance_moved * 38) * 30 * query.modified_move_speed", 0, 0]},
-        "legr": {"rotation": ["-math.cos(query.modified_distance_moved * 38) * 30 * query.modified_move_speed", 0, 0]},
-        **{f"beard{i}": {"rotation": [f"math.sin(query.life_time * 200 + {i * 40}) * 12", 0, 0]} for i in range(4)}}},
-    "animation.galaxysmp_nester.walk": {"loop": True, "bones": {**walk4, "head": {"rotation": ["query.target_x_rotation", "query.target_y_rotation", 0]}}},
-})
-for ident, egg in (("baby_sifter", ("#963c46", "#5af0e6")), ("bearded_sifter", ("#78466e", "#6ebeff")), ("nester", ("#5f5041", "#ffaa3c"))):
-    client(ident, {"default": f"textures/entity/galaxysmp_{ident}"}, ident, {"walk": f"animation.galaxysmp_{ident}.walk"}, ["walk"], egg=egg)
-
-hostile = {
-    **COMMON,
-    "minecraft:movement.basic": {}, "minecraft:navigation.walk": {"avoid_water": True, "can_pass_doors": True},
-    "minecraft:behavior.hurt_by_target": {"priority": 1},
-    "minecraft:behavior.nearest_attackable_target": {"priority": 2, "must_see": True, "reselect_targets": True,
-        "entity_types": [{"filters": {"any_of": [{"test": "is_family", "subject": "other", "value": "player"},
-                                                 {"test": "is_family", "subject": "other", "value": "galaxysmp_pet"}]}, "max_dist": 16}]},
-    "minecraft:behavior.random_stroll": {"priority": 6, "speed_multiplier": 0.9},
-    "minecraft:experience_reward": {"on_death": "query.last_hit_by_player ? 5 : 0"},
-    "minecraft:despawn": {"despawn_from_distance": {"min_distance": 48, "max_distance": 96}},
-}
-del hostile["minecraft:persistent"]
-entity("baby_sifter", {**hostile, "minecraft:type_family": {"family": ["sifter", "sift_hostile", "monster", "mob"]},
-                       "minecraft:collision_box": {"width": 0.5, "height": 0.55}, "minecraft:health": {"value": 10, "max": 10},
-                       "minecraft:movement": {"value": 0.33}, "minecraft:attack": {"damage": 2},
-                       "minecraft:behavior.melee_attack": {"priority": 3, "speed_multiplier": 1.3, "track_target": True},
-                       "minecraft:loot": {"table": "loot_tables/entities/galaxysmp_sifter.json"}})
-entity("bearded_sifter", {**hostile, "minecraft:type_family": {"family": ["sifter", "sift_hostile", "monster", "mob"]},
-                          "minecraft:collision_box": {"width": 0.7, "height": 1.6}, "minecraft:health": {"value": 24, "max": 24},
-                          "minecraft:movement": {"value": 0.23},
-                          "minecraft:shooter": {"def": "galaxysmp:sift_orb"},
-                          "minecraft:behavior.ranged_attack": {"priority": 3, "attack_interval_min": 2.5, "attack_interval_max": 4.0, "attack_radius": 14, "speed_multiplier": 1.0},
-                          "minecraft:loot": {"table": "loot_tables/entities/galaxysmp_sifter.json"}})
-entity("nester", {**hostile, "minecraft:type_family": {"family": ["nester", "sift_hostile", "monster", "mob"]},
-                  "minecraft:collision_box": {"width": 0.9, "height": 1.0}, "minecraft:health": {"value": 20, "max": 20},
-                  "minecraft:movement": {"value": 0.3}, "minecraft:attack": {"damage": 5},
-                  "minecraft:behavior.leap_at_target": {"priority": 3, "yd": 0.45, "must_be_on_ground": True},
-                  "minecraft:behavior.melee_attack": {"priority": 4, "speed_multiplier": 1.2, "track_target": True, "cooldown_time": 1.5},
-                  "minecraft:loot": {"table": "loot_tables/entities/galaxysmp_sifter.json"}})
-write(os.path.join(BP, "loot_tables", "entities", "galaxysmp_sifter.json"), {"pools": [
-    {"rolls": 1, "entries": [{"type": "item", "name": "minecraft:amethyst_shard", "weight": 3, "functions": [{"function": "set_count", "count": {"min": 1, "max": 2}}]},
-                             {"type": "item", "name": "minecraft:bone", "weight": 3, "functions": [{"function": "set_count", "count": {"min": 1, "max": 3}}]},
-                             {"type": "item", "name": "minecraft:glow_berries", "weight": 2}]},
-    {"rolls": 1, "conditions": [{"condition": "killed_by_player"}, {"condition": "random_chance_with_looting", "chance": 0.05, "looting_multiplier": 0.02}],
-     "entries": [{"type": "item", "name": "galaxysmp:dumpling_treat", "weight": 1}]}]})
-
-# the Sifter orb: a slow, homing blue bolt
-t = Tex(16, 16)
-t.box(0, 0, 4, 4, 4, (120, 200, 255), shade=False)
-t.save("galaxysmp_sift_orb")
-geo("sift_orb", 16, 16, [bone("root", None, (0, 2, 0), [cube([-2, 0, -2], [4, 4, 4], [0, 0])])], bounds=(0.5, 0.5))
-anims("sift_orb", {"animation.galaxysmp_sift_orb.spin": {"loop": True, "bones": {"root": {"rotation": ["query.life_time * 400", "query.life_time * 300", 0]}}}})
-client("sift_orb", {"default": "textures/entity/galaxysmp_sift_orb"}, "sift_orb", {"spin": "animation.galaxysmp_sift_orb.spin"}, ["spin"])
-entity("sift_orb", {
-    "minecraft:collision_box": {"width": 0.3, "height": 0.3},
-    "minecraft:projectile": {"on_hit": {"impact_damage": {"damage": 4, "knockback": True}, "remove_on_hit": {}},
-                             "power": 0.6, "gravity": 0.0, "inertia": 1.0, "liquid_inertia": 1.0, "uncertainty_base": 1, "uncertainty_multiplier": 0,
-                             "anchor": 1, "offset": [0, 0.5, 0], "homing": True, "reflect_on_hurt": True, "hit_sound": "bow.hit"},
-    "minecraft:physics": {}, "minecraft:pushable": {"is_pushable": False, "is_pushable_by_piston": False},
-    "minecraft:despawn": {"filters": {"test": "actor_health", "operator": "<", "value": 0}},
-}, spawnable=False)
 
 # ================================================================== PORTAL SCREEN (a picture in a portal, sized by properties)
 PICS = ["wilderness", "copper", "sift", "chaos"]
@@ -562,19 +399,14 @@ write(os.path.join(RP, "render_controllers", "portal_screen.render_controllers.j
 write(os.path.join(RP, "sounds.json"), {"entity_sounds": {"entities": {
     "galaxysmp:blub": {"volume": 0.6, "pitch": [1.5, 1.8], "events": {"ambient": "mob.rabbit.idle", "hurt": "mob.rabbit.hurt", "death": "mob.rabbit.death"}},
     "galaxysmp:dumpling": {"volume": 0.7, "pitch": [1.3, 1.6], "events": {"hurt": "mob.slime.small", "death": "mob.slime.small"}},
-    "galaxysmp:trill": {"volume": 0.5, "pitch": [1.4, 1.8], "events": {"ambient": "mob.parrot.idle", "hurt": "mob.parrot.hurt", "death": "mob.parrot.death"}},
-    "galaxysmp:seedling": {"volume": 0.4, "pitch": [1.6, 2.0], "events": {"hurt": "mob.rabbit.hurt", "death": "mob.rabbit.death"}},
-    "galaxysmp:baby_sifter": {"volume": 0.7, "pitch": [1.3, 1.5], "events": {"ambient": "mob.endermite.say", "hurt": "mob.endermite.hit", "death": "mob.endermite.kill"}},
-    "galaxysmp:bearded_sifter": {"volume": 0.8, "pitch": [0.8, 1.0], "events": {"ambient": "mob.evocation_illager.ambient", "hurt": "mob.zombie.hurt", "death": "mob.zombie.death"}},
-    "galaxysmp:nester": {"volume": 0.8, "pitch": [0.9, 1.1], "events": {"ambient": "mob.ravager.ambient", "hurt": "mob.ravager.hurt", "death": "mob.ravager.death"}},
 }}})
-NAMES = {"dumpling": "Dumpling", "blub": "Blub", "seedling": "Seedling", "trill": "Trill", "baby_sifter": "Baby Sifter",
-         "bearded_sifter": "Bearded Sifter", "nester": "Nester", "sift_orb": "Sifter Orb", "portal_screen": "Portal"}
+NAMES = {"dumpling": "Dumpling", "blub": "Blub", "portal_screen": "Portal"}
+REMOVED = ["seedling", "trill", "baby_sifter", "bearded_sifter", "nester", "sift_orb"]   # taken out (owner's choice)
 lang = os.path.join(RP, "texts", "en_US.lang")
-lines = [l for l in open(lang).read().splitlines() if not any(f"galaxysmp:{k}." in l for k in NAMES) and "dumpling_treat" not in l and "portal_axe" not in l]
+lines = [l for l in open(lang).read().splitlines() if not any(f"galaxysmp:{k}." in l for k in list(NAMES) + REMOVED) and "dumpling_treat" not in l and "portal_axe" not in l]
 for k, v in NAMES.items():
     lines.append(f"entity.galaxysmp:{k}.name={v}")
-    if k not in ("sift_orb", "portal_screen"):
+    if k != "portal_screen":
         lines.append(f"item.spawn_egg.entity.galaxysmp:{k}.name={v} Spawn Egg")
 lines += ["item.galaxysmp:dumpling_treat=Dumpling Treat", "item.galaxysmp:portal_axe=Portal Axe"]
 open(lang, "w").write("\n".join(lines) + "\n")
@@ -582,4 +414,11 @@ it = json.load(open(os.path.join(RP, "textures", "item_texture.json")))
 it["texture_data"]["galaxysmp_dumpling_treat"] = {"textures": "textures/items/galaxysmp_dumpling_treat"}
 it["texture_data"]["galaxysmp_portal_axe"] = {"textures": "textures/items/galaxysmp_portal_axe"}
 json.dump(it, open(os.path.join(RP, "textures", "item_texture.json"), "w"), indent=1)
+for k in REMOVED:
+    for f in (os.path.join(BP, "entities", f"{k}.json"), os.path.join(RP, "entity", f"{k}.entity.json"),
+              os.path.join(RP, "models", "entity", f"{k}.geo.json"), os.path.join(RP, "textures", "entity", f"galaxysmp_{k}.png"),
+              os.path.join(RP, "animations", f"{k}.animation.json"), os.path.join(RP, "animations", "sifters.animation.json"),
+              os.path.join(BP, "loot_tables", "entities", f"galaxysmp_{k}.json"), os.path.join(BP, "loot_tables", "entities", "galaxysmp_sifter.json")):
+        if os.path.exists(f):
+            os.remove(f)
 print("mobs written")

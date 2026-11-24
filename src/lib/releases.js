@@ -512,6 +512,13 @@ Your pets are yours alone: other players can't feed, ride or hurt them.`,
 
 If a trip ever can't be completed, you'll now see a message instead of nothing happening.`,
   },
+  {
+    id: "2026-11-24-new-blub",
+    title: "A brand-new look for Blubs",
+    body: `Blubs have been completely redesigned. They're now chunky blue creatures with tall bunny ears, a teal belly, a small sleepy face and four stubby feet.
+
+We've also simplified the Sift's wildlife: for now, Dumplings and Blubs are the creatures you'll find there. The Sift itself is getting a full redesign soon.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

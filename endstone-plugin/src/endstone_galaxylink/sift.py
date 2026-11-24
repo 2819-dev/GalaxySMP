@@ -2,11 +2,10 @@
 
 Bedrock add-ons can't add new dimensions, so the Sift is a big sky island (192 x 192 blocks) at x/z 50000.
 The plugin builds it once by itself (about 2 minutes, a piece at a time) with three areas:
-  Glow Meadow  - teal ground, blue flowers, fireflies and drooping teal trees (Dumplings, Blubs, Seedlings)
-  Rose Hills   - pink rock hills with blossom bushes (Blubs, Trills)
-  Bone Flats   - a pale bone desert with giant ribs and amethyst (Sifters come out here at night)
-Mobs are spawned by the plugin near players in the Sift (wild Dumplings, Blubs, Seedlings, Trills;
-Baby Sifters, Bearded Sifters and Nesters at night). An invisible wall keeps people from falling off.
+  Glow Meadow  - teal ground, blue flowers, fireflies and drooping teal trees
+  Rose Hills   - pink rock hills with blossom bushes
+  Bone Flats   - a pale bone desert with giant ribs and amethyst
+Wild Dumplings and Blubs are spawned by the plugin near players in the Sift. An invisible wall keeps people from falling off.
 
 Get there: the "The Sift" card on the Main Menu (staff add it on the website), a Sift portal (Portal Axe), or /sift.
 """
@@ -24,11 +23,11 @@ SEED = 2027
 PER_TICK = 200          # commands per tick while building
 AREA = "gsmp_sift_build"
 
-PASSIVE = {"meadow": ["galaxysmp:dumpling", "galaxysmp:dumpling", "galaxysmp:blub", "galaxysmp:seedling", "galaxysmp:trill"],
-           "hills": ["galaxysmp:blub", "galaxysmp:blub", "galaxysmp:trill", "galaxysmp:dumpling"],
-           "bones": ["galaxysmp:seedling", "galaxysmp:trill"]}
-HOSTILE = {"meadow": ["galaxysmp:baby_sifter"], "hills": ["galaxysmp:baby_sifter", "galaxysmp:nester"],
-           "bones": ["galaxysmp:bearded_sifter", "galaxysmp:nester", "galaxysmp:baby_sifter"]}
+# only Dumplings and Blubs live in the Sift (the other Sift mobs were taken out)
+PASSIVE = {"meadow": ["galaxysmp:dumpling", "galaxysmp:dumpling", "galaxysmp:blub"],
+           "hills": ["galaxysmp:blub", "galaxysmp:blub", "galaxysmp:dumpling"],
+           "bones": ["galaxysmp:blub", "galaxysmp:dumpling"]}
+HOSTILE = {}
 PASSIVE_CAP, HOSTILE_CAP = 10, 6
 
 
@@ -371,12 +370,9 @@ class Sift:
         for p in here:
             l = p.location
             near = [a for a in sift_mobs if (a.location.x - l.x) ** 2 + (a.location.z - l.z) ** 2 < 48 * 48]
-            hostile = [a for a in near if str(a.type) in ("galaxysmp:baby_sifter", "galaxysmp:bearded_sifter", "galaxysmp:nester")]
-            passive = [a for a in near if a not in hostile and str(a.type) != "galaxysmp:sift_orb"]
+            passive = [a for a in near if str(a.type) in ("galaxysmp:dumpling", "galaxysmp:blub")]
             if len(passive) < PASSIVE_CAP:
                 self.spawn_near(l, PASSIVE)
-            if night and len(hostile) < HOSTILE_CAP:
-                self.spawn_near(l, HOSTILE)
             if night:
                 for _ in range(4):
                     fx, fz = l.x + random.uniform(-10, 10), l.z + random.uniform(-10, 10)
@@ -391,7 +387,7 @@ class Sift:
                 continue
             top, _, z = c
             mob = random.choice(table[z])
-            y = top + (random.randint(6, 12) if mob == "galaxysmp:trill" else 1)
+            y = top + 1
             self.cmd(f"summon {mob} {CX + dx + 0.5} {y} {CZ + dz + 0.5}")
             return True
         return False
