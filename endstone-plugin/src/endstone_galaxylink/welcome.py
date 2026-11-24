@@ -1174,7 +1174,7 @@ class Welcome:
             if cur is not None and str(getattr(cur.type, "id", cur.type)) == MENU_ITEM:
                 return
             if cur is not None:
-                free = inv.first_empty()
+                free = inv.first_empty() if callable(inv.first_empty) else inv.first_empty
                 if free is None or free < 0:
                     return player.send_message("§7Your inventory is full, so the Menu compass wasn't added. Type §e/menu§7 any time.")
                 inv.set_item(free, cur)

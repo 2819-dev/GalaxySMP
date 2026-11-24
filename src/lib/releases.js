@@ -575,6 +575,11 @@ The bigger Sift is built in the background after the update, which takes about h
 - **Help:** send a message to staff from the menu.
 - **Social** is now in the top-right corner. Settings are coming soon.`,
   },
+  {
+    id: "2026-11-24-menu-compass-fix",
+    title: "Menu compass fix",
+    body: `- The Menu compass is now always added to the last hotbar slot, even when that slot already has an item in it (the item is moved to a free slot).`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
