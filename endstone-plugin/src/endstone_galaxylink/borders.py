@@ -16,7 +16,7 @@ import time
 AXE = "galaxysmp:border_axe"
 MAIN = "GalaxySMP"
 MAIN_HALF = 10000        # the default main world border: this far from spawn in each direction
-WARN = 6                 # blocks from the edge where the glowing border shows
+WARN = 8                 # blocks from the edge where the striped border wall shows
 PUSH = 1.5               # how far back inside someone is put
 
 
@@ -114,7 +114,7 @@ class Borders:
                     edge = self.to_edge(here, l.x, l.z)
                     if edge >= PUSH:
                         self.safe[uid] = (p.dimension.name, l.x, l.y, l.z, l.yaw, l.pitch)
-                    if edge < WARN and self.tick_n % 2 == 0:
+                    if edge < WARN:
                         self.show_edge(p, here)
                     continue
                 if self.free(p) or self.in_minigame(p):
@@ -148,32 +148,34 @@ class Borders:
                 pass
 
     def show_edge(self, p, b):
-        """A glowing wall of particles along the border near you."""
+        """A blue striped wall along the border near you (like a world border), made of flat particles from the pack."""
         from endstone_galaxylink.floating import dim_cmd
         l = p.location
-        server = self.plugin.server
-        pts = []
+        walls = []   # (x, z, particle): particle "x" is a wall along x (facing z), "z" a wall along z (facing x)
         if b.get("shape") == "circle":
             a0 = math.atan2(l.z - b["cz"], l.x - b["cx"])
-            for k in range(-3, 4):
-                a = a0 + k * 1.5 / b["r"]
-                pts.append((b["cx"] + math.cos(a) * b["r"], b["cz"] + math.sin(a) * b["r"]))
+            for k in range(-4, 5):
+                a = a0 + k * 2.0 / b["r"]
+                tx, tz = -math.sin(a), math.cos(a)   # the direction the wall runs here
+                walls.append((b["cx"] + math.cos(a) * b["r"], b["cz"] + math.sin(a) * b["r"], "x" if abs(tx) >= abs(tz) else "z"))
         else:
-            for k in range(-3, 4):
-                if l.x - b["x1"] < WARN:
-                    pts.append((b["x1"], l.z + k * 1.5))
-                if b["x2"] + 1 - l.x < WARN:
-                    pts.append((b["x2"] + 1, l.z + k * 1.5))
-                if l.z - b["z1"] < WARN:
-                    pts.append((l.x + k * 1.5, b["z1"]))
-                if b["z2"] + 1 - l.z < WARN:
-                    pts.append((l.x + k * 1.5, b["z2"] + 1))
+            span = [l.x + k * 2 for k in range(-4, 5)], [l.z + k * 2 for k in range(-4, 5)]
+            if l.x - b["x1"] < WARN:
+                walls += [(b["x1"], zz, "z") for zz in span[1] if b["z1"] <= zz <= b["z2"] + 1]
+            if b["x2"] + 1 - l.x < WARN:
+                walls += [(b["x2"] + 1, zz, "z") for zz in span[1] if b["z1"] <= zz <= b["z2"] + 1]
+            if l.z - b["z1"] < WARN:
+                walls += [(xx, b["z1"], "x") for xx in span[0] if b["x1"] <= xx <= b["x2"] + 1]
+            if b["z2"] + 1 - l.z < WARN:
+                walls += [(xx, b["z2"] + 1, "x") for xx in span[0] if b["x1"] <= xx <= b["x2"] + 1]
         where = dim_cmd(p.dimension.name)
-        for x, z in pts:
-            for dy in (0.2, 1.2, 2.2):
+        server = self.plugin.server
+        base = math.floor(l.y)
+        for x, z, kind in walls:
+            for dy in (-1, 1, 3, 5):
                 try:
                     server.dispatch_command(server.command_sender,
-                                            f"execute in {where} run particle minecraft:blue_flame_particle {x:.2f} {l.y + dy:.2f} {z:.2f}")
+                                            f"execute in {where} run particle galaxysmp:border_{kind} {x:.2f} {base + dy} {z:.2f}")
                 except Exception:
                     pass
 
@@ -273,18 +275,45 @@ class Borders:
         return (b["x1"] + b["x2"]) // 2, (b["z1"] + b["z2"]) // 2
 
     def teleport(self, p, b):
-        """Takes you to the middle of a border, standing on the ground."""
+        """Takes you to the middle of a border: up high first (so the land loads), then down onto the ground."""
         sift = getattr(self.plugin, "sift", None)
         if b["server"] == "The Sift" and sift is not None and sift.built():
             sift.go(p)
             return
+        from endstone.level import Location
         x, z = self.center(b)
+        name = {"overworld": "Overworld", "nether": "Nether", "the_end": "TheEnd"}.get(b["dim"], "Overworld")
+        level = self.plugin.server.level
+        dim = level.get_dimension(name) or next((d for d in level.dimensions if dim_key(d.name) == b["dim"]), None)
+        if dim is None:
+            p.send_message("§cThat border's world isn't available.")
+            return
+        high = 100 if b["dim"] == "nether" else 200
+        try:
+            p.teleport(Location(dim, x + 0.5, high, z + 0.5, 0.0, 0.0))
+        except Exception as e:
+            p.send_message(f"§cCouldn't teleport: {e}")
+            return
         server = self.plugin.server
-        where = {"overworld": "overworld", "nether": "nether", "the_end": "the_end"}.get(b["dim"], "overworld")
-        name = p.name.replace('"', "")
-        # spreadplayers loads the land and puts you on top of it
-        server.dispatch_command(server.command_sender, f'execute in {where} run spreadplayers {x} {z} 0 1 "{name}"')
-        p.send_message(f"§bTeleported to §f{self.label(b)}§b.")
+        pname = p.name.replace('"', "")
+        server.dispatch_command(server.command_sender, f'effect "{pname}" slow_falling 15 0 true')
+        p.send_message(f"§bTeleporting to §f{self.label(b)}§b...")
+        from endstone_galaxylink.safety import later
+
+        def land(pl, tries=0):
+            try:
+                y = pl.dimension.get_highest_block_y_at(int(x), int(z))
+            except Exception:
+                y = None
+            if (y is None or y < -60) and tries < 5:   # the land isn't loaded yet: try again in a second
+                return later(self.plugin, pl, lambda q: land(q, tries + 1), 20)
+            if y is not None and y > -60 and (b["dim"] != "nether" or y < 120):
+                try:
+                    pl.teleport(Location(pl.dimension, x + 0.5, y + 1, z + 0.5, 0.0, 0.0))
+                except Exception:
+                    pass
+            server.dispatch_command(server.command_sender, f'effect "{pname}" slow_falling 0')
+        later(self.plugin, p, land, 30)
 
     def menu(self, p):
         from endstone.form import ActionForm

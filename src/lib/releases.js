@@ -539,6 +539,12 @@ We've also simplified the Sift's wildlife: for now, Dumplings and Blubs are the 
 
 Staff can also now name world borders and teleport to them.`,
   },
+  {
+    id: "2026-11-24-borders-visible-join-list",
+    title: "Visible world borders and one-tap joining",
+    body: `- **See the border:** a blue striped wall now appears when you get close to the edge of a world.
+- **One-tap joining:** tap any server in the Featured Servers list to join it right away.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

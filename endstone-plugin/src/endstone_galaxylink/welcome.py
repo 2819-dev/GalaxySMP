@@ -501,11 +501,9 @@ class Welcome:
         if s.get("action") != "soon":
             form.add_button(f"§a§l» Join {s['name']}§r\n§7Tap to play", icon=image_of(s), on_click=lambda p, i=sel: self.join(p, i))
         for i, v in enumerate(servers):
-            mark = "§q§s" if i == sel else ""
-            status = "§eComing soon" if v.get("action") == "soon" else f"§a● §7{self.players_on(v)} playing"
-            if i == sel and v.get("action") != "soon":
-                status += "  §e» Tap to join"
-            form.add_button(f"{mark}§l{v['name']}§r\n{status}", icon=image_of(v), on_click=lambda p, i=i: self.select(p, i))
+            # one tap joins (the same kind of button as the Join button above, which works on every device)
+            status = "§eComing soon" if v.get("action") == "soon" else f"§a● §7{self.players_on(v)} playing  §e» Tap to join"
+            form.add_button(f"§l{v['name']}§r\n{status}", icon=image_of(v), on_click=lambda p, i=i: self.join(p, i))
         self.send(player, form)
 
     def select(self, player, i):

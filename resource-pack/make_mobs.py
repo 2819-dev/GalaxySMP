@@ -387,6 +387,26 @@ d.polygon([(9, 1), (14, 2), (15, 6), (12, 7), (9, 4)], fill=(40, 150, 230, 255))
 d.line([(10, 2), (14, 3)], fill=(150, 240, 255, 255)); d.point((13, 5), fill=(255, 255, 255, 255))
 im.save(os.path.join(RP, "textures", "items", "galaxysmp_border_axe.png"))
 
+# the world border wall: flat blue striped squares (2 x 2 blocks), one kind facing z (a wall along x), one facing x
+im = Image.new("RGBA", (32, 32), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+for k in range(-32, 64, 8):
+    d.polygon([(k, 32), (k + 4, 32), (k + 36, 0), (k + 32, 0)], fill=(70, 160, 255, 170))
+d.rectangle([0, 0, 31, 31], outline=None)
+os.makedirs(os.path.join(RP, "textures", "particle"), exist_ok=True)
+im.save(os.path.join(RP, "textures", "particle", "galaxysmp_border.png"))
+for kind, facing in (("x", "emitter_transform_xy"), ("z", "emitter_transform_yz")):
+    write(os.path.join(RP, "particles", f"galaxysmp_border_{kind}.json"), {"format_version": "1.10.0", "particle_effect": {
+        "description": {"identifier": f"galaxysmp:border_{kind}",
+                        "basic_render_parameters": {"material": "particles_blend", "texture": "textures/particle/galaxysmp_border"}},
+        "components": {
+            "minecraft:emitter_rate_instant": {"num_particles": 1},
+            "minecraft:emitter_lifetime_once": {"active_time": 0.05},
+            "minecraft:emitter_shape_point": {},
+            "minecraft:particle_lifetime_expression": {"max_lifetime": 0.5},
+            "minecraft:particle_appearance_billboard": {"size": [1.0, 1.0], "facing_camera_mode": facing,
+                                                        "uv": {"texture_width": 32, "texture_height": 32, "uv": [0, 0], "uv_size": [32, 32]}},
+            "minecraft:particle_appearance_tinting": {"color": [1, 1, 1, "math.clamp(math.sin(variable.particle_age / variable.particle_lifetime * 180) * 1.4, 0, 1)"]}}}})
+
 # the Sift's teal sky (the plugin turns this fog on while you're in the Sift)
 write(os.path.join(RP, "fogs", "galaxysmp_sift.json"), {"format_version": "1.16.100", "minecraft:fog_settings": {
     "description": {"identifier": "galaxysmp:sift"},
