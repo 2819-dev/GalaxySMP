@@ -617,6 +617,12 @@ The bigger Sift is built in the background after the update, which takes about h
 - **13 new staff icons** for ranks: Ban Hammer, Gavel, Knight Helmet, Sheriff Badge, Siren, Handcuffs, Ban Sign, Scales of Justice, Padlock, Wrench, Headset, Megaphone and Verified Shield.
 - They show in chat, on rank badges in game and on the website.`,
   },
+  {
+    id: "2026-11-24-meet-the-team-ranks",
+    title: "#Meet The Team follows our ranks",
+    body: `- **#Meet The Team** is now organized by rank, in the same order as our rank list: Ownership first, then Admins, then Moderators.
+- Each rank has its own heading with its badge and how many members it has.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

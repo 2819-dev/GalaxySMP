@@ -69,8 +69,14 @@ export async function listTeam(request, env) {
       head: headUrlFor(u), bio: u.team_bio || "", inGame: Boolean(u.in_game), since: u.created_at,
       profile: u.gamertag ? `/player/${encodeURIComponent(u.gamertag)}` : null,
       canEdit: Number(u.id) === Number(me.id) || meOwner, isMe: Number(u.id) === Number(me.id),
+      // grouped and ordered like the Ranks page (Control Panel > Ranks): the owner, then each rank in that order
+      group: u.rank_name || (owner ? "Owner" : "Staff"), groupRank: rankOf(u),
+      order: [owner ? 0 : 1, u.rank_priority ?? 1e9, u.rank_position ?? 1e9, new Date(u.created_at).getTime()],
     };
-  }).sort((a, b) => Number(b.owner) - Number(a.owner) || b.power - a.power).map(({ power, ...m }) => m);
+  }).sort((a, b) => {
+    for (let i = 0; i < 4; i++) if (a.order[i] !== b.order[i]) return a.order[i] - b.order[i];
+    return 0;
+  }).map(({ power, order, ...m }) => m);
   return json({ ok: true, team });
 }
 

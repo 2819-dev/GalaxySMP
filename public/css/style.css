@@ -4816,3 +4816,7 @@ html[data-theme="light"] .mk-balance { color: rgb(160,110,8); }
 .pp-pet { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2, rgba(255,255,255,.04)); min-width: 0; }
 .pp-pet b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pp-pet-ic { font-size: 24px; line-height: 1; flex: none; }
+
+/* #Meet The Team: one section per rank, in rank order */
+.tm-groups { display: flex; flex-direction: column; gap: 22px; }
+.tm-group-h { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 1rem; }

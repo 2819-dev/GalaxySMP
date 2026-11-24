@@ -14,7 +14,7 @@ const face = (src, name, size) => {
 
 // ---------- Meet The Team ----------
 export function renderTeam(root, { toast }) {
-  const grid = h("div", { class: "tm-grid" });
+  const grid = h("div", { class: "tm-groups" });
   root.append(h("div", { class: "cp-wrap tm-wrap" },
     h("div", { class: "tl-intro" }, h("h2", { text: "Meet The Team" }),
       h("p", { class: "text-3" }, "The people who run GalaxySMP. Want to join them? ", h("a", { href: "/community#applications", text: "Apply in #applications" }), ".")),
@@ -22,7 +22,19 @@ export function renderTeam(root, { toast }) {
   async function load() {
     let d;
     try { d = await getJson("/api/team"); } catch (e) { grid.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
-    grid.replaceChildren(...d.team.map((m) => {
+    // one section per rank, in the same order as the Ranks page (the owner first)
+    const groups = [];
+    for (const m of d.team) {
+      if (!groups.length || groups[groups.length - 1].name !== m.group) groups.push({ name: m.group, rank: m.groupRank, members: [] });
+      groups[groups.length - 1].members.push(m);
+    }
+    grid.replaceChildren(...groups.map((g) => h("section", { class: "tm-group" },
+      h("h3", { class: "tm-group-h" }, g.rank ? rankTag(g.rank) : h("span", { text: g.name }),
+        h("span", { class: "text-3 small", text: ` ${g.members.length} ${g.members.length === 1 ? "member" : "members"}` })),
+      h("div", { class: "tm-grid" }, ...g.members.map(card)))));
+  }
+  function card(m) {
+    {
       const bio = h("p", { class: `tm-bio${m.bio ? "" : " empty"}`, text: m.bio || (m.isMe ? "Add a short bio so players get to know you." : "No bio yet.") });
       const actions = h("div", { class: "tm-actions" });
       if (!m.isMe) actions.append(h("a", { class: "btn btn-primary btn-sm", href: `/community#dm-${m.id}` }, iconEl("message"), "Message"));
@@ -33,7 +45,7 @@ export function renderTeam(root, { toast }) {
         h("div", { class: "tm-top" }, h("div", { class: `tm-pic${m.inGame ? " on" : ""}` }, face(m.head, m.name, 72)),
           h("div", {}, h("h3", { class: "tm-name", text: m.name }), role, m.inGame ? h("span", { class: "tm-online", text: "Playing now" }) : null)),
         bio, actions);
-    }));
+    }
   }
   function editBio(m) {
     const box = h("textarea", { class: "input", id: "tm-bio", rows: 5, maxlength: 400, placeholder: "e.g. I've been playing Minecraft since 2015. I love redstone and helping new players. Ask me anything!" });
