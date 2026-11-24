@@ -550,6 +550,11 @@ Staff can also now name world borders and teleport to them.`,
     title: "Smoother server while the Sift is built",
     body: `The Sift is now built in the background more gently, so the server stays smooth and responsive while it's being made. It takes about 10 minutes after a restart.`,
   },
+  {
+    id: "2026-11-24-party-command-fix",
+    title: "/party works again",
+    body: `We fixed a problem that stopped the **/party** command from working in game. You can use **/party invite <player>**, **/party accept** and **/party leave** again, as well as **/p <message>** for party chat.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

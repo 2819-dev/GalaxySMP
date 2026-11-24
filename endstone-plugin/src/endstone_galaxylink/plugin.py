@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.79.3"
+VERSION = "2.79.4"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -94,11 +94,11 @@ class GalaxyLink(Plugin):
                           "galaxylink.command.takemoney"),
         "shopnpc": _cmd("Summon a shop NPC where you stand (tap it to edit it). /shopnpc fix puts back missing NPCs near you.", "/shopnpc [action: message]", "galaxylink.command.shopnpc"),
         "guide": _cmd("Help: server info, rules and commands. Command blocks: guide @p", "/guide [player: player]", "galaxylink.command.guide"),
-        "party": _cmd("Your party: invite players, accept an invite, or leave. Party chat: /p <message>.", "/party [accept|leave|invite <player>]", "galaxylink.command.party"),
+        "party": _cmd("Your party: invite players, accept an invite, or leave. Party chat: /p <message>.", "/party [action: message]", "galaxylink.command.party"),
         "p": _cmd("Party chat.", "/p <message: message>", "galaxylink.command.party", ["pc"]),
         "sift": _cmd("Staff: go to the Sift, or build it (/sift build, /sift status).", "/sift [build|status]", "galaxylink.command.sift"),
         "border": _cmd("World borders: a menu of them, teleport to one, get the Border Axe, or reset.", "/border [tp|list|axe|reset] [name: message]", "galaxylink.command.border"),
-        "portal": _cmd("Picture portals: get the Portal Axe, list or remove portals.", "/portal [axe|list|remove <id>]", "galaxylink.command.portal"),
+        "portal": _cmd("Picture portals: get the Portal Axe, list or remove portals.", "/portal [action: message]", "galaxylink.command.portal"),
         "menu": _cmd("The GalaxySMP Main Menu: Featured Servers, How to Play, Rules, What's New and Store.", "/menu", "galaxylink.command.menu", ["mainmenu", "hub"]),
         "tpa": _cmd("Ask to teleport to a player.", "/tpa <player: player>", "galaxylink.command.tpa"),
         "tpahere": _cmd("Ask a player to teleport to you.", "/tpahere <player: player>", "galaxylink.command.tpahere"),
@@ -758,6 +758,7 @@ class GalaxyLink(Plugin):
         self.moderation.on_command(event)  # muted players can't /msg or /me
 
     def _party(self, sender, args):
+        args = " ".join(args).split()   # "/party invite Steve" arrives as one piece of text
         sub = (args[0].lower() if args else "")
         if sub == "accept":
             return self.social.accept(sender)
@@ -921,7 +922,7 @@ class GalaxyLink(Plugin):
             "guide": lambda: self._guide(sender, args),
             "menu": lambda: self.welcome.open_menu(sender),
             "sift": lambda: self.sift.command(sender, args),
-            "portal": lambda: self.portals.command(sender, args),
+            "portal": lambda: self.portals.command(sender, " ".join(args).split()),
             "border": lambda: self.borders.command(sender, args),
             "party": lambda: self._party(sender, args),
             "p": lambda: self.social.party_chat(sender, " ".join(args).strip()) if args else sender.send_message("§eUsage: /p <message>"),
