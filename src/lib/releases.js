@@ -580,6 +580,12 @@ The bigger Sift is built in the background after the update, which takes about h
     title: "Menu compass fix",
     body: `- The Menu compass is now always added to the last hotbar slot, even when that slot already has an item in it (the item is moved to a free slot).`,
   },
+  {
+    id: "2026-11-24-activity-cards",
+    title: "Activity cards on the Servers screen",
+    body: `- **Picture cards:** in **Play > Servers**, each server's activities now show as big cards with a picture, a name, a subtitle and a short description.
+- GalaxySMP shows Survival, Plots, Jobs & Shops and Minigames. The Sift shows Adventure and Pets.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

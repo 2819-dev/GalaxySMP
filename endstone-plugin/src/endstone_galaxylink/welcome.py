@@ -80,6 +80,30 @@ def activity_icon(name):
     return next((ic for key, ic in ACTIVITY_ICONS if key in n), "")
 
 
+ACT_PICS = ("survival", "pvp", "bedwars", "build", "event", "parkour", "plots", "shop", "pets", "adventure")
+ACT_GUESS = [("surviv", "survival"), ("pvp", "pvp"), ("fight", "pvp"), ("combat", "pvp"), ("bedwar", "bedwars"), ("minigame", "bedwars"),
+             ("build", "build"), ("creative", "build"), ("event", "event"), ("parkour", "parkour"), ("plot", "plots"), ("job", "shop"),
+             ("econom", "shop"), ("shop", "shop"), ("trad", "shop"), ("pet", "pets"), ("mob", "pets"), ("adventure", "adventure"), ("explor", "adventure")]
+
+
+def activities_of(server):
+    """A server's activities: [{title, subtitle, text, pic}]. Older settings only have "tags" (Survival · Plots), so
+    those become activities with a matching picture."""
+    acts = [a for a in (server.get("activities") or []) if isinstance(a, dict) and str(a.get("title") or "").strip()]
+    if not acts:
+        for t in [x.strip() for x in re.split(r"[·,|/]", server.get("tags") or "") if x.strip()]:
+            n = t.lower()
+            acts.append({"title": t, "pic": next((pic for key, pic in ACT_GUESS if key in n), "event")})
+    return acts[:6]
+
+
+def activity_pic(a):
+    pic = str(a.get("pic") or "")
+    if pic.startswith("https://"):
+        return pic
+    return f"textures/ui/gsmp_act_{pic if pic in ACT_PICS else 'event'}"
+
+
 def ping_icon(ms):
     return PING[0 if ms < 80 else 1 if ms < 150 else 2 if ms < 250 else 3]
 
@@ -502,10 +526,9 @@ class Welcome:
         return f"{ping_icon(ms)} §f{ms}ms   {PLAYERS} §f{n} §7{'player' if n == 1 else 'players'}"
 
     def details(self, s):
-        lines = [f"§l§f{s['name']}§r", f"§7{s.get('description') or ''}"]
-        acts = [a.strip() for a in re.split(r"[·,|/]", s.get("tags") or "") if a.strip()]
-        if acts:
-            lines += ["", "§fActivities"] + [f"{activity_icon(a)} §b{a}" for a in acts]
+        lines = ["§l§fDescription§r", f"§7{s.get('description') or ''}"]
+        if activities_of(s):
+            lines += ["", "§l§fActivities§r"]   # the picture cards follow (activity buttons, see show_play)
         return "\n".join(lines)
 
     # ---------- Play: Homes / Warps / Servers ----------
@@ -573,6 +596,7 @@ class Welcome:
         # what's shown on the right: picture, strip, name, green button, small buttons, description
         view = {"pic": bg, "strip": "", "name": "", "go": None, "go_text": "", "acts": [], "text": ""}
         items = []   # (button text, icon, on_click)
+        extra = []   # after the list: activity cards
         if tab == 0:
             items.append(("§l+ Set a home here§r\n§7" + (f"{len(homes)}/{limit} homes" if homes else "Save this spot"), "textures/ui/gsmp_icon_add",
                           lambda p: self.home_name_form(p)))
@@ -647,6 +671,13 @@ class Welcome:
             soon = s.get("action") == "soon"
             view.update(pic=image_of(s), strip=self.stats_line(player, s), name=f"§l{s['name']}", go_text="SOON" if soon else "PLAY",
                         go=(lambda p, i=sel: self.join(p, i)), text=self.details(s))
+            for a in activities_of(s):   # big picture cards under the description (hidden from the list)
+                lines = [f"§j§v§l§f{a['title']}§r"]
+                if a.get("subtitle"):
+                    lines.append(f"§7{a['subtitle']}")
+                if a.get("text"):
+                    lines.append(f"§f{a['text']}")
+                extra.append(("\n".join(lines), activity_pic(a), lambda p: self.show(p)))
         form = ActionForm(title=f"{SERVERS}{self.codes(st)}§lPlay", content=view["text"])
         for i, label in enumerate(tabs):
             form.add_button(f"§j§t{'§q§s' if i == tab else ''}§f{label}", on_click=lambda p, i=i: self.go(p, "play", i))
@@ -661,7 +692,7 @@ class Welcome:
                 form.add_button("§j§a", icon=acts[k][0], on_click=acts[k][1])
             else:
                 form.add_button(self.HIDE, on_click=lambda p: self.show(p))
-        for text, icon, click in items:
+        for text, icon, click in items + extra:
             if icon:
                 form.add_button(text, icon=icon, on_click=click)
             else:

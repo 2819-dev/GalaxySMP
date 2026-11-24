@@ -990,6 +990,8 @@ async function loadWelcome() {
 }
 
 const SERVER_PICS = [["galaxysmp", "Wilderness Bound"], ["event", "Chaos Cubed"], ["bedwars", "Chaos Cubed (close-up)"], ["build", "Copper Age"], ["parkour", "The Sift"]];
+const ACTIVITY_PICS = [["survival", "Survival (pickaxe)"], ["pvp", "PvP (sword)"], ["bedwars", "Bedwars (bed)"], ["build", "Building (bricks)"],
+  ["event", "Event (star)"], ["parkour", "Parkour (boot)"], ["plots", "Plots (house)"], ["shop", "Shops & jobs (coin)"], ["pets", "Pets (paw)"], ["adventure", "Adventure (map)"]];
 const JOIN_BLOCKS = [["grass", "Grass"], ["diamond", "Diamond"], ["gold", "Gold"], ["emerald", "Emerald"], ["netherite", "Netherite"], ["amethyst", "Amethyst"],
   ["lava", "Lava"], ["ice", "Ice"], ["galaxy", "Galaxy"], ["ender", "Ender"], ["rainbow", "Rainbow"]];
 const SERVER_ACTIONS = [["play", "Play (main server)"], ["spawn", "Go to spawn"], ["warp", "Go to a warp"], ["minigames", "Open the Minigame Center"], ["sift", "Go to the Sift"], ["soon", "Coming soon"]];
@@ -999,6 +1001,33 @@ function welcomeSelect(options, value, onChange) {
   el.value = value;
   el.addEventListener("change", () => { onChange(el.value); welcomeChanged(); renderWelcome(); });
   return el;
+}
+
+// Activities: big picture cards under the server's description in the Main Menu (picture, name, subtitle, text)
+function renderActivities(v) {
+  v.activities ||= [];
+  const box = h("div", { class: "stack", style: "gap:8px" }, h("div", { class: "small text-3" }, "Activities (picture cards under the description, up to 6)"));
+  v.activities.forEach((a, k) => {
+    const custom = !ACTIVITY_PICS.some(([key]) => key === a.pic);
+    const preview = h("img", { class: "act-pic", alt: "", width: 48, height: 48, style: "image-rendering:pixelated;border-radius:6px;flex:none",
+      src: custom ? a.pic : `/img/activities/${a.pic || "event"}.png` });
+    box.append(h("div", { class: "help-block", style: "padding:10px" },
+      h("div", { class: "srv-row" }, preview,
+        h("div", { class: "stack", style: "gap:6px;flex:1;min-width:0" },
+          h("label", { class: "small text-3" }, "Name", welcomeInput(a.title, { maxlength: 32, placeholder: "e.g. SkyWars" }, (x) => { a.title = x; })),
+          h("label", { class: "small text-3" }, "Subtitle", welcomeInput(a.subtitle || "", { maxlength: 48, placeholder: "e.g. Strike it lucky!" }, (x) => { a.subtitle = x; })))),
+      h("label", { class: "small text-3" }, "Text", welcomeInput(a.text || "", { maxlength: 140, rows: 2 }, (x) => { a.text = x; })),
+      h("label", { class: "small text-3" }, "Picture",
+        welcomeSelect([...ACTIVITY_PICS, ["custom", "My own picture (link)"]], custom ? "custom" : a.pic, (x) => { a.pic = x === "custom" ? "https://" : x; })),
+      custom ? h("label", { class: "small text-3" }, "Picture link (https://..., a square picture works best)", welcomeInput(a.pic, { maxlength: 300 }, (x) => { a.pic = x; preview.src = x; })) : null,
+      h("div", { class: "row-actions" },
+        h("button", { class: "btn btn-ghost btn-sm", type: "button", "aria-label": "Move up", text: "↑", disabled: k === 0,
+          onclick: () => { [v.activities[k - 1], v.activities[k]] = [v.activities[k], v.activities[k - 1]]; welcomeChanged(); renderWelcome(); } }),
+        h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: () => { v.activities.splice(k, 1); welcomeChanged(); renderWelcome(); } }))));
+  });
+  box.append(h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "+ Add activity", disabled: v.activities.length >= 6,
+    onclick: () => { v.activities.push({ title: "New activity", subtitle: "", text: "", pic: "event" }); welcomeChanged(); renderWelcome(); } }));
+  return box;
 }
 
 function renderServers() {
@@ -1014,7 +1043,7 @@ function renderServers() {
         h("div", { class: "stack", style: "gap:6px;flex:1;min-width:0" },
           h("label", { class: "small text-3" }, "Name", welcomeInput(v.name, { maxlength: 32 }, (x) => { v.name = x; })),
           h("label", { class: "small text-3" }, "Description", welcomeInput(v.description, { maxlength: 90 }, (x) => { v.description = x; })))),
-      h("label", { class: "small text-3" }, "Activities (shown in blue, e.g. Survival · Plots)", welcomeInput(v.tags, { maxlength: 50 }, (x) => { v.tags = x; })),
+      renderActivities(v),
       h("label", { class: "small text-3" }, "Picture",
         welcomeSelect([...SERVER_PICS, ["custom", "My own picture (link)"]], custom ? "custom" : v.image, (x) => { v.image = x === "custom" ? "https://" : x; })),
       custom ? h("label", { class: "small text-3" }, "Picture link (https://..., a wide picture works best)", welcomeInput(v.image, { maxlength: 300 }, (x) => { v.image = x; preview.src = x; })) : null,
@@ -1059,7 +1088,7 @@ function renderWelcome() {
 }
 
 $("welcome-enabled").addEventListener("change", () => { welcomeData.enabled = $("welcome-enabled").checked; welcomeChanged(); });
-$("welcome-add-server").addEventListener("click", () => { welcomeData.servers.push({ name: "New Event", description: "", tags: "Event", image: "event", action: "soon", warp: "", enabled: true, anim: "galaxy", odds: false, joinName: "" }); welcomeChanged(); renderWelcome(); });
+$("welcome-add-server").addEventListener("click", () => { welcomeData.servers.push({ name: "New Event", description: "", tags: "", activities: [{ title: "Event", subtitle: "", text: "", pic: "event" }], image: "event", action: "soon", warp: "", enabled: true, anim: "galaxy", odds: false, joinName: "" }); welcomeChanged(); renderWelcome(); });
 $("welcome-add-tab").addEventListener("click", () => { welcomeData.tabs.push({ title: "New tab", text: "" }); welcomeChanged(); renderWelcome(); });
 $("welcome-save").addEventListener("click", async () => {
   $("welcome-save").disabled = true;

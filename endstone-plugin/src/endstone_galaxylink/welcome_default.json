@@ -11,7 +11,33 @@
    "warp": "",
    "anim": "grass",
    "odds": true,
-   "joinName": "GalaxySMP"
+   "joinName": "GalaxySMP",
+   "activities": [
+    {
+     "title": "Survival",
+     "subtitle": "Build your story",
+     "text": "Explore, mine and build with friends in a friendly survival world.",
+     "pic": "survival"
+    },
+    {
+     "title": "Plots",
+     "subtitle": "A place of your own",
+     "text": "Claim a protected plot near spawn, upgrade it, and sell or rent it out.",
+     "pic": "plots"
+    },
+    {
+     "title": "Jobs & Shops",
+     "subtitle": "Earn and trade",
+     "text": "Get paid for your job, run a shop and trade on the Auction House.",
+     "pic": "shop"
+    },
+    {
+     "title": "Minigames",
+     "subtitle": "Play together",
+     "text": "Bedwars, parkour courses and build contests with the community.",
+     "pic": "bedwars"
+    }
+   ]
   },
   {
    "name": "The Sift",
@@ -22,7 +48,21 @@
    "warp": "",
    "anim": "amethyst",
    "odds": false,
-   "joinName": "The Sift"
+   "joinName": "The Sift",
+   "activities": [
+    {
+     "title": "Adventure",
+     "subtitle": "A land far away",
+     "text": "Explore pink meadows, red rock pillars and white weeping trees.",
+     "pic": "adventure"
+    },
+    {
+     "title": "Pets",
+     "subtitle": "Tame and name them",
+     "text": "Find Dumplings and Blubs, tame them with treats and give them names.",
+     "pic": "pets"
+    }
+   ]
   }
  ],
  "tabs": [

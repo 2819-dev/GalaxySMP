@@ -2849,7 +2849,7 @@
                      "100%"
                     ],
                     "$show_background": false,
-                    "$scrolling_content": "server_form.gsmp_text",
+                    "$scrolling_content": "server_form.gsmp_detail_content",
                     "$scroll_size": [
                      4,
                      "100% - 4px"
@@ -3916,6 +3916,167 @@
     "pressed@server_form.gsmp_slot_icon_face": {
      "$face_texture": "textures/ui/gsmp_button_pressed"
     }
+   }
+  ]
+ },
+ "gsmp_activity_card": {
+  "type": "panel",
+  "size": [
+   "100%",
+   74
+  ],
+  "bindings": [
+   {
+    "binding_name": "#form_button_text",
+    "binding_type": "collection",
+    "binding_collection_name": "form_buttons"
+   },
+   {
+    "binding_type": "view",
+    "source_property_name": "(not ((#form_button_text - '§j§v') = #form_button_text))",
+    "target_property_name": "#visible"
+   }
+  ],
+  "controls": [
+   {
+    "row": {
+     "type": "stack_panel",
+     "orientation": "horizontal",
+     "size": [
+      "100% - 6px",
+      66
+     ],
+     "anchor_from": "top_left",
+     "anchor_to": "top_left",
+     "offset": [
+      3,
+      4
+     ],
+     "controls": [
+      {
+       "frame": {
+        "type": "image",
+        "texture": "textures/ui/Black",
+        "alpha": 0.55,
+        "size": [
+         66,
+         66
+        ],
+        "controls": [
+         {
+          "picture": {
+           "type": "image",
+           "size": [
+            64,
+            64
+           ],
+           "bilinear": false,
+           "layer": 1,
+           "anchor_from": "center",
+           "anchor_to": "center",
+           "bindings": [
+            {
+             "binding_name": "#form_button_texture",
+             "binding_name_override": "#texture",
+             "binding_type": "collection",
+             "binding_collection_name": "form_buttons"
+            },
+            {
+             "binding_name": "#form_button_texture_file_system",
+             "binding_name_override": "#texture_file_system",
+             "binding_type": "collection",
+             "binding_collection_name": "form_buttons"
+            }
+           ]
+          }
+         }
+        ]
+       }
+      },
+      {
+       "gap": {
+        "type": "panel",
+        "size": [
+         8,
+         "100%"
+        ]
+       }
+      },
+      {
+       "text": {
+        "type": "panel",
+        "size": [
+         "fill",
+         "100%"
+        ],
+        "controls": [
+         {
+          "label": {
+           "type": "label",
+           "text": "#form_button_text",
+           "shadow": true,
+           "color": [
+            1,
+            1,
+            1
+           ],
+           "size": [
+            "100%",
+            "default"
+           ],
+           "anchor_from": "top_left",
+           "anchor_to": "top_left",
+           "bindings": [
+            {
+             "binding_name": "#form_button_text",
+             "binding_type": "collection",
+             "binding_collection_name": "form_buttons"
+            }
+           ]
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "gsmp_activity_cards": {
+  "type": "stack_panel",
+  "orientation": "vertical",
+  "size": [
+   "100%",
+   "100%c"
+  ],
+  "factory": {
+   "name": "buttons",
+   "control_ids": {
+    "button": "@server_form.gsmp_activity_card"
+   }
+  },
+  "collection_name": "form_buttons",
+  "bindings": [
+   {
+    "binding_name": "#form_button_contents",
+    "binding_name_override": "#collection_length"
+   }
+  ]
+ },
+ "gsmp_detail_content": {
+  "type": "stack_panel",
+  "orientation": "vertical",
+  "size": [
+   "100%",
+   "100%c"
+  ],
+  "controls": [
+   {
+    "text@server_form.gsmp_text": {}
+   },
+   {
+    "cards@server_form.gsmp_activity_cards": {}
    }
   ]
  }

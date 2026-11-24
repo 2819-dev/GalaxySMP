@@ -85,11 +85,20 @@ export async function loadWelcome(sql) {
     if (sift && Array.isArray(v.servers) && v.servers.length < 10 && !v.servers.some((s) => s.action === "sift")) v.servers = [...v.servers, sift];
     v.siftCard = true;
   }
+  if (rows[0] && !rows[0].value.activityCards && Array.isArray(rows[0].value.servers)) {
+    // Activity picture cards arrived after this Main Menu was saved: give the built-in servers their ready-made activities once
+    for (const sv of rows[0].value.servers) {
+      const def = DEFAULT_WELCOME.servers.find((d) => d.name === sv.name || (d.action === "sift" && sv.action === "sift"));
+      if (def?.activities && !(sv.activities || []).length) sv.activities = def.activities;
+    }
+    rows[0].value.activityCards = true;
+  }
   return rows[0] ? { welcome: { ...DEFAULT_WELCOME, ...rows[0].value }, custom: true, updated: { at: rows[0].updated_at, by: rows[0].updated_by } } : { welcome: DEFAULT_WELCOME, custom: false, updated: null };
 }
 
 const SERVER_IMAGES = ["galaxysmp", "event", "bedwars", "parkour", "build"];
 const SERVER_ACTIONS = ["play", "spawn", "warp", "minigames", "sift", "soon"];
+const ACTIVITY_PICS = ["survival", "pvp", "bedwars", "build", "event", "parkour", "plots", "shop", "pets", "adventure"];
 const JOIN_BLOCKS = ["grass", "diamond", "gold", "emerald", "netherite", "amethyst", "lava", "ice", "galaxy", "ender", "rainbow"];
 
 function validWelcome(body) {
@@ -110,12 +119,19 @@ function validWelcome(body) {
     const action = SERVER_ACTIONS.includes(v?.action) ? v.action : "play";
     const warp = clean(v?.warp, 16);
     if (action === "warp" && !/^[A-Za-z0-9_-]{3,16}$/.test(warp)) throw new HttpError(400, `Server ${i + 1}: type the name of the warp it sends players to.`);
-    return { name, description: clean(v?.description, 90), tags: clean(v?.tags, 60), image, action, warp: action === "warp" ? warp : "", enabled: v?.enabled !== false,
+    const activities = (Array.isArray(v?.activities) ? v.activities : []).slice(0, 6).map((a, k) => {
+      const title = clean(a?.title, 32);
+      if (!title) throw new HttpError(400, `Server ${i + 1}, activity ${k + 1} needs a name.`);
+      let pic = String(a?.pic || "event").trim();
+      if (!ACTIVITY_PICS.includes(pic) && !/^https:\/\/[^\s"'<>]{4,300}$/.test(pic)) throw new HttpError(400, `Server ${i + 1}, activity ${k + 1}: pick a picture, or paste a link that starts with https://`);
+      return { title, subtitle: clean(a?.subtitle, 48), text: clean(a?.text, 140), pic };
+    });
+    return { name, description: clean(v?.description, 90), tags: clean(v?.tags, 60), activities, image, action, warp: action === "warp" ? warp : "", enabled: v?.enabled !== false,
              anim: JOIN_BLOCKS.includes(v?.anim) ? v.anim : "grass", odds: Boolean(v?.odds), joinName: clean(v?.joinName, 24) || name };
   });
   if (!servers.some((v) => v.enabled && v.action === "play")) throw new HttpError(400, "Keep at least one server that's switched on and set to \"Play\" (the main server).");
   const splashes = (Array.isArray(body?.splashes) ? body.splashes : String(body?.splash || "").split("\n")).map((x) => clean(x, 60)).filter(Boolean).slice(0, 40);
-  return { enabled: body?.enabled !== false, splashes, intro, tabs, servers, siftCard: true };
+  return { enabled: body?.enabled !== false, splashes, intro, tabs, servers, siftCard: true, activityCards: true };
 }
 
 // The latest news and the next event, shown as live info on the welcome screen.
