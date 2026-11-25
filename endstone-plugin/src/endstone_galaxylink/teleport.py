@@ -92,6 +92,17 @@ class Teleports:
         self.back[str(player.unique_id)] = where(player)
         player.teleport(self.location(spot))
         player.send_message(f"§aTeleported to {label}.")
+        self.arrived(player)
+
+    def arrived(self, player):
+        """A soft whoosh and sparkles where you land (a moment later, once you're there)."""
+        from endstone_galaxylink import fx
+        uid = player.unique_id
+        try:
+            self.plugin.server.scheduler.run_task(self.plugin, lambda: (lambda p: p and fx.teleport(self.plugin, p))(
+                self.plugin.server.get_player(uid)), delay=4)
+        except Exception:
+            pass
 
     # ---------- /rtp: a random safe spot in the wild ----------
     def rtp(self, player):
@@ -173,6 +184,7 @@ class Teleports:
                 self.rtp_used = {}
             self.rtp_used[str(uid)] = time.time()
             l = p.location
+            self.arrived(p)
             p.send_message(f"§aWhoosh! You're in the wild at §f{math.floor(l.x)} {math.floor(l.y)} {math.floor(l.z)}§a. §7Use /back to go back, /spawn to go home.")
         if ok is False:
             player.send_message("§cRandom teleport didn't work. Please tell staff.")

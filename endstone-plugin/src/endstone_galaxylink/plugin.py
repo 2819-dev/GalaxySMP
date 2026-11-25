@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.87.0"
+VERSION = "2.88.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -473,6 +473,11 @@ class GalaxyLink(Plugin):
             player.kick(self.servercontrol.kick_text())
             return
         brand_new = self.progress.load(player.xuid) is None
+        try:   # a cleaner join line in chat: [+] Name (welcome for brand-new players)
+            event.join_message = (f"§8[§a+§8] §f{player.name} §7joined for the first time. Say hi!" if brand_new
+                                  else f"§8[§a+§8] §7{player.name}")
+        except Exception:
+            pass
         self.server.scheduler.run_task(self, lambda: self.penguins.on_join(player) if player.is_valid else None, delay=40)  # normal speed and hearts
         welcomed = False
         try:
@@ -535,6 +540,10 @@ class GalaxyLink(Plugin):
     @event_handler
     def on_player_quit(self, event: PlayerQuitEvent):
         p = event.player
+        try:
+            event.quit_message = f"§8[§c-§8] §7{p.name}"
+        except Exception:
+            pass
         # each one on its own, so one problem doesn't stop the others
         for part in ("ranks.forget", "plates.on_quit", "galaxymap.on_quit", "parkour.on_quit", "collection.on_quit",
                      "teleports.on_quit", "progress.on_quit", "bedwars.on_quit", "penguins.on_quit", "welcome.on_quit", "social.on_quit", "mail.on_quit",

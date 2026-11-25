@@ -23,6 +23,7 @@ How to Play tabs on the website (Control Panel > Help menu > Join screen). Never
 also zooms the player's view.
 """
 
+import datetime
 import json
 import random
 import re
@@ -135,20 +136,25 @@ class Welcome:
         self.joined = {}          # player uuid -> name of the server they picked (players count for event servers)
         self.db = plugin.economy.db
         self.db.execute("CREATE TABLE IF NOT EXISTS menu_prefs (xuid TEXT PRIMARY KEY, music INTEGER DEFAULT 1, scene INTEGER DEFAULT -1, skip INTEGER DEFAULT 0)")
+        try:   # 2.88: sparkles on/off (teleports, rewards, purchases)
+            self.db.execute("ALTER TABLE menu_prefs ADD COLUMN fx INTEGER DEFAULT 1")
+        except Exception:
+            pass
         self.db.commit()
 
     # ---------- Settings (per player) ----------
     def prefs(self, player):
         try:
-            r = self.db.execute("SELECT music, scene, skip FROM menu_prefs WHERE xuid = ?", (str(player.xuid),)).fetchone()
+            r = self.db.execute("SELECT music, scene, skip, fx FROM menu_prefs WHERE xuid = ?", (str(player.xuid),)).fetchone()
         except Exception:
             r = None
-        return {"music": bool(r[0]) if r else True, "scene": int(r[1]) if r else -1, "skip": bool(r[2]) if r else False}
+        return {"music": bool(r[0]) if r else True, "scene": int(r[1]) if r else -1, "skip": bool(r[2]) if r else False,
+                "fx": bool(r[3]) if r and r[3] is not None else True}
 
     def set_pref(self, player, **kw):
         p = dict(self.prefs(player), **kw)
-        self.db.execute("INSERT OR REPLACE INTO menu_prefs (xuid, music, scene, skip) VALUES (?,?,?,?)",
-                        (str(player.xuid), int(p["music"]), int(p["scene"]), int(p["skip"])))
+        self.db.execute("INSERT OR REPLACE INTO menu_prefs (xuid, music, scene, skip, fx) VALUES (?,?,?,?,?)",
+                        (str(player.xuid), int(p["music"]), int(p["scene"]), int(p["skip"]), int(p["fx"])))
         self.db.commit()
 
     @staticmethod
@@ -345,12 +351,84 @@ class Welcome:
         form.add_button("§j§c§f" + self.mail_label(player), on_click=lambda p: self.go(p, "mail"))
         form.add_button("§j§c§f§lProfile", on_click=lambda p: self.go(p, "profile"))
         form.add_button("§j§r" + self.restart_line(), on_click=lambda p: self.show(p))
-        form.add_button("§lPlay", on_click=lambda p: self.go(p, "play", st.get("ptab", 2)))
+        form.add_button("§p§f§lPlay", on_click=lambda p: self.go(p, "play", st.get("ptab", 2)))
         form.add_button("Settings", on_click=lambda p: self.go(p, "settings"))
         form.add_button("Tutorial & Commands", on_click=lambda p: self.go(p, "guide"))
         form.add_button("Help", on_click=lambda p: self.ask_help(p))
+        # after the main buttons: the live info tiles under them (friends online, daily reward, next event, players)
+        for text, icon, click in self.live_tiles(player):
+            form.add_button(text, icon=icon, on_click=click)
         self.send(player, form)
         self.music(player, True)
+
+    def live_tiles(self, player):
+        """The small live tiles on the Main Menu: [(text, icon, on_click)]. "§j§i§N" picks the tile's caption in the
+        resource pack (1 Friends, 2 Daily, 3 Event, 4 Playing); the rest is the big value."""
+        tiles = []
+        pic = lambda n: f"textures/ui/gsmp_live_{n}"
+        social = getattr(self.plugin, "social", None)
+        if social is not None:
+            if social.linked(player):
+                n = len(social.online_friends(player))
+                tiles.append((f"§j§i§1{'§a' if n else '§7'}{n} online", pic("friends"), lambda p: self.go(p, "social")))
+            else:
+                tiles.append(("§j§i§1§bLink", pic("friends"), lambda p: self.go(p, "link")))
+        prog = getattr(self.plugin, "progress", None)
+        if prog is not None:
+            try:
+                can, day, streak = prog.daily_state(player)
+                if can:
+                    tiles.append(("§j§i§2§6Ready!", pic("daily"), lambda p: self.claim_daily(p)))
+                else:
+                    from endstone_galaxylink.progress import TZ as PTZ   # the daily reward's day starts at midnight there
+                    now = datetime.datetime.now(PTZ)
+                    left = (datetime.datetime.combine(now.date() + datetime.timedelta(days=1), datetime.time(), PTZ) - now).total_seconds()
+                    tiles.append((f"§j§i§2§7in {self.short_time(left)}", pic("daily"), lambda p: self.go(p, "title")))
+            except Exception:
+                pass
+        ev = self.event_value()
+        if ev:
+            tiles.append((f"§j§i§3{ev}", pic("event"), lambda p: self.go(p, "guide", 3)))
+        try:
+            server = self.plugin.server
+            tiles.append((f"§j§i§4§f{len(server.online_players)}§7/{int(server.max_players)}", pic("online"),
+                          lambda p: self.go(p, "play", 2)))
+        except Exception:
+            pass
+        return tiles
+
+    @staticmethod
+    def short_time(seconds):
+        m = max(0, int(seconds // 60))
+        if m >= 48 * 60:
+            return f"{m // 1440}d"
+        if m >= 60:
+            return f"{m // 60}h {m % 60}m" if m < 600 else f"{m // 60}h"
+        return f"{max(1, m)}m"
+
+    def event_value(self):
+        """The next event's countdown for its tile ("2h 15m", "Now!"), or None when there's no upcoming event."""
+        if not self.news.get("event"):
+            return None
+        try:
+            at = float(self.news.get("at") or 0) / 1000
+        except Exception:
+            at = 0
+        if not at:
+            return "§bSoon"
+        left = at - time.time()
+        if left <= 0:
+            return "§aNow!" if left > -3 * 3600 else None
+        return f"§b{self.short_time(left)}"
+
+    def claim_daily(self, player):
+        prog = getattr(self.plugin, "progress", None)
+        if prog is not None:
+            try:
+                prog.claim_daily(player)
+            except Exception as e:
+                self.plugin.logger.warning(f"Main Menu daily reward: {e}")
+        self.go(player, "title")
 
     # ---------- Link Account ----------
     def show_link(self, player):
@@ -919,7 +997,9 @@ class Welcome:
                 f"§fMenu music: {'§aOn' if pr['music'] else '§cOff'}\n§7The music that plays while the Main Menu is open.\n\n"
                 f"§fWallpaper: §b{scene}\n§7The picture behind the Main Menu. Random picks a new one every time.\n\n"
                 f"§fMain Menu when I join: {'§cSkip' if pr['skip'] else '§aShow'}\n§7Skip it to go straight into the game. "
-                "§e/menu§7 and the menu compass still open it.\n\n§7Tap a button on the left to change a setting.")
+                "§e/menu§7 and the menu compass still open it.\n\n"
+                f"§fSparkles: {'§aOn' if pr['fx'] else '§cOff'}\n§7Little sparkles when you teleport, buy something or get a reward "
+                "(the sounds stay on).\n\n§7Tap a button on the left to change a setting.")
         form = ActionForm(title=f"{PAGE}{self.codes(st)}§lSettings", content=body)
 
         def music(p):
@@ -945,6 +1025,8 @@ class Welcome:
         form.add_button(f"Wallpaper: {scene}", on_click=wallpaper)
         form.add_button(f"On join: {'Skip menu' if pr['skip'] else 'Show menu'}",
                         on_click=lambda p: (self.set_pref(p, skip=not self.prefs(p)["skip"]), self.show(p)))
+        form.add_button(f"Sparkles: {'On' if pr['fx'] else 'Off'}",
+                        on_click=lambda p: (self.set_pref(p, fx=not self.prefs(p)["fx"]), self.show(p)))
         self.send(player, form)
 
     GUIDE_TABS = ["Tutorial", "Commands", "Rules", "What's New", "Store"]

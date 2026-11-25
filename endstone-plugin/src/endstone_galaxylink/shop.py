@@ -133,6 +133,8 @@ class Shop:
         dropped = money.give(player, stacks)
         extra = f" §7({dropped} didn't fit and were dropped at your feet)" if dropped else ""
         player.send_message(f"§aBought §f{count}x {it['name']}§a for §e{money.exact(cost)}§a.{extra}")
+        from endstone_galaxylink import fx
+        fx.purchase(self.plugin, player)
 
     def sell(self, player, item, count=None):
         price = self.sell_prices.get(item)

@@ -242,6 +242,9 @@ class Economy:
             progress.add(sender, "paid", cents)
         sender.send_message(f"§aYou paid §e{target.name} {money.exact(cents)}§a.")
         target.send_message(f"§e{sender.name}§a paid you §e{money.exact(cents)}§a.")
+        from endstone_galaxylink import fx
+        fx.money(self.plugin, sender)
+        fx.money(self.plugin, target)
 
     def cmd_admin(self, sender, label, args):
         name, amount = self.split_target(args)

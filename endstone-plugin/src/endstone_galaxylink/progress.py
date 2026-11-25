@@ -427,9 +427,10 @@ class Progress:
             player.send_message(f"§6§l🔥 {s['streak']}-day streak!§r §7Amazing. Keep it going!")
         try:
             show_title(self.plugin, player, "§6Daily reward", f"§aDay {day}: {dollars(cents)}", 5, 50, 15)
-            player.play_sound(player.location, "random.levelup", 0.8, 1.2)
         except Exception:
             pass
+        from endstone_galaxylink import fx
+        fx.reward(self.plugin, player)
         self.check_achievements(player)
 
     def daily_menu(self, player):
@@ -548,6 +549,8 @@ class Progress:
                 player.send_toast("§dAchievement unlocked!", name)
             except Exception:
                 pass
+            from endstone_galaxylink import fx
+            fx.achievement(self.plugin, player)
             if aid != "welcome":
                 for p in self.plugin.server.online_players:
                     if p is not player:

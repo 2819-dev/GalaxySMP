@@ -651,6 +651,16 @@ The bigger Sift is built in the background after the update, which takes about h
 - **The Sift:** it's coming soon. Until it opens, the Main Menu and /sift show a "coming soon" note instead.
 - **For staff:** crash reports in #Staff Logs now include a second-by-second memory chart for the last two minutes and the game's own crash file when there is one, so the cause of any stop is clear. **/sift build**, **/sift stop** and **/sift status** control the build.`,
   },
+  {
+    id: "2026-11-25-modern-menus",
+    title: "A modern look in game",
+    body: `Every menu on the server has a new, modern look, and the Main Menu shows what's happening right now.
+- **Main Menu:** a cleaner design with smooth animations when it opens, a bold Play button, and buttons that slide gently when you point at them.
+- **Live tiles:** under the buttons you can see how many friends are online, whether your daily reward is ready (tap it to claim), a countdown to the next event, and how many players are on.
+- **Every menu matches:** shops, the Auction House, homes, moderation and every other pop-up now use the same dark glass style with rounded buttons and a gradient Submit button.
+- **Feel:** a soft whoosh and sparkles when you teleport, a coin sound when you buy something or get paid, a chime for rewards, and a fanfare for achievements and job level-ups. You can switch the sparkles off in Main Menu > Settings.
+- **Chat and HUD:** cleaner join and leave lines in chat, and a rounded style for the action bar and item names above the hotbar.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

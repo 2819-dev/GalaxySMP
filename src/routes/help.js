@@ -139,7 +139,7 @@ export async function welcomeNews(sql) {
   const [n] = await sql`SELECT title FROM news_posts WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 1`.catch(() => []);
   const [e] = await sql`SELECT title, starts_at FROM events WHERE deleted_at IS NULL AND starts_at > now() ORDER BY starts_at LIMIT 1`.catch(() => []);
   const when = e ? new Date(e.starts_at).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York", timeZoneName: "short" }) : null;
-  return { title: n?.title || null, event: e?.title || null, when };
+  return { title: n?.title || null, event: e?.title || null, when, at: e ? new Date(e.starts_at).getTime() : null };
 }
 
 // Today's holiday for the Main Menu (the same days as the website's decorations and loading screen), or null.

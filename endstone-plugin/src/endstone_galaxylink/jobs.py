@@ -175,9 +175,10 @@ class Jobs:
             player.send_message(f"§a§lLevel up! §r§f{name} level {new_level}§a: you now earn {multiplier(new_level):.2f}x.")
             try:
                 player.send_toast("§aJob level up!", f"{name} level {new_level}")
-                player.play_sound(player.location, "random.levelup", 0.7, 1.0)
             except Exception:
                 pass
+            from endstone_galaxylink import fx
+            fx.level_up(self.plugin, player)
         x = str(player.xuid)
         owed = self.pending.get(x, (0, None, None))[0]
         self.pending[x] = (owed + cents, player.name, player.unique_id)   # never keep the player object (they may leave)

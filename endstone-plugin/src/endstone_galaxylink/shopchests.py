@@ -418,6 +418,8 @@ class ShopChests:
         self._sale(s, sid, player.xuid, player.name, n, cost)
         dropped = money.give(player, money.make_stacks(s["item"], n))
         player.send_message(f"§aBought {n}x {self.item_name(s)} for {money.exact(cost)}." + (" §7Some dropped at your feet." if dropped else ""))
+        from endstone_galaxylink import fx
+        fx.purchase(self.plugin, player)
         self.tell_owner(s, f"§a{player.name} bought {n}x {self.item_name(s)} from your shop for {money.exact(cost)}.")
 
     def sell(self, player, sid, times):

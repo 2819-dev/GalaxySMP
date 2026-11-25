@@ -120,6 +120,10 @@ class AuctionHouse:
         seller_p = next((p for p in self.plugin.server.online_players if str(p.xuid) == seller), None)
         if seller_p:
             seller_p.send_message(f"§a{player.name} bought your §f{amount}x {label}§a. You got §e{money.exact(payout)}§a.")
+        from endstone_galaxylink import fx
+        fx.purchase(self.plugin, player)
+        if seller_p:
+            fx.money(self.plugin, seller_p)
         self.push()
         return self._tell(player, True, f"You bought {amount}x {label} for {money.exact(price)}"
                           + (" on the website" if from_website else "") + f".{where}")
