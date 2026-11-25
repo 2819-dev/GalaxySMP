@@ -449,6 +449,10 @@ export class VoiceHub extends DurableObject {
         cgroup: msg.cgroup && typeof msg.cgroup === "object" ? Object.fromEntries(Object.entries(msg.cgroup).slice(0, 8).map(([k, v]) => [clip(k, 20), Number(v) || 0])) : {},
         traceback: (Array.isArray(msg.traceback) ? msg.traceback : []).slice(0, 80).map((l) => clip(l, 300)),
         memory: Object.fromEntries(Object.entries(msg.memory && typeof msg.memory === "object" ? msg.memory : {}).slice(0, 8).map(([k, v]) => [clip(k, 20), Number(v) || 0])),
+        // memory every 2 seconds for the last 2 minutes: [seconds since start, MB]
+        memTrail: (Array.isArray(msg.memTrail) ? msg.memTrail : []).slice(-60).filter(Array.isArray).map(([s, m]) => [Number(s) || 0, Number(m) || 0]),
+        endstoneCrash: msg.endstoneCrash && typeof msg.endstoneCrash === "object" ? { file: clip(msg.endstoneCrash.file, 120),
+          lines: (Array.isArray(msg.endstoneCrash.lines) ? msg.endstoneCrash.lines : []).slice(-80).map((l) => clip(l, 300)) } : null,
       };
       this.backOnline(details.players);   // (in the background; it catches its own errors)
       return getDb(this.env)`INSERT INTO audit_log (actor_id, action, details) VALUES (NULL, 'server.crash', ${JSON.stringify(details)}::jsonb)`

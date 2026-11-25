@@ -1236,17 +1236,15 @@ class Welcome:
         elif action == "sift":
             sift = getattr(self.plugin, "sift", None)
             if sift is None or not sift.built():
-                if sift is not None and not sift.building():
-                    sift.start_build()
                 if st.get("portal"):
                     self.open.pop(str(player.unique_id), None)
-                    return player.send_message("§bThe Sift is still being made. §7Try again in a few minutes!")
+                    return player.send_message("§bThe Sift is coming soon! §7It isn't open yet.")
                 from endstone_galaxylink import sift as SF
                 done = len(self.plugin.economy.get_config(SF.PIECES) or []) if sift is not None else 0
                 total = len(SF.TILES)
                 st["screen"], st["tab"] = "play", 2
                 return self.page(player, "The Sift", ["< Back"], 0,
-                                 f"§l§bAlmost ready!§r\n\nThe Sift is still being built ({min(done, total)}/{total} pieces).\n§7Try again in a few minutes.")
+                                 f"§l§bComing soon!§r\n\nThe Sift is still being made ({min(done, total)}/{total} pieces).\n§7Keep an eye on #Updates.")
             spot = sift.spot()
         theme = s.get("anim") if s.get("anim") in THEMES else "grass"
         if s.get("odds"):

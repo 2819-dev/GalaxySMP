@@ -4880,3 +4880,9 @@ html[data-theme="light"] .mk-balance { color: rgb(160,110,8); }
 .qj-hint { margin: 0; font-size: .72rem; color: var(--text-3, #9aa0b4); text-align: right; }
 .qj-empty { padding: 8px 10px; margin: 0; }
 @media (max-width: 600px) { .qj-hint { display: none; } .qj-back { padding-top: 12px; } }
+
+/* Staff Logs: memory chart in crash reports */
+.sl-mem-wrap { margin: 8px 0; max-width: 340px; }
+.sl-mem { width: 100%; height: 70px; display: block; background: var(--surface-2, rgba(255,255,255,.04)); border-radius: 8px; }
+.sl-mem-line { fill: none; stroke: var(--accent, #4fd1ff); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.sl-mem-limit { stroke: #ff6b6b; stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }

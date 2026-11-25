@@ -99,6 +99,13 @@ def cgroup_memory():
     return {k: v for k, v in out.items() if v is not None}
 
 
+def cgroup_now():
+    """(used MB, limit MB) of the server's container right now: two tiny file reads, cheap enough for every second."""
+    used = _num("/sys/fs/cgroup/memory.current") or _num("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+    limit = _num("/sys/fs/cgroup/memory.max") or _num("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+    return (round(used / 1048576) if used else None, round(limit / 1048576) if limit and limit < 1 << 50 else None)
+
+
 def cpu_stat():
     s = _kv("/sys/fs/cgroup/cpu.stat")
     if s:
@@ -297,7 +304,14 @@ class Diagnostics:
         except Exception:
             pass
         try:
-            h["entities"] = len(s.level.actors)
+            actors = s.level.actors
+            h["entities"] = len(actors)
+            if len(actors) > 400:   # a lot of entities: which kinds (to find what piles up)
+                kinds = {}
+                for a in actors:
+                    t = str(a.type).replace("minecraft:", "")
+                    kinds[t] = kinds.get(t, 0) + 1
+                h["topEntities"] = dict(sorted(kinds.items(), key=lambda kv: -kv[1])[:6])
         except Exception:
             pass
         try:
@@ -407,6 +421,11 @@ def crash_cause(prev, now_info):
     container_new = prev.get("containerStart") and now_info.get("containerStart") and abs(now_info["containerStart"] - prev["containerStart"]) > 5
     if used and limit and used >= limit * 0.9:
         return "It probably ran out of memory: it was using almost all of its memory limit just before it stopped."
+    trail = [m for _, m in (prev.get("memTrail") or []) if m]
+    lim = limit or (prev.get("memLimit") or 0)
+    if trail and lim and (max(trail[-5:]) >= lim * 0.8 or (len(trail) >= 5 and trail[-1] - min(trail[-15:]) > lim * 0.25)):
+        return ("It most likely ran out of memory: memory shot up in the last seconds before it stopped "
+                f"(to {trail[-1]} MB of {lim} MB). The memory trail below shows it second by second.")
     if container_new:
         return ("It was stopped from outside: the hosting panel or the host restarted the server's container. "
                 "There was no error and no shutdown message, which is what a Kill/Restart in the panel or a host restart looks like.")

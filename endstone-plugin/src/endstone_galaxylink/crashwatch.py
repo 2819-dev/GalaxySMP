@@ -13,7 +13,8 @@ import json
 import time
 from pathlib import Path
 
-BEAT_SECONDS = 10
+BEAT_SECONDS = 2          # the "still running" note is refreshed this often (with a memory reading each time)
+MEM_WARN = 0.85           # memory guard: above this share of the limit, warn staff and pause heavy jobs
 LOG_LINES = 150
 
 
@@ -73,6 +74,10 @@ class CrashWatch:
         self.doing = "starting up"
         self.last_beat = 0
         self.report = None
+        self.trail = []           # [seconds since start, container MB] every 2 seconds, the last 2 minutes
+        self.full_memory = {}
+        self.full_at = 0
+        self.warned_at = 0
         try:
             prev = json.loads(self.file.read_text("utf-8"))
         except FileNotFoundError:
@@ -114,16 +119,43 @@ class CrashWatch:
             players = [p.name for p in self.plugin.server.online_players]
         except Exception:
             players = []
-        from endstone_galaxylink.diagnostics import cgroup_memory
+        from endstone_galaxylink.diagnostics import cgroup_memory, cgroup_now
         cg = cgroup_memory()
+        used, limit = cgroup_now()
+        self.trail = (self.trail + [[round(now - self.started), used]])[-60:]
+        if now - self.full_at >= 10:   # the full memory picture (it looks through all processes) every 10 seconds
+            self.full_at = now
+            self.full_memory = memory()
+        self.guard(used, limit)
         diag = getattr(self.plugin, "diagnostics", None)
-        data = {"started": self.started, "t": now, "doing": self.doing, "players": players[:40], "memory": memory(),
+        data = {"started": self.started, "t": now, "doing": self.doing, "players": players[:40], "memory": self.full_memory,
                 "bootTime": self.boot, "containerStart": self.container, "oomKills": cg.get("oomKills"), "cgroup": cg,
-                "health": getattr(diag, "latest", None)}
+                "health": getattr(diag, "latest", None), "memTrail": self.trail, "memLimit": limit}
         try:
             tmp = self.file.with_suffix(".tmp")
             tmp.write_text(json.dumps(data), "utf-8")
             tmp.replace(self.file)
+        except Exception:
+            pass
+
+    def guard(self, used, limit):
+        """Memory guard: when the server gets close to its memory limit (the host kills it at the limit, with no
+        warning), pause the heavy background jobs and tell staff, at most once a minute."""
+        if not used or not limit or used < limit * MEM_WARN:
+            return
+        now = time.time()
+        sift = getattr(self.plugin, "sift", None)
+        if sift is not None and getattr(sift, "tile", None) is not None:
+            sift.wait = max(getattr(sift, "wait", 0), 1200)   # the Sift builder rests a minute
+        if now - self.warned_at < 60:
+            return
+        self.warned_at = now
+        msg = f"Memory is high: {used} MB of {limit} MB. Heavy background jobs are paused."
+        self.plugin.logger.warning(msg)
+        try:
+            for p in self.plugin.server.online_players:
+                if p.is_op:
+                    p.send_message(f"§c[Server] §7{msg}")
         except Exception:
             pass
 
@@ -176,9 +208,10 @@ class CrashWatch:
         up = (last - prev["started"]) / 60 if prev.get("started") and last else None
         from endstone_galaxylink.diagnostics import crash_cause, cgroup_memory
         tb = self.traceback()
+        ec = self.endstone_crash(prev.get("started") or 0)
         try:
             cause = crash_cause(prev, {"bootTime": self.boot, "containerStart": self.container,
-                                       "oomKills": cgroup_memory().get("oomKills"), "traceback": tb})
+                                       "oomKills": cgroup_memory().get("oomKills"), "traceback": tb or (ec or {}).get("lines")})
         except Exception:
             cause = None
         return {
@@ -195,7 +228,26 @@ class CrashWatch:
             "log": self.log_tail(last),
             "traceback": tb,
             "memory": prev.get("memory") or {},
+            "memTrail": (prev.get("memTrail") or [])[-60:],
+            "endstoneCrash": ec,
         }
+
+    def endstone_crash(self, since):
+        """Endstone writes crash_reports/crash-<time>-server.txt when the game itself crashes: the newest one written
+        during the run that stopped, if any (its last lines)."""
+        folder = Path.cwd() / "crash_reports"
+        try:
+            files = [f for f in folder.iterdir() if f.is_file() and f.stat().st_mtime >= since - 5]
+        except Exception:
+            return None
+        if not files:
+            return None
+        f = max(files, key=lambda x: x.stat().st_mtime)
+        try:
+            text = f.read_bytes()[-20000:].decode("utf-8", "replace")
+        except Exception as e:
+            return {"file": f.name, "lines": [f"(couldn't read it: {e})"]}
+        return {"file": f.name, "lines": [ln.rstrip()[:300] for ln in text.splitlines() if ln.strip()][-80:]}
 
     def traceback(self):
         """What Python was doing at the moment of the crash (written by faulthandler), if anything."""

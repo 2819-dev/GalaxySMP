@@ -642,6 +642,15 @@ The bigger Sift is built in the background after the update, which takes about h
 - **Signed-in devices:** Account settings now lists every device you're signed in on, so you can sign out of any one of them, or everywhere else at once.
 - **For staff:** the rank editor shows the badge exactly as it looks in game, and each member's card has private staff notes and their full history of mutes, bans, warnings and kicks from the website and the game.`,
   },
+  {
+    id: "2026-11-25-server-stability",
+    title: "Server stability update",
+    body: `The server was restarting far too often over the last two days. This update fixes the main cause and adds safeguards.
+- **Fewer restarts:** the heavy background job that builds The Sift no longer starts by itself. It only runs when staff start it, goes much more gently, and pauses automatically whenever the server is busy or using a lot of memory.
+- **Memory guard:** if the server ever gets close to its memory limit, heavy background work pauses right away and staff are alerted in game.
+- **The Sift:** it's coming soon. Until it opens, the Main Menu and /sift show a "coming soon" note instead.
+- **For staff:** crash reports in #Staff Logs now include a second-by-second memory chart for the last two minutes and the game's own crash file when there is one, so the cause of any stop is clear. **/sift build**, **/sift stop** and **/sift status** control the build.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

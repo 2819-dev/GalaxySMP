@@ -36,6 +36,23 @@ const DESCRIBE = {
 };
 const KIND = (a) => (a === "server.crash" ? "bad" : /ban|kick/.test(a) && !/unban/.test(a) ? "bad" : /mute|warn|rollback|remove|block|delete/.test(a) && !/un(mute|block)/.test(a) ? "warn" : "ok");
 
+// The last 2 minutes of memory before a crash, as a small line chart with the host's limit as a dashed line.
+function memoryChart(trail, limit) {
+  const pts = (trail || []).filter((p) => p[1] > 0);
+  if (pts.length < 2) return null;
+  const W = 300, H = 70, top = Math.max(limit || 0, ...pts.map((p) => p[1])) * 1.05;
+  const t0 = pts[0][0], span = Math.max(1, pts[pts.length - 1][0] - t0);
+  const x = (s) => ((s - t0) / span) * W, y = (m) => H - (m / top) * H;
+  const ns = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs) => { const e = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, class: "sl-mem", role: "img", "aria-label": `Memory before it stopped: ${pts[pts.length - 1][1]} MB at the end` });
+  if (limit) svg.append(el("line", { x1: 0, x2: W, y1: y(limit), y2: y(limit), class: "sl-mem-limit" }));
+  svg.append(el("polyline", { points: pts.map((p) => `${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(" "), class: "sl-mem-line" }));
+  const last = pts[pts.length - 1];
+  return h("div", { class: "sl-mem-wrap" }, svg,
+    h("div", { class: "text-3 small", text: `Memory, the last ${Math.round(span)} seconds: ${Math.min(...pts.map((p) => p[1]))} → ${last[1]} MB${limit ? ` (limit ${limit} MB, dashed)` : ""}` }));
+}
+
 // A crash report: what the plugin was doing, who was online and the end of the server log.
 function crashDetails(d) {
   const facts = [
@@ -53,7 +70,12 @@ function crashDetails(d) {
   const trace = d.traceback?.length
     ? h("details", { class: "sl-crash-log" }, h("summary", { text: "What the plugin was running when it crashed" }), h("pre", { class: "small", text: d.traceback.join("\n") }))
     : null;
-  return h("div", { class: "sl-reason text-3 small" }, ...facts.map((f) => h("div", { text: f })), trace, log);
+  const game = d.endstoneCrash?.lines?.length
+    ? h("details", { class: "sl-crash-log", open: true }, h("summary", { text: `The game's own crash report (${d.endstoneCrash.file || "crash file"})` }),
+      h("pre", { class: "small", text: d.endstoneCrash.lines.join("\n") }))
+    : null;
+  return h("div", { class: "sl-reason text-3 small" }, ...facts.map((f) => h("div", { text: f })),
+    memoryChart(d.memTrail, d.memory?.containerLimit || d.cgroup?.limitMB), game, trace, log);
 }
 
 export function renderStaffLogs(root, { setTimer }) {

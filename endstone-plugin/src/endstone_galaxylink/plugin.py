@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.86.0"
+VERSION = "2.87.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -96,7 +96,7 @@ class GalaxyLink(Plugin):
         "guide": _cmd("Help: server info, rules and commands. Command blocks: guide @p", "/guide [player: player]", "galaxylink.command.guide"),
         "party": _cmd("Your party: invite players, accept an invite, or leave. Party chat: /p <message>.", "/party [action: message]", "galaxylink.command.party"),
         "p": _cmd("Party chat.", "/p <message: message>", "galaxylink.command.party", ["pc"]),
-        "sift": _cmd("Staff: go to the Sift, or build it (/sift build, /sift status).", "/sift [build|status]", "galaxylink.command.sift"),
+        "sift": _cmd("Staff: go to the Sift, or build it (/sift build, /sift stop, /sift status).", "/sift [action: message]", "galaxylink.command.sift"),
         "border": _cmd("World borders: a menu of them, teleport to one, get the Border Axe, or reset.", "/border [tp|list|axe|reset] [name: message]", "galaxylink.command.border"),
         "portal": _cmd("Picture portals: get the Portal Axe, list or remove portals.", "/portal [action: message]", "galaxylink.command.portal"),
         "menu": _cmd("The GalaxySMP Main Menu: Featured Servers, How to Play, Rules, What's New and Store.", "/menu", "galaxylink.command.menu", ["mainmenu", "hub"]),
@@ -350,8 +350,8 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self._safe("borders.tick", self.borders.tick), delay=60, period=5)
         self.server.scheduler.run_task(self, self._safe("sift.build_tick", self.sift.build_tick), delay=20, period=1)
         self.server.scheduler.run_task(self, self._safe("sift.tick", self.sift.tick), delay=200, period=100)
-        if not self.sift.built():  # build the Sift once, a minute after the first start
-            self.server.scheduler.run_task(self, self._safe("sift.start_build", self.sift.start_build), delay=1200)
+        # The Sift is never built automatically at start any more (building far-away land is the heaviest job there
+        # is, and doing it at every start made the server unstable). Staff run /sift build when the server is quiet.
         self.server.scheduler.run_task(self, self._watched("checking AFK players", self.afk.tick), delay=100, period=100)
         self.server.scheduler.run_task(self, self._watched("checking command plates", self.plates.tick), delay=40, period=4)
         self.server.scheduler.run_task(self, self._watched("setting up the map item", self.galaxymap.setup), delay=200)

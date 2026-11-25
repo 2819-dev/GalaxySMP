@@ -3,7 +3,9 @@
 A round valley about 600 blocks across, closed in by tall banded red cliffs so it feels like its own world:
 salmon-pink ground with mossy flower meadows, tall spiky pink grass, pale weeping trees with long white curtains,
 and huge red rock pillars with flat, tree-covered tops. While you're inside, the sky turns teal (a fog from the pack).
-The plugin builds it once by itself, a 64 x 64 piece at a time (about half an hour), and checks each piece really built.
+Staff build it once with /sift build (best when the server is quiet): a 64 x 64 piece at a time, slowly, pausing
+whenever the server is busy or memory is high, and checking each piece really built. It never builds by itself:
+building far-away land is the heaviest thing the server does, and doing it at every start made the server unstable.
 Wild Dumplings and Blubs are spawned by the plugin near players in the Sift.
 
 Get there: the "The Sift" card on the Main Menu, a Sift portal (Portal Axe), or /sift (staff).
@@ -22,9 +24,11 @@ R = 300                 # radius of the valley: 600 x 600 blocks, red cliffs all
 TILE = 64
 TILES = [(tx, tz) for tx in range(-320, 320, TILE) for tz in range(-320, 320, TILE)]   # 100 pieces
 SEED = 2027
-PER_TICK = 120          # at most this many commands per tick while building...
-BUDGET = 0.010          # ...and at most 10 ms of each tick (a tick is 50 ms), so the server stays smooth
-BUSY_MSPT = 40          # if the server is already slow (ms per tick), wait instead of building
+PER_TICK = 50           # at most this many commands per tick while building...
+BUDGET = 0.005          # ...and at most 5 ms of each tick (a tick is 50 ms), so the server stays smooth
+BUSY_MSPT = 30          # if the server is already slow (ms per tick), wait instead of building
+MEM_PAUSE = 0.55        # pause building while the server uses more than this share of its memory limit
+TILE_REST = 300         # ticks to rest between pieces (15 seconds), so new land can settle and memory drop
 AREA = "gsmp_sift_build"
 VERSION = 3             # bump to rebuild the Sift after a redesign (3: 600 x 600)
 UNDER = "minecraft:red_terracotta"
@@ -289,6 +293,13 @@ class Sift:
     def start_build(self, sender=None):
         if self.tile is not None or self.queue:
             return False
+        if self.memory_high():
+            if sender is not None:
+                try:
+                    sender.send_message("§eThe server is using a lot of memory right now. §7Try /sift build again later (when it's quieter).")
+                except Exception:
+                    pass
+            return None
         done = set(map(tuple, self.plugin.economy.get_config(PIECES) or []))
         self.todo = [t for t in TILES if t not in done]
         self.sender = sender
@@ -333,7 +344,7 @@ class Sift:
         self.queue = deque(tile_commands(tx, tz))
         self.area = f"{AREA}_{(tx + 128) // TILE}{(tz + 128) // TILE}"
         self.cmd(f"tickingarea add {CX + tx} {BASE} {CZ + tz} {CX + tx + TILE - 1} {BASE} {CZ + tz + TILE - 1} {self.area} true")
-        self.wait = 100   # let the chunks load
+        self.wait = TILE_REST   # rest, then let the chunks load
 
     def build_tick(self):
         """Called every tick while building."""
@@ -353,6 +364,9 @@ class Sift:
                 return   # the server is busy right now: build a little later
         except Exception:
             pass
+        if self.memory_high():
+            self.wait = 200   # memory is high: wait 10 seconds and check again
+            return
         start = time.perf_counter()
         for _ in range(PER_TICK):
             if not self.queue or time.perf_counter() - start > BUDGET:
@@ -376,7 +390,18 @@ class Sift:
         tiles = list(self.plugin.economy.get_config(PIECES) or [])
         tiles.append(list(self.tile))
         self.plugin.economy.set_config(PIECES, tiles)
+        # leaves and plants cut by the build drop items: clear them, so they don't pile up as thousands of entities
+        self.cmd(f"execute in overworld run kill @e[type=item,x={CX + tx},y={LOW - 10},z={CZ + tz},dx={TILE},dy={CLEAR_TO - LOW + 20},dz={TILE}]")
         self.next_tile()
+
+    def memory_high(self):
+        """True while the server uses more than MEM_PAUSE of its memory limit (or when we can't tell, False)."""
+        try:
+            from endstone_galaxylink.diagnostics import cgroup_now
+            used, limit = cgroup_now()
+            return bool(used and limit and used > limit * MEM_PAUSE)
+        except Exception:
+            return False
 
     def building(self):
         return self.tile is not None
@@ -397,9 +422,7 @@ class Sift:
     # ---------- going there ----------
     def go(self, player):
         if not self.built():
-            player.send_message("§bThe Sift is still being made. §7Try again in a few minutes!")
-            if not self.building():
-                self.start_build()
+            player.send_message("§bThe Sift is coming soon! §7It isn't open yet.")
             return False
         tp = getattr(self.plugin, "teleports", None)
         try:
@@ -425,18 +448,19 @@ class Sift:
             return
         if name != "minecraft:air":
             return
-        self.plugin.logger.warning("The Sift: no ground at the landing spot, rebuilding")
+        self.plugin.logger.warning("The Sift: no ground at the landing spot (staff can run /sift build again)")
         spot = self.plugin.economy.get_config("spawn")
         try:
             if spot:
                 player.teleport(self.plugin.teleports.location(spot))
         except Exception:
             pass
-        player.send_message("§bSorry! The Sift isn't finished yet. §7It's being made now; try again in a few minutes.")
+        player.send_message("§bSorry! The Sift isn't finished yet. §7Staff have been told.")
+        # never wipe the progress or start building by itself here: staff decide (/sift status, /sift build)
         self.plugin.economy.set_config(BUILT, False)
-        self.plugin.economy.set_config(PIECES, [])
-        if not self.building():
-            self.start_build()
+        for s in self.plugin.server.online_players:
+            if s.is_op:
+                s.send_message("§e[Sift] §7A player landed on missing ground at the Sift. Type §e/sift build§7 when the server is quiet.")
 
     # ---------- life: mobs and fireflies ----------
     def tick(self):
@@ -498,6 +522,7 @@ class Sift:
 
     # ---------- /sift ----------
     def command(self, sender, args):
+        args = " ".join(args or []).split()   # "/sift build again" arrives as one piece of text
         sub = (args[0].lower() if args else "")
         if sub == "build" and sender.is_op:
             if self.built() and (len(args) < 2 or args[1].lower() != "again"):
@@ -506,11 +531,25 @@ class Sift:
             if len(args) > 1 and args[1].lower() == "again":
                 self.plugin.economy.set_config(PIECES, [])
                 self.plugin.economy.set_config(BUILT, False)
-            sender.send_message("§bBuilding the Sift... §7(about half an hour)" if self.start_build(sender) else "§eIt's already being built.")
+            started = self.start_build(sender)
+            if started:
+                sender.send_message("§bBuilding the Sift slowly in the background. §7It pauses when the server is busy. "
+                                    "Best when few players are on. §e/sift stop§7 pauses it, §e/sift status§7 shows progress.")
+            elif started is False:
+                sender.send_message("§eIt's already being built.")
+            return True
+        if sub == "stop" and sender.is_op:
+            if self.tile is None:
+                sender.send_message("§7The Sift isn't being built right now.")
+                return True
+            self.cmd(f"tickingarea remove {getattr(self, 'area', AREA)}")
+            self.tile, self.queue, self.todo = None, deque(), []
+            sender.send_message("§eStopped building the Sift. §7Finished pieces are kept; §e/sift build§7 carries on later.")
             return True
         if sub == "status" and sender.is_op:
             done = len(self.plugin.economy.get_config(PIECES) or [])
-            sender.send_message(f"§bThe Sift: §f{'ready' if self.built() else f'{done}/{len(TILES)} pieces built'}")
+            state = "ready" if self.built() else f"{done}/{len(TILES)} pieces built" + (" (building now)" if self.building() else " (not building)")
+            sender.send_message(f"§bThe Sift: §f{state}")
             return True
         if not hasattr(sender, "xuid"):
             sender.send_message("Players only.")
