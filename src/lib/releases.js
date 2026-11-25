@@ -692,6 +692,16 @@ The bigger Sift is built in the background after the update, which takes about h
 - **Custom:** pick Custom and type any length, like 2m, 45m, 3h, 1h30m or 2d (up to 1 year).
 - Works everywhere you mute: chat and voice mutes on the website, the player card in the Staff Panel, and /mod in game. The muted player is told exactly how long.`,
   },
+  {
+    id: "2026-11-25-calls-in-dms",
+    title: "Calls now happen right in your messages",
+    body: `Calls are now separate from voice chat, and they happen right where you are.
+- **Call from your DMs or a profile:** tap **Call** and a small call bar appears at the bottom of the page (at the top on phones). Nothing else opens.
+- **When a friend calls:** the call bar shows who's calling with **Answer** and **Decline**. Answering starts the call right there.
+- **In the call:** see who's talking, mute yourself, add up to 4 people, or hang up, all from the call bar. If you open a profile during a call, tap **Join** on its call bar to keep talking.
+- **Voice chat** (proximity and groups) is back to just voice chat, and calls don't use it any more.
+- **In game:** \`/call\` works the same. You talk from your DMs on galaxymc.us, on your phone or computer.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

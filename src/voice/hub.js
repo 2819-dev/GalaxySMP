@@ -24,7 +24,6 @@ import { hubStub } from "../routes/chat.js";
 import { notify } from "../routes/notify.js";
 import { recordChunks } from "../routes/map.js";
 import { tradeFromGame } from "../routes/trades.js";
-import { CallMixin } from "./calls.js";
 
 const DOWN_AFTER_MS = 3 * 60 * 1000; // quick restarts (under 3 minutes) don't send notifications
 
@@ -43,7 +42,6 @@ export class VoiceHub extends DurableObject {
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
     ctx.blockConcurrencyWhile(async () => {
       this.groups = (await ctx.storage.get("groups")) || {};
-      this.calls = (await ctx.storage.get("calls")) || {};   // private calls (calls.js)
       // The locked Staff group: always there, only members with the Staff category permission can join
       if (!this.groups.staff) this.groups.staff = { id: "staff", name: "Staff", description: "Staff only", room: true, staffOnly: true, passwordHash: null, createdBy: null, position: 0 };
     });
@@ -115,7 +113,6 @@ export class VoiceHub extends DurableObject {
       inGame: Boolean(p),
       dim: p ? p.dim : null,
       group: a.groupId,
-      inCall: Boolean(a.callId),   // in a private call (who with isn't shared)
       mic: Boolean(a.micOn),
       deafened: Boolean(a.deafened),
       talking: Boolean(a.talking && a.micOn && !this.isVoiceMuted(a)),
@@ -138,7 +135,7 @@ export class VoiceHub extends DurableObject {
     if (this.isVoiceMuted(a)) return "voice_muted";
     if (a.deafened) return "deafened";
     if (!a.micOn) return "muted";
-    if (a.talking) return a.global && a.canGlobal ? "talking_global" : a.groupId || a.callId ? "talking_group" : "talking";
+    if (a.talking) return a.global && a.canGlobal ? "talking_global" : a.groupId ? "talking_group" : "talking";
     return "connected"; // in voice and quiet: no icon, like Simple Voice Chat
   }
 
@@ -205,7 +202,6 @@ export class VoiceHub extends DurableObject {
   // May `listener` hear `speaker` right now?
   canHear(listener, speaker) {
     if (listener.id === speaker.id || !speaker.trackName || this.isVoiceMuted(speaker)) return false;
-    if (speaker.callId) return listener.callId === speaker.callId;   // a call is private: only the people in it hear
     if (speaker.global && speaker.canGlobal) return true;
     if (listener.groupId && listener.groupId === speaker.groupId) return true;
     if (this.groups[speaker.groupId]?.staffOnly) return false; // the Staff group is private: no one nearby hears it
@@ -351,7 +347,6 @@ export class VoiceHub extends DurableObject {
       micOn: false, deafened: false, talking: false, global: false, groupId: null, sessionId: null, trackName: null,
     });
     this.send(server, { type: "hello", you: user.id, range: RANGE, voiceMutedUntil: user.voiceMutedUntil });
-    this.callOnConnect(server, user.id);   // back in their call, or their phone is ringing
     this.sendRoster();
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -373,25 +368,27 @@ export class VoiceHub extends DurableObject {
         this.positions.clear();
         await this.ctx.storage.delete("server"); // server went away: status shows offline right away
         await this.ctx.storage.put("pluginGoneAt", Date.now());
-        await this.wakeAt(Date.now() + DOWN_AFTER_MS); // still gone in 3 minutes: tell members (calls share the alarm)
+        await this.wakeAt(Date.now() + DOWN_AFTER_MS); // still gone in 3 minutes: tell members
       }
       return;
     }
     this.broadcast({ type: "left", id: a.id });
-    await this.callOnDisconnect(a.id).catch((e) => console.error("call disconnect", e));
     await this.cleanupGroups();
     this.sendRoster();
   }
 
+  // the hub has one alarm: never put it later than it already is
+  async wakeAt(at) {
+    const cur = await this.ctx.storage.getAlarm();
+    if (!cur || at < cur) await this.ctx.storage.setAlarm(at);
+  }
+
   // ---------- server online / offline notifications ----------
   async alarm() {
-    // calls: rings nobody answered, people whose Voice page stayed closed (calls.js)
-    const next = await this.sweepCalls().catch((e) => { console.error("calls sweep", e); return null; });
-    if (next) await this.wakeAt(next + 200);
     const goneAt = await this.ctx.storage.get("pluginGoneAt");
     if (!goneAt || this.pluginSocket()) return;
     if (await this.ctx.storage.get("downNotified")) return;
-    if (Date.now() - goneAt < DOWN_AFTER_MS - 1000) return this.wakeAt(goneAt + DOWN_AFTER_MS);   // woken early by a call
+    if (Date.now() - goneAt < DOWN_AFTER_MS - 1000) return this.wakeAt(goneAt + DOWN_AFTER_MS);   // woken early
     await this.ctx.storage.put("downNotified", goneAt);
     await notify(this.env, "all", "server", {
       title: "GalaxySMP is offline", body: "The server is restarting or down. We'll let you know when it's back.", url: "/status", tag: "server", ttl: 3600,
@@ -427,7 +424,9 @@ export class VoiceHub extends DurableObject {
 
   onPlugin(msg) {
     if (["call_start", "call_add", "call_accept", "call_decline", "call_leave"].includes(msg.type) && msg.xuid) {
-      return this.callFromGame(msg);   // /call in game (calls.js)
+      // /call in game: calls have their own hub (src/calls/hub.js)
+      return import("../routes/calls.js").then((m) => m.callsStub(this.env).fetch("https://calls/internal/game", { method: "POST", body: JSON.stringify(msg) }))
+        .catch((e) => console.error("call from game", e));
     }
     if (msg.type === "answer" && msg.req) {
       const done = this.waiting?.get(msg.req);
@@ -762,34 +761,7 @@ export class VoiceHub extends DurableObject {
         this.sendRoster();
         return reply({ ok: true });
       }
-      case "call.start":
-      case "call.add": {
-        if (flooding(ws, "call", 0.2, 3)) throw new Error("Slow down a little.");
-        const sql = getDb(this.env);
-        const me = (await this.person(sql, { id: a.id })) || { id: a.id, username: a.username, xuid: null };
-        me.owner = Boolean(a.owner) || me.owner;
-        const to = typeof msg.to === "number" || /^\d+$/.test(String(msg.to || "")) ? { id: Number(msg.to) } : { name: msg.to };
-        const target = await this.person(sql, to);
-        if (!target) throw new Error("No member with that name. They need a galaxymc.us account (/link in game).");
-        const cur = this.callOf(a.id);
-        if (msg.type === "call.add" && !cur) throw new Error("You're not in a call.");
-        const c = cur ? await this.callAdd(cur, me, target) : await this.callStart(me, target);
-        return reply({ ok: true, call: this.publicCall(c), calling: target.username });
-      }
-      case "call.accept": {
-        const c = await this.callAccept(a.id, msg.id);
-        return reply({ ok: true, call: this.publicCall(c) });
-      }
-      case "call.decline": {
-        await this.callDecline(a.id, msg.id);
-        return reply({ ok: true });
-      }
-      case "call.leave": {
-        await this.callLeave(a.id);
-        return reply({ ok: true });
-      }
       case "group.create": {
-        if (a.callId) await this.callLeave(a.id, "You left the call to join a group.");
         // only temporary groups count (saved groups and staff rooms have their own limits)
         if (Object.values(this.groups).filter((x) => !x.saved && !x.room).length >= MAX_GROUPS) throw new Error("There are too many groups right now.");
         const name = String(msg.name || "").trim().replace(/\s+/g, " ").slice(0, 24);
@@ -807,7 +779,6 @@ export class VoiceHub extends DurableObject {
         return reply({ ok: true, group: id });
       }
       case "group.join": {
-        if (a.callId) await this.callLeave(a.id, "You left the call to join a group.");
         const g = this.groups[String(msg.id)];
         if (!g) throw new Error("That group no longer exists.");
         if (g.staffOnly && !a.staffChat) throw new Error("Only staff can join the Staff group.");
@@ -936,7 +907,6 @@ export class VoiceHub extends DurableObject {
 
   // ---------- staff actions (from the website's moderation API) ----------
   async handleInternal(event) {
-    if (event.type === "call_decline") { await this.callDecline(event.userId, event.id); return; }   // the Community page's Decline
     const targets = this.ctx.getWebSockets(`user:${event.userId}`);
     if (event.type === "voice_mute") {
       for (const ws of targets) {
@@ -979,6 +949,3 @@ export class VoiceHub extends DurableObject {
     }
   }
 }
-
-// Calls (calls.js): the call methods are part of the hub.
-Object.assign(VoiceHub.prototype, CallMixin);

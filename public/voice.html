@@ -85,22 +85,6 @@
 
       <!-- In voice -->
       <div id="v-app" hidden>
-        <!-- A call (2.90): who's in it, the timer, mute, add someone, hang up -->
-        <section class="panel call-panel" id="v-call" hidden aria-live="polite">
-          <div class="call-top">
-            <span class="call-badge" aria-hidden="true">📞</span>
-            <div class="call-info">
-              <div class="call-title" id="v-call-title">Call</div>
-              <div class="call-status text-3 small" id="v-call-status"></div>
-            </div>
-          </div>
-          <div class="call-people" id="v-call-people"></div>
-          <div class="call-actions">
-            <button class="btn btn-secondary" type="button" id="v-call-mute">Unmute</button>
-            <button class="btn btn-secondary" type="button" id="v-call-add">Add someone</button>
-            <button class="btn btn-danger" type="button" id="v-call-hangup">Hang up</button>
-          </div>
-        </section>
         <section class="panel voice-controls">
           <div class="voice-status">
             <span class="status-line" id="v-conn"><span class="dot"></span><span>Connecting…</span></span>
@@ -146,19 +130,6 @@
       </div>
     </div>
   </main>
-
-  <!-- Someone is calling (2.90) -->
-  <div class="call-incoming" id="v-incoming" hidden role="alertdialog" aria-labelledby="v-incoming-name">
-    <div class="call-incoming-card">
-      <div class="call-ring" aria-hidden="true">📞</div>
-      <div class="call-incoming-name" id="v-incoming-name"></div>
-      <div class="text-3 small" id="v-incoming-sub">is calling you</div>
-      <div class="call-incoming-actions">
-        <button class="btn btn-danger" type="button" id="v-incoming-decline">Decline</button>
-        <button class="btn btn-primary call-answer" type="button" id="v-incoming-accept">Answer</button>
-      </div>
-    </div>
-  </div>
 
   <div id="site-footer"></div>
 </body>

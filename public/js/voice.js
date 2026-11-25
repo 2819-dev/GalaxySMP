@@ -87,8 +87,6 @@ const S = {
   timers: [],
   leaving: false,
   volumes: {},
-  call: null,       // the call you're in (2.90): { id, startedAt, max, people: [{ id, username, state, connected }] }
-  incoming: null,   // someone calling you: { id, from, fromId, with }
 };
 try { S.volumes = JSON.parse(localStorage.getItem("gsmp-voice-volumes") || "{}"); } catch { /* private mode */ }
 
@@ -168,26 +166,7 @@ function onMessage(m) {
     case "voice_invite":
       toast(`${m.from} invited you to the voice group "${m.group}". Tap Join under Groups.`);
       return;
-    case "call":
-      S.call = m.call;
-      renderCall();
-      renderRoster();
-      return;
-    case "call.incoming":
-      showIncoming(m);
-      return;
-    case "call.ring_end":
-      if (S.incoming?.id === m.id) hideIncoming();
-      return;
-    case "call.ended":
-      S.call = null;
-      renderCall();
-      renderRoster();
-      toast(m.reason || "The call ended.");
-      return;
-    case "call.note":
-      toast(m.text);
-      return;
+
     case "roster":
       S.users = new Map(m.users.map((u) => [u.id, u]));
       S.groups = m.groups;
@@ -306,12 +285,9 @@ function attachTrack(mid, track) {
   Object.assign(sub, { audio, source, muffle, gain, pan });
 }
 
-const inMyCall = (id) => Boolean(S.call && S.call.people.some((p) => p.id === id && p.state === "in"));
-
 // Mirrors the server's rules; the server double-checks every request.
 function canHear(u, slack) {
   if (u.id === S.myId || !u.published || u.voiceMuted) return false;
-  if (u.inCall) return inMyCall(u.id);   // calls are private: only the people in the call hear each other
   if (u.global && u.canGlobal) return true;
   const me = S.users.get(S.myId);
   if (me?.group && me.group === u.group) return true;
@@ -401,7 +377,7 @@ function updateMix() {
     let p = 0;
     let cutoff = 20000;
     if (u && !S.deafened) {
-      if ((u.global && u.canGlobal) || (me?.group && me.group === u.group) || inMyCall(owner)) {
+      if ((u.global && u.canGlobal) || (me?.group && me.group === u.group)) {
         g = 1;
       } else {
         const b = S.pos.get(owner);
@@ -438,7 +414,6 @@ function groupName(id) {
 
 function detail(u) {
   const me = S.users.get(S.myId);
-  if (u.inCall) return u.id !== S.myId && inMyCall(u.id) ? "In your call" : "In a call";
   if (u.global && u.canGlobal) return "Global Mic";
   if (u.id !== S.myId && me?.group && me.group === u.group) return `In your group`;
   const parts = [];
@@ -799,7 +774,6 @@ async function join() {
     startMeter();
     S.timers.push(setInterval(updateSubscriptions, 700));
     S.timers.push(setInterval(updateMix, 100));
-    afterJoin();
     if (isIPad()) notice("iPad tip: iPadOS pauses the microphone when Voice isn't on screen. Open Voice in Split View or Slide Over next to Minecraft (swipe up the Dock and drag GalaxySMP to the side) so others keep hearing you. If you switch away anyway, your mic turns back on when you come back.", true);
   } catch (e) {
     cleanup();
@@ -830,10 +804,6 @@ function cleanup() {
   S.users.clear();
   S.pos.clear();
   S.talking = false;
-  S.call = null;
-  hideIncoming();
-  stopRing();
-  renderCall();
 }
 
 function leave() {
@@ -841,163 +811,6 @@ function leave() {
   try { S.ws?.close(1000, "bye"); } catch { /* ignore */ }
   cleanup();
   show("v-join");
-}
-
-// ---------- Calls (2.90) ----------
-const fmtClock = (ms) => {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  return `${h ? `${h}:${String(m).padStart(2, "0")}` : m}:${String(sec).padStart(2, "0")}`;
-};
-
-// A soft ring: two short tones every 2 seconds (incoming), or one longer tone (calling someone)
-const ring = { timer: null, kind: null };
-function tone(freqs, len) {
-  const ctx = S.ctx || (ring.ctx ||= new (window.AudioContext || window.webkitAudioContext)());
-  if (ctx.state === "suspended") ctx.resume().catch(() => {});
-  const t0 = ctx.currentTime;
-  freqs.forEach((f, i) => {
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.type = "sine";
-    o.frequency.value = f;
-    const start = t0 + i * (len + 0.08);
-    g.gain.setValueAtTime(0, start);
-    g.gain.linearRampToValueAtTime(0.16, start + 0.02);
-    g.gain.setValueAtTime(0.16, start + len - 0.05);
-    g.gain.linearRampToValueAtTime(0, start + len);
-    o.connect(g).connect(S.out || ctx.destination);
-    o.start(start);
-    o.stop(start + len + 0.05);
-  });
-}
-function startRing(kind) {
-  if (ring.kind === kind) return;
-  stopRing();
-  ring.kind = kind;
-  const play = () => (kind === "incoming" ? tone([880, 660], 0.35) : tone([440], 0.9));
-  try { play(); } catch { /* no audio yet */ }
-  ring.timer = setInterval(() => { try { play(); } catch { /* ignore */ } }, kind === "incoming" ? 2000 : 3000);
-}
-function stopRing() {
-  clearInterval(ring.timer);
-  ring.timer = null;
-  ring.kind = null;
-}
-
-function renderCall() {
-  const box = $("v-call");
-  const c = S.call;
-  clearInterval(renderCall.t);
-  if (!c) {
-    box.hidden = true;
-    if (ring.kind === "outgoing") stopRing();
-    return;
-  }
-  box.hidden = false;
-  const others = c.people.filter((p) => p.id !== S.myId);
-  const inCall = others.filter((p) => p.state === "in");
-  const ringing = others.filter((p) => p.state === "ringing");
-  $("v-call-title").textContent = others.length ? others.map((p) => p.username).join(", ") : "Call";
-  const status = () => {
-    if (!inCall.length && ringing.length) return `Calling ${ringing.map((p) => p.username).join(", ")}…`;
-    const time = c.startedAt ? fmtClock(Date.now() - c.startedAt) : "";
-    return [time, ringing.length ? `Calling ${ringing.map((p) => p.username).join(", ")}…` : null].filter(Boolean).join(" · ");
-  };
-  $("v-call-status").textContent = status();
-  renderCall.t = setInterval(() => { $("v-call-status").textContent = status(); }, 1000);
-  $("v-call-people").replaceChildren(...c.people.map((p) => {
-    const u = S.users.get(p.id);
-    const talking = p.state === "in" && u?.talking && u?.mic;
-    const sub = p.state === "ringing" ? "Ringing…" : p.id === S.myId ? (S.micOn ? "You" : "You · muted")
-      : !p.connected ? "Connecting…" : u && !u.mic ? "Muted" : talking ? "Talking" : "In the call";
-    return h("div", { class: `call-person${talking ? " talking" : ""}${p.state === "ringing" ? " ringing" : ""}` },
-      h("span", { class: "call-avatar", text: (p.username || "?").slice(0, 1).toUpperCase() }),
-      h("span", { class: "call-person-name", text: p.username }),
-      h("span", { class: "call-person-sub text-3 small", text: sub }));
-  }));
-  $("v-call-mute").textContent = S.micOn ? "Mute" : "Unmute";
-  $("v-call-add").disabled = c.people.length >= c.max;
-  $("v-call-add").title = c.people.length >= c.max ? `A call can have up to ${c.max} people.` : "";
-  if (!inCall.length && ringing.length) startRing("outgoing");
-  else if (ring.kind === "outgoing") stopRing();
-}
-
-function showIncoming(m) {
-  S.incoming = m;
-  $("v-incoming-name").textContent = m.from;
-  $("v-incoming-sub").textContent = m.with?.length ? `is calling you, with ${m.with.join(", ")}` : "is calling you";
-  $("v-incoming").hidden = false;
-  startRing("incoming");
-  $("v-incoming-accept").focus();
-}
-function hideIncoming() {
-  S.incoming = null;
-  $("v-incoming").hidden = true;
-  if (ring.kind === "incoming") stopRing();
-}
-
-async function answerCall(id) {
-  hideIncoming();
-  try {
-    const r = await request("call.accept", { id });
-    S.call = r.call;
-    renderCall();
-    if (!S.micOn) toast("You're in the call. Unmute to talk.");
-  } catch (e) { toast(e.message); }
-}
-
-async function startCall(to) {
-  try {
-    const r = await request("call.start", { to });
-    S.call = r.call;
-    renderCall();
-    toast(`Calling ${r.calling}…`);
-  } catch (e) { toast(e.message); }
-}
-
-// Add a friend to the call: your friends who aren't in it yet, or any name
-async function addToCall() {
-  const name = h("input", { class: "input", maxlength: 32, placeholder: "Friend's name", autocomplete: "off" });
-  const list = h("div", { class: "call-add-list" }, h("p", { class: "text-3 small", style: "margin:0", text: "Loading your friends…" }));
-  const add = async (to) => {
-    try { await request("call.add", { to }); toast("Calling…"); close?.(); } catch (e) { toast(e.message); }
-  };
-  let close = null;
-  getJson("/api/friends").then((d) => {
-    const here = new Set((S.call?.people || []).map((p) => p.id));
-    const friends = (d.friends || []).filter((f) => !here.has(f.id));
-    list.replaceChildren(...(friends.length ? friends.map((f) => h("div", { class: "vinvite" },
-      h("span", {}, f.username, f.inGame ? h("span", { class: "text-3 small", text: " · playing" }) : null),
-      h("button", { class: "btn btn-primary btn-sm", type: "button", text: "Add", onclick: () => add(f.id) })))
-      : [h("p", { class: "text-3 small", style: "margin:0", text: "No other friends to add. Type a name below." })]));
-  }).catch(() => list.replaceChildren(h("p", { class: "text-3 small", style: "margin:0", text: "Type their name below." })));
-  close = openDialog({
-    title: "Add someone to the call",
-    body: h("div", { class: "form" }, h("p", { class: "text-2 small", style: "margin:0", text: `Up to ${S.call?.max || 4} people. They need to be your friend.` }),
-      list, field("Or type a name", name)),
-    actions: [{ label: "Close" }, { label: "Call", kind: "primary", onClick: async () => { await request("call.add", { to: name.value }); toast("Calling…"); } }],
-  })?.close || null;
-}
-
-$("v-call-mute").addEventListener("click", () => $("v-mic").click());
-$("v-call-add").addEventListener("click", addToCall);
-$("v-call-hangup").addEventListener("click", () => request("call.leave").catch((e) => toast(e.message)));
-$("v-incoming-accept").addEventListener("click", () => S.incoming && answerCall(S.incoming.id));
-$("v-incoming-decline").addEventListener("click", () => {
-  const id = S.incoming?.id;
-  hideIncoming();
-  if (id) request("call.decline", { id }).catch(() => {});
-});
-
-// /voice?call=<member> (Call button in DMs and profiles) and /voice?answer=<call> (a ring notification)
-const params = new URLSearchParams(location.search);
-const wantCall = params.get("call");
-const wantAnswer = params.get("answer");
-function afterJoin() {
-  if (!wantCall && !wantAnswer) return;
-  history.replaceState(null, "", "/voice");
-  if (wantAnswer) answerCall(wantAnswer);
-  else if (wantCall) startCall(/^\d+$/.test(wantCall) ? Number(wantCall) : wantCall);
 }
 
 // ---------- Wire up controls ----------
@@ -1071,10 +884,6 @@ if (!isInstalled() && window.top === window) {  // inside the community page, it
   if (!user) return show("v-signin");
   S.me = user;
   $("v-name").textContent = user.username;
-  if (wantCall || wantAnswer) {   // came here to call someone or answer: one tap (the browser needs it for the microphone)
-    $("v-join-btn").textContent = wantAnswer ? "Answer the call" : "Join voice and call";
-    $("v-join").querySelector("h2").textContent = wantAnswer ? "Answer your call" : "Start your call";
-  }
   show("v-join");
 })();
 

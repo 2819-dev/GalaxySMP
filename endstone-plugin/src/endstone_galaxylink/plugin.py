@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.91.0"
+VERSION = "2.92.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -95,7 +95,7 @@ class GalaxyLink(Plugin):
         "shopnpc": _cmd("Summon a shop NPC where you stand (tap it to edit it). /shopnpc fix puts back missing NPCs near you.", "/shopnpc [action: message]", "galaxylink.command.shopnpc"),
         "guide": _cmd("Help: server info, rules and commands. Command blocks: guide @p", "/guide [player: player]", "galaxylink.command.guide"),
         "party": _cmd("Your party: invite players, accept an invite, or leave. Party chat: /p <message>.", "/party [action: message]", "galaxylink.command.party"),
-        "call": _cmd("Call a friend (voice on galaxymc.us/voice): /call <player>, /call accept, /call decline, /call add <player>, /call hangup.",
+        "call": _cmd("Call a friend (you talk from your DMs on galaxymc.us): /call <player>, /call accept, /call decline, /call add <player>, /call hangup.",
                      "/call [action: message]", "galaxylink.command.call"),
         "p": _cmd("Party chat.", "/p <message: message>", "galaxylink.command.party", ["pc"]),
         "sift": _cmd("Staff: go to the Sift, or build it (/sift build, /sift stop, /sift status).", "/sift [action: message]", "galaxylink.command.sift"),

@@ -351,9 +351,9 @@ function renderDMs(p) {
         await postJson(`/api/dm/block/${userId}`, { blocked: !d.blocked }); open(userId);
       } }],
     }));
-    // Call (2.90): friends only (the owner can call anyone); the call opens on the Voice page
-    const callBtn = h("a", { class: "btn btn-secondary btn-sm dm-call-btn", href: `/voice?call=${userId}`, hidden: true, title: `Call ${d.other.username}` },
-      iconEl("phone"), "Call");
+    // Call: friends only (the owner can call anyone); the call bar opens right here (call.js)
+    const callBtn = h("button", { class: "btn btn-secondary btn-sm dm-call-btn", type: "button", hidden: true, title: `Call ${d.other.username}`,
+      onclick: () => import("/js/call.js").then((m) => m.startCall(Number(userId))) }, iconEl("phone"), "Call");
     const owner = Boolean(ctx.me?.owner || chatState.me?.owner);
     if (!d.blocked) {
       if (owner) callBtn.hidden = false;
@@ -406,7 +406,8 @@ function renderDMs(p) {
         h("span", { class: "dm-call-ico" }, iconEl("phone")),
         h("span", { class: "dm-call-text", text }),
         h("span", { class: "dm-call-time text-3 small", text: dmTime(m.at) }),
-        !callBtn.hidden || owner ? h("a", { class: "btn btn-ghost btn-sm", href: `/voice?call=${userId}`, text: "Call back" }) : null);
+        !callBtn.hidden || owner ? h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Call back",
+          onclick: () => import("/js/call.js").then((m) => m.startCall(Number(userId))) }) : null);
     };
     const add = (m) => {
       if (m.call) {

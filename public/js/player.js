@@ -68,6 +68,7 @@ async function load() {
   }
   const p = data.player;
   document.title = `${p.name} · GalaxySMP`;
+  if (signedIn) import("/js/call.js").then((m) => m.initCalls()).catch(() => {});   // a call you're in (rejoin) or one ringing
   if (p.bot) { box.replaceChildren(botPage(p)); return; }
   const s = p.stats;
   const pos = (k) => (p.positions[k] ? `#${p.positions[k].toLocaleString()} on the server` : null);
@@ -97,9 +98,10 @@ async function load() {
   const actions = h("div", { class: "pp-actions" });
   if (social && !social.isMe) actions.append(h("a", { class: "btn btn-primary btn-sm", href: `/community#dm-${social.id}` }, iconEl("message"), "Message"));
   if (social && !social.isMe) actions.append(h("a", { class: "btn btn-secondary btn-sm", href: `/community?to=${encodeURIComponent(p.name)}#marketplace/trades` }, iconEl("handshake"), "Trade"));
-  // Call (2.90): friends (the owner can call anyone)
+  // Call: friends (the owner can call anyone); the call bar opens right here on the profile (call.js)
   if (social && !social.isMe) {
-    const call = h("a", { class: "btn btn-secondary btn-sm", href: `/voice?call=${social.id}`, hidden: p.friend !== "friends" }, iconEl("phone"), "Call");
+    const call = h("button", { class: "btn btn-secondary btn-sm", type: "button", hidden: p.friend !== "friends",
+      onclick: () => import("/js/call.js").then((m) => m.startCall(Number(social.id))) }, iconEl("phone"), "Call");
     actions.append(call);
     if (p.friend !== "friends") getJson("/api/me").then((m) => { if (m.user?.owner) call.hidden = false; }).catch(() => {});
   }

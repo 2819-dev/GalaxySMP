@@ -1361,6 +1361,7 @@ function connect() {
   if (state.stopped) return;
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   const ws = new WebSocket(`${proto}//${location.host}/api/chat/connect`);
+  import("/js/call.js").then((m) => m.initCalls()).catch(() => {});   // a call you're in, or one ringing (once per page)
   state.ws = ws;
 
   ws.addEventListener("open", () => {
@@ -1482,11 +1483,11 @@ function handleEvent(data) {
     case "voice_invite":
       toast(`${data.from} invited you to the voice group "${data.group}". Open Voice Chat to join.`);
       break;
-    case "call_ring":   // a friend is calling you (2.90)
-      import("/js/call-ring.js").then((m) => m.showRing(data)).catch(() => toast(`${data.from} is calling you. Open Voice to answer.`));
+    case "call_ring":   // a friend is calling you: the call bar shows Answer / Decline (call.js)
+      import("/js/call.js").then((m) => m.showIncoming(data)).catch(() => toast(`${data.from} is calling you. Open your messages to answer.`));
       break;
     case "call_ring_end":
-      import("/js/call-ring.js").then((m) => m.endRing(data)).catch(() => {});
+      import("/js/call.js").then((m) => m.endRing(data)).catch(() => {});
       break;
     case "dm_read":
     case "dm_edit":

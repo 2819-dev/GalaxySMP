@@ -13,14 +13,6 @@ export async function voiceEvent(env, event) {
   await voiceStub(env).fetch("https://voice/internal/event", { method: "POST", body: JSON.stringify(event) });
 }
 
-// POST /api/calls/decline { id }: decline a call from the ringing banner on the Community page (2.90)
-export async function declineCall(request, env) {
-  const user = await requireUser(request, env);
-  const body = await request.json().catch(() => ({}));
-  await voiceEvent(env, { type: "call_decline", userId: Number(user.id), id: String(body.id || "").slice(0, 16) || null });
-  return Response.json({ ok: true });
-}
-
 // A browser joins voice. The website account (made with /link) is the voice identity.
 export async function voiceConnect(request, env) {
   if (request.headers.get("Upgrade") !== "websocket") throw new HttpError(426, "Expected a WebSocket.");
@@ -50,7 +42,6 @@ async function voiceHeaders(env, request, user) {
     mcUuid: String(extra.mc_uuid).toLowerCase(),
     canGlobal: power >= 50 || Boolean(extra.global_mic),
     staffChat: can(user, "staff_chat"),
-    owner: Boolean(user.owner),   // the owner can call anyone (everyone else calls friends)
     voiceMutedUntil: extra.voice_muted_until && new Date(extra.voice_muted_until) > new Date() ? extra.voice_muted_until : null,
     device: user.device || null,
   }));

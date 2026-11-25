@@ -594,7 +594,7 @@ class Welcome:
             if str(p_on.unique_id) not in social.party_of(str(player.unique_id)):
                 form.add_button("Invite to party", on_click=lambda p: (social.invite(p, p_on), self.go(p, "social", 2)))
         form.add_button("Message", on_click=lambda p: social.ask_message(p, f["name"], then=lambda pl: self.go(pl, "social", 0)))
-        if getattr(self.plugin, "calls", None) is not None:   # a voice call (talk on galaxymc.us/voice)
+        if getattr(self.plugin, "calls", None) is not None:   # a call (you talk from your DMs on galaxymc.us)
             form.add_button("📞 Call", on_click=lambda p: (self.plugin.calls.command(p, [f["name"]]), self.go(p, "social", 0)))
         form.add_button("§cRemove friend", on_click=lambda p: social.act(p, "remove", then=lambda: self.go(p, "social", 0), userId=f["id"]))
         self.send(player, form)

@@ -1,7 +1,7 @@
 """Calls in game (2.90): private voice calls with friends, up to 4 people.
 
     /call <player>       call a friend (the owner can call anyone)
-    /call accept         answer (the call itself is on galaxymc.us/voice, on your phone or computer)
+    /call accept         answer (you talk from your DMs on galaxymc.us, on your phone or computer)
     /call decline        say no
     /call add <player>   add a friend to the call you're in
     /call hangup         leave the call
@@ -17,7 +17,7 @@ USAGE = ("§b📞 Calls§r §7(friends only, up to 4 people)\n"
          "§e/call accept§7 / §e/call decline§7 answer or say no\n"
          "§e/call add <player>§7 add a friend to your call\n"
          "§e/call hangup§7 leave the call\n"
-         "§7You talk on §bgalaxymc.us/voice§7 (on your phone or computer).")
+         "§7You talk from your §bDMs on galaxymc.us§7 (on your phone or computer).")
 
 
 class Calls:
@@ -78,7 +78,7 @@ class Calls:
             except Exception:
                 pass
             p.send_message(f"§b📞 §f{name}§b is calling you. §7Type §a/call accept§7 to answer or §c/call decline§7. "
-                           "§7You'll talk on §bgalaxymc.us/voice§7.")
+                           "§7You talk from your §bDMs on galaxymc.us§7.")
             self.ring_sound(p)
         elif t == "call_ring_end":
             self.ringing.pop(x, None)
