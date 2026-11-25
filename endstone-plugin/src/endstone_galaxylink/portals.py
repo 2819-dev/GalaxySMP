@@ -187,17 +187,28 @@ class Portals:
             return
         now = time.time()
         welcome = getattr(self.plugin, "welcome", None)
+        inside_now = set()
+        was_inside = getattr(self, "inside_before", set())
         for p in list(self.plugin.server.online_players):
             try:
+                uid = str(p.unique_id)
                 l = p.location
                 hit = next((i for i in items if self.inside(i, p.dimension.name, l.x, l.y, l.z)), None)
-                if hit is None or now - self.used.get(str(p.unique_id), 0) < COOLDOWN:
+                if hit is None:
                     continue
-                self.used[str(p.unique_id)] = now
+                inside_now.add(uid)
+                # only stepping INTO a portal counts (standing in one, e.g. after "isn't open", doesn't repeat it),
+                # and never while the join Main Menu is open
+                if uid in was_inside or now - self.used.get(uid, 0) < COOLDOWN:
+                    continue
+                if welcome is not None and welcome.waiting(p):
+                    continue
+                self.used[uid] = now
                 if welcome is None or not welcome.travel(p, hit["dest"]):
                     p.send_message(f"§c{hit['dest']} isn't open right now.")
             except Exception:
                 continue
+        self.inside_before = inside_now
         if now - self.checked > 30:
             self.checked = now
             self.repair(items)

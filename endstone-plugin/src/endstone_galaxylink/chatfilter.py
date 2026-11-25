@@ -37,12 +37,17 @@ def normalize(text):
     return "".join(LEET.get(ch, ch) for ch in t)
 
 
+MAX_SPACED = 24   # the longest spaced-out word ("s h i t") we look for, in letters
+
+
 def letter_pattern(word):
     return "".join(f"{re.escape(c)}+" for c in normalize(word) if c.isalnum())
 
 
 def compile_words(rows):
-    word_res, contains_res = [], []
+    """All whole-word patterns in ONE regex and all "contains" patterns in another (one check per piece of text
+    instead of one per word: much faster on long messages)."""
+    words, contains, plain = [], [], []
     for row in rows or []:
         if row.get("match") == "safe":
             continue
@@ -50,11 +55,13 @@ def compile_words(rows):
         if not p:
             continue
         if row.get("match") == "contains":
-            contains_res.append(re.compile(p))
+            contains.append(p)
         else:
-            word_res.append(re.compile(f"^{p}(?:s|es|ed|ing|er|ers|y)?$"))
-            word_res.append(re.sub(r"[^a-z]", "", normalize(row.get("word", ""))))  # plain spelling, for f*ck-style matches
-    return [r for r in word_res if not isinstance(r, str)], contains_res, [r for r in word_res if isinstance(r, str)]
+            words.append(p)
+            plain.append(re.sub(r"[^a-z]", "", normalize(row.get("word", ""))))  # plain spelling, for f*ck-style matches
+    word_res = [re.compile("^(?:" + "|".join(words) + ")(?:s|es|ed|ing|er|ers|y)?$")] if words else []
+    contains_res = [re.compile("(?:" + "|".join(contains) + ")")] if contains else []
+    return word_res, contains_res, plain
 
 
 def scramble(n):
@@ -127,9 +134,10 @@ class ChatFilter:
                 run.append(tok)
                 continue
             if len(run) > 1:
+                letters = "".join(t[2] for t in run)
                 for i in range(len(run)):
-                    for j in range(i + 1, len(run)):
-                        if self._bad("".join(t[2] for t in run[i:j + 1])):
+                    for j in range(i + 1, min(len(run), i + MAX_SPACED)):   # no bad word is longer than that
+                        if self._bad(letters[i:j + 1]):
                             spans.append((run[i][0], run[j][1]))
             run = []
         # Words hidden across spaces ("contains" words only): check the whole message's letters.

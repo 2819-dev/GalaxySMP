@@ -51,7 +51,8 @@ class Leaderboards:
     # ---------- text ----------
     def text(self, key):
         _, title, fmt = BOARD_BY_KEY.get(key, BOARDS[0])
-        rows = self.plugin.progress.leaderboard(key, 10)
+        cache = getattr(self, "_rows", None)
+        rows = cache[key] if cache and key in cache else self.plugin.progress.leaderboard(key, 10)
         lines = [f"§l§d✦ §b{title} §d✦"]
         if not rows:
             lines.append("§7Nobody yet. Be the first!")
@@ -73,10 +74,14 @@ class Leaderboards:
     def update(self):
         """Every minute: refresh the rankings on every board."""
         try:
+            # every board's rankings in one pass over the saved stats (not one pass per board)
+            self._rows = self.plugin.progress.leaderboards({b["key"] for b in self.boards}, 10) if self.boards else {}
             for board in self.boards:
                 self.show(board)
         except Exception as e:
             self.plugin.logger.warning(f"Leaderboard update failed: {e}")
+        finally:
+            self._rows = None
 
     # ---------- /leaderboard ----------
     def menu(self, player):

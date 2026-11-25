@@ -187,14 +187,19 @@ def rebuild(snap):
     return stack
 
 
-GIVE_HOOK = None  # set by the Build Contest: items for a player who is building are kept for later
+GIVE_HOOK = None  # (older single hook; kept working)
+GIVE_HOOKS = []   # minigames (Build Contest, Bedwars): items for a player whose real inventory is put away are kept for later
 
 
 def give(player, stack_or_list):
     """Adds items to a player's inventory and drops anything that doesn't fit at their feet."""
     stacks = stack_or_list if isinstance(stack_or_list, list) else [stack_or_list]
-    if GIVE_HOOK is not None and GIVE_HOOK(player, stacks):
-        return 0
+    for hook in GIVE_HOOKS + ([GIVE_HOOK] if GIVE_HOOK is not None else []):
+        try:
+            if hook(player, stacks):
+                return 0
+        except Exception:
+            pass
     dropped = 0
     for stack in stacks:
         try:
@@ -208,6 +213,23 @@ def give(player, stack_or_list):
             except Exception:
                 pass
     return dropped
+
+
+def give_fitting(player, item, count):
+    """Gives up to as many of an item as fit in the player's empty inventory slots (so big amounts aren't dropped on
+    the ground to despawn). Returns how many are left over (still to give)."""
+    if count <= 0:
+        return 0
+    try:
+        inv = player.inventory
+        free = sum(1 for i in range(36) if inv.get_item(i) is None)
+    except Exception:
+        free = 36
+    stacks = make_stacks(item, count)
+    now, later = stacks[:free], stacks[free:]
+    if now:
+        give(player, now)
+    return sum(s.amount for s in later)
 
 
 def make_stacks(item, count):

@@ -54,7 +54,8 @@ class BuildContest:
         self.jobs = []        # [generator, ticks left to wait]
         self.reminded = {}    # event id -> set of reminders sent
         self.allow_tp = set() # player uuids we're teleporting ourselves
-        money.GIVE_HOOK = self.keep_for_later
+        if self.keep_for_later not in money.GIVE_HOOKS:
+            money.GIVE_HOOKS.append(self.keep_for_later)
 
     # ---------- setup ----------
     def save_cfg(self):
@@ -222,7 +223,9 @@ class BuildContest:
             if prize and not self.eco.charge(p, prize):
                 p.send_message(f"§cYou don't have {usd(prize)} for the prize.")
                 return
-            base["contest"] = {"theme": theme, "minutes": BUILD_MINUTES[int(v[1])], "prize": prize, "phase": None}
+            # "charged": whether money was really taken (staff don't pay), so a refund never gives back money nobody paid
+            base["contest"] = {"theme": theme, "minutes": BUILD_MINUTES[int(v[1])], "prize": prize, "phase": None,
+                               "charged": bool(prize) and not p.is_op}
             self.plugin.minigames.create_event(p, base)
             if prize:
                 p.send_message(f"§7{usd(prize)} is held for the prize. You get it back if the contest doesn't happen.")
@@ -234,6 +237,8 @@ class BuildContest:
         if not c or c.get("refunded") or c.get("paid") or not c.get("prize"):
             return
         c["refunded"] = True
+        if not c.get("charged", True):
+            return   # staff hosted it without paying: nothing to give back
         self.eco.add(e["host"], e["host_name"], c["prize"])
         self.plugin.minigames.mail(e["host"], f"§7The {usd(c['prize'])} prize for your Build Contest was given back to you.")
 
@@ -273,6 +278,12 @@ class BuildContest:
         c = e["contest"]
         mg = self.plugin.minigames
         players = [p for p in (self.online(x) for x in e["players"]) if p is not None][:MAX_PLAYERS]
+        bw = getattr(self.plugin, "bedwars", None)
+        if bw is not None:   # someone in Bedwars can't start building too (their real items are already put away there)
+            busy = [p for p in players if bw.playing(p) or str(p.unique_id) in getattr(bw, "queue", [])]
+            for p in busy:
+                p.send_message("§eThe Build Contest started, but you're in Bedwars, so you weren't added this time.")
+            players = [p for p in players if p not in busy]
         if len(players) < MIN_PLAYERS:
             self.broadcast(f"§eThe Build Contest was cancelled: it needs at least {MIN_PLAYERS} players.")
             self.refund(e)
@@ -512,8 +523,7 @@ class BuildContest:
         """Items given to someone who is building (a trade, the Auction House, a crate...) would be wiped with the
         Creative inventory at the end, so they're added to their saved items instead."""
         try:
-            if not self.building(player):
-                return False
+            # building now, or saved items waiting to be given back (e.g. they just rejoined)
             row = self.db.execute("SELECT data FROM bc_saved WHERE xuid = ?", (str(player.xuid),)).fetchone()
             if not row:
                 return False

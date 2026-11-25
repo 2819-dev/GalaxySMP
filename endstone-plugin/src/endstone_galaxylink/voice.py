@@ -199,7 +199,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.88.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.89.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -447,11 +447,13 @@ class VoiceLink:
             try:
                 from endstone_galaxylink.plugin import VERSION
                 info["plugin"] = VERSION
-                from endstone_galaxylink.ranktags import world_packs
-                icons = [v for p, v in world_packs("resource") if p == "6b0f4c3e-2d1a-4a8e-9c5b-1f7e3a9d2c41"]
-                info["iconsPack"] = ".".join(map(str, max(icons))) if icons else "missing"
-                from endstone_galaxylink.ranktags import glyph_conflicts
-                info["iconConflicts"] = [f"{n} ({pg})" for n, pg in glyph_conflicts()][:5]
+                packs = getattr(self, "_pack_info", None)
+                if packs is None:   # the packs only change on a restart: look through the pack folders once
+                    from endstone_galaxylink.ranktags import world_packs, glyph_conflicts
+                    icons = [v for p, v in world_packs("resource") if p == "6b0f4c3e-2d1a-4a8e-9c5b-1f7e3a9d2c41"]
+                    packs = self._pack_info = {"iconsPack": ".".join(map(str, max(icons))) if icons else "missing",
+                                               "iconConflicts": [f"{n} ({pg})" for n, pg in glyph_conflicts()][:5]}
+                info.update(packs)
             except Exception:
                 pass
             try:
@@ -495,48 +497,42 @@ class VoiceLink:
         return "Exploring"
 
     def announce_online(self):
-        """Tell the website which players are here (so ranks can be given on the website) and everyone's money."""
-        self.send_seen(list(self.plugin.server.online_players))
-        try:
-            self.plugin.chatfilter.report()
-        except Exception as e:
-            self.plugin.logger.warning(f"Couldn't send the chat filter state to the website: {e}")
-        try:
-            self.plugin.minigames.push()
-        except Exception as e:
-            self.plugin.logger.warning(f"Couldn't send minigames to the website: {e}")
-        try:
-            self.plugin.crates.push()  # the Crate Odds page
-        except Exception as e:
-            self.plugin.logger.warning(f"Couldn't send crate odds to the website: {e}")
-        try:
-            self.plugin.auction.push()
-            if getattr(self.plugin, "market", None):
-                self.plugin.market.push()
-            if getattr(self.plugin, "parkour", None):
-                self.plugin.parkour.push()
-            if getattr(self.plugin, "collection", None):
-                self.plugin.collection.resend(self)
-            if getattr(self.plugin, "plotplus", None):
-                self.plugin.plotplus.push()
-        except Exception as e:
-            self.plugin.logger.warning(f"Couldn't send Auction House listings to the website: {e}")
-        self.plugin.shopchests.push()
-        try:
+        """Tell the website which players are here (so ranks can be given on the website) and everyone's money, shops,
+        stats and so on. Each part runs on its own tick (a few ticks apart), so a reconnect never freezes the game."""
+        pl = self.plugin
+
+        def heads():
             from endstone_galaxylink.heads import send_head
-            for p in list(self.plugin.server.online_players):
-                send_head(self.plugin, p)
-        except Exception as e:
-            self.plugin.logger.warning(f"Couldn't send player heads to the website: {e}")
-        try:
-            self.send_json(self.plugin.progress.definitions())
-            self.plugin.progress.push(everything=True)
-        except Exception as e:
-            self.plugin.logger.warning(f"Couldn't send stats to the website: {e}")
-        try:
-            self.plugin.economy.sync(everything=True)
-        except Exception as e:
-            self.plugin.logger.warning(f"Couldn't send balances to the website: {e}")
+            for p in list(pl.server.online_players):
+                send_head(pl, p)
+
+        def stats():
+            self.send_json(pl.progress.definitions())
+            pl.progress.push(everything=True)
+
+        steps = [("players", lambda: self.send_seen(list(pl.server.online_players))),
+                 ("the chat filter state", pl.chatfilter.report),
+                 ("minigames", pl.minigames.push),
+                 ("crate odds", pl.crates.push),
+                 ("Auction House listings", pl.auction.push),
+                 ("buy orders", lambda: getattr(pl, "market", None) and pl.market.push()),
+                 ("parkour", lambda: getattr(pl, "parkour", None) and pl.parkour.push()),
+                 ("item collections", lambda: getattr(pl, "collection", None) and pl.collection.resend(self)),
+                 ("plots for sale and rent", lambda: getattr(pl, "plotplus", None) and pl.plotplus.push()),
+                 ("shop chests", pl.shopchests.push),
+                 ("player heads", heads),
+                 ("stats", stats),
+                 ("balances", lambda: pl.economy.sync(everything=True))]
+        for i, (what, fn) in enumerate(steps):
+            def run(fn=fn, what=what):
+                try:
+                    fn()
+                except Exception as e:
+                    pl.logger.warning(f"Couldn't send {what} to the website: {e}")
+            try:
+                pl.server.scheduler.run_task(pl, run, delay=1 + i * 3)
+            except Exception:
+                run()
 
     def send_json(self, obj):
         ws = self.ws

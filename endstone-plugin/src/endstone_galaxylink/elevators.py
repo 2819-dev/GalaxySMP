@@ -492,9 +492,16 @@ class Elevators:
         for e in self.list.values():
             if e["dim"] == d and not (x2 < e["x1"] or x1 > e["x2"] or z2 < e["z1"] or z1 > e["z2"]):
                 return player.send_message("§cThat overlaps another elevator.")
-        floor = self.dim({"dim": d}).get_block_at(x1, y0, z1)
+        dim = self.dim({"dim": d})
+        floor = dim.get_block_at(x1, y0, z1)
         if floor.type == "minecraft:air":
             return player.send_message("§cTap the cabin floor blocks (not air).")
+        # the whole cabin floor must already be built from that block (the plugin never makes blocks for you)
+        for x in range(x1, x2 + 1):
+            for z in range(z1, z2 + 1):
+                if dim.get_block_at(x, y0, z).type != floor.type:
+                    return player.send_message(f"§cBuild the whole {x2 - x1 + 1}x{z2 - z1 + 1} cabin floor from the same block first, "
+                                               "then tap two opposite corners.")
         try:
             states = dict(floor.data.block_states)
         except Exception:
@@ -503,12 +510,28 @@ class Elevators:
         self.list[eid] = {"id": eid, "name": "Elevator", "owner": str(player.xuid), "owner_name": player.name, "dim": d,
                           "x1": x1, "z1": z1, "x2": x2, "z2": z2, "cur": y0, "row": y0, "floor_block": [floor.type, states],
                           "floors": [{"y": y0, "name": "Lobby"}], "queue": []}
-        self.set_row(self.list[eid], y0, self.list[eid]["floor_block"])  # make the whole cabin floor the same block
         self.save()
         self.plugin.progress.add(player, "elevators")
         player.send_message(f"§aElevator created ({x2 - x1 + 1}x{z2 - z1 + 1} cabin) with its first floor, Lobby. "
                             "§7Now go to each other floor, stand on the landing next to the shaft and use the Elevator Tool > Add a floor here. "
                             "Keep the shaft above the cabin an empty hole (no floor inside it on the other floors).")
+
+    def on_break(self, event):
+        """The cabin floor of an elevator can't be broken while the elevator exists (it moves with every trip)."""
+        b = event.block
+        try:
+            dim = b.dimension.name
+        except Exception:
+            return False
+        for e in self.list.values():
+            if e["dim"] == dim and b.y == e.get("row") and e["x1"] <= b.x <= e["x2"] and e["z1"] <= b.z <= e["z2"]:
+                event.is_cancelled = True
+                try:
+                    event.player.send_message("§7That's an elevator's cabin floor. Delete the elevator first (Elevator Tool).")
+                except Exception:
+                    pass
+                return True
+        return False
 
     def add_floor_form(self, player, eid):
         e = self.list.get(eid)

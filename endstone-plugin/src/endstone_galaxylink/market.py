@@ -33,6 +33,10 @@ class Market:
                 status TEXT DEFAULT 'open');
             CREATE INDEX IF NOT EXISTS orders_status ON orders(status);
         """)
+        try:   # 1 = the buyer's money is held, 0 = a staff order (nothing held); older orders: NULL (held)
+            self.db.execute("ALTER TABLE orders ADD COLUMN held INTEGER")
+        except Exception:
+            pass
         self.db.commit()
 
     def record_sale(self, kind, ref, seller_xuid, seller_name, buyer_xuid, buyer_name, label, amount, price):
@@ -148,10 +152,11 @@ class Market:
             return False, f"You can have up to {MAX_ORDERS} open buy orders."
         total = want * each
         p = self.online(xuid)
-        if not (p is not None and p.is_op) and not self.eco.take(xuid, total):
+        free = p is not None and p.is_op   # staff orders aren't paid for, so they're never refunded either
+        if not free and not self.eco.take(xuid, total):
             return False, f"You need {money.exact(total)} for this order (it's held until the order is filled or cancelled)."
-        self.db.execute("INSERT INTO orders (buyer, buyer_name, item_id, label, want, each, created) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        (xuid, name, item_id, label or money.pretty_id(item_id), want, each, time.time()))
+        self.db.execute("INSERT INTO orders (buyer, buyer_name, item_id, label, want, each, created, held) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (xuid, name, item_id, label or money.pretty_id(item_id), want, each, time.time(), 0 if free else 1))
         self.db.commit()
         self.push()
         return True, f"Buy order posted: {want:,}x {label} at {money.exact(each)} each. {money.exact(total)} is held until it's filled."
@@ -208,6 +213,9 @@ class Market:
             return False
         oid, buyer, buyer_name, _, label, want, filled, _, each, _, _ = row
         refund = (want - filled) * each
+        held = self.db.execute("SELECT held FROM orders WHERE id = ?", (oid,)).fetchone()
+        if held and held[0] == 0:
+            refund = 0   # a staff order: no money was held
         self.db.execute("UPDATE orders SET status = ? WHERE id = ?", (why, oid))
         self.db.commit()
         if refund:
@@ -232,12 +240,17 @@ class Market:
         rows = self.db.execute("SELECT id, item_id, label, owed FROM orders WHERE buyer = ? AND owed > 0", (str(xuid),)).fetchall()
         for oid, item_id, label, owed in rows:
             try:
-                dropped = money.give(p, money.make_stacks(item_id, owed))
+                left = money.give_fitting(p, item_id, owed)
             except Exception as e:
                 self.plugin.logger.warning(f"Buy order {oid}: couldn't give {item_id}: {e}")
                 continue
-            self.db.execute("UPDATE orders SET owed = 0 WHERE id = ?", (oid,))
-            p.send_message(f"§aYour buy order delivered §f{owed}x {label}§a." + (" §7(Some dropped at your feet: your inventory was full.)" if dropped else ""))
+            self.db.execute("UPDATE orders SET owed = ? WHERE id = ?", (left, oid))
+            got = owed - left
+            if got:
+                p.send_message(f"§aYour buy order delivered §f{got}x {label}§a."
+                               + (f" §7{left} more are waiting: make room and rejoin." if left else ""))
+            elif left:
+                p.send_message(f"§eYour buy order has §f{left}x {label}§e waiting, but your inventory is full. §7Make room and rejoin.")
         if rows:
             self.db.commit()
 

@@ -205,11 +205,16 @@ class Borders:
         where = dim_cmd(p.dimension.name)
         server = self.plugin.server
         base = math.floor(l.y)
+        # drawn straight to this player (no command to parse; only they need to see their own border warning)
+        direct = hasattr(p, "spawn_particle")
         for x, z, kind in walls:
             for dy in (-1, 1, 3, 5):
                 try:
-                    server.dispatch_command(server.command_sender,
-                                            f"execute in {where} run particle galaxysmp:border_{kind} {x:.2f} {base + dy} {z:.2f}")
+                    if direct:
+                        p.spawn_particle(f"galaxysmp:border_{kind}", x, base + dy, z)
+                    else:
+                        server.dispatch_command(server.command_sender,
+                                                f"execute in {where} run particle galaxysmp:border_{kind} {x:.2f} {base + dy} {z:.2f}")
                 except Exception:
                     pass
 

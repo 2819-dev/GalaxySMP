@@ -20,7 +20,7 @@ import time
 from importlib import resources
 
 RADIUS = 5              # chunks around each player
-PER_RUN = 3             # chunks drawn per run (every 2 seconds)
+PER_RUN = 2             # chunks drawn per run (every 2 seconds)
 REDRAW_SECONDS = 600
 STYLE = 4               # map look version (3 = with heights for the 3D view, 4 = every block has its own colour)
 LIVE_EVERY = 5          # seconds between live player updates
@@ -196,14 +196,13 @@ class LiveMap:
     def wanted(self, now):
         """Chunks near Overworld players that need (re)drawing (and are loaded), nearest first."""
         seen = {}
-        loaded = None
+        dim0 = None
         for p in self.plugin.server.online_players:
             try:
                 if p.dimension.type.name.lower() != "overworld":
                     continue
                 l = p.location
-                if loaded is None:
-                    loaded = self.loaded(p.dimension)
+                dim0 = dim0 or p.dimension
             except Exception:
                 continue
             pcx, pcz = int(l.x) >> 4, int(l.z) >> 4
@@ -212,13 +211,17 @@ class LiveMap:
                     if dx * dx + dz * dz > RADIUS * RADIUS:
                         continue
                     key = (pcx + dx, pcz + dz)
-                    if key not in loaded or now - self.drawn.get(key, 0) < REDRAW_SECONDS:
+                    if now - self.drawn.get(key, 0) < REDRAW_SECONDS:
                         continue
                     d = dx * dx + dz * dz
                     if key not in seen or d < seen[key][0]:
                         seen[key] = (d, p.dimension)
-        self.loaded_now = loaded or set()
-        return sorted(((d, key, dim) for key, (d, dim) in seen.items()), key=lambda t: t[0])
+        if not seen:   # nothing new to draw: don't ask Minecraft for the loaded chunks at all (that list is big)
+            self.loaded_now = set()
+            return []
+        loaded = self.loaded(dim0) if dim0 is not None else set()
+        self.loaded_now = loaded
+        return sorted(((d, key, dim) for key, (d, dim) in seen.items() if key in loaded), key=lambda t: t[0])
 
     def draw_some(self, voice, now):
         todo = self.wanted(now)[:PER_RUN]

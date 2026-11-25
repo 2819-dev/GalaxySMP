@@ -145,6 +145,8 @@ class Bedwars:
         self.parties = {}        # leader uid -> [member uids] (Bedwars parties: always put on the same team)
         self.invites = {}        # invited uid -> (leader uid, time)
         self.mode_votes = {}     # uid -> players per team they voted for
+        if self.keep_for_later not in money.GIVE_HOOKS:
+            money.GIVE_HOOKS.append(self.keep_for_later)   # items given during a game are kept for after it
         self.cleanup_leftovers() # a game that was running when the server stopped
 
     # ---------- storage ----------
@@ -241,6 +243,22 @@ class Bedwars:
         return stack
 
     # ---------- saving and restoring a player's own things ----------
+    def keep_for_later(self, player, stacks):
+        """Items given to someone in Bedwars (a quest reward, a Store pack, a trade, the Auction House...) would be wiped
+        with the game inventory, so they're added to their saved items and given back after the game."""
+        try:
+            row = self.db.execute("SELECT data FROM bw_saved WHERE xuid = ?", (str(player.xuid),)).fetchone()
+            if not row:
+                return False
+            data = json.loads(row[0])
+            data.setdefault("extra", []).extend(money.snapshot(s) for s in stacks if s is not None)
+            self.db.execute("UPDATE bw_saved SET data = ? WHERE xuid = ?", (json.dumps(data), str(player.xuid)))
+            self.db.commit()
+            player.send_message("§7You got items during Bedwars. They're kept safe and you get them after the game.")
+            return True
+        except Exception:
+            return False
+
     def save_player(self, player):
         inv = player.inventory
         data = {
@@ -299,7 +317,10 @@ class Bedwars:
                 except Exception:
                     pass
             try:
-                player.game_mode = GameMode(int(data.get("mode", 0)))
+                mode = GameMode(int(data.get("mode", 0)))
+                if mode == GameMode.CREATIVE and not player.is_op:
+                    mode = GameMode.SURVIVAL   # nobody but staff comes out of a minigame in Creative
+                player.game_mode = mode
             except Exception:
                 player.game_mode = GameMode.SURVIVAL
             try:
@@ -313,6 +334,9 @@ class Bedwars:
                     pass
             self.db.execute("DELETE FROM bw_saved WHERE xuid = ?", (str(player.xuid),))
             self.db.commit()
+            extra = [money.rebuild(s) for s in data.get("extra") or []]
+            if extra:   # items they got during the game
+                money.give(player, [x for x in extra if x is not None])
         else:
             player.game_mode = GameMode.SURVIVAL
         try:
@@ -423,6 +447,8 @@ class Bedwars:
         if not inv or now() - inv[1] > 300:
             return player.send_message("§7You don't have a party invite (they last 5 minutes).")
         leader = inv[0]
+        if leader == uid or self.online(leader) is None:
+            return player.send_message("§7That party invite isn't valid any more (the leader left).")
         if self.party_of(uid):
             self.party_leave(player, quiet=True)
         members = self.parties.setdefault(leader, [])
@@ -518,6 +544,15 @@ class Bedwars:
         uid = str(player.unique_id)
         if not self.ready():
             return player.send_message("§cBedwars isn't set up yet.")
+        bc = getattr(self.plugin, "buildcontest", None)
+        try:
+            if bc is not None and (bc.building(player) or bc.has_saved(player)):
+                return player.send_message("§cYou're in the Build Contest. Leave it first (/leave).")
+        except Exception:
+            pass
+        wl = getattr(self.plugin, "welcome", None)
+        if wl is not None and wl.waiting(player) and uid not in self.queue and uid not in self.players:
+            wl.done(player, greet=False)   # still on the join Main Menu (e.g. pulled in by their party): start playing first
         if uid in self.queue or uid in self.players:
             return
         if len(self.queue) >= self.capacity():

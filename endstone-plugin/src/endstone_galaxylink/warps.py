@@ -92,8 +92,18 @@ class Warps:
         self.db.execute("INSERT OR REPLACE INTO warps (owner, owner_name, name, data, created, visits) VALUES (?,?,?,?,?,?)",
                         (str(player.xuid), player.name, name, json.dumps(where(player)), time.time(), old["visits"] if old else 0))
         self.db.commit()
+        if old and old["name"] != name:
+            self.unfeature(old["name"])   # renamed: the old name isn't featured any more
         msg = f"moved and renamed to §e{name}" if old and old["name"] != name else ("moved here" if old else f"§e{name}§a is ready")
         player.send_message(f"§aYour warp {msg}. §7Anyone can visit with §e/warp {name}§7.")
+
+    def unfeature(self, name):
+        """A deleted or renamed warp leaves the Featured Warps (so a new warp with that name isn't featured by mistake)."""
+        eco = self.plugin.economy
+        cur = eco.get_config("featured_warps") or []
+        keep = [n for n in cur if str(n).lower() != str(name).lower()]
+        if len(keep) != len(cur):
+            eco.set_config("featured_warps", keep)
 
     def del_warp(self, player, args):
         name = " ".join(args).strip()
@@ -105,4 +115,5 @@ class Warps:
             return player.send_message("§cYou can only delete your own warp.")
         self.db.execute("DELETE FROM warps WHERE owner = ?", (w["owner"],))
         self.db.commit()
+        self.unfeature(w["name"])
         player.send_message(f"§aDeleted the warp {w['name']}" + (f" (by {w['ownerName']})." if w["owner"] != str(player.xuid) else "."))

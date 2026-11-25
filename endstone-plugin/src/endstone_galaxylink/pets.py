@@ -36,6 +36,7 @@ class Pets:
     def __init__(self, plugin):
         self.plugin = plugin
         self.bounced = {}    # player uuid -> last bounce time
+        self.no_dumplings_until = 0   # no dumplings anywhere: skip the bounce check until then
         self.landing = {}    # player uuid -> no fall damage until
         self.on_shoulder = {}  # player uuid -> blub actor id
         self.waiting = []    # pets that just spawned: (time, actor) checked for babies
@@ -67,6 +68,21 @@ class Pets:
                         (pid, str(xuid), kind, name if name is not None else (row[0] if row else None), row[1] if row else time.time()))
         self.db.commit()
         self.sync(xuid)
+
+    def on_death(self, actor):
+        """A remembered pet died: it leaves its owner's pet list (in game and on the website)."""
+        try:
+            pid = next((str(t)[len(PID_TAG):] for t in actor.scoreboard_tags if str(t).startswith(PID_TAG)), None)
+        except Exception:
+            return
+        if not pid:
+            return
+        row = self.db.execute("SELECT xuid FROM pet_book WHERE pet_id = ?", (pid,)).fetchone()
+        if not row:
+            return
+        self.db.execute("DELETE FROM pet_book WHERE pet_id = ?", (pid,))
+        self.db.commit()
+        self.sync(row[0])
 
     def of(self, xuid):
         rows = self.db.execute("SELECT pet_id, kind, name, tamed FROM pet_book WHERE xuid = ? ORDER BY tamed", (str(xuid),)).fetchall()
@@ -211,23 +227,29 @@ class Pets:
         """Every few ticks: players standing on a dumpling get bounced up (boing!)."""
         self.check_babies()
         now = time.time()
+        if now < self.no_dumplings_until:   # none anywhere last time: look again in a couple of seconds
+            return
         server = self.plugin.server
-        for p in list(server.online_players):
+        players = [p for p in list(server.online_players) if now - self.bounced.get(str(p.unique_id), 0) >= BOUNCE_COOLDOWN]
+        if not players:
+            return
+        # each world's dumplings are found once per check (not once per player): looking through every entity is slow
+        spots = {}
+        for p in players:
             try:
-                uid = str(p.unique_id)
-                if now - self.bounced.get(uid, 0) < BOUNCE_COOLDOWN:
-                    continue
+                dim = p.dimension
+                if dim.name not in spots:
+                    spots[dim.name] = [a.location for a in dim.actors if type_of(a) == "galaxysmp:dumpling"]
                 l = p.location
-                for a in p.dimension.actors:
-                    if type_of(a) != "galaxysmp:dumpling":
-                        continue
-                    d = a.location
+                for d in spots[dim.name]:
                     dy = l.y - d.y
                     if abs(l.x - d.x) < 0.55 and abs(l.z - d.z) < 0.55 and 0.25 < dy < 0.9:
                         self.bounce(p, d)
                         break
             except Exception:
                 continue
+        if not any(spots.values()):
+            self.no_dumplings_until = now + 2
 
     def bounce(self, p, where):
         uid = str(p.unique_id)

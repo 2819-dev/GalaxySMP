@@ -26,6 +26,13 @@ class Economy:
         folder = plugin.data_folder
         folder.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(str(folder / "economy.db"), check_same_thread=False)
+        try:
+            # faster saves: write-ahead log, and no extra disk flush on every save (still safe if the server is killed;
+            # only a power cut on the host could lose the last second)
+            self.db.execute("PRAGMA journal_mode=WAL")
+            self.db.execute("PRAGMA synchronous=NORMAL")
+        except Exception:
+            pass
         self.db.executescript("""
             CREATE TABLE IF NOT EXISTS balances (xuid TEXT PRIMARY KEY, name TEXT, cents INTEGER NOT NULL, updated REAL);
             CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT);

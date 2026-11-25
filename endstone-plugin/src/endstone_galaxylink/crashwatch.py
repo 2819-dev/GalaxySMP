@@ -105,32 +105,40 @@ class CrashWatch:
 
     # ---------- while running ----------
     def mark(self, what):
-        """Notes what the plugin is about to do (shown in the crash report if the server dies during it)."""
+        """Notes what the plugin is about to do (shown in the crash report if the server dies during it). Starting a
+        task writes the note straight away (a light write: no new memory readings); going back to idle doesn't."""
         if what != self.doing:
             self.doing = what
-            self.beat(force=True)
+            if what != "idle":
+                self.beat(force=True, light=True)
 
-    def beat(self, force=False):
+    def beat(self, force=False, light=False):
         now = time.time()
         if not force and now - self.last_beat < BEAT_SECONDS:
             return
-        self.last_beat = now
-        try:
-            players = [p.name for p in self.plugin.server.online_players]
-        except Exception:
-            players = []
-        from endstone_galaxylink.diagnostics import cgroup_memory, cgroup_now
-        cg = cgroup_memory()
-        used, limit = cgroup_now()
-        self.trail = (self.trail + [[round(now - self.started), used]])[-60:]
-        if now - self.full_at >= 10:   # the full memory picture (it looks through all processes) every 10 seconds
-            self.full_at = now
-            self.full_memory = memory()
-        self.guard(used, limit)
-        diag = getattr(self.plugin, "diagnostics", None)
-        data = {"started": self.started, "t": now, "doing": self.doing, "players": players[:40], "memory": self.full_memory,
-                "bootTime": self.boot, "containerStart": self.container, "oomKills": cg.get("oomKills"), "cgroup": cg,
-                "health": getattr(diag, "latest", None), "memTrail": self.trail, "memLimit": limit}
+        data = getattr(self, "last_data", None)
+        if light and data is not None:
+            # only "what it's doing" changed: rewrite the last note with that (no new readings)
+            data = dict(data, t=now, doing=self.doing)
+        else:
+            self.last_beat = now
+            try:
+                players = [p.name for p in self.plugin.server.online_players]
+            except Exception:
+                players = []
+            from endstone_galaxylink.diagnostics import cgroup_memory, cgroup_now
+            cg = cgroup_memory()
+            used, limit = cgroup_now()
+            self.trail = (self.trail + [[round(now - self.started), used]])[-60:]   # one reading every 2 seconds
+            if now - self.full_at >= 10:   # the full memory picture (it looks through all processes) every 10 seconds
+                self.full_at = now
+                self.full_memory = memory()
+            self.guard(used, limit)
+            diag = getattr(self.plugin, "diagnostics", None)
+            data = {"started": self.started, "t": now, "doing": self.doing, "players": players[:40], "memory": self.full_memory,
+                    "bootTime": self.boot, "containerStart": self.container, "oomKills": cg.get("oomKills"), "cgroup": cg,
+                    "health": getattr(diag, "latest", None), "memTrail": self.trail, "memLimit": limit}
+            self.last_data = data
         try:
             tmp = self.file.with_suffix(".tmp")
             tmp.write_text(json.dumps(data), "utf-8")

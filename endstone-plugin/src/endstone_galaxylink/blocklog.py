@@ -55,6 +55,7 @@ class BlockLog:
             old_type TEXT, old_states TEXT, new_type TEXT, new_states TEXT, undone INTEGER DEFAULT 0)""")
         self.db.execute("CREATE INDEX IF NOT EXISTS block_log_pos ON block_log (dim, x, y, z)")
         self.db.execute("CREATE INDEX IF NOT EXISTS block_log_player ON block_log (xuid, t)")
+        self.db.execute("CREATE INDEX IF NOT EXISTS block_log_t ON block_log (t)")   # the daily clean-up finds old rows fast
         self.db.commit()
         self.buffer = []
         self.inspecting = set()
@@ -83,15 +84,20 @@ class BlockLog:
             self.buffer = []
 
     def prune(self):
+        """Forgets changes older than KEEP_DAYS, 5,000 rows at a time (one batch per second until done), so a big
+        clean-up never freezes the server."""
         self.flush()
-        self.db.execute("DELETE FROM block_log WHERE t < ?", (time.time() - KEEP_DAYS * 86400,))
+        cur = self.db.execute("DELETE FROM block_log WHERE id IN (SELECT id FROM block_log WHERE t < ? LIMIT 5000)",
+                              (time.time() - KEEP_DAYS * 86400,))
         self.db.commit()
-        self.last_prune = time.time()
+        self.pruning = cur.rowcount >= 5000
+        if not self.pruning:
+            self.last_prune = time.time()
 
     def tick(self):
         """Every second: save logged changes; once a day, forget old ones."""
         self.flush()
-        if time.time() - self.last_prune > 86400:
+        if getattr(self, "pruning", False) or time.time() - self.last_prune > 86400:
             self.prune()
 
     def _add(self, player, action, block, old_type, old_states, new_type, new_states):

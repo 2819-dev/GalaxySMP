@@ -224,11 +224,15 @@ export async function pluginDm(request, env) {
   const toName = String(b.to || "").trim().toLowerCase();
   const [fromRow] = await sql`SELECT u.id FROM players p JOIN users u ON u.mc_uuid = p.uuid WHERE p.xuid = ${fromXuid}`;
   if (!fromRow) return json({ ok: false, message: "Link your account first: type /link and follow the steps on galaxymc.us." });
-  const targets = await sql`
+  // the exact name first; a name that only starts with what was typed must be the only one (never message "Bobby" for "Bob")
+  let targets = await sql`
     SELECT u.id FROM users u LEFT JOIN players p ON p.uuid = u.mc_uuid
      WHERE lower(u.username) = ${toName} OR lower(p.gamertag) = ${toName}
-     UNION SELECT u.id FROM users u WHERE lower(u.username) LIKE ${toName.replace(/[\\%_]/g, (c) => "\\" + c) + "%"}
-     LIMIT 2`;
+     LIMIT 1`;
+  if (!targets.length) {
+    targets = await sql`SELECT u.id FROM users u WHERE lower(u.username) LIKE ${toName.replace(/[\\%_]/g, (c) => "\\" + c) + "%"} LIMIT 2`;
+    if (targets.length > 1) return json({ ok: false, message: `More than one member's name starts with "${b.to}". Type their full name.` });
+  }
   if (!targets.length) return json({ ok: false, message: `No community member called ${b.to}. They need to link their account on galaxymc.us first.` });
   const from = await loadUser(sql, fromRow.id);
   const to = await loadUser(sql, targets[0].id);

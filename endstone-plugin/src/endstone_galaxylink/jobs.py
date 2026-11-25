@@ -10,6 +10,7 @@ Money is added every few seconds and shown above the hotbar.
 """
 
 import datetime
+import sys
 import time
 
 from endstone.form import ActionForm
@@ -23,7 +24,8 @@ except Exception:
 SWITCH_CENTS = 25000
 DAILY_CAP = 30000
 MAX_LEVEL = 21
-PLACED_MEMORY = 200000
+PLACED_MEMORY = 60000      # player-placed blocks remembered (so they don't pay when broken again); about 10 MB
+SAVE_EVERY = 60            # seconds between saves of everyone's job levels (and when the server stops)
 
 STONE = {"stone", "cobblestone", "deepslate", "cobbled_deepslate", "andesite", "diorite", "granite", "tuff", "netherrack",
          "blackstone", "basalt", "calcite", "end_stone", "sandstone", "red_sandstone", "dripstone_block"}
@@ -111,6 +113,9 @@ class Jobs:
             if b in CROPS and int((states or {}).get("growth", (states or {}).get("age", 0))) >= CROPS[b]:
                 return 4, 1
             if b in EASY_FARM:
+                need = {"cocoa": 2, "sweet_berry_bush": 3}.get(b)   # only ripe ones pay
+                if need is not None and int((states or {}).get("age", (states or {}).get("growth", 0))) < need:
+                    return 0, 0
                 return 3, 1
         return 0, 0
 
@@ -122,6 +127,8 @@ class Jobs:
         crop = short(block.type) in CROPS or short(block.type) in EASY_FARM
         if not info or (placed_by_player and not crop):  # planted crops still pay when fully grown
             return
+        if placed_by_player and short(block.type) in ("pumpkin", "melon_block"):
+            return   # a pumpkin or melon someone placed (not grown) never pays, or it could be placed and broken forever
         try:
             states = dict(block.data.block_states)
         except Exception:
@@ -131,10 +138,10 @@ class Jobs:
             self.pay(player, info, cents, xp)
 
     def on_place(self, player, block):
-        key = (block.dimension.name, block.x, block.y, block.z)
+        key = (sys.intern(block.dimension.name), block.x, block.y, block.z)
         if len(self.placed) > PLACED_MEMORY:
-            for k in list(self.placed)[:PLACED_MEMORY // 4]:
-                self.placed.pop(k, None)
+            for _ in range(PLACED_MEMORY // 4):   # forget the oldest quarter
+                self.placed.pop(next(iter(self.placed)), None)
         self.placed[key] = time.time()
         info = self.info(player)
         if info and info["job"] == "builder":
@@ -201,7 +208,9 @@ class Jobs:
             except Exception:
                 pass
         self.pending.clear()
-        self.save()
+        if time.time() - getattr(self, "saved_at", 0) >= SAVE_EVERY:
+            self.saved_at = time.time()
+            self.save()
 
     # ---------- /jobs ----------
     def menu(self, player):

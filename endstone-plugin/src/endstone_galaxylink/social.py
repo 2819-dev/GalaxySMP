@@ -100,6 +100,13 @@ class Social:
         self.state.pop(uid, None)
         self.links.pop(uid, None)
         bw = getattr(self.plugin, "bedwars", None)
+        if bw is not None:   # party invites to or from someone who left are gone
+            try:
+                for k, v in list(bw.invites.items()):
+                    if k == uid or v[0] == uid:
+                        bw.invites.pop(k, None)
+            except Exception:
+                pass
         if bw is not None and self.party_of(uid):
             try:
                 self.leave_party(player, quiet=True, moving=False)
@@ -163,6 +170,10 @@ class Social:
 
     def invite(self, player, target):
         uid, tid = str(player.unique_id), str(target.unique_id)
+        if uid == tid:
+            return player.send_message("§7You can't invite yourself.")
+        if not getattr(target, "is_valid", True):
+            return player.send_message("§cThat player isn't online any more.")
         bw = self.bw()
         party = self.party_of(uid)
         if party and party[0] != uid:
@@ -330,23 +341,27 @@ class Social:
         return "\n".join(lines)
 
     # ---------- small forms ----------
-    def ask_name(self, player, title, label, then):
+    def ask_name(self, player, title, label, then, back=None):
+        """back(player) runs when the pop-up is closed or sent empty (the Main Menu passes its own "show again")."""
         def submit(p, data):
             try:
                 v = json.loads(data)
             except ValueError:
-                return
+                v = None
             name = str(v[0] if v else "").strip()[:32]
             if name:
                 then(p, name)
-        player.send_form(ModalForm(title=title, controls=[TextInput(label, "e.g. Steve", "")], submit_button="OK", on_submit=submit))
+            elif back:
+                back(p)
+        player.send_form(ModalForm(title=title, controls=[TextInput(label, "e.g. Steve", "")], submit_button="OK", on_submit=submit,
+                                   on_close=back))
 
     def ask_message(self, player, to_name, then=None):
         def submit(p, data):
             try:
                 v = json.loads(data)
             except ValueError:
-                return
+                v = None
             text = str(v[0] if v else "").strip()
             if text:
                 dms = getattr(self.plugin, "dms", None)
@@ -355,4 +370,4 @@ class Social:
             if then:
                 then(p)
         player.send_form(ModalForm(title=f"Message {to_name}", controls=[TextInput("Message (they see it in game and on galaxymc.us)", "Hi!", "")],
-                                   submit_button="Send", on_submit=submit))
+                                   submit_button="Send", on_submit=submit, on_close=then))

@@ -148,8 +148,10 @@ class ShopChests:
         if count <= 0:
             return
         if player is not None:
-            money.give(player, money.make_stacks(item, count))
-            return
+            count = money.give_fitting(player, item, count)
+            if count <= 0:
+                return
+            player.send_message(f"§eYour inventory is full: §f{count}§e more items are kept for you. §7Make room and rejoin to get them.")
         self.returns.setdefault(str(xuid), []).append([item, count])
         self.eco.set_config("shop_returns", self.returns)
 
@@ -157,9 +159,17 @@ class ShopChests:
         items = self.returns.pop(str(player.xuid), None)
         if items:
             self.eco.set_config("shop_returns", self.returns)
+            left = []
             for item, count in items:
-                money.give(player, money.make_stacks(item, count))
-            player.send_message("§6Items from your closed shop chests were given back to you.")
+                rest = money.give_fitting(player, item, count)
+                if rest:
+                    left.append([item, rest])
+            if left:   # the rest waits until next time (nothing is dropped on the ground)
+                self.returns[str(player.xuid)] = left
+                self.eco.set_config("shop_returns", self.returns)
+                player.send_message("§6Some items from your closed shop chests were given back. §7Your inventory is full: make room and rejoin for the rest.")
+            else:
+                player.send_message("§6Items from your closed shop chests were given back to you.")
         bought = self.deliveries.pop(str(player.xuid), None)
         if bought:
             self.eco.set_config("shop_web_deliveries", self.deliveries)

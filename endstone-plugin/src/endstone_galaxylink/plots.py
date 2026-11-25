@@ -508,6 +508,28 @@ class Plots:
         player.send_message(f"§aSaving {self.label(plot)}... §7(about 5 seconds)")
         self.run(self._job_create(pid, player.unique_id))
 
+    def recover(self):
+        """Plots left half-done by a restart: resets and deletes run again, a paid upgrade is refunded, and a plot
+        that was being saved is saved again. (Otherwise they'd say "being reset" forever.)"""
+        for pid, plot in list(self.plots.items()):
+            st = plot.get("status")
+            try:
+                if st == "resetting":
+                    self.run(self._job_reset(pid))
+                elif st == "deleting":
+                    self.run(self._job_delete(pid))
+                elif st == "saving" and plot.get("pending_upgrade"):
+                    up = plot.pop("pending_upgrade")
+                    plot["status"] = "ready"
+                    self.save(pid)
+                    if up.get("owner") and up.get("cost"):
+                        self.eco.add(up["owner"], up.get("owner_name"), int(up["cost"]))
+                        self.plugin.logger.info(f"Plot {pid}: an upgrade was interrupted by a restart; refunded {up['cost']} cents")
+                elif st == "saving":
+                    self.run(self._job_create(pid, None))
+            except Exception as e:
+                self.plugin.logger.warning(f"Plot {pid}: couldn't recover ({e})")
+
     # ---------- jobs (spread over several ticks) ----------
     def run(self, gen):
         self.jobs.append([gen, 0])
@@ -525,6 +547,8 @@ class Plots:
             except Exception as e:
                 self.plugin.logger.warning(f"Plot job failed: {e}")
                 self.jobs.remove(job)
+        if self._ticks == 400:   # 20 seconds after the server started: finish what a restart interrupted
+            self.recover()
         if self._ticks % 10 == 0:
             self.draw_highlights()
         if self._ticks % 20 == 0:
@@ -639,7 +663,7 @@ class Plots:
             self.save(pid)
         finally:
             self._keep_loaded(plot, False)
-        admin = self.plugin.server.get_player(admin_uid)
+        admin = self.plugin.server.get_player(admin_uid) if admin_uid else None
         if admin:
             if plot["kind"] == "plot":
                 admin.send_message(f"§a{self.label(plot)} is ready to claim! §7The white concrete edge shows it's available.")
@@ -1086,8 +1110,11 @@ class Plots:
                 if plot["dim"] != p.dimension.name:
                     continue
                 y0 = math.floor(l.y)
-                for x, z in self.border_points(plot, l.x, l.z, 24):
-                    for dy in (0, 1, 2, 3):
+                # every other block, 2 heights, within 16 blocks: still a clear outline, a tenth of the particles
+                for i, (x, z) in enumerate(self.border_points(plot, l.x, l.z, 16)):
+                    if i % 2:
+                        continue
+                    for dy in (0, 2):
                         p.spawn_particle("minecraft:blue_flame_particle", x, y0 + dy, z)
 
     @staticmethod

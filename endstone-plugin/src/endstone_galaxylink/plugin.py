@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.88.0"
+VERSION = "2.89.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -353,9 +353,9 @@ class GalaxyLink(Plugin):
         # The Sift is never built automatically at start any more (building far-away land is the heaviest job there
         # is, and doing it at every start made the server unstable). Staff run /sift build when the server is quiet.
         self.server.scheduler.run_task(self, self._watched("checking AFK players", self.afk.tick), delay=100, period=100)
-        self.server.scheduler.run_task(self, self._watched("checking command plates", self.plates.tick), delay=40, period=4)
+        self.server.scheduler.run_task(self, self._safe("plates.tick", self.plates.tick), delay=40, period=4)
         self.server.scheduler.run_task(self, self._watched("setting up the map item", self.galaxymap.setup), delay=200)
-        self.server.scheduler.run_task(self, self._watched("checking parkour plates", self.parkour.tick), delay=40, period=4)
+        self.server.scheduler.run_task(self, self._safe("parkour.tick", self.parkour.tick), delay=40, period=4)
         self.server.scheduler.run_task(self, self._watched("item collection", self.collection.scan), delay=600, period=1200)
         self.server.scheduler.run_task(self, self._watched("plot rentals", self.plotplus.tick), delay=1200, period=1200)
         self.server.scheduler.run_task(self, self._safe("elevators.check_tools", self.elevators.check_tools), delay=1200, period=1200)
@@ -588,7 +588,12 @@ class GalaxyLink(Plugin):
 
     @event_handler
     def on_actor_death(self, event: ActorDeathEvent):
-        """A player defeated a mob: counts for stats, quests and achievements."""
+        """A player defeated a mob: counts for stats, quests and achievements. (A pet that died leaves My Pets.)"""
+        if getattr(self, "pets", None) is not None and not hasattr(event.actor, "xuid"):
+            try:
+                self.pets.on_death(event.actor)
+            except Exception:
+                pass
         try:
             killer = event.damage_source.actor
         except Exception:
@@ -641,6 +646,8 @@ class GalaxyLink(Plugin):
         if self.buildcontest.on_block(event, False):  # the Build Contest arena (no job money for Creative building)
             return
         if self.crates.on_break(event):  # crates can't be broken
+            return
+        if getattr(self, "elevators", None) is not None and self.elevators.on_break(event):   # cabin floors can't be broken
             return
         self.shopchests.on_break(event)
         if event.cancelled:
@@ -854,6 +861,11 @@ class GalaxyLink(Plugin):
             self.blocklog.flush()
         if getattr(self, "progress", None):
             self.progress.save()
+        if getattr(self, "jobs", None):
+            try:
+                self.jobs.save()
+            except Exception:
+                pass
         if getattr(self, "diagnostics", None):
             try:
                 self.diagnostics.stopping()

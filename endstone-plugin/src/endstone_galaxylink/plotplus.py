@@ -190,8 +190,11 @@ class PlotPlus:
         if not self.eco.charge(p, cost):
             return False, f"You need {money.exact(cost)} to rent it for {days} day{'s' if days != 1 else ''}."
         self.eco.add(plot["owner"], plot.get("owner_name"), cost)
-        plot["rental"] = {"xuid": str(p.xuid), "name": p.name, "until": time.time() + days * 86400}
-        plot.setdefault("members", {})[p.name.lower()] = {"name": p.name, "role": "builder", "rental": True}
+        members = plot.setdefault("members", {})
+        before = members.get(p.name.lower())   # if they were already a member, that comes back when the rental ends
+        plot["rental"] = {"xuid": str(p.xuid), "name": p.name, "until": time.time() + days * 86400,
+                          "before": before if before and not before.get("rental") else None}
+        members[p.name.lower()] = {"name": p.name, "role": "builder", "rental": True}
         self.plots.save(pid)
         self.push()
         p.send_message(f"§aYou rented §f{self.plots.label(plot)}§a for {days} day{'s' if days != 1 else ''} (§e{money.exact(cost)}§a). You can build there until it ends.")
@@ -213,6 +216,8 @@ class PlotPlus:
                 m = (plot.get("members") or {}).get(r["name"].lower())
                 if m and m.get("rental"):
                     plot["members"].pop(r["name"].lower(), None)
+                    if r.get("before"):
+                        plot["members"][r["name"].lower()] = r["before"]
                 plot["rental"] = None
                 self.plots.save(pid)
                 changed = True
@@ -339,23 +344,42 @@ class PlotPlus:
     def _job_upgrade(self, pid, kind, b, cost, uid):
         plot = self.plots.plots[pid]
         plot["status"] = "saving"
+        # if the server stops before this finishes, the payment is given back at the next start (Plots.recover)
+        plot["pending_upgrade"] = {"cost": cost, "owner": plot.get("owner"), "owner_name": plot.get("owner_name")}
         self.plots.save(pid)
         if not plot.get("orig"):   # the original pieces stay named from the original corner
             plot["orig"] = {k: plot[k] for k in ("x1", "z1", "x2", "z2")}
         grown = dict(plot, **b)
         self.plots._keep_loaded(grown, True)
-        yield 60
-        n = len(plot.get("extra_tiles") or [])
-        extra = list(plot.get("extra_tiles") or [])
-        for i, (x1, y1, z1, x2, y2, z2) in enumerate(self._strips(plot, kind, b)):
-            name = f"gsmp_plot_{pid}_up{n + i}"
-            self.plots.cmd(f"structure save {name} {x1} {y1} {z1} {x2} {y2} {z2} false disk true", plot)
-            extra.append({"name": name, "x": x1, "y": y1, "z": z1})
-        yield 10
+        try:
+            yield 60
+            again, why = self.grown(plot, kind)   # the space must still be free (a neighbour may have grown meanwhile)
+            if again is None or again != b:
+                raise RuntimeError(why or "the space isn't free any more")
+            n = len(plot.get("extra_tiles") or [])
+            extra = list(plot.get("extra_tiles") or [])
+            for i, (x1, y1, z1, x2, y2, z2) in enumerate(self._strips(plot, kind, b)):
+                name = f"gsmp_plot_{pid}_up{n + i}"
+                self.plots.cmd(f"structure save {name} {x1} {y1} {z1} {x2} {y2} {z2} false disk true", plot)
+                extra.append({"name": name, "x": x1, "y": y1, "z": z1})
+            yield 10
+        except Exception as e:
+            # it didn't work: the plot stays as it was and the payment comes back
+            plot["status"] = "ready"
+            plot.pop("pending_upgrade", None)
+            self.plots.save(pid)
+            self.plots._keep_loaded(grown, False)
+            if plot.get("owner"):
+                self.eco.add(plot["owner"], plot.get("owner_name"), cost)
+            p = self.plugin.server.get_player(uid)
+            if p is not None:
+                p.send_message(f"§cThe upgrade couldn't be done ({e}). §7Your {money.exact(cost)} was given back.")
+            return
         plot.update(b)
         plot["extra_tiles"] = extra
         plot["upgrades"] = int(plot.get("upgrades", 0)) + 1
         plot["status"] = "ready"
+        plot.pop("pending_upgrade", None)
         self.plots.save(pid)
         self.plots._keep_loaded(plot, False)
         self.push()

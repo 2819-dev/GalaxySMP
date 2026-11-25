@@ -89,6 +89,9 @@ class Trades:
         bc = getattr(self.plugin, "buildcontest", None)
         if bc is not None and bc.building(p):
             return False, "You can't offer items while you're in a Build Contest."
+        bw = getattr(self.plugin, "bedwars", None)
+        if bw is not None and bw.playing(p):
+            return False, "You can't offer items while you're in Bedwars."
         inv = p.inventory
         stack = inv.get_item(int(slot)) if 0 <= int(slot) < inv.size else None
         if not self.tradable(stack) or money.item_id(stack) != expect_id or stack.amount != int(expect_amount):

@@ -661,6 +661,18 @@ The bigger Sift is built in the background after the update, which takes about h
 - **Feel:** a soft whoosh and sparkles when you teleport, a coin sound when you buy something or get paid, a chime for rewards, and a fanfare for achievements and job level-ups. You can switch the sparkles off in Main Menu > Settings.
 - **Chat and HUD:** cleaner join and leave lines in chat, and a rounded style for the action bar and item names above the hotbar.`,
   },
+  {
+    id: "2026-11-25-speed-and-fixes",
+    title: "Smoother server and many fixes",
+    body: `A full check of the game for slow spots and bugs.
+- **Smoother:** pets, penguins, the live map, leaderboards, saving, the chat filter and world borders all do much less work, so the server stays smooth with more players on. **/rtp** now has a one-minute wait between uses (each one makes the server create new land).
+- **Items are safe in minigames:** items you get while you're in Bedwars or the Build Contest (rewards, Store packs, trades, purchases) are kept and given to you after the game, instead of being lost.
+- **Big deliveries:** large amounts from shop chests and buy orders now fill your free space and the rest waits for you, instead of dropping on the ground.
+- **Plots:** a plot reset or upgrade that a server restart interrupted now finishes by itself (or the upgrade is refunded).
+- **Main Menu:** fixed being stuck on the join menu after closing a Social pop-up, Mail replies opening the wrong conversation, homes being replaced by a new home with the same name, and portals repeating. Home and warp teleports from /menu now use the normal 3-second teleport, and /back works after them.
+- **Fairness:** fixed an elevator and a farming trick that created free items or money, and nobody leaves a minigame in Creative mode any more.
+- **Also fixed:** the Main Menu music and pet bounce sounds sometimes not playing, Night Vision ending removing your other potion effects, and messages to a player whose name starts like another player's going to the wrong person.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

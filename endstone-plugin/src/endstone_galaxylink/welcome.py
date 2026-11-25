@@ -214,10 +214,24 @@ class Welcome:
         if not brand_new and self.prefs(player)["skip"]:
             return False   # Settings: "Show the Main Menu when I join" is off (/menu still opens it)
         self.open[str(player.unique_id)] = self.new_state(brand_new, player=player)
+        self.open[str(player.unique_id)]["seen"] = time.time()
         self.lock(player, True)
         from endstone_galaxylink.safety import later
-        later(self.plugin, player, lambda p: self.lock(p, False), 20 * 180)   # never stuck for more than 3 minutes
+        later(self.plugin, player, self.time_out, 20 * 180)   # never stuck for more than 3 minutes
         return True
+
+    def time_out(self, player):
+        """3 minutes after joining: movement comes back. If the menu isn't being used any more (no screen shown for
+        2 minutes, e.g. a pop-up was closed), the menu ends so they can play normally (and can be hurt again)."""
+        self.lock(player, False)
+        st = self.state(player)
+        if st is None or st.get("reopened"):
+            return
+        if time.time() - st.get("seen", 0) > 120:
+            self.done(player, greet=False)
+        else:
+            from endstone_galaxylink.safety import later
+            later(self.plugin, player, self.time_out, 20 * 60)
 
     def open_menu(self, player):
         """/menu, the menu compass, or Main Menu in /guide."""
@@ -263,6 +277,7 @@ class Welcome:
         st = self.state(player)
         if st is None:
             return
+        st["seen"] = time.time()
         if st["screen"] == "servers":   # (older name) the Servers tab of Play
             st["screen"], st["tab"] = "play", 2
         {"play": self.show_play, "guide": self.show_guide, "settings": self.show_settings,
@@ -436,12 +451,14 @@ class Welcome:
         social = getattr(self.plugin, "social", None)
         uid = str(player.unique_id)
         if social is not None and social.linked(player):
-            return self.page(player, "Link Account", ["Done"], 0, "§aYour account is linked.§r\n\nYou can chat, use voice chat and add friends on §bgalaxymc.us§r.")
+            return self.page(player, "Link Account", ["Done"], 0, "§aYour account is linked.§r\n\nYou can chat, use voice chat and add friends on §bgalaxymc.us§r.",
+                             go_to=[("title", 0)])
         info = social.links.get(uid) if social is not None else None
         if not info:
             if social is not None and not st.get("link_asked"):
                 st["link_asked"] = True
                 social.link_info(player, then=lambda: self.show(player) if self.state(player) and self.state(player)["screen"] == "link" else None)
+            st["link_asked"] = False   # Refresh asks the website again (in case the first try failed)
             return self.page(player, "Link Account", ["Refresh"], 0, "§7Getting your code...")
         body = (f"§l§fLink your account§r\n\n"
                 f"§71.§r Scan the QR code with your phone's camera,\n§7   or go to §bgalaxymc.us/community§r and enter:\n\n"
@@ -502,7 +519,8 @@ class Welcome:
                 lines.append(f"§f{f['name']}  {status}")
                 form.add_button(f"{'§a● ' if p else '§8○ '}§f{f['name']}", on_click=lambda pl, f=f: self.friend_menu(pl, f))
             form.add_button("§a+ Add Friend", on_click=lambda p: social.ask_name(p, "Add Friend", "Their gamertag",
-                            lambda pl, name: social.act(pl, "request", then=lambda: self.go(pl, "social", 0), username=name)))
+                            lambda pl, name: social.act(pl, "request", then=lambda: self.go(pl, "social", 0), username=name),
+                            back=lambda pl: self.go(pl, "social", 0)))
         elif tab == 1:
             data = social.state.get(uid) or {}
             inc, out = data.get("incoming") or [], data.get("outgoing") or []
@@ -530,7 +548,8 @@ class Welcome:
                 lines.append("§7Make a party to play together: join servers and minigames as a group, with party chat.")
             if inv and not party and time.time() - inv[1] < 300:
                 lp = social.online(inv[0])
-                form.add_button(f"§aJoin {lp.name if lp else 'the'}'s party", on_click=lambda p: (social.accept(p), self.go(p, "social", 2)))
+                if lp is not None:
+                    form.add_button(f"§aJoin {lp.name}'s party", on_click=lambda p: (social.accept(p), self.go(p, "social", 2)))
             if not party or party[0] == uid:
                 form.add_button("§a+ Invite", on_click=self.party_invite_menu)
             if party and party[0] == uid:
@@ -855,6 +874,16 @@ class Welcome:
             return
         if self.in_minigame(player):
             return player.send_message("§cYou can't teleport during a minigame.")
+        tp = getattr(self.plugin, "teleports", None)
+        if st.get("reopened") and tp is not None:
+            # opened with /menu or the compass during play: the usual teleport (3-second wait, /back works)
+            self.open.pop(str(player.unique_id), None)
+            self.music(player, False)
+            try:
+                player.close_form()
+            except Exception:
+                pass
+            return tp.go(player, lambda: spot, label)
         self.done(player, spot=spot, label=label, greet=False)
         try:
             player.close_form()
@@ -876,7 +905,7 @@ class Welcome:
             limit = tp.max_homes(player)
             player.send_message(f"§cYou can have up to {limit} home{'s' if limit != 1 else ''}. §7Delete one first (the trash can).")
             return self.show(player)
-        default = rename or ("home" if "home" not in homes else f"home{len(homes) + 1}")
+        default = rename or ("home" if "home" not in homes else next(f"home{n}" for n in range(2, 1000) if f"home{n}" not in homes))
 
         cur_icon = self.icon_key_of(player, rename) if rename else HOME_ICONS[0][0]
         icon_names = [n for n, _ in HOME_ICONS]
@@ -893,6 +922,10 @@ class Welcome:
                 icon = cur_icon
             final = name
             if rename is None:
+                if name in [h["name"] for h in self.homes_of(p)]:
+                    # a new home never replaces one you already have (that's what the move button is for)
+                    p.send_message(f"§cYou already have a home called {name}. §7Pick another name, or use the move button.")
+                    return self.show(p)
                 tp.set_home(p, [name])
             elif name != rename:
                 if name in [h["name"] for h in self.homes_of(p)]:
@@ -975,6 +1008,8 @@ class Welcome:
         if name.lower() in [n.lower() for n in cur]:
             cur = [n for n in cur if n.lower() != name.lower()]
             player.send_message(f"§7Took §f{name}§7 off Featured Warps.")
+        elif len(cur) >= 12:
+            player.send_message("§cThere are already 12 Featured Warps. §7Take one off first.")
         else:
             cur.append(name)
             player.send_message(f"§e★ §f{name}§a is now a Featured Warp.")
@@ -982,11 +1017,13 @@ class Welcome:
         self.show(player)
 
     # ---------- pages ----------
-    def page(self, player, title, tabs, tab, body):
+    def page(self, player, title, tabs, tab, body, go_to=None):
+        """go_to: optional [(screen, tab)] per button, for buttons that lead somewhere else (e.g. < Back)."""
         st = self.state(player)
         form = ActionForm(title=f"{PAGE}{self.codes(st)}§l{title}", content=body)
         for i, label in enumerate(tabs):
-            form.add_button(f"§e§l{label}" if i == tab else label, on_click=lambda p, i=i, scr=st["screen"]: self.go(p, scr, i))
+            scr, t = go_to[i] if go_to and i < len(go_to) else (st["screen"], i)
+            form.add_button(f"§e§l{label}" if i == tab else label, on_click=lambda p, scr=scr, t=t: self.go(p, scr, t))
         self.send(player, form)
 
     def show_settings(self, player):
@@ -1165,7 +1202,8 @@ class Welcome:
             form.content = "\n".join(body)
             form.add_button("§a+ Write a message", on_click=lambda p: self.write_mail(p))
             for k, t in enumerate(threads):
-                form.add_button(f"{'§c● ' if t.get('unread') else ''}{t['with']}", on_click=lambda p, k=k: self.go(p, "mail", 2 + k))
+                form.add_button(f"{'§c● ' if t.get('unread') else ''}{t['with']}",
+                                on_click=lambda p, k=k, tid=t["id"]: self.open_thread(p, k, tid))
         elif tab == 1:
             body = ["§l§fNotifications§r", ""]
             for n in notes:
@@ -1177,7 +1215,8 @@ class Welcome:
             if unread_notes:
                 form.add_button("Mark all as read", on_click=lambda p: mail.refresh(p, then=lambda: self.go(p, "mail", 1), mark_read=True))
         else:
-            k = tab - 2
+            tid = st.get("mail_tid")
+            k = next((i for i, x in enumerate(threads) if x.get("id") == tid), tab - 2) if tid is not None else tab - 2
             if k >= len(threads):
                 return self.go(player, "mail", 0)
             t = threads[k]
@@ -1194,6 +1233,12 @@ class Welcome:
             form.content = "\n".join(body)
             form.add_button(f"§a§lReply to {t['with']}", on_click=lambda p, t=t: self.write_mail(p, to=t["with"], back=tab))
         self.send(player, form)
+
+    def open_thread(self, player, k, tid):
+        st = self.state(player)
+        if st is not None:
+            st["mail_tid"] = tid
+        self.go(player, "mail", 2 + k)
 
     def write_mail(self, player, to=None, back=0):
         from endstone.form import ModalForm, TextInput
@@ -1326,7 +1371,8 @@ class Welcome:
                 total = len(SF.TILES)
                 st["screen"], st["tab"] = "play", 2
                 return self.page(player, "The Sift", ["< Back"], 0,
-                                 f"§l§bComing soon!§r\n\nThe Sift is still being made ({min(done, total)}/{total} pieces).\n§7Keep an eye on #Updates.")
+                                 f"§l§bComing soon!§r\n\nThe Sift is still being made ({min(done, total)}/{total} pieces).\n§7Keep an eye on #Updates.",
+                                 go_to=[("play", 2)])
             spot = sift.spot()
         theme = s.get("anim") if s.get("anim") in THEMES else "grass"
         if s.get("odds"):
@@ -1443,7 +1489,7 @@ class Welcome:
         """Nobody gets hurt while the menu is open on join."""
         try:
             st = self.open.get(str(event.actor.unique_id))
-            if st is not None and not st.get("reopened"):
+            if st is not None and not st.get("reopened") and not self.in_minigame(event.actor):
                 event.is_cancelled = True
                 return True
         except Exception:

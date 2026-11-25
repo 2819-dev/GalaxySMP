@@ -11,6 +11,7 @@ import uuid
 
 REQUEST_SECONDS = 60
 WARMUP_TICKS = 60  # 3 seconds
+RTP_COOLDOWN = 60       # seconds between /rtp uses (each one makes the server generate new land)
 RTP_MIN, RTP_MAX = 500, 5000   # /rtp: this many blocks from spawn
 RTP_AVOID = 48                 # never land within this many blocks of a plot
 
@@ -109,6 +110,11 @@ class Teleports:
         if player.dimension.name.lower() not in ("overworld", "minecraft:overworld"):
             player.send_message("§cRandom teleport only works in the Overworld.")
             return
+        # a random spot means brand-new land for the server to make (heavy work): once a minute per player
+        wait = RTP_COOLDOWN - (time.time() - getattr(self, "rtp_used", {}).get(str(player.unique_id), 0))
+        if wait > 0 and not player.is_op:
+            player.send_message(f"§eYou can use /rtp again in {int(wait) + 1} seconds.")
+            return
         self.go(player, lambda: None, "a random spot in the wild", run=self._rtp_now)
 
     def rtp_command(self, sender, args):
@@ -149,7 +155,7 @@ class Teleports:
                 return x, z
         return None
 
-    def _rtp_now(self, player, tries=4):
+    def _rtp_now(self, player, tries=2):
         pick = self._rtp_pick()
         if pick is None:
             player.send_message("§cCouldn't find a free spot. Try again.")

@@ -639,6 +639,31 @@ class Progress:
     def definitions(self):
         return {"type": "achievement_defs", "list": [{"id": a[0], "name": a[1], "desc": a[2], "emoji": a[3]} for a in ACHIEVEMENTS]}
 
+    def leaderboards(self, keys, limit=10):
+        """Top players for several stats with ONE pass over everyone's saved stats (floating leaderboards, every minute)."""
+        import heapq
+        keys = set(keys)
+        out = {}
+        if "money" in keys:
+            out["money"] = self.leaderboard("money", limit)
+        stat_keys = keys - {"money"}
+        if not stat_keys:
+            return out
+        self.save()
+        rows = {k: [] for k in stat_keys}
+        for x, name, d in self.db.execute("SELECT xuid, name, data FROM player_stats").fetchall():
+            try:
+                s = json.loads(d)
+            except Exception:
+                continue
+            for k in stat_keys:
+                v = len(s.get("achievements", {})) if k == "achievements" else s.get(k, 0)
+                if v:
+                    rows[k].append((name, v))
+        for k, r in rows.items():
+            out[k] = heapq.nlargest(limit, r, key=lambda t: t[1])
+        return out
+
     def leaderboard(self, key, limit=10):
         """Top players for a stat (used by the floating leaderboards). Online players' latest numbers are included."""
         self.save()

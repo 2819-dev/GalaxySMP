@@ -283,7 +283,8 @@ class Cosmetics:
             if until > now:
                 self.night_vision_for(p)
             elif until and now - until < 120:  # just ended
-                self.plugin.server.dispatch_command(self.plugin.server.command_sender, f'effect "{p.name.replace(chr(34), "")}" clear')
+                # only Night Vision ends (a "clear" would also remove the player's own potions)
+                self.plugin.server.dispatch_command(self.plugin.server.command_sender, f'effect "{p.name.replace(chr(34), "")}" night_vision 0')
                 p.send_message("§7Your Night Vision has ended. Get more at galaxymc.us/store.")
                 self.night.pop(str(p.xuid), None)
                 self.eco.set_config("night_vision", self.night)

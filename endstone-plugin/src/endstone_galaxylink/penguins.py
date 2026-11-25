@@ -342,10 +342,11 @@ class Penguins:
         penguin when it's lost."""
         self.ticks += 1
         server = self.plugin.server
-        try:
-            self.keep_pets_out()
-        except Exception:
-            pass
+        if self.ticks % 4 == 1:   # every 2 seconds is plenty (it looks through every entity, which is slow)
+            try:
+                self.keep_pets_out()
+            except Exception:
+                pass
         if self.ticks % 2 == 0:
             self.graced = self.grace_check()
         now = time.time()
