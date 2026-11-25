@@ -733,6 +733,11 @@ Find it on the Main Menu under **Play > PvP**. It opens as soon as its arenas fi
 - **Bump it:** walk into the pile or tap a Blub and they tumble off in every direction with a squeak. Leave them be and they climb down by themselves after a few minutes.
 Only grown-up, untamed Blubs join a pile. Your own Blubs stay with you.`,
   },
+  {
+    id: "2026-11-26-blub-piles-lying",
+    title: "Comfier Blub piles",
+    body: `Blubs in a pile now lie down on each other with their little feet out in front, instead of standing on top of each other.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

@@ -116,10 +116,15 @@
    "loop": true,
    "bones": {
     "root": {
+     "position": [
+      0,
+      -2,
+      0
+     ],
      "rotation": [
-      "math.mod(query.property('galaxysmp:turn') * 37, 13) - 6",
+      "math.mod(query.property('galaxysmp:turn') * 37, 9) - 4",
       "query.property('galaxysmp:turn') * 22.5 + math.mod(query.property('galaxysmp:turn') * 11, 9)",
-      "math.mod(query.property('galaxysmp:turn') * 53, 11) - 5"
+      "math.mod(query.property('galaxysmp:turn') * 53, 9) - 4"
      ]
     },
     "body": {
@@ -131,31 +136,33 @@
     },
     "leg1": {
      "rotation": [
-      "query.is_riding ? -20 : 0",
+      -90,
       0,
-      "query.is_riding ? -10 : 0"
+      -8
+     ],
+     "position": [
+      0,
+      1,
+      -2
      ]
     },
     "leg2": {
      "rotation": [
-      "query.is_riding ? -20 : 0",
+      -90,
       0,
-      "query.is_riding ? 10 : 0"
+      8
+     ],
+     "position": [
+      0,
+      1,
+      -2
      ]
     },
     "leg3": {
-     "rotation": [
-      "query.is_riding ? 20 : 0",
-      0,
-      "query.is_riding ? -10 : 0"
-     ]
+     "scale": 0.01
     },
     "leg4": {
-     "rotation": [
-      "query.is_riding ? 20 : 0",
-      0,
-      "query.is_riding ? 10 : 0"
-     ]
+     "scale": 0.01
     }
    }
   }
