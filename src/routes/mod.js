@@ -20,7 +20,9 @@ import { openGameReportCount } from "./gamemod.js";
 
 const MOD = 50;
 const ADMIN = 100;
-export const MUTE_OPTIONS = [10, 60, 1440, 10080, 43200]; // 10 min, 1 h, 1 day, 7 days, 30 days
+export const MUTE_OPTIONS = [1, 3, 5, 10, 60, 1440, 10080, 43200]; // the quick picks (any length from 1 minute to 1 year is allowed)
+const MAX_MUTE_MINUTES = 525600;
+const validMinutes = (m) => Number.isInteger(m) && m >= 1 && m <= MAX_MUTE_MINUTES;
 export const REPORT_REASONS = ["Bad language", "Bullying or harassment", "Personal information", "Spam", "Inappropriate content", "Other"];
 const ROLE_IDS = { member: 1, vip: 2, moderator: 3, admin: 4 };
 
@@ -135,7 +137,7 @@ export async function mute(request, env, ctx, url, params) {
   const actor = await requireStaff(request, env, "mute_members");
   const body = await readJson(request);
   const minutes = Number(body.minutes);
-  if (!MUTE_OPTIONS.includes(minutes)) throw new HttpError(400, "Choose a mute length.");
+  if (!validMinutes(minutes)) throw new HttpError(400, "Choose a mute length (1 minute to 1 year).");
   const sql = getDb(env);
   const target = await loadTarget(sql, Number(params.id));
   assertCanAct(env, actor, target);
@@ -264,7 +266,7 @@ export async function voiceMute(request, env, ctx, url, params) {
   const actor = await requireStaff(request, env);
   const body = await readJson(request);
   const minutes = Number(body.minutes);
-  if (!MUTE_OPTIONS.includes(minutes)) throw new HttpError(400, "Choose a mute length.");
+  if (!validMinutes(minutes)) throw new HttpError(400, "Choose a mute length (1 minute to 1 year).");
   const sql = getDb(env);
   const target = await loadTarget(sql, Number(params.id));
   assertCanAct(env, actor, target);
@@ -542,9 +544,10 @@ export async function logBlock(env, { userId, place, content, reason, detail }) 
 // ---------- telling the member (a notification in their inbox, and on their phone when they allow it) ----------
 function muteLength(minutes) {
   if (minutes >= 1440 * 365) return "a very long time";
-  if (minutes >= 1440) return `${Math.round(minutes / 1440)} day${Math.round(minutes / 1440) === 1 ? "" : "s"}`;
-  if (minutes >= 60) return `${Math.round(minutes / 60)} hour${Math.round(minutes / 60) === 1 ? "" : "s"}`;
-  return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  const plural = (v, w) => `${v} ${w}${v === 1 ? "" : "s"}`;
+  if (minutes >= 1440) return minutes % 1440 === 0 ? plural(minutes / 1440, "day") : `${plural(Math.floor(minutes / 1440), "day")} ${plural(Math.round((minutes % 1440) / 60), "hour")}`.replace(/ 0 hours$/, "");
+  if (minutes >= 60) return minutes % 60 === 0 ? plural(minutes / 60, "hour") : `${plural(Math.floor(minutes / 60), "hour")} ${plural(minutes % 60, "minute")}`;
+  return plural(minutes, "minute");
 }
 
 async function tellMember(env, userId, title, body) {

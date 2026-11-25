@@ -2,7 +2,7 @@
 // and Players (one card per player with everything staff need). All text goes in with textContent.
 import { faceSvg } from "/js/face.js";
 import { moneyDollars } from "/js/money.js";
-import { h, openDialog, postJson, getJson, select, field, muteDialog, banDialog, voiceMuteDialog, MUTE_LABELS } from "/js/dialog.js";
+import { h, openDialog, postJson, getJson, select, field, muteDialog, banDialog, voiceMuteDialog, MUTE_LABELS, lengthField, lengthLabel } from "/js/dialog.js";
 import { ticketChat, chip, when, LABELS, PRIORITIES, ticketEvent } from "/js/tickets.js";
 import { iconEl } from "/js/site.js";
 import { ranksDialog } from "/js/rank-picker.js";
@@ -277,20 +277,19 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
       : h("button", { class: `btn btn-sm ${cls}`, type: "button", onclick: fn }, ic ? iconEl(ic) : null, label));
     const gameAction = (action, title, opts = {}) => () => {
       const reason = h("input", { class: "input", id: "pa-reason", maxlength: 200, placeholder: opts.reasonRequired ? "Required: what did they do?" : "Optional" });
-      const lens = opts.lengths ? select("pa-len", opts.lengths, opts.defaultLen) : null;
+      const lens = opts.lengths ? lengthField("pa-len", opts.defaultLen, opts.extraLengths || []) : null;
       openDialog({
         title: `${title} ${p.name}`,
-        body: h("div", { class: "form" }, opts.text ? h("p", { class: "text-2", text: opts.text }) : null, lens ? field("Length", lens) : null, opts.noReason ? null : field("Reason", reason)),
+        body: h("div", { class: "form" }, opts.text ? h("p", { class: "text-2", text: opts.text }) : null, lens ? lens.el : null, opts.noReason ? null : field("Reason", reason)),
         actions: [{ label: "Cancel" }, {
           label: title, kind: opts.danger ? "danger" : "primary",
           onClick: async () => {
-            await postJson(`/api/mod/players/${xuid}/${action}`, { reason: reason.value, minutes: lens ? (lens.value === "perm" ? null : Number(lens.value)) : null });
+            await postJson(`/api/mod/players/${xuid}/${action}`, { reason: reason.value, minutes: lens ? lens.value() : null });
             reload(`${title} sent to the server.`);
           },
         }],
       });
     };
-    const LEN = Object.entries(MUTE_LABELS);
     const statTile = (label, v) => h("div", { class: "pc-stat" }, h("b", { text: String(v) }), h("span", { text: label }));
 
     const notesBox = h("div", { class: "pc-notes" });
@@ -322,11 +321,11 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
       h("h4", { text: "In game" }),
       h("div", { class: "pc-actions" },
         act("Warn", "btn-secondary", gameAction("warn", "Warn", { reasonRequired: true })),
-        act("Mute", "btn-secondary", gameAction("mute", "Mute", { lengths: LEN, defaultLen: 60 })),
+        act("Mute", "btn-secondary", gameAction("mute", "Mute", { lengths: true, defaultLen: 60 })),
         act("Unmute", "btn-secondary", gameAction("unmute", "Unmute", { noReason: true })),
         act("Kick", "btn-secondary", gameAction("kick", "Kick", { reasonRequired: true, text: "They're removed from the server but can join again." })),
         p.banned ? act("Unban", "btn-secondary", gameAction("unban", "Unban", { noReason: true }), true)
-          : act("Ban", "btn-danger", gameAction("ban", "Ban", { lengths: [...LEN, ["perm", "Permanent"]], defaultLen: "perm", danger: true, reasonRequired: true }), true),
+          : act("Ban", "btn-danger", gameAction("ban", "Ban", { lengths: true, extraLengths: [["perm", "Permanent"]], defaultLen: "perm", danger: true, reasonRequired: true }), true),
         act("Give crate keys", "btn-secondary", () => keyDialog(p, xuid, reload), true, "key"),
         owner && acc && !acc.owner ? act("Act as member", "btn-secondary", () => openDialog({
           title: `See the site as ${acc.username || p.name}?`,
@@ -399,7 +398,7 @@ export function setupPanel({ loaders, power, owner, selectTab, toast, setBadge }
       h("h4", { text: `Punishment history (${d.history.length})` }),
       d.history.length ? h("div", { class: "pc-list" }, d.history.map((x) => h("div", { class: `pc-li k-${x.kind}` },
         h("b", { text: KIND_WORDS[x.kind] || x.kind }),
-        h("span", { text: `${["mute", "ban"].includes(x.kind) ? `(${x.minutes == null ? "permanent" : MUTE_LABELS[x.minutes] || `${x.minutes} min`}) ` : ""}by ${x.by}${x.reason ? `: ${x.reason}` : ""}` }),
+        h("span", { text: `${["mute", "ban"].includes(x.kind) ? `(${lengthLabel(x.minutes)}) ` : ""}by ${x.by}${x.reason ? `: ${x.reason}` : ""}` }),
         h("time", { class: "text-3 small", text: fmt(x.at) }))))
         : h("p", { class: "text-3 small", style: "margin:0", text: "Clean record." }),
 

@@ -79,7 +79,59 @@ export async function getJson(path) {
   return data;
 }
 
-export const MUTE_LABELS = { 10: "10 minutes", 60: "1 hour", 1440: "1 day", 10080: "7 days", 43200: "30 days" };
+export const MUTE_LABELS = { 1: "1 minute", 3: "3 minutes", 5: "5 minutes", 10: "10 minutes", 60: "1 hour", 1440: "1 day", 10080: "7 days", 43200: "30 days" };
+export const MAX_MUTE_MINUTES = 525600;   // 1 year
+
+// A typed length -> minutes: "2m", "45 min", "3h", "1h30m", "2d", "1w", or a plain number of minutes. null if it isn't one.
+export function parseLength(text) {
+  const s = String(text || "").trim().toLowerCase().replace(/\s+/g, "");
+  if (!s) return null;
+  const UNIT = { "": 1, m: 1, min: 1, mins: 1, minute: 1, minutes: 1, h: 60, hr: 60, hrs: 60, hour: 60, hours: 60,
+    d: 1440, day: 1440, days: 1440, w: 10080, wk: 10080, week: 10080, weeks: 10080 };
+  const re = /(\d+(?:\.\d+)?)([a-z]*)/g;
+  let total = 0, pos = 0, m;
+  while ((m = re.exec(s))) {
+    if (m.index !== pos || UNIT[m[2]] == null) return null;
+    total += parseFloat(m[1]) * UNIT[m[2]];
+    pos = re.lastIndex;
+  }
+  if (pos !== s.length) return null;
+  total = Math.round(total);
+  return total >= 1 && total <= MAX_MUTE_MINUTES ? total : null;
+}
+
+// minutes -> "3 minutes", "1 hour 30 minutes", "2 days"
+export function lengthLabel(minutes) {
+  if (minutes == null) return "permanent";
+  const n = Number(minutes);
+  if (MUTE_LABELS[n]) return MUTE_LABELS[n];
+  const plural = (v, w) => `${v} ${w}${v === 1 ? "" : "s"}`;
+  if (n % 1440 === 0) return plural(n / 1440, "day");
+  if (n % 60 === 0) return plural(n / 60, "hour");
+  if (n > 60) return `${plural(Math.floor(n / 60), "hour")} ${plural(n % 60, "minute")}`;
+  return plural(n, "minute");
+}
+
+// The "Length" field of a mute: the quick picks, plus Custom (type any length). value() gives minutes (null = permanent),
+// or throws a message for the dialog when the typed length isn't one.
+export function lengthField(id, def = 60, extra = []) {
+  const sel = select(id, [...Object.entries(MUTE_LABELS), ...extra, ["custom", "Custom…"]], def);
+  const custom = h("input", { class: "input", id: `${id}-custom`, maxlength: 16, placeholder: "e.g. 2m, 45m, 3h, 2d", hidden: true, style: "margin-top:6px",
+    "aria-label": "Custom length" });
+  sel.addEventListener("change", () => { custom.hidden = sel.value !== "custom"; if (!custom.hidden) custom.focus(); });
+  const el = field("Length", sel, "Pick one, or Custom to type any length: m = minutes, h = hours, d = days (up to 1 year).");
+  sel.after(custom);
+  return {
+    el,
+    value() {
+      if (sel.value === "perm") return null;
+      if (sel.value !== "custom") return Number(sel.value);
+      const n = parseLength(custom.value);
+      if (!n) throw new Error("Type a length like 2m, 45m, 3h or 2d (up to 1 year).");
+      return n;
+    },
+  };
+}
 export const REPORT_REASONS = ["Bad language", "Bullying or harassment", "Personal information", "Spam", "Inappropriate content", "Other"];
 export const PLAYER_REPORT_REASONS = ["Cheating or hacking", "Griefing", "Stealing", "Bad language", "Bullying or harassment", "Spam", "Other"];
 
@@ -120,17 +172,17 @@ function quickReasons(input) {
 
 // Shared staff actions, used by both the chat and the Staff page.
 export function muteDialog(member, onDone) {
-  const len = select("mute-len", Object.entries(MUTE_LABELS), 60);
+  const len = lengthField("mute-len", 60);
   const shown = h("input", { class: "input", id: "mute-shown", maxlength: 300, placeholder: "e.g. Spamming in #chat" });
   const reason = h("input", { class: "input", id: "mute-reason", maxlength: 300, placeholder: "Optional" });
   openDialog({
     title: `Mute ${member.username}`,
-    body: h("div", { class: "form" }, h("p", { class: "text-2", text: "Muted members can still read chat, but can't send messages until the mute ends." }), field("Length", len),
+    body: h("div", { class: "form" }, h("p", { class: "text-2", text: "Muted members can still read chat, but can't send messages until the mute ends." }), len.el,
       field("Reason shown to them", shown, "They see this in a notification and when they try to send a message."), quickReasons(shown),
       field("Staff note", reason, "Only staff see this (in the audit log).")),
     actions: [
       { label: "Cancel" },
-      { label: "Mute", kind: "primary", onClick: async () => { await postJson(`/api/mod/members/${member.id}/mute`, { minutes: Number(len.value), shownReason: shown.value, reason: reason.value }); onDone?.("Member muted."); } },
+      { label: "Mute", kind: "primary", onClick: async () => { await postJson(`/api/mod/members/${member.id}/mute`, { minutes: len.value(), shownReason: shown.value, reason: reason.value }); onDone?.("Member muted."); } },
     ],
   });
 }
@@ -163,17 +215,17 @@ export function roleDialog(member, onDone) {
 }
 
 export function voiceMuteDialog(member, onDone) {
-  const len = select("vmute-len", Object.entries(MUTE_LABELS), 60);
+  const len = lengthField("vmute-len", 60);
   const shown = h("input", { class: "input", id: "vmute-shown", maxlength: 300, placeholder: "e.g. Loud noises" });
   const reason = h("input", { class: "input", id: "vmute-reason", maxlength: 300, placeholder: "Optional" });
   openDialog({
     title: `Mute ${member.username} in voice`,
-    body: h("div", { class: "form" }, h("p", { class: "text-2", text: "They can still listen in voice, but nobody will hear them until the mute ends." }), field("Length", len),
+    body: h("div", { class: "form" }, h("p", { class: "text-2", text: "They can still listen in voice, but nobody will hear them until the mute ends." }), len.el,
       field("Reason shown to them", shown, "They see this in voice and in a notification."), quickReasons(shown),
       field("Staff note", reason, "Only staff see this (in the audit log).")),
     actions: [
       { label: "Cancel" },
-      { label: "Mute in voice", kind: "primary", onClick: async () => { await postJson(`/api/mod/members/${member.id}/voice-mute`, { minutes: Number(len.value), shownReason: shown.value, reason: reason.value }); onDone?.("Muted in voice."); } },
+      { label: "Mute in voice", kind: "primary", onClick: async () => { await postJson(`/api/mod/members/${member.id}/voice-mute`, { minutes: len.value(), shownReason: shown.value, reason: reason.value }); onDone?.("Muted in voice."); } },
     ],
   });
 }

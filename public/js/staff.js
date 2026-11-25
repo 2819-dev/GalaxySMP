@@ -1,7 +1,7 @@
 // Staff Tools page: reports, members, word filter, ranks, economy and audit log.
 import { money, moneyExact } from "/js/money.js";
 import { toast, iconEl } from "/js/site.js";
-import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, voiceMuteDialog, select, field } from "/js/dialog.js";
+import { h, openDialog, postJson, getJson, MUTE_LABELS, muteDialog, banDialog, voiceMuteDialog, select, field, lengthLabel } from "/js/dialog.js";
 import { setupPanel } from "/js/staff-panel.js";
 import { ranksDialog } from "/js/rank-picker.js";
 import { setupAppeals } from "/js/appeals-panel.js";
@@ -112,7 +112,7 @@ loaders.reports = async () => {
 };
 
 const KIND_WORDS = { warn: "Warned", mute: "Muted", unmute: "Unmuted", kick: "Kicked", ban: "Banned", unban: "Unbanned" };
-const lengthWord = (m) => (m == null ? "permanent" : MUTE_LABELS[m] || (m % 1440 === 0 ? `${m / 1440} days` : `${m} minutes`));
+const lengthWord = (m) => lengthLabel(m);
 
 function gameReportCard(r) {
   const card = h("article", { class: "panel report-card" });
@@ -354,14 +354,14 @@ $("fb-refresh").addEventListener("click", loadBlocks);
 let auditBefore = null;
 const DESCRIBE = {
   "message.delete": (e) => ["deleted a message by ", e.target],
-  "user.mute": (e) => ["muted ", e.target, ` for ${MUTE_LABELS[e.details.minutes] || `${e.details.minutes} minutes`}`],
+  "user.mute": (e) => ["muted ", e.target, ` for ${lengthLabel(e.details.minutes)}`],
   "user.unmute": (e) => ["unmuted ", e.target],
   "user.ban": (e) => ["banned ", e.target],
   "user.unban": (e) => ["unbanned ", e.target],
   "user.role": (e) => ["changed the role of ", e.target, ` from ${ROLE_NAMES[e.details.from] || e.details.from} to ${ROLE_NAMES[e.details.to] || e.details.to}`],
   "report.resolve": () => ["resolved a report"],
   "report.dismiss": () => ["dismissed a report"],
-  "voice.mute": (e) => ["muted ", e.target, ` in voice for ${MUTE_LABELS[e.details.minutes] || `${e.details.minutes} minutes`}`],
+  "voice.mute": (e) => ["muted ", e.target, ` in voice for ${lengthLabel(e.details.minutes)}`],
   "voice.unmute": (e) => ["unmuted ", e.target, " in voice"],
   "voice.kick": (e) => ["removed ", e.target, " from voice"],
   "voice.global_grant": (e) => ["gave the Global Mic to ", e.target],

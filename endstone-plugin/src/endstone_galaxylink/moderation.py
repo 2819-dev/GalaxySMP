@@ -24,7 +24,29 @@ from endstone.form import ActionForm, Dropdown, ModalForm, TextInput
 from endstone_galaxylink.announcements import show_title
 
 REPORT_REASONS = ["Cheating or hacking", "Griefing", "Stealing", "Bad language", "Bullying or harassment", "Spam", "Other"]
-MUTE_CHOICES = [(10, "10 minutes"), (60, "1 hour"), (1440, "1 day"), (10080, "7 days"), (43200, "30 days")]
+MUTE_CHOICES = [(1, "1 minute"), (3, "3 minutes"), (5, "5 minutes"), (10, "10 minutes"), (60, "1 hour"), (1440, "1 day"), (10080, "7 days"),
+                (43200, "30 days")]
+MAX_MUTE_MINUTES = 525600   # 1 year
+
+
+def parse_length(text):
+    """A typed length -> minutes: "2m", "45 min", "3h", "1h30m", "2d", "1w", or a plain number of minutes. None if it isn't one."""
+    import re
+    s = re.sub(r"\s+", "", str(text or "").lower())
+    if not s:
+        return None
+    units = {"": 1, "m": 1, "min": 1, "mins": 1, "minute": 1, "minutes": 1, "h": 60, "hr": 60, "hrs": 60, "hour": 60, "hours": 60,
+             "d": 1440, "day": 1440, "days": 1440, "w": 10080, "wk": 10080, "week": 10080, "weeks": 10080}
+    total, pos = 0.0, 0
+    for m in re.finditer(r"(\d+(?:\.\d+)?)([a-z]*)", s):
+        if m.start() != pos or m.group(2) not in units:
+            return None
+        total += float(m.group(1)) * units[m.group(2)]
+        pos = m.end()
+    if pos != len(s):
+        return None
+    total = round(total)
+    return total if 1 <= total <= MAX_MUTE_MINUTES else None
 BAN_CHOICES = [(1440, "1 day"), (10080, "7 days"), (43200, "30 days"), (None, "Permanent")]
 REPORT_COOLDOWN = 60
 QUICK_REASONS = ["Spam", "Bad language", "Harassment", "Griefing", "Advertising", "Inappropriate content", "Breaking the rules"]
@@ -40,7 +62,15 @@ def length_text(minutes):
     for m, label in MUTE_CHOICES + BAN_CHOICES:
         if m == minutes:
             return f"for {label}"
-    return f"for {minutes} minutes"
+    n = int(minutes)
+    plural = lambda v, w: f"{v} {w}{'' if v == 1 else 's'}"
+    if n % 1440 == 0:
+        return f"for {plural(n // 1440, 'day')}"
+    if n % 60 == 0:
+        return f"for {plural(n // 60, 'hour')}"
+    if n > 60:
+        return f"for {plural(n // 60, 'hour')} {plural(n % 60, 'minute')}"
+    return f"for {plural(n, 'minute')}"
 
 
 def time_left(until):
@@ -508,17 +538,32 @@ class Moderation:
                                                           TextInput("Or type a reason (the player sees it)", "e.g. Spamming chat", "")],
                                    submit_button="Confirm", on_submit=submit2))
 
-    def length_form(self, player, title, choices, then):
+    def length_form(self, player, title, choices, then, custom=None):
+        """How long + why. Mutes also get a Custom length box (2m, 45m, 3h, 2d...): a length typed there wins."""
+        custom = choices is MUTE_CHOICES if custom is None else custom
+        labels = [c[1] for c in choices] + (["Custom (type it below)"] if custom else [])
+        default = next((i for i, c in enumerate(choices) if c[0] == 60), 1)
+
         def submit(p, data):
             try:
                 v = json.loads(data)
-                then(choices[int(v[0])][0], clean(v[2], 300) or (QUICK_REASONS[int(v[1]) - 1] if int(v[1]) > 0 else ""))
+                reason = clean(v[2], 300) or (QUICK_REASONS[int(v[1]) - 1] if int(v[1]) > 0 else "")
+                typed = str(v[3]).strip() if custom and len(v) > 3 else ""
+                if typed or (custom and int(v[0]) >= len(choices)):
+                    mins = parse_length(typed)
+                    if mins is None:
+                        p.send_message("§cType a length like §e2m§c, §e45m§c, §e3h§c or §e2d§c (up to 1 year).")
+                        return self.length_form(p, title, choices, then, custom)
+                    return then(mins, reason)
+                then(choices[int(v[0])][0], reason)
             except (ValueError, IndexError, TypeError):
                 pass
-        player.send_form(ModalForm(title=title, controls=[Dropdown("How long?", [c[1] for c in choices], 1),
-                                                          Dropdown("Quick reason", ["(none, or type below)"] + QUICK_REASONS, 0),
-                                                          TextInput("Or type a reason (the player sees it)", "e.g. Bad language", "")],
-                                   submit_button="Confirm", on_submit=submit))
+        controls = [Dropdown("How long?", labels, default),
+                    Dropdown("Quick reason", ["(none, or type below)"] + QUICK_REASONS, 0),
+                    TextInput("Or type a reason (the player sees it)", "e.g. Bad language", "")]
+        if custom:
+            controls.append(TextInput("Custom length (optional): m = minutes, h = hours, d = days", "e.g. 2m, 45m, 3h, 2d", ""))
+        player.send_form(ModalForm(title=title, controls=controls, submit_button="Confirm", on_submit=submit))
 
     def ban_form(self, player, xuid, name):
         self.length_form(player, "§4Ban " + name, BAN_CHOICES, lambda mins, r: self.ban(player, xuid, name, mins, r))

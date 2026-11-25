@@ -684,6 +684,14 @@ The bigger Sift is built in the background after the update, which takes about h
 - **Call history:** every call shows in your DMs: "Call · 12 min", "Missed call" or "Declined", with a Call back button.
 - Calls are for friends. You can switch call notifications on or off in Account settings.`,
   },
+  {
+    id: "2026-11-25-short-mutes",
+    title: "Shorter and custom mutes for staff",
+    body: `Staff can now give much shorter mutes, or exactly the length they want.
+- **Quick picks:** 1, 3 and 5 minutes join 10 minutes, 1 hour, 1 day, 7 days and 30 days.
+- **Custom:** pick Custom and type any length, like 2m, 45m, 3h, 1h30m or 2d (up to 1 year).
+- Works everywhere you mute: chat and voice mutes on the website, the player card in the Staff Panel, and /mod in game. The muted player is told exactly how long.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

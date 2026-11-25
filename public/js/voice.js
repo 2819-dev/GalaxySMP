@@ -3,7 +3,7 @@
 // allowed to hear (nearby players, your group, Global Mic). Volume and left/right
 // direction follow positions sent by the server plugin.
 import { toast, config, installApp, isInstalled } from "/js/site.js";
-import { h, openDialog, getJson, postJson, select, field, MUTE_LABELS } from "/js/dialog.js";
+import { h, openDialog, getJson, postJson, select, field, MUTE_LABELS, lengthField } from "/js/dialog.js";
 
 const $ = (id) => document.getElementById(id);
 const STAFF = 50;
@@ -665,14 +665,14 @@ async function staffDialog(u) {
 }
 
 function voiceMuteDialog(u) {
-  const len = select("vmute-len", Object.entries(MUTE_LABELS), 60);
+  const len = lengthField("vmute-len", 60);
   const reason = h("input", { class: "input", id: "vmute-reason", maxlength: 300, placeholder: "Optional, shown in the audit log" });
   openDialog({
     title: `Mute ${u.username} in voice`,
-    body: h("div", { class: "form" }, h("p", { class: "text-2", style: "margin:0", text: "They can still listen, but nobody will hear them until the mute ends." }), field("Length", len), field("Reason", reason)),
+    body: h("div", { class: "form" }, h("p", { class: "text-2", style: "margin:0", text: "They can still listen, but nobody will hear them until the mute ends." }), len.el, field("Reason", reason)),
     actions: [{ label: "Cancel" }, {
       label: "Mute", kind: "primary",
-      onClick: async () => { await postJson(`/api/mod/members/${u.id}/voice-mute`, { minutes: Number(len.value), reason: reason.value }); toast("Muted in voice."); },
+      onClick: async () => { await postJson(`/api/mod/members/${u.id}/voice-mute`, { minutes: len.value(), reason: reason.value }); toast("Muted in voice."); },
     }],
   });
 }
