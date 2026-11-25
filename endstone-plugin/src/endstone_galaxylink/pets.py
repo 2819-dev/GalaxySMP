@@ -239,7 +239,7 @@ class Pets:
         name = quote(p.name)
         try:
             server.dispatch_command(sender, f"effect {name} levitation 1 28 true")
-            server.dispatch_command(sender, f"playsound mob.slime.jump {name} ~ ~ ~ 1 0.7")
+            server.dispatch_command(sender, f"execute as {name} at @s run playsound mob.slime.jump @s ~ ~ ~ 1 0.7")
             server.dispatch_command(sender, f"execute in {dim_cmd(p.dimension.name)} run particle minecraft:villager_happy {where.x:.2f} {where.y + 0.6:.2f} {where.z:.2f}")
         except Exception:
             return

@@ -52,3 +52,23 @@ def later(plugin, player, fn, delay):
         if p is not None:
             fn(p)
     plugin.server.scheduler.run_task(plugin, run, delay=delay)
+
+
+_quiet_senders = {}
+
+
+def run_cmd(plugin, line):
+    """Runs a console command. Clean-up commands (kill @e[...]) often match nothing, which Minecraft reports as an
+    error ("No targets matched selector"); those run quietly so they don't fill the console and the error log."""
+    server = plugin.server
+    sender = server.command_sender
+    if " kill @e" in f" {line}" or line.startswith("kill @e"):
+        sender = _quiet_senders.get(id(server))
+        if sender is None:
+            try:
+                from endstone.command import CommandSenderWrapper
+                sender = CommandSenderWrapper(server.command_sender, on_message=lambda m: None, on_error=lambda m: None)
+            except Exception:
+                sender = server.command_sender
+            _quiet_senders[id(server)] = sender
+    return server.dispatch_command(sender, line)

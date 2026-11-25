@@ -105,7 +105,8 @@ class BuildContest:
         from endstone_galaxylink.plots import dim_cmd
         server = self.plugin.server
         try:
-            server.dispatch_command(server.command_sender, f"execute in {dim_cmd(self.arena()[0])} run {line}")
+            from endstone_galaxylink.safety import run_cmd
+            run_cmd(self.plugin, f"execute in {dim_cmd(self.arena()[0])} run {line}")
         except Exception:
             pass
 

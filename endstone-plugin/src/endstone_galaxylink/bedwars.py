@@ -178,7 +178,8 @@ class Bedwars:
 
     def cmd(self, text):
         try:
-            self.plugin.server.dispatch_command(self.plugin.server.command_sender, text)
+            from endstone_galaxylink.safety import run_cmd
+            run_cmd(self.plugin, text)
         except Exception:
             pass
 

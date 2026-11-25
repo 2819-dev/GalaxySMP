@@ -103,7 +103,7 @@ class NpcManager:
 
     def kill_tagged(self, nid):
         dim = self.dimension_cmd(self.npcs[nid]["dim"]) if nid in self.npcs else "overworld"
-        self.plugin.server.dispatch_command(self.plugin.server.command_sender, f"execute in {dim} run kill @e[tag={TAG}_{nid}]")
+        self.cmd(f"execute in {dim} run kill @e[tag={TAG}_{nid}]")
 
     @staticmethod
     def dimension_cmd(name):
@@ -143,7 +143,8 @@ class NpcManager:
         self.cmd(f"execute in {self.dimension_cmd(rec['dim'])} run effect @e[tag={TAG}_{nid}] slowness infinite 255 true")
 
     def cmd(self, line):
-        self.plugin.server.dispatch_command(self.plugin.server.command_sender, line)
+        from endstone_galaxylink.safety import run_cmd
+        run_cmd(self.plugin, line)
 
     def npc_id(self, actor):
         try:

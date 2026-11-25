@@ -39,7 +39,8 @@ class Portals:
 
     def cmd(self, c):
         try:
-            return self.plugin.server.dispatch_command(self.plugin.server.command_sender, c)
+            from endstone_galaxylink.safety import run_cmd
+            return run_cmd(self.plugin, c)
         except Exception:
             return False
 

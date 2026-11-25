@@ -76,7 +76,8 @@ class FloatingTexts:
             pass
 
     def run(self, line):
-        self.plugin.server.dispatch_command(self.plugin.server.command_sender, line)
+        from endstone_galaxylink.safety import run_cmd
+        run_cmd(self.plugin, line)
 
     def kill_at(self, lab):
         """Removes floating text entities at exactly this label's spot (nothing else is touched)."""

@@ -286,7 +286,7 @@ class Welcome:
         try:
             if on and st is not None and not st["music"] and self.prefs(player)["music"]:
                 st["music"] = True
-                server.dispatch_command(server.command_sender, f'playsound music.menu "{name}" ~ ~ ~ 0.6')
+                server.dispatch_command(server.command_sender, f'execute as "{name}" at @s run playsound music.menu @s ~ ~ ~ 0.6 1 0.6')
             elif not on:
                 server.dispatch_command(server.command_sender, f'stopsound "{name}" music.menu')
         except Exception:
