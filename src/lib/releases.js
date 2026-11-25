@@ -673,6 +673,17 @@ The bigger Sift is built in the background after the update, which takes about h
 - **Fairness:** fixed an elevator and a farming trick that created free items or money, and nobody leaves a minigame in Creative mode any more.
 - **Also fixed:** the Main Menu music and pet bounce sounds sometimes not playing, Night Vision ending removing your other potion effects, and messages to a player whose name starts like another player's going to the wrong person.`,
   },
+  {
+    id: "2026-11-25-calls",
+    title: "Calls",
+    body: `You can now call your friends, just like a phone call, and add more friends to make a group call.
+- **Call a friend:** tap **Call** in your DMs or on a friend's profile. The call opens on the Voice page, and only the people in the call can hear each other.
+- **Group calls:** anyone in the call can tap **Add someone** to bring in more friends, up to 4 people.
+- **When someone calls you:** you'll see who's calling on the website (with Answer and Decline), get a notification on your phone or computer if you've turned them on, and hear it ring in game.
+- **In game:** \`/call <player>\` calls a friend, \`/call accept\` or \`/call decline\` answers, \`/call add <player>\` adds someone, and \`/call hangup\` leaves. You talk on galaxymc.us/voice on your phone or computer. Friends also have a Call button in Main Menu > Social.
+- **Call history:** every call shows in your DMs: "Call · 12 min", "Missed call" or "Declined", with a Call back button.
+- Calls are for friends. You can switch call notifications on or off in Account settings.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

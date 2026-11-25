@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.89.0"
+VERSION = "2.90.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -95,6 +95,8 @@ class GalaxyLink(Plugin):
         "shopnpc": _cmd("Summon a shop NPC where you stand (tap it to edit it). /shopnpc fix puts back missing NPCs near you.", "/shopnpc [action: message]", "galaxylink.command.shopnpc"),
         "guide": _cmd("Help: server info, rules and commands. Command blocks: guide @p", "/guide [player: player]", "galaxylink.command.guide"),
         "party": _cmd("Your party: invite players, accept an invite, or leave. Party chat: /p <message>.", "/party [action: message]", "galaxylink.command.party"),
+        "call": _cmd("Call a friend (voice on galaxymc.us/voice): /call <player>, /call accept, /call decline, /call add <player>, /call hangup.",
+                     "/call [action: message]", "galaxylink.command.call"),
         "p": _cmd("Party chat.", "/p <message: message>", "galaxylink.command.party", ["pc"]),
         "sift": _cmd("Staff: go to the Sift, or build it (/sift build, /sift stop, /sift status).", "/sift [action: message]", "galaxylink.command.sift"),
         "border": _cmd("World borders: a menu of them, teleport to one, get the Border Axe, or reset.", "/border [tp|list|axe|reset] [name: message]", "galaxylink.command.border"),
@@ -173,6 +175,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.sift": _perm("Allows /sift (server operators).", "op"),
         "galaxylink.command.portal": _perm("Allows /portal (server operators).", "op"),
         "galaxylink.command.party": _perm("Allows /party and /p.", True),
+        "galaxylink.command.call": _perm("Allows /call (voice calls with friends).", True),
         "galaxylink.command.tpa": _perm("Allows /tpa.", True),
         "galaxylink.command.tpahere": _perm("Allows /tpahere.", True),
         "galaxylink.command.tpaccept": _perm("Allows /tpaccept.", True),
@@ -301,6 +304,8 @@ class GalaxyLink(Plugin):
         self.borders = Borders(self)  # a border for every server; only the owner can go outside
         from endstone_galaxylink.social import Social
         self.social = Social(self)  # Main Menu > Social: friends, parties, recent players, profile card
+        from endstone_galaxylink.calls import Calls
+        self.calls = Calls(self)  # /call: private voice calls with friends (the call runs on galaxymc.us/voice)
         from endstone_galaxylink.mail import Mail
         self.mail = Mail(self)  # Main Menu > Mail: website messages and notifications
         self.elevators = Elevators(self)
@@ -374,6 +379,7 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self._watched("drawing the website map", self.livemap.tick), delay=200, period=40)  # website map
         self.server.scheduler.run_task(self, self._watched("a plot job (save/reset)", self.plots.tick, lambda: self.plots.jobs), delay=1, period=1)
         self.server.scheduler.run_task(self, self._safe("crashwatch.tick", self.crashwatch.tick), delay=20, period=20)
+        self.server.scheduler.run_task(self, self._safe("calls.tick", self.calls.tick), delay=40, period=40)   # ringing
         self.server.scheduler.run_task(self, self._watched("the Build Contest", self.buildcontest.tick,
                                                           lambda: self.buildcontest.jobs or self.buildcontest.running()), delay=40, period=20)
         self.server.scheduler.run_task(self, self._safe("plots.check_tools", self.plots.check_tools), delay=400, period=200)  # plot tools come back if missing
@@ -547,7 +553,7 @@ class GalaxyLink(Plugin):
         # each one on its own, so one problem doesn't stop the others
         for part in ("ranks.forget", "plates.on_quit", "galaxymap.on_quit", "parkour.on_quit", "collection.on_quit",
                      "teleports.on_quit", "progress.on_quit", "bedwars.on_quit", "penguins.on_quit", "welcome.on_quit", "social.on_quit", "mail.on_quit",
-                     "pets.on_quit", "portals.on_quit", "sift.on_quit", "borders.on_quit"):
+                     "pets.on_quit", "portals.on_quit", "sift.on_quit", "borders.on_quit", "calls.on_quit"):
             obj, fn = part.split(".")
             try:
                 getattr(getattr(self, obj), fn)(p)
@@ -918,7 +924,7 @@ class GalaxyLink(Plugin):
         player_only = {"pay", "shop", "sell", "ah", "baltop", "shopnpc", "ranks", "tpa", "tpahere", "tpaccept",
                        "tpdeny", "spawn", "setspawn", "home", "sethome", "delhome", "homes", "back", "plan", "plot", "plotaxe", "minigames", "tpd", "plate",
                        "report", "mod", "inspect", "rollback", "daily", "quests", "achievements", "stats", "leaderboard", "jobs", "crates", "elevator",
-                       "shift", "whois", "support", "map", "parkour", "warp", "setwarp", "delwarp", "goal", "votecomputer", "menu", "party", "p"}
+                       "shift", "whois", "support", "map", "parkour", "warp", "setwarp", "delwarp", "goal", "votecomputer", "menu", "party", "p", "call"}
         if name in player_only and not isinstance(sender, Player):
             sender.send_message(f"/{name} can only be used in game.")
             return True
@@ -951,6 +957,7 @@ class GalaxyLink(Plugin):
             "portal": lambda: self.portals.command(sender, " ".join(args).split()),
             "border": lambda: self.borders.command(sender, args),
             "party": lambda: self._party(sender, args),
+            "call": lambda: self.calls.command(sender, args),
             "p": lambda: self.social.party_chat(sender, " ".join(args).strip()) if args else sender.send_message("§eUsage: /p <message>"),
             "tpa": lambda: tp.request(sender, args, "to"),
             "tpahere": lambda: tp.request(sender, args, "here"),

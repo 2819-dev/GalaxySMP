@@ -199,7 +199,7 @@ class VoiceLink:
             try:
                 self.ws = _Socket(self.url, {
                     "Authorization": "Bearer " + self.secret,
-                    "User-Agent": "GalaxyLink-Endstone/2.89.0",
+                    "User-Agent": "GalaxyLink-Endstone/2.90.0",
                 })
                 self.plugin.logger.info("Voice chat connected.")
                 self.plugin.server.scheduler.run_task(self.plugin, self.announce_online)
@@ -315,6 +315,8 @@ class VoiceLink:
                     p.send_message(f"§b{str(msg.get('from'))[:32]}§7 invited you to the voice group §b{str(msg.get('group'))[:24]}§7. "
                                    "Join on §egalaxymc.us/voice§7 (Voice Chat > Groups).")
             self._on_main(tell)
+        elif msg.get("type") in ("call_ring", "call_ring_end", "call_note"):   # calls (2.90)
+            self._on_main(lambda m=msg: self.plugin.calls.on_message(m))
         elif msg.get("type") == "dm":
             self._on_main(lambda: self.plugin.dms.deliver(msg))
         elif msg.get("type") == "staff_alert":

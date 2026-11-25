@@ -25,6 +25,7 @@ export const KINDS = {
   community: { name: "Suggestions & builds", hint: "Replies to your suggestions, and Build of the Week", default: true },
   giveaways: { name: "Giveaways", hint: "New giveaways, and when you win one", default: true },
   summary: { name: "Daily summary", hint: "Each evening: who played today, your money and streak", default: true },
+  calls: { name: "Calls", hint: "When a friend calls you, and calls you missed", default: true },
 };
 // How long the bell keeps notifications
 export const KEEP = { day: { name: "Past day", sql: "1 day" }, week: { name: "Past week", sql: "7 days" }, month: { name: "Past month", sql: "30 days" },
@@ -176,7 +177,7 @@ export async function notify(env, userIds, kind, message, options = {}) {
   }
   const ids = userIds === "all" ? null : [...new Set(userIds.map(Number).filter((id) => id && !skip.has(id)))];
   if (ids && !ids.length) return 0;
-  if (ids && kind && !NOT_IN_INBOX.has(kind)) await toInbox(sql, ids, kind, message).catch((e) => console.error("inbox failed", e));
+  if (ids && kind && !NOT_IN_INBOX.has(kind) && !options.noInbox) await toInbox(sql, ids, kind, message).catch((e) => console.error("inbox failed", e));
   if (!env.VAPID_PRIVATE_KEY) return 0;
   const exclude = [...skip];
   const def = kind ? KINDS[kind].default : true;

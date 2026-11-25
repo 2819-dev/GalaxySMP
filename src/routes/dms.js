@@ -106,7 +106,7 @@ export async function listThreads(request, env) {
   const rows = await sql`
     SELECT t.id, t.last_message_at, CASE WHEN t.user_a = ${me.id} THEN t.a_unread ELSE t.b_unread END AS unread,
            o.id AS other_id, o.username, p.xuid, p.head_at, p.gamerpic_at, (p.online_at > now() - interval '150 seconds') AS in_game,
-           (SELECT CASE WHEN m.body = '' AND m.image_id IS NOT NULL THEN '📷 Picture' WHEN m.body = '' AND m.audio_id IS NOT NULL THEN '🎤 Voice message' ELSE m.body END FROM dm_messages m WHERE m.thread_id = t.id ORDER BY m.id DESC LIMIT 1) AS preview,
+           (SELECT CASE WHEN m.call IS NOT NULL THEN (CASE m.call->>'status' WHEN 'missed' THEN '📞 Missed call' WHEN 'declined' THEN '📞 Call declined' ELSE '📞 Call' END) WHEN m.body = '' AND m.image_id IS NOT NULL THEN '📷 Picture' WHEN m.body = '' AND m.audio_id IS NOT NULL THEN '🎤 Voice message' ELSE m.body END FROM dm_messages m WHERE m.thread_id = t.id ORDER BY m.id DESC LIMIT 1) AS preview,
            (SELECT sender_id FROM dm_messages m WHERE m.thread_id = t.id ORDER BY m.id DESC LIMIT 1) AS last_sender
       FROM dm_threads t
       JOIN users o ON o.id = CASE WHEN t.user_a = ${me.id} THEN t.user_b ELSE t.user_a END
@@ -125,6 +125,27 @@ export async function listThreads(request, env) {
   });
 }
 
+// A call's line in the DM conversation between the person who called (or added them) and the person called:
+// info = { status: "ended" | "missed" | "declined", seconds, group } ("group": more than two people were in the call).
+export async function logCall(env, fromId, toId, info) {
+  const sql = getDb(env);
+  const [a, b] = pair(fromId, toId);
+  if (a === b) return;
+  const fromIsA = Number(fromId) === a;
+  const unread = info.status === "missed" ? 1 : 0;   // a missed call shows as new for the person who missed it
+  const [thread] = await sql`
+    INSERT INTO dm_threads (user_a, user_b, last_message_at, a_unread, b_unread)
+    VALUES (${a}, ${b}, now(), ${fromIsA ? 0 : unread}, ${fromIsA ? unread : 0})
+    ON CONFLICT (user_a, user_b) DO UPDATE SET last_message_at = now(),
+      a_unread = dm_threads.a_unread + ${fromIsA ? 0 : unread}, b_unread = dm_threads.b_unread + ${fromIsA ? unread : 0}
+    RETURNING id`;
+  const call = { status: String(info.status), seconds: Math.max(0, Math.round(Number(info.seconds) || 0)), group: Boolean(info.group) };
+  const [msg] = await sql`INSERT INTO dm_messages (thread_id, sender_id, body, via, call) VALUES (${thread.id}, ${fromId}, '', 'web', ${JSON.stringify(call)}::jsonb) RETURNING id, created_at`;
+  const [from] = await sql`SELECT username FROM users WHERE id = ${fromId}`;
+  await notify(env, { id: Number(msg.id), threadId: Number(thread.id), from: Number(fromId), fromName: from?.username || "", to: Number(toId), body: "", at: msg.created_at,
+    via: "web", audio: null, image: null, form: null, call });
+}
+
 export async function getConversation(request, env, ctx, url, params) {
   const me = await requireUser(request, env);
   const sql = getDb(env);
@@ -136,14 +157,14 @@ export async function getConversation(request, env, ctx, url, params) {
   if (thread) {
     const before = Number(url.searchParams.get("before")) || null;
     const rows = await sql`
-      SELECT d.id, d.sender_id, d.body, d.via, d.created_at, d.read_at, d.edited_at, d.audio_id, a.duration_ms, d.image_id, i.width AS img_w, i.height AS img_h, d.form_id FROM dm_messages d
+      SELECT d.id, d.sender_id, d.body, d.via, d.created_at, d.read_at, d.edited_at, d.audio_id, a.duration_ms, d.image_id, i.width AS img_w, i.height AS img_h, d.form_id, d.call FROM dm_messages d
         LEFT JOIN message_audio a ON a.id = d.audio_id LEFT JOIN message_images i ON i.id = d.image_id
        WHERE d.thread_id = ${thread.id} AND (${before}::bigint IS NULL OR d.id < ${before})
        ORDER BY d.id DESC LIMIT 60`;
     messages = rows.reverse().map((m) => ({ id: Number(m.id), from: Number(m.sender_id), body: m.body, via: m.via, at: m.created_at,
       read: Boolean(m.read_at), editedAt: m.edited_at || null, audio: m.audio_id ? { id: Number(m.audio_id), ms: Number(m.duration_ms) } : null,
       image: m.image_id ? { id: Number(m.image_id), w: Number(m.img_w), h: Number(m.img_h) } : null,
-      form: m.form_id ? { id: Number(m.form_id) } : null }));
+      form: m.form_id ? { id: Number(m.form_id) } : null, call: m.call || null }));
     // opening the conversation reads their messages: the sender can't edit them any more
     // (looking as this member with "Act as Member" doesn't mark their messages as read)
     const read = me.acting_by ? [] : await sql`UPDATE dm_messages SET read_at = now() WHERE thread_id = ${thread.id} AND sender_id <> ${me.id} AND read_at IS NULL RETURNING id`;

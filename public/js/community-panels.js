@@ -351,12 +351,20 @@ function renderDMs(p) {
         await postJson(`/api/dm/block/${userId}`, { blocked: !d.blocked }); open(userId);
       } }],
     }));
+    // Call (2.90): friends only (the owner can call anyone); the call opens on the Voice page
+    const callBtn = h("a", { class: "btn btn-secondary btn-sm dm-call-btn", href: `/voice?call=${userId}`, hidden: true, title: `Call ${d.other.username}` },
+      iconEl("phone"), "Call");
+    const owner = Boolean(ctx.me?.owner || chatState.me?.owner);
+    if (!d.blocked) {
+      if (owner) callBtn.hidden = false;
+      else getJson("/api/friends").then((f) => { if ((f.friends || []).some((x) => x.id === Number(userId))) callBtn.hidden = false; }).catch(() => {});
+    }
     const head = h("div", { class: "dm-head" },
       h("button", { class: "btn btn-ghost btn-sm dm-back", type: "button", text: "← Back", onclick: () => { current = null; ctx.setView?.("dms"); wrap.classList.remove("has-open"); loadList(); } }),
       dmFace(d.other.head, d.other.username),
       h("div", { class: "dm-head-main" }, h("b", { text: d.other.username }),
         h("span", { class: "text-3 small", text: d.other.inGame ? "Playing on GalaxySMP: they'll see this in game" : "Not in game right now" })),
-      blockBtn);
+      callBtn, blockBtn);
     const meId = ctx.me?.id;
     const fill = (node, m) => {
       const text = node.querySelector(".dm-text");
@@ -387,7 +395,27 @@ function renderDMs(p) {
       }
     };
     const msgs = new Map();
+    const callLine = (m) => {   // "Call · 12 min", "Missed call", "Declined" (2.90)
+      const mine = m.from === meId;
+      const s = Number(m.call.seconds) || 0;
+      const dur = s < 60 ? `${Math.max(1, s)} sec` : s < 3600 ? `${Math.round(s / 60)} min` : `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min`;
+      const text = m.call.status === "missed" ? (mine ? `${d.other.username} missed your call` : "Missed call")
+        : m.call.status === "declined" ? (mine ? `${d.other.username} declined your call` : "You declined the call")
+        : `${m.call.group ? "Group call" : "Call"} · ${dur}`;
+      return h("div", { class: `dm-call ${m.call.status}${mine ? " mine" : ""}` },
+        h("span", { class: "dm-call-ico" }, iconEl("phone")),
+        h("span", { class: "dm-call-text", text }),
+        h("span", { class: "dm-call-time text-3 small", text: dmTime(m.at) }),
+        !callBtn.hidden || owner ? h("a", { class: "btn btn-ghost btn-sm", href: `/voice?call=${userId}`, text: "Call back" }) : null);
+    };
     const add = (m) => {
+      if (m.call) {
+        const node = callLine(m);
+        node.dataset.id = m.id;
+        msgs.set(m.id, { m, node });
+        log.append(node);
+        return;
+      }
       const mine = m.from === meId;
       const node = h("div", { class: `dm-msg${mine ? " mine" : ""}` },
         h("div", { class: "dm-bubble" }, h("div", { class: "dm-text msg-text" }), h("div", { class: "dm-meta" })));

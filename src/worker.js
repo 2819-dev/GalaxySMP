@@ -26,7 +26,7 @@ import * as seasonRoutes from "./routes/season.js";
 import * as goals from "./routes/goals.js";
 import * as referrals from "./routes/referrals.js";
 import * as showcase from "./routes/showcase.js";
-import { voiceConnect, voiceServer, cubeVoiceConnect } from "./routes/voice.js";
+import { voiceConnect, declineCall, voiceServer, cubeVoiceConnect } from "./routes/voice.js";
 import * as cube from "./routes/cube.js";
 import * as ranks from "./routes/ranks.js";
 import * as economy from "./routes/economy.js";
@@ -268,6 +268,7 @@ const routes = [
   ["GET", "/api/showcase/options", (req, env) => showcase.options(req, env)],
   ["POST", "/api/showcase", (req, env) => showcase.save(req, env)],
   ["GET", "/api/voice/connect", (req, env) => voiceConnect(req, env)],
+  ["POST", "/api/calls/decline", (req, env) => declineCall(req, env)],
   ["GET", "/api/streams", (req, env) => import("./routes/streams.js").then((m) => m.list(req, env))],
   ["GET", "/api/sessions", (req, env) => import("./routes/sessions.js").then((m) => m.list(req, env))],
   ["POST", "/api/recordings/start", (req, env) => import("./routes/recordings.js").then((m) => m.start(req, env))],

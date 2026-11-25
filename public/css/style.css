@@ -4886,3 +4886,42 @@ html[data-theme="light"] .mk-balance { color: rgb(160,110,8); }
 .sl-mem { width: 100%; height: 70px; display: block; background: var(--surface-2, rgba(255,255,255,.04)); border-radius: 8px; }
 .sl-mem-line { fill: none; stroke: var(--accent, #4fd1ff); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .sl-mem-limit { stroke: #ff6b6b; stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+
+/* ---------- Calls (2.90) ---------- */
+.call-panel { margin-bottom: 16px; background: linear-gradient(135deg, rgba(56, 214, 255, .10), rgba(156, 92, 255, .10)), var(--surface); border-color: rgba(120, 160, 255, .35); }
+.call-top { display: flex; align-items: center; gap: 12px; }
+.call-badge { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-size: 1.2rem; background: linear-gradient(135deg, #38d6ff, #7a5cff); }
+.call-title { font-weight: 700; font-size: 1.1rem; }
+.call-people { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+.call-person { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; background: var(--surface-2); border: 2px solid transparent; transition: border-color .15s, box-shadow .15s; }
+.call-person.talking { border-color: var(--ok); box-shadow: 0 0 0 3px rgba(52, 199, 123, .18); }
+.call-person.ringing { opacity: .7; }
+.call-person.ringing .call-avatar { animation: call-pulse 1.2s ease-in-out infinite; }
+.call-avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: #fff; background: linear-gradient(135deg, #38d6ff, #7a5cff); }
+.call-person-name { font-weight: 600; }
+.call-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.call-incoming { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: rgba(4, 6, 20, .55); backdrop-filter: blur(4px); padding: 16px; }
+.call-incoming[hidden] { display: none; }
+.call-incoming-card { width: min(340px, 100%); text-align: center; padding: 28px 22px; border-radius: 22px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0, 0, 0, .45); }
+.call-incoming-name { font-size: 1.4rem; font-weight: 800; margin-top: 10px; }
+.call-incoming-actions { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+.call-incoming-actions .btn { min-width: 110px; }
+.call-ring { display: inline-grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; font-size: 1.8rem; background: linear-gradient(135deg, #38d6ff, #7a5cff); animation: call-pulse 1.2s ease-in-out infinite; }
+.call-answer { background: #22b866; border-color: #22b866; }
+.call-answer:hover { background: #2bcc74; }
+@keyframes call-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(56, 214, 255, .45); } 50% { box-shadow: 0 0 0 12px rgba(56, 214, 255, 0); } }
+@media (prefers-reduced-motion: reduce) { .call-ring, .call-person.ringing .call-avatar { animation: none; } }
+.call-banner { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1000; width: min(460px, calc(100% - 24px)); display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: 18px; background: var(--surface); border: 1px solid rgba(120, 160, 255, .45); box-shadow: 0 14px 40px rgba(0, 0, 0, .45); }
+.call-banner .call-ring { width: 44px; height: 44px; font-size: 1.2rem; flex: none; }
+.call-banner-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.call-banner-text b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.call-banner-actions { display: flex; gap: 6px; flex: none; }
+@media (max-width: 420px) { .call-banner { flex-wrap: wrap; } .call-banner-actions { width: 100%; } .call-banner-actions .btn { flex: 1; } }
+.call-add-list { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow: auto; }
+.dm-call { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 10px auto; padding: 6px 14px; width: fit-content; max-width: 100%;
+  border-radius: 999px; background: var(--surface-2); color: var(--text-2); font-size: .92rem; }
+.dm-call-ico svg { width: 16px; height: 16px; vertical-align: -3px; }
+.dm-call.missed .dm-call-ico, .dm-call.declined .dm-call-ico { color: #ff6b6b; }
+.dm-call.ended .dm-call-ico { color: var(--ok); }
+.dm-call-btn svg { width: 15px; height: 15px; }

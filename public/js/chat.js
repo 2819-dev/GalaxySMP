@@ -1482,6 +1482,12 @@ function handleEvent(data) {
     case "voice_invite":
       toast(`${data.from} invited you to the voice group "${data.group}". Open Voice Chat to join.`);
       break;
+    case "call_ring":   // a friend is calling you (2.90)
+      import("/js/call-ring.js").then((m) => m.showRing(data)).catch(() => toast(`${data.from} is calling you. Open Voice to answer.`));
+      break;
+    case "call_ring_end":
+      import("/js/call-ring.js").then((m) => m.endRing(data)).catch(() => {});
+      break;
     case "dm_read":
     case "dm_edit":
     case "dm_form":

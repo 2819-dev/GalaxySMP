@@ -187,7 +187,7 @@ export class CommunityHub extends DurableObject {
       this.broadcast({ type: "presence", userId: event.userId, online: false });
       return;
     }
-    if (event.type === "voice_invite") { // only the invited member
+    if (event.type === "voice_invite" || event.type === "call_ring" || event.type === "call_ring_end") { // only the invited / called member
       const text = JSON.stringify(event);
       for (const ws of this.socketsFor(event.to)) { try { ws.send(text); } catch { /* gone */ } }
       return;

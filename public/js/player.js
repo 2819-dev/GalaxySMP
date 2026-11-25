@@ -97,6 +97,12 @@ async function load() {
   const actions = h("div", { class: "pp-actions" });
   if (social && !social.isMe) actions.append(h("a", { class: "btn btn-primary btn-sm", href: `/community#dm-${social.id}` }, iconEl("message"), "Message"));
   if (social && !social.isMe) actions.append(h("a", { class: "btn btn-secondary btn-sm", href: `/community?to=${encodeURIComponent(p.name)}#marketplace/trades` }, iconEl("handshake"), "Trade"));
+  // Call (2.90): friends (the owner can call anyone)
+  if (social && !social.isMe) {
+    const call = h("a", { class: "btn btn-secondary btn-sm", href: `/voice?call=${social.id}`, hidden: p.friend !== "friends" }, iconEl("phone"), "Call");
+    actions.append(call);
+    if (p.friend !== "friends") getJson("/api/me").then((m) => { if (m.user?.owner) call.hidden = false; }).catch(() => {});
+  }
   if (p.userId && p.friend && p.friend !== "self") actions.append(friendButton(p));
   actions.append(h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => compareDialog(p) }, iconEl("scale"), "Compare"));
   if (social?.isMe) actions.append(h("a", { class: "btn btn-primary btn-sm", href: "/account" }, iconEl("pencil"), "Edit profile"));
