@@ -1368,12 +1368,10 @@ class Welcome:
                 if st.get("portal"):
                     self.open.pop(str(player.unique_id), None)
                     return player.send_message("§bThe Sift is coming soon! §7It isn't open yet.")
-                from endstone_galaxylink import sift as SF
-                done = len(self.plugin.economy.get_config(SF.PIECES) or []) if sift is not None else 0
-                total = len(SF.TILES)
+                done, total = sift.progress() if sift is not None else (0, 1)
                 st["screen"], st["tab"] = "play", 2
                 return self.page(player, "The Sift", ["< Back"], 0,
-                                 f"§l§bComing soon!§r\n\nThe Sift is still being made ({min(done, total)}/{total} pieces).\n§7Keep an eye on #Updates.",
+                                 f"§l§bComing soon!§r\n\nThe Sift is still being made ({round(100 * done / max(1, total))}% done).\n§7Keep an eye on #Updates.",
                                  go_to=[("play", 2)])
             spot = sift.spot()
         theme = s.get("anim") if s.get("anim") in THEMES else "grass"

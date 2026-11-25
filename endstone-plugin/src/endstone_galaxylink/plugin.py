@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.92.0"
+VERSION = "2.93.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -877,6 +877,8 @@ class GalaxyLink(Plugin):
                 self.diagnostics.stopping()
             except Exception:
                 pass
+        if getattr(self, "sift", None):
+            self.sift.stopping()
         if getattr(self, "_voice", None):
             self.economy.sync()
             self._voice.stop()

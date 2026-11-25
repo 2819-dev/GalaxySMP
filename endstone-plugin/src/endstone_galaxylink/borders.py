@@ -15,6 +15,8 @@ import time
 
 AXE = "galaxysmp:border_axe"
 MAIN = "GalaxySMP"
+SIFT = "The Sift"        # its border is built in: it always follows the valley, at the foot of its cliffs
+_SPAN = None
 MAIN_HALF = 10000        # the default main world border: this far from spawn in each direction
 WARN = 8                 # blocks from the edge where the striped border wall shows
 PUSH = 1.5               # how far back inside someone is put
@@ -42,25 +44,45 @@ class Borders:
 
     # ---------- the borders ----------
     def borders(self):
-        """Every border: {id, server, dim, shape: box|circle, x1, z1, x2, z2 | cx, cz, r}."""
+        """Every border: {id, server, dim, shape: box|circle|sift, x1, z1, x2, z2 | cx, cz, r}.
+        The Sift's border is always there and always follows its valley (whatever was saved before)."""
         saved = self.plugin.economy.get_config("borders")
         if saved is not None:
-            items = list(saved)
-            for b in items:   # the Sift grew: its border follows its (wavy) valley edge now
-                if b.get("id") == "sift" and b.get("shape") == "circle":
-                    b["shape"] = "sift"
-            return items
-        out = []
-        spawn = self.plugin.economy.get_config("spawn") or {}
-        sx, sz = float(spawn.get("x", 0)), float(spawn.get("z", 0))
-        out.append({"id": "main", "server": MAIN, "name": "Main World", "dim": "overworld", "shape": "box",
-                    "x1": int(sx - MAIN_HALF), "z1": int(sz - MAIN_HALF), "x2": int(sx + MAIN_HALF), "z2": int(sz + MAIN_HALF)})
+            items = [dict(b) for b in saved]
+        else:
+            spawn = self.plugin.economy.get_config("spawn") or {}
+            sx, sz = float(spawn.get("x", 0)), float(spawn.get("z", 0))
+            items = [{"id": "main", "server": MAIN, "name": "Main World", "dim": "overworld", "shape": "box",
+                      "x1": int(sx - MAIN_HALF), "z1": int(sz - MAIN_HALF), "x2": int(sx + MAIN_HALF), "z2": int(sz + MAIN_HALF)}]
+        return self.with_sift(items)
+
+    def with_sift(self, items):
+        """Puts the Sift's own border in (replacing any older or hand-made one for the Sift)."""
         try:
             from endstone_galaxylink import sift as S
-            out.append({"id": "sift", "server": "The Sift", "name": "The Sift", "dim": "overworld", "shape": "sift", "cx": S.CX, "cz": S.CZ, "r": self.sift_r()})
         except Exception:
-            pass
+            return items
+        old = next((b for b in items if b.get("id") == "sift"), {})
+        out = [b for b in items if b.get("id") != "sift" and not (b.get("server") == SIFT and b.get("dim") == "overworld")]
+        out.append({"id": "sift", "server": SIFT, "name": old.get("name") or SIFT, "dim": "overworld", "shape": "sift",
+                    "cx": S.CX, "cz": S.CZ, "r": self.sift_r()})
         return out
+
+    @staticmethod
+    def sift_span():
+        """How far the Sift's border is from its middle: (closest, farthest), in blocks."""
+        global _SPAN
+        if _SPAN is None:
+            from endstone_galaxylink import sift as S
+            b, rs = {"cx": 0, "cz": 0}, []
+            for k in range(360):
+                a, lo, hi = k * math.tau / 360, 0.0, float(S.R)
+                for _ in range(24):
+                    m = (lo + hi) / 2
+                    lo, hi = (m, hi) if Borders.sift_edge(b, math.cos(a) * m, math.sin(a) * m)[0] >= 0 else (lo, m)
+                rs.append(lo)
+            _SPAN = (int(min(rs)), int(max(rs)))
+        return _SPAN
 
     @staticmethod
     def sift_r():
@@ -72,7 +94,9 @@ class Borders:
             return 220
 
     def save(self, items):
-        self.plugin.economy.set_config("borders", items)
+        self.plugin.economy.set_config("borders", [b for b in items if b.get("id") != "sift"] +
+                                       [{"id": "sift", "server": SIFT, "name": b.get("name") or SIFT, "dim": "overworld", "shape": "sift"}
+                                        for b in items if b.get("id") == "sift"])
 
     @staticmethod
     def sift_edge(b, x, z):
@@ -225,10 +249,10 @@ class Borders:
 
     # ---------- the Border Axe ----------
     def servers(self):
+        """Servers the Border Axe can make a border for (the Sift's border is built in and always follows its valley)."""
         welcome = getattr(self.plugin, "welcome", None)
-        names = [MAIN] + [str(s.get("name")) for s in (welcome.servers() if welcome else []) if s.get("action") != "play"]
-        if "The Sift" not in names:
-            names.append("The Sift")
+        names = [MAIN] + [str(s.get("name")) for s in (welcome.servers() if welcome else [])
+                          if s.get("action") not in ("play", "sift") and str(s.get("name")) != SIFT]
         return list(dict.fromkeys(names))
 
     def on_interact(self, event):
@@ -290,6 +314,9 @@ class Borders:
     def set_border(self, p, box, server, name=None):
         """A server has one border per dimension: a new one replaces the old one."""
         name = name or server
+        if server == SIFT:
+            p.send_message("§eThe Sift's border always follows its valley, at the foot of the cliffs, so it can't be changed.")
+            return
         items = [b for b in self.borders() if not (b["server"] == server and b["dim"] == box["dim"])]
         items.append(dict(box, id=f"{server.lower().replace(' ', '_')}_{box['dim']}", server=server, name=name))
         self.save(items)
@@ -369,7 +396,8 @@ class Borders:
         form = ActionForm(title=self.label(b), content=self.describe(b))
         form.add_button("§aTeleport there", on_click=lambda pl: self.teleport(pl, b))
         form.add_button("Rename", on_click=lambda pl: self.ask_rename(pl, b))
-        form.add_button("§cRemove this border", on_click=lambda pl: self.remove(pl, b["id"]))
+        if b.get("id") != "sift":
+            form.add_button("§cRemove this border", on_click=lambda pl: self.remove(pl, b["id"]))
         form.add_button("< Back", on_click=self.menu)
         p.send_form(form)
 
@@ -395,7 +423,9 @@ class Borders:
 
     def describe(self, b):
         if b.get("shape") == "sift":
-            return f"§f{b['server']}§r\n§7Follows the Sift's valley, inside its cliffs (about 600 blocks across)"
+            near, far = self.sift_span()
+            return (f"§f{b['server']}§r\n§7Follows the Sift's valley at the foot of its cliffs, {near}-{far} blocks from its middle "
+                    f"({b['cx']} {b['cz']}). Always set by the Sift.")
         if b.get("shape") == "circle":
             return f"§f{b['server']}§r\n§7A circle {b['r'] * 2} blocks across, around {b['cx']} {b['cz']}"
         return (f"§f{b['server']}§r\n§7{b['x2'] - b['x1'] + 1} x {b['z2'] - b['z1'] + 1} blocks, "
@@ -404,7 +434,12 @@ class Borders:
     def ask_remove(self, p, b):
         from endstone.form import ActionForm
         if b.get("shape") == "sift":
-            where = "the Sift's valley, inside its cliffs"
+            near, far = self.sift_span()
+            form = ActionForm(title=f"{self.label(b)} border", content=f"§fThe Sift's valley, at the foot of its cliffs ({near}-{far} blocks "
+                                                                       "from the middle)§r\n\n§7It's always set by the Sift, so it can't be removed.")
+            form.add_button("§aTeleport to the middle", on_click=lambda pl: self.teleport(pl, b))
+            form.add_button("OK")
+            return p.send_form(form)
         elif b.get("shape") == "circle":
             where = f"a circle {b['r'] * 2} blocks across"
         else:
@@ -416,6 +451,8 @@ class Borders:
         p.send_form(form)
 
     def remove(self, p, bid):
+        if bid == "sift":
+            return p.send_message("§eThe Sift's border is always set by the Sift, so it can't be removed.")
         items = self.borders()
         left = [b for b in items if b["id"] != bid]
         self.save(left)

@@ -702,6 +702,15 @@ The bigger Sift is built in the background after the update, which takes about h
 - **Voice chat** (proximity and groups) is back to just voice chat, and calls don't use it any more.
 - **In game:** \`/call\` works the same. You talk from your DMs on galaxymc.us, on your phone or computer.`,
   },
+  {
+    id: "2026-11-25-sift-finishing",
+    title: "The Sift is being finished",
+    body: `We're putting the finishing touches on The Sift, and it now completes itself in the background.
+- **Built from the middle out:** the landing area and the heart of the valley are finished first, then the land grows toward the cliffs.
+- **Built at quiet times:** it builds only while the server is quiet and running smoothly, and pauses as soon as more players join, so your game isn't affected.
+- **Its border is always right:** The Sift's border follows the valley at the foot of its red cliffs, all the way around, and always matches the land.
+- **Opening soon:** the Main Menu shows how far along it is. When it's ready, **The Sift** card takes you straight there.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
