@@ -63,6 +63,43 @@
      "pic": "pets"
     }
    ]
+  },
+  {
+   "name": "PvP",
+   "description": "Fight in space arenas: free-for-all, duels, ranked and events",
+   "tags": "PvP · Ranked · Events",
+   "image": "bedwars",
+   "action": "pvp",
+   "warp": "",
+   "anim": "netherite",
+   "odds": false,
+   "joinName": "Galaxy PvP",
+   "activities": [
+    {
+     "title": "Free-for-all",
+     "subtitle": "Jump in any time",
+     "text": "Potion, Classic, Sumo and Build arenas. Kill streaks pay more.",
+     "pic": "pvp"
+    },
+    {
+     "title": "Ranked duels",
+     "subtitle": "Climb the tiers",
+     "text": "1v1s for your rating: Bronze up to Galaxy. Casual duels too.",
+     "pic": "pvp"
+    },
+    {
+     "title": "Party fights",
+     "subtitle": "Friends vs friends",
+     "text": "Split your party into two teams, or a party free-for-all.",
+     "pic": "bedwars"
+    },
+    {
+     "title": "Events",
+     "subtitle": "Sumo and Knockout",
+     "text": "Tournaments in the Colosseum. The last one standing wins a prize.",
+     "pic": "event"
+    }
+   ]
   }
  ],
  "tabs": [
@@ -101,5 +138,6 @@
   "Shiny chips inside!",
   "Trust the penguin!"
  ],
- "siftCard": true
+ "siftCard": true,
+ "pvpCard": true
 }

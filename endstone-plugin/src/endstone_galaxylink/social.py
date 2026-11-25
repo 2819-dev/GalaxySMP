@@ -135,6 +135,9 @@ class Social:
     # ---------- where someone is ----------
     def where(self, p):
         try:
+            pvp = getattr(self.plugin, "pvp", None)
+            if pvp is not None and pvp.playing(p):
+                return "In PvP"
             bw = getattr(self.plugin, "bedwars", None)
             if bw is not None and bw.playing(p):
                 return "Playing Bedwars"

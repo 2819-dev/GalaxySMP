@@ -14,7 +14,7 @@ const withUnlocks = (s) => (s.tiers || []).map((t, i) => ({ ...t,
   free: { ...t.free, unlock: tierUnlock("free", i + 1, s.id), cosmetic: SEASON_COSMETICS[`free:${i + 1}`]?.[1] || null },
   pro: { ...t.pro, unlock: tierUnlock("pro", i + 1, s.id), cosmetic: SEASON_COSMETICS[`pro:${i + 1}`]?.[1] || null } }));
 
-export const XP = { minute: 1, quest: 30, achievement: 50, bw_win: 40 };
+export const XP = { minute: 1, quest: 30, achievement: 50, bw_win: 40, pvp_win: 20 };
 // Bedwars effects some tiers also give (picked in game with /cosmetics). "track:tier" -> [id, name]
 export const SEASON_COSMETICS = {
   "free:20": ["bw_kill_notes", "Bedwars kill effect: Music Notes"],
@@ -56,15 +56,16 @@ export async function currentSeason(sql) {
                             RETURNING *`;
   if (!made) return (await sql`SELECT * FROM seasons WHERE starts_at <= now() AND ends_at > now() ORDER BY id DESC LIMIT 1`)[0];
   // XP only counts what's done from now on
-  await sql`INSERT INTO season_progress (season_id, xuid, base_play, base_quests, base_ach, base_bw)
-            SELECT ${made.id}, xuid, playtime_s, quests_done, cardinality(achievements), bw_wins FROM players ON CONFLICT DO NOTHING`;
+  await sql`INSERT INTO season_progress (season_id, xuid, base_play, base_quests, base_ach, base_bw, base_pvp)
+            SELECT ${made.id}, xuid, playtime_s, quests_done, cardinality(achievements), bw_wins, pvp_paid_wins FROM players ON CONFLICT DO NOTHING`;
   return made;
 }
 
 const XP_SQL = `GREATEST(0, (p.playtime_s - coalesce(sp.base_play, 0)) / 60)
                 + 30 * GREATEST(0, p.quests_done - coalesce(sp.base_quests, 0))
                 + 50 * GREATEST(0, cardinality(p.achievements) - coalesce(sp.base_ach, 0))
-                + 40 * GREATEST(0, p.bw_wins - coalesce(sp.base_bw, 0))`;
+                + 40 * GREATEST(0, p.bw_wins - coalesce(sp.base_bw, 0))
+                + 20 * GREATEST(0, p.pvp_paid_wins - coalesce(sp.base_pvp, 0))`;
 
 async function myPlayer(sql, user) {
   const [p] = await sql`SELECT p.xuid, p.gamertag,

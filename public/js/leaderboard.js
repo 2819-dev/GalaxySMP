@@ -17,14 +17,21 @@ const FORMAT = {
   bw_wins: (v) => plural(v, "win"),
   bw_finals: (v) => plural(v, "final kill"),
   bw_beds: (v) => plural(v, "bed") + " broken",
+  pvp_rating: (v) => `${v.toLocaleString()} · ${tierName(v)}`,
+  pvp_wins: (v) => plural(v, "win"),
+  pvp_kills: (v) => plural(v, "kill"),
 };
-const SHORT = { money: "Money", mined: "Mining", placed: "Building", playtime: "Playtime", streak: "Daily streak", achievements: "Achievements", bw_wins: "Wins", bw_finals: "Final kills", bw_beds: "Beds broken" };
+// PvP ranked tiers (the same as in game)
+export const tierName = (r) => (r >= 1700 ? "Galaxy" : r >= 1500 ? "Diamond" : r >= 1300 ? "Platinum" : r >= 1100 ? "Gold" : r >= 900 ? "Silver" : "Bronze");
+const SHORT = { money: "Money", mined: "Mining", placed: "Building", playtime: "Playtime", streak: "Daily streak", achievements: "Achievements", bw_wins: "Wins", bw_finals: "Final kills", bw_beds: "Beds broken",
+                pvp_rating: "Ranked rating", pvp_wins: "Duel wins", pvp_kills: "Kills" };
 // The leaderboards in 4 groups: pick a group, then one of its boards.
 const GROUPS = [
   { key: "economy", name: "Economy", boards: ["money"] },
   { key: "survival", name: "Survival", boards: ["mined", "placed"] },
   { key: "activity", name: "Activity", boards: ["playtime", "streak", "achievements"] },
   { key: "bedwars", name: "Bedwars", boards: ["bw_wins", "bw_finals", "bw_beds"] },
+  { key: "pvp", name: "PvP", boards: ["pvp_rating", "pvp_wins", "pvp_kills"] },
   { key: "parkour", name: "Parkour", boards: ["parkour"] },
 ];
 SHORT.parkour = "Parkour";
@@ -33,7 +40,7 @@ const pkClock = (ms) => { const s = ms / 1000; return `${Math.floor(s / 60)}:${(
 const groupOf = (key) => GROUPS.find((g) => g.boards.includes(key)) || GROUPS[0];
 export const profileUrl = (name) => `/player/${encodeURIComponent(name)}`;
 
-let board = new URLSearchParams(location.search).get("board") || (location.hash === "#bedwars" ? "bw_wins" : "money");
+let board = new URLSearchParams(location.search).get("board") || (location.hash === "#bedwars" ? "bw_wins" : location.hash === "#pvp" ? "pvp_rating" : "money");
 let bwRange = "all";  // Bedwars: all time, this week or this month
 if (!GROUPS.some((g) => g.boards.includes(board))) board = "money";
 
@@ -60,7 +67,7 @@ function tabs() {
   sub.hidden = group.boards.length < 2;
   tabRow(sub, group.boards.map((b) => [b, SHORT[b]]), board, pick);
   let range = document.getElementById("lb-range");
-  if (group.key === "bedwars") {
+  if (group.key === "bedwars" || (group.key === "pvp" && board !== "pvp_rating")) {
     if (!range) {
       range = document.createElement("div");
       range.className = "lb-subtabs lb-range";
@@ -159,6 +166,12 @@ async function load() {
     const res = await fetch(`/api/leaderboards?board=${encodeURIComponent(board)}`);
     const data = await res.json();
     if (!data.ok) throw new Error();
+    if (groupOf(board).key === "pvp" && board !== "pvp_rating" && bwRange !== "all") {  // PvP this week / this month
+      const top = await (await fetch(`/api/pvp/top?range=${bwRange}`)).json();
+      const field = { pvp_wins: "wins", pvp_kills: "kills" }[board];
+      data.players = (top.players || []).map((p) => ({ name: p.name, value: p[field] || 0 })).filter((p) => p.value > 0).sort((a, b) => b.value - a.value);
+      data.title = `PvP ${SHORT[board].toLowerCase()} ${bwRange === "week" ? "this week" : "this month"} (duels, ranked, party fights and events)`;
+    }
     if (groupOf(board).key === "bedwars" && bwRange !== "all") {  // this week / this month, from the match history
       const top = await (await fetch(`/api/bedwars/top?range=${bwRange}`)).json();
       const field = { bw_wins: "wins", bw_finals: "finals", bw_beds: "beds" }[board];

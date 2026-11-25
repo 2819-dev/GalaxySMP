@@ -3819,6 +3819,14 @@ html[data-theme="light"] .holiday-greeting { border-color: rgba(184, 134, 47, .3
 .bwh-res { font-weight: 700; font-size: .8rem; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); }
 .bwh-res.win { color: var(--ok); } .bwh-res.loss { color: var(--text-3); }
 .bwh-stats { font-size: .85rem; color: var(--text-2); }
+/* PvP on profiles (2.94): match rows like Bedwars (not buttons), and a chip per ranked kit in its tier color */
+.bwh-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); }
+.bwh-res.draw { color: var(--warn, #e0a800); }
+.pvp-kits { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.pvp-kit { font-size: .8rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); }
+.pvp-kit.tier-bronze { color: #c77a45; } .pvp-kit.tier-silver { color: #9aa6b2; } .pvp-kit.tier-gold { color: #d9a514; }
+.pvp-kit.tier-platinum { color: #2fb3a6; } .pvp-kit.tier-diamond { color: #3aa0ff; }
+.pvp-kit.tier-galaxy { color: #fff; background: linear-gradient(90deg, #38d6ff, #4678ff, #9c5cff); border-color: transparent; }
 
 /* Home: who's online now */
 .online-card { margin-top: 14px; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border); }

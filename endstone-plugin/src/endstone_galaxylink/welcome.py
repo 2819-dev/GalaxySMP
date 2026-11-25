@@ -1374,6 +1374,17 @@ class Welcome:
                                  f"§l§bComing soon!§r\n\nThe Sift is still being made ({round(100 * done / max(1, total))}% done).\n§7Keep an eye on #Updates.",
                                  go_to=[("play", 2)])
             spot = sift.spot()
+        elif action == "pvp":
+            pvp = getattr(self.plugin, "pvp", None)
+            if pvp is None or not pvp.ready():
+                if st.get("portal"):
+                    self.open.pop(str(player.unique_id), None)
+                    return player.send_message("§bPvP is opening soon!")
+                done, total = pvp.builder.progress() if pvp is not None else (0, 1)
+                st["screen"], st["tab"] = "play", 2
+                return self.page(player, "PvP", ["< Back"], 0,
+                                 f"§l§bOpening soon!§r\n\nThe PvP arenas are still being built ({round(100 * done / max(1, total))}% done).\n§7Keep an eye on #Updates.",
+                                 go_to=[("play", 2)])
         theme = s.get("anim") if s.get("anim") in THEMES else "grass"
         if s.get("odds"):
             theme = roll_theme() or theme
@@ -1427,6 +1438,11 @@ class Welcome:
             pass
         if not st.get("reopened") and greet:
             player.send_message(f"§d✦ §fWelcome to {label or 'GalaxySMP'}! §7Type §e/menu§7 for the Main Menu, §e/guide§7 for help.")
+        if action == "pvp":
+            pvp = getattr(self.plugin, "pvp", None)
+            if pvp is not None:
+                from endstone_galaxylink.safety import later
+                later(self.plugin, player, pvp.join, 5)   # once the Main Menu has let go of them
         if action == "minigames":
             mg = getattr(self.plugin, "minigames", None)
             if mg is not None:

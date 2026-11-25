@@ -23,7 +23,11 @@ const BOARDS = {
   bw_finals: { col: "bw_finals", title: "Bedwars Final Kills" },
   bw_beds: { col: "bw_beds", title: "Bedwars Beds Broken" },
   contest_wins: { col: "contest_wins", title: "Build Contest Wins" },
+  pvp_rating: { col: "pvp_rating", title: "Top PvP Rating" },
+  pvp_wins: { col: "pvp_wins", title: "PvP Duel Wins" },
+  pvp_kills: { col: "pvp_kills", title: "PvP Kills" },
 };
+const PVP_KITS = ["potion", "classic", "sumo", "boxing", "build"];
 const ONLINE_SECONDS = 150;
 const STREAK_MILESTONES = [30, 50, 100, 200, 365];
 const n = (v) => Math.max(0, Math.round(Number(v) || 0));
@@ -40,14 +44,23 @@ export async function recordStats(env, list, online) {
     await sql.transaction(players.slice(i, i + 100).map((p) => {
       const ach = (Array.isArray(p.achievements) ? p.achievements : []).map((a) => String(a).slice(0, 40)).slice(0, 200);
       const bw = p.bedwars && typeof p.bedwars === "object" ? p.bedwars : {};
+      const pv = p.pvp && typeof p.pvp === "object" ? p.pvp : {};
+      const ratings = Object.fromEntries(Object.entries(pv.ratings && typeof pv.ratings === "object" ? pv.ratings : {})
+        .filter(([k]) => PVP_KITS.includes(k)).map(([k, v]) => [k, Math.max(0, Math.min(5000, Math.round(Number(v) || 0)))]));
       return sql`
         INSERT INTO players (xuid, gamertag, playtime_s, mined, placed, kills, deaths, quests_done, streak, best_streak, achievements, stats_at,
-                             bw_games, bw_wins, bw_kills, bw_finals, bw_beds)
+                             bw_games, bw_wins, bw_kills, bw_finals, bw_beds,
+                             pvp_kills, pvp_deaths, pvp_wins, pvp_losses, pvp_best_streak, pvp_rating, pvp_events, pvp_paid_wins, pvp_ratings)
         VALUES (${String(p.xuid)}, ${String(p.name || "Player").slice(0, 32)}, ${n(p.playtime)}, ${n(p.mined)}, ${n(p.placed)}, ${n(p.kills)},
                 ${n(p.deaths)}, ${n(p.quests)}, ${n(p.streak)}, ${n(p.best)}, ${ach}, now(),
-                ${n(bw.games)}, ${n(bw.wins)}, ${n(bw.kills)}, ${n(bw.finals)}, ${n(bw.beds)})
+                ${n(bw.games)}, ${n(bw.wins)}, ${n(bw.kills)}, ${n(bw.finals)}, ${n(bw.beds)},
+                ${n(pv.kills)}, ${n(pv.deaths)}, ${n(pv.wins)}, ${n(pv.losses)}, ${n(pv.bestStreak)}, ${n(pv.rating)}, ${n(pv.events)}, ${n(pv.paidWins)},
+                ${JSON.stringify(ratings)}::jsonb)
         ON CONFLICT (xuid) DO UPDATE SET playtime_s = EXCLUDED.playtime_s, mined = EXCLUDED.mined, placed = EXCLUDED.placed,
           bw_games = EXCLUDED.bw_games, bw_wins = EXCLUDED.bw_wins, bw_kills = EXCLUDED.bw_kills, bw_finals = EXCLUDED.bw_finals, bw_beds = EXCLUDED.bw_beds,
+          pvp_kills = EXCLUDED.pvp_kills, pvp_deaths = EXCLUDED.pvp_deaths, pvp_wins = EXCLUDED.pvp_wins, pvp_losses = EXCLUDED.pvp_losses,
+          pvp_best_streak = EXCLUDED.pvp_best_streak, pvp_rating = EXCLUDED.pvp_rating, pvp_events = EXCLUDED.pvp_events,
+          pvp_paid_wins = EXCLUDED.pvp_paid_wins, pvp_ratings = EXCLUDED.pvp_ratings,
           kills = EXCLUDED.kills, deaths = EXCLUDED.deaths, quests_done = EXCLUDED.quests_done, streak = EXCLUDED.streak,
           best_streak = EXCLUDED.best_streak, achievements = EXCLUDED.achievements, stats_at = now(),
           gamertag = CASE WHEN ${Boolean(p.name)} THEN EXCLUDED.gamertag ELSE players.gamertag END,
@@ -218,6 +231,7 @@ export async function profile(request, env, ctx, url, params) {
            (p.online_at > now() - interval '150 seconds') AS online,
            rk.name AS rank_name, rk.prefix AS rank_prefix, rk.color AS rank_color, rk.icon AS rank_icon, rk.gradient AS rank_gradient,
            rk.position AS rank_position, rk.priority AS rank_priority, p.bw_games, p.bw_wins, p.bw_kills, p.bw_finals, p.bw_beds, p.contest_wins,
+           p.pvp_kills, p.pvp_deaths, p.pvp_wins, p.pvp_losses, p.pvp_best_streak, p.pvp_rating, p.pvp_events, p.pvp_ratings,
            s.plan, s.expires_at, u.id AS user_id, u.username AS user_name, u.platform AS user_platform
       FROM players p
       LEFT JOIN player_top_rank pr ON pr.xuid = p.xuid LEFT JOIN ranks rk ON rk.id = pr.rank_id
@@ -247,6 +261,8 @@ export async function profile(request, env, ctx, url, params) {
       friend: p.user_id ? await (await import("./friends.js")).friendState(sql, me.id, p.user_id) : null,
       userId: p.user_id ? Number(p.user_id) : null,
       bedwars: { games: Number(p.bw_games || 0), wins: Number(p.bw_wins || 0), kills: Number(p.bw_kills || 0), finals: Number(p.bw_finals || 0), beds: Number(p.bw_beds || 0) },
+      pvp: { kills: Number(p.pvp_kills || 0), deaths: Number(p.pvp_deaths || 0), wins: Number(p.pvp_wins || 0), losses: Number(p.pvp_losses || 0),
+             bestStreak: Number(p.pvp_best_streak || 0), rating: Number(p.pvp_rating || 0), events: Number(p.pvp_events || 0), ratings: p.pvp_ratings || {} },
       stats: { playtime: Number(p.playtime_s), mined: Number(p.mined), placed: Number(p.placed), kills: Number(p.kills), deaths: Number(p.deaths),
                quests: p.quests_done, streak: p.streak, bestStreak: p.best_streak },
       streakInfo: { freezes: Number(p.freezes || 0), log: p.streak_log || {}, lastDaily: p.last_daily ? new Date(p.last_daily).toISOString().slice(0, 10) : null },

@@ -157,8 +157,12 @@ class Bedwars:
         return next((p for p in self.plugin.server.online_players if str(p.unique_id) == uid), None)
 
     def playing(self, player):
+        """In Bedwars, or in PvP: the rest of the plugin uses this to mean "in a minigame" (no teleports, trades, tools...)."""
         uid = str(player.unique_id)
-        return uid in self.players or uid in self.queue
+        if uid in self.players or uid in self.queue:
+            return True
+        pvp = getattr(self.plugin, "pvp", None)
+        return bool(pvp is not None and pvp.playing(player))
 
     def ready(self):
         c = self.cfg
@@ -642,7 +646,7 @@ class Bedwars:
                     p.send_message("§7Your team's game is still going. You can watch, or type §f/leave§7 to go back now.")
             self.plugin.server.scheduler.run_task(self.plugin, watch, delay=40)
             return
-        if self.has_saved(player) and not self.playing(player):
+        if self.has_saved(player) and str(player.unique_id) not in self.players and str(player.unique_id) not in self.queue:
             uid = str(player.unique_id)
             self.plugin.server.scheduler.run_task(self.plugin, lambda: self._welcome_back(uid), delay=40)
 
@@ -658,7 +662,7 @@ class Bedwars:
 
     def _welcome_back(self, uid):
         p = self.online(uid)
-        if p is not None and not self.playing(p) and self.has_saved(p):
+        if p is not None and str(p.unique_id) not in self.players and str(p.unique_id) not in self.queue and self.has_saved(p):
             self.restore_player(p)
             p.send_message("§aYou left Bedwars when you disconnected. Your items are back.")
 

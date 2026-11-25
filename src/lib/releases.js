@@ -711,6 +711,19 @@ The bigger Sift is built in the background after the update, which takes about h
 - **Its border is always right:** The Sift's border follows the valley at the foot of its red cliffs, all the way around, and always matches the land.
 - **Opening soon:** the Main Menu shows how far along it is. When it's ready, **The Sift** card takes you straight there.`,
   },
+  {
+    id: "2026-11-25-pvp",
+    title: "Introducing GalaxySMP PvP",
+    body: `Our own PvP server is here, with arenas floating in space.
+- **Free-for-all:** jump into the Potion, Classic, Sumo or Build arena any time. Kill streaks pay more. In Build, placed blocks fade after 10 seconds.
+- **Duels and Ranked:** casual 1v1s in five kits (Potion, Classic, Sumo, Boxing and Build), or ranked duels for a rating and a tier from Bronze up to Galaxy. Challenge anyone with \`/duel <name>\`.
+- **Party fights:** split your party into two teams, or have a party free-for-all.
+- **Events:** staff host Sumo events and Knockout tournaments in the Starfall Colosseum. The last player standing wins $300.
+- **Kit Editor:** put each kit's items where you like them, and every match uses your layout.
+- **On your profile:** your rating, tier, wins, kills, best streak and recent matches, plus new PvP leaderboards. Wins count toward the season pass, and five new achievements are waiting.
+- **Effects:** your kill and victory effects play in PvP too, and two new ones are in the Store: Galaxy Burst and Confetti.
+Find it on the Main Menu under **Play > PvP**. It opens as soon as its arenas finish building. Your survival items are kept safe while you play and come back when you leave.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

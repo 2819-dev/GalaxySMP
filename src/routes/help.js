@@ -85,6 +85,12 @@ export async function loadWelcome(sql) {
     if (sift && Array.isArray(v.servers) && v.servers.length < 10 && !v.servers.some((s) => s.action === "sift")) v.servers = [...v.servers, sift];
     v.siftCard = true;
   }
+  if (rows[0] && !rows[0].value.pvpCard) {
+    // PvP arrived after this Main Menu was saved: add its card once (staff can remove it, and it stays removed)
+    const v = rows[0].value, pvp = DEFAULT_WELCOME.servers.find((s) => s.action === "pvp");
+    if (pvp && Array.isArray(v.servers) && v.servers.length < 10 && !v.servers.some((s) => s.action === "pvp")) v.servers = [...v.servers, pvp];
+    v.pvpCard = true;
+  }
   if (rows[0] && !rows[0].value.activityCards && Array.isArray(rows[0].value.servers)) {
     // Activity picture cards arrived after this Main Menu was saved: give the built-in servers their ready-made activities once
     for (const sv of rows[0].value.servers) {
@@ -97,7 +103,7 @@ export async function loadWelcome(sql) {
 }
 
 const SERVER_IMAGES = ["galaxysmp", "event", "bedwars", "parkour", "build"];
-const SERVER_ACTIONS = ["play", "spawn", "warp", "minigames", "sift", "soon"];
+const SERVER_ACTIONS = ["play", "spawn", "warp", "minigames", "sift", "pvp", "soon"];
 const ACTIVITY_PICS = ["survival", "pvp", "bedwars", "build", "event", "parkour", "plots", "shop", "pets", "adventure"];
 const JOIN_BLOCKS = ["grass", "diamond", "gold", "emerald", "netherite", "amethyst", "lava", "ice", "galaxy", "ender", "rainbow"];
 
@@ -131,7 +137,7 @@ function validWelcome(body) {
   });
   if (!servers.some((v) => v.enabled && v.action === "play")) throw new HttpError(400, "Keep at least one server that's switched on and set to \"Play\" (the main server).");
   const splashes = (Array.isArray(body?.splashes) ? body.splashes : String(body?.splash || "").split("\n")).map((x) => clean(x, 60)).filter(Boolean).slice(0, 40);
-  return { enabled: body?.enabled !== false, splashes, intro, tabs, servers, siftCard: true, activityCards: true };
+  return { enabled: body?.enabled !== false, splashes, intro, tabs, servers, siftCard: true, pvpCard: true, activityCards: true };
 }
 
 // The latest news and the next event, shown as live info on the welcome screen.

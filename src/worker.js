@@ -338,6 +338,8 @@ const routes = [
   ["GET", "/api/bedwars/match/:id", (req, env, ctx, url, params) => import("./routes/bedwars.js").then((m) => m.match(req, env, ctx, url, params))],
   ["GET", "/api/bedwars/live", (req, env) => import("./routes/bedwars.js").then((m) => m.live(req, env))],
   ["GET", "/api/bedwars/top", (req, env, ctx, url) => import("./routes/bedwars.js").then((m) => m.top(req, env, ctx, url))],
+  ["GET", "/api/pvp/history", (req, env, ctx, url) => import("./routes/pvp.js").then((m) => m.history(req, env, ctx, url))],
+  ["GET", "/api/pvp/top", (req, env, ctx, url) => import("./routes/pvp.js").then((m) => m.top(req, env, ctx, url))],
   ["GET", "/api/map/info", (req, env) => livemap.mapInfo(req, env)],
   ["POST", "/api/panel/map", (req, env) => panel.setMap(req, env)],
   ["GET", "/api/panel/voice-rooms", (req, env) => panel.voiceRooms(req, env)],

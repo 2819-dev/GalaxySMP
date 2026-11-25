@@ -22,6 +22,7 @@ const ACH_ICONS = {
   parkour_1: "flame", parkour_5: "trophy2", parkour_record: "comet", collect_100: "gift2", collect_250: "castle", collect_500: "gem",
   generous: "handshake", job_10: "wrench", job_21: "medal", traveler: "portal", engineer: "elevator",
   bw_first_game: "sword", bw_first_win: "trophy2", bw_wins_10: "crown", bw_beds_10: "pickaxe", bw_finals_25: "skull",
+  pvp_first_win: "sword", pvp_wins_25: "shield", pvp_streak_10: "flame", pvp_galaxy: "orbit", pvp_champion: "medal",
 };
 const achIcon = (id) => ACH_ICONS[id] || "star";
 
@@ -205,6 +206,19 @@ async function load() {
       stat("skull", "Final kills", short(bw.finals)),
       stat("pickaxe", "Beds broken", short(bw.beds))), bwHistory(p.name)) : null;
 
+  // ---- PvP ----
+  const pv = p.pvp || {};
+  const pvp = (pv.wins || pv.losses || pv.kills || pv.rating) ? section("PvP",
+    h("div", { class: "pp-stats" },
+      stat("crown", "Ranked", pv.rating ? `${pvpTier(pv.rating)} ${pv.rating}` : "Not ranked yet", pv.rating ? "best kit rating" : "play ranked duels"),
+      stat("trophy2", "Duel wins", short(pv.wins), `${short(pv.losses)} loss${pv.losses === 1 ? "" : "es"}`),
+      stat("sword", "Kills", short(pv.kills), `${pv.deaths ? (pv.kills / pv.deaths).toFixed(2) : short(pv.kills)} kills per death`),
+      stat("flame", "Best kill streak", short(pv.bestStreak)),
+      pv.events ? stat("medal", "Events won", short(pv.events)) : null),
+    Object.keys(pv.ratings || {}).length ? h("div", { class: "pvp-kits" }, ...Object.entries(pv.ratings).sort((a, b) => b[1] - a[1]).map(([k, r]) =>
+      h("span", { class: `pvp-kit tier-${pvpTier(r).toLowerCase()}`, text: `${PVP_KITS[k] || k} · ${pvpTier(r)} ${r}` }))) : null,
+    pvpHistory(p.name)) : null;
+
   // ---- activity over time (charts) ----
   const charts = section("Activity", h("p", { class: "text-3 small", style: "margin:0", text: "Loading…" }));
   loadCharts(p.name, charts);
@@ -268,7 +282,7 @@ async function load() {
       social.isMe ? h("p", { class: "text-3 small", style: "margin:10px 0 0", text: social.wishlistHidden ? "Only you can see your wishlist. Change this in Account settings." : "Everyone signed in can see this. You can hide it in Account settings." }) : null);
   }
 
-  box.replaceChildren(...[hero, showcase].filter(Boolean), h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, streakBox, stats, bedwars, charts), h("div", { class: "pp-col" }, wishlist, achievements, petsBox, collection, screens)));
+  box.replaceChildren(...[hero, showcase].filter(Boolean), h("div", { class: "pp-cols" }, h("div", { class: "pp-col" }, about, streakBox, stats, bedwars, pvp, charts), h("div", { class: "pp-col" }, wishlist, achievements, petsBox, collection, screens)));
 }
 
 // The Dumplings, Blubs and Penguins they've tamed in game (named in the popup when they tame them)
@@ -579,6 +593,24 @@ async function compareDialog(p) {
   run();
 }
 
+
+// ---- PvP: tiers and recent matches ----
+const PVP_KITS = { potion: "Potion PvP", classic: "Classic", sumo: "Sumo", boxing: "Boxing", build: "Build" };
+const PVP_MODES = { duel: "Duel", ranked: "Ranked", party: "Party fight", event: "Event" };
+const pvpTier = (r) => (r >= 1700 ? "Galaxy" : r >= 1500 ? "Diamond" : r >= 1300 ? "Platinum" : r >= 1100 ? "Gold" : r >= 900 ? "Silver" : "Bronze");
+function pvpHistory(name) {
+  const box = h("div", { class: "bwh" }, h("p", { class: "text-3 small", style: "margin:10px 0 0", text: "Loading recent matches…" }));
+  getJson(`/api/pvp/history?name=${encodeURIComponent(name)}`).then((d) => {
+    if (!d.matches?.length) { box.replaceChildren(); return; }
+    box.replaceChildren(h("h3", { class: "pp-sub", style: "margin:14px 0 6px;font-size:.95rem", text: "Recent matches" }),
+      h("ul", { class: "bwh-list" }, ...d.matches.map((m) => h("li", {}, h("div", { class: "bwh-row" },
+        h("span", { class: `bwh-res ${m.draw ? "draw" : m.won ? "win" : "loss"}`, text: m.draw ? "Draw" : m.won ? "Win" : "Loss" }),
+        h("span", { class: "bwh-stats" }, `${PVP_MODES[m.mode] || "Duel"} · ${m.kitName}${m.against ? ` · vs ${m.against}` : ""}`
+          + (m.change != null ? ` · ${m.change >= 0 ? "+" : ""}${m.change} rating` : "") + (m.kit === "boxing" ? ` · ${m.hits} hits` : "")),
+        h("span", { class: "text-3 small", text: new Date(m.startedAt).toLocaleDateString([], { month: "short", day: "numeric" }) }))))));
+  }).catch(() => box.replaceChildren());
+  return box;
+}
 
 // ---- Bedwars match history (recent games; tap one for the full recap) ----
 const TEAM_NAMES = { red: "Red", blue: "Blue", green: "Green", yellow: "Yellow" };

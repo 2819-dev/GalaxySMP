@@ -1002,7 +1002,7 @@ const ACTIVITY_PICS = [["survival", "Survival (pickaxe)"], ["pvp", "PvP (sword)"
   ["event", "Event (star)"], ["parkour", "Parkour (boot)"], ["plots", "Plots (house)"], ["shop", "Shops & jobs (coin)"], ["pets", "Pets (paw)"], ["adventure", "Adventure (map)"]];
 const JOIN_BLOCKS = [["grass", "Grass"], ["diamond", "Diamond"], ["gold", "Gold"], ["emerald", "Emerald"], ["netherite", "Netherite"], ["amethyst", "Amethyst"],
   ["lava", "Lava"], ["ice", "Ice"], ["galaxy", "Galaxy"], ["ender", "Ender"], ["rainbow", "Rainbow"]];
-const SERVER_ACTIONS = [["play", "Play (main server)"], ["spawn", "Go to spawn"], ["warp", "Go to a warp"], ["minigames", "Open the Minigame Center"], ["sift", "Go to the Sift"], ["soon", "Coming soon"]];
+const SERVER_ACTIONS = [["play", "Play (main server)"], ["spawn", "Go to spawn"], ["warp", "Go to a warp"], ["minigames", "Open the Minigame Center"], ["sift", "Go to the Sift"], ["pvp", "Go to PvP"], ["soon", "Coming soon"]];
 
 function welcomeSelect(options, value, onChange) {
   const el = h("select", { class: "input" }, ...options.map(([v, label]) => h("option", { value: v, text: label })));

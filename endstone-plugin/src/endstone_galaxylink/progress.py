@@ -159,6 +159,11 @@ ACHIEVEMENTS = [
     ("bw_wins_10", "Bedwars Veteran", "Win 10 games of Bedwars", "🥇", 15000, lambda s, x: s.get("bw_wins", 0) >= 10),
     ("bw_beds_10", "Bed Breaker", "Destroy 10 beds in Bedwars", "🪓", 7500, lambda s, x: s.get("bw_beds", 0) >= 10),
     ("bw_finals_25", "Finisher", "Get 25 final kills in Bedwars", "⚔️", 10000, lambda s, x: s.get("bw_finals", 0) >= 25),
+    ("pvp_first_win", "Duelist", "Win a PvP duel", "🗡️", 1000, lambda s, x: s.get("pvp_wins", 0) >= 1),
+    ("pvp_wins_25", "Gladiator", "Win 25 PvP duels", "🛡️", 10000, lambda s, x: s.get("pvp_wins", 0) >= 25),
+    ("pvp_streak_10", "Unstoppable", "Get a 10 kill streak in PvP", "🔥", 5000, lambda s, x: s.get("pvp_best_streak", 0) >= 10),
+    ("pvp_galaxy", "Galaxy Tier", "Reach Galaxy tier in ranked PvP", "🌌", 25000, lambda s, x: s.get("pvp_rating", 0) >= 1700),
+    ("pvp_champion", "Champion", "Win a PvP event", "🏅", 10000, lambda s, x: s.get("pvp_events", 0) >= 1),
 ]
 ACH_BY_ID = {a[0]: a for a in ACHIEVEMENTS}
 
@@ -621,7 +626,11 @@ class Progress:
                 "kills": s["kills"], "deaths": s["deaths"], "quests": s["quests"], "streak": s["streak"], "best": s["best_streak"],
                 "achievements": sorted(s["achievements"].keys()), "lastDaily": s.get("last_daily"),
                 "freezes": int(s.get("freezes", 0)), "streakLog": dict(sorted((s.get("streak_log") or {}).items())[-21:]),
-                "bedwars": {k: int(s.get(f"bw_{k}", 0)) for k in ("games", "wins", "kills", "finals", "beds")}}
+                "bedwars": {k: int(s.get(f"bw_{k}", 0)) for k in ("games", "wins", "kills", "finals", "beds")},
+                "pvp": {"kills": int(s.get("pvp_kills", 0)), "deaths": int(s.get("pvp_deaths", 0)), "wins": int(s.get("pvp_wins", 0)),
+                        "losses": int(s.get("pvp_losses", 0)), "bestStreak": int(s.get("pvp_best_streak", 0)), "rating": int(s.get("pvp_rating", 0)),
+                        "events": int(s.get("pvp_events", 0)), "paidWins": int(s.get("pvp_paid_wins", 0)),
+                        "ratings": {str(k): int(v) for k, v in (s.get("pvp_ratings") or {}).items()}}}
 
     def push(self, everything=False):
         voice = getattr(self.plugin, "_voice", None)

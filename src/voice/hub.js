@@ -606,6 +606,9 @@ export class VoiceHub extends DurableObject {
     if (msg.type === "bw_match") {  // a Bedwars game finished: match history
       return import("../routes/bedwars.js").then((m) => m.recordMatch(this.env, msg)).catch((e) => console.error("bw match failed", e));
     }
+    if (msg.type === "pvp_match") {  // a PvP match finished: match history
+      return import("../routes/pvp.js").then((m) => m.recordMatch(this.env, msg)).catch((e) => console.error("pvp match failed", e));
+    }
     if (msg.type === "bw_lobby") {  // players waiting for Bedwars: alerts for members who want them
       return import("../routes/bedwars.js").then((m) => m.lobbyAlert(this.env, this.ctx.storage, msg)).catch((e) => console.error("bw lobby failed", e));
     }

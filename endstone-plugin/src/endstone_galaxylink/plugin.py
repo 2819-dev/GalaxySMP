@@ -15,7 +15,7 @@ from endstone.command import Command, CommandSender
 from endstone.event import (PlayerLoginEvent, ActorDamageEvent, ActorDeathEvent, ActorExplodeEvent, ActorSpawnEvent, ActorTeleportEvent, BlockBreakEvent, BlockExplodeEvent,
                             BlockFromToEvent, BlockPlaceEvent, PlayerChatEvent, PlayerCommandEvent, PlayerDeathEvent,
                             PlayerDropItemEvent, PlayerItemConsumeEvent, PlayerInteractActorEvent, PlayerInteractEvent, PlayerJoinEvent, PlayerQuitEvent,
-                            PlayerRespawnEvent,
+                            PlayerRespawnEvent, ActorKnockbackEvent, PlayerPickupItemEvent,
                             event_handler)
 from endstone.plugin import Plugin
 from endstone_galaxylink.safety import later
@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.93.0"
+VERSION = "2.94.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -145,7 +145,9 @@ class GalaxyLink(Plugin):
         "chatfilter": _cmd("Turn the chat filter on or off for everyone.", "/chatfilter [state: message]", "galaxylink.command.chatfilter"),
         "minigames": _cmd("The Minigame Center: host, join or watch minigames.", "/minigames", "galaxylink.command.minigames", ["minigame", "mg"]),
         "bedwars": _cmd("Play Bedwars.", "/bedwars [action: message]", "galaxylink.command.bedwars", ["bw"]),
-        "leave": _cmd("Leave Bedwars or a Build Contest and get your own items back.", "/leave", "galaxylink.command.bedwars"),
+        "leave": _cmd("Leave Bedwars, PvP or a Build Contest and get your own items back.", "/leave", "galaxylink.command.bedwars"),
+        "pvp": _cmd("GalaxySMP PvP: free-for-all, duels, ranked, party fights and events. Staff: /pvp build|status|event.", "/pvp [action: message]", "galaxylink.command.pvp"),
+        "duel": _cmd("Challenge a player to a PvP duel: /duel <player> [kit], /duel accept, /duel deny.", "/duel [action: message]", "galaxylink.command.pvp"),
         "trade": _cmd("See trade offers to you (offer items at galaxymc.us/trades).", "/trade", "galaxylink.command.trade"),
         "afk": _cmd("Mark yourself as away (AFK), or back.", "/afk", "galaxylink.command.afk"),
         "tpd": _cmd("Teleport where you've been sent (e.g. to the staff member who accepted your minigame).", "/tpd", "galaxylink.command.tpd"),
@@ -197,6 +199,7 @@ class GalaxyLink(Plugin):
         "galaxylink.command.plate": _perm("Allows /plate: command pressure plates (server operators).", "op"),
         "galaxylink.command.minigames": _perm("Allows /minigames.", True),
         "galaxylink.command.bedwars": _perm("Allows /bedwars and /leave.", True),
+        "galaxylink.command.pvp": _perm("Allows /pvp and /duel (building the arenas needs operator).", True),
         "galaxylink.command.trade": _perm("Allows /trade.", True),
         "galaxylink.command.report": _perm("Allows /report.", True),
         "galaxylink.command.shift": _perm("Allows /shift (the website decides who is staff).", True),
@@ -336,6 +339,8 @@ class GalaxyLink(Plugin):
         self.goals = Goals(self)      # server-wide goals from the website
         from endstone_galaxylink.bedwars import Bedwars
         self.bedwars = Bedwars(self)
+        from endstone_galaxylink.pvp import PvP
+        self.pvp = PvP(self)          # GalaxySMP PvP: space arenas over the End's void
         from endstone_galaxylink.livemap import LiveMap
         self.livemap = LiveMap(self)
         ranks_module.PICTURES = self.ranktags
@@ -376,6 +381,8 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self._safe("backups.tick", self.backups.tick), delay=1200, period=1200)
         self.server.scheduler.run_task(self, self._safe("social.tick", self.social.tick), delay=600, period=600)
         self.server.scheduler.run_task(self, self._safe("bedwars.tick", self.bedwars.tick), delay=100, period=10)
+        self.server.scheduler.run_task(self, self._safe("pvp.tick", self.pvp.tick), delay=100, period=5)
+        self.server.scheduler.run_task(self, self._safe("pvp.builder.tick", self.pvp.builder.tick), delay=40, period=1)
         self.server.scheduler.run_task(self, self._watched("drawing the website map", self.livemap.tick), delay=200, period=40)  # website map
         self.server.scheduler.run_task(self, self._watched("a plot job (save/reset)", self.plots.tick, lambda: self.plots.jobs), delay=1, period=1)
         self.server.scheduler.run_task(self, self._safe("crashwatch.tick", self.crashwatch.tick), delay=20, period=20)
@@ -535,6 +542,7 @@ class GalaxyLink(Plugin):
         self.elevators.check_tool(player)
         self.cosmetics.on_join(player)
         self.bedwars.on_join(player)  # items from a Bedwars game they disconnected from come back
+        self.pvp.on_join(player)      # ...and from PvP
         self.trades.on_join(player)   # trade items bought or returned while they were offline
         player.send_message("§7Need help? Type §e/guide§7 for server info, rules and commands.")
         self.refresh_tags()
@@ -553,7 +561,7 @@ class GalaxyLink(Plugin):
         # each one on its own, so one problem doesn't stop the others
         for part in ("ranks.forget", "plates.on_quit", "galaxymap.on_quit", "parkour.on_quit", "collection.on_quit",
                      "teleports.on_quit", "progress.on_quit", "bedwars.on_quit", "penguins.on_quit", "welcome.on_quit", "social.on_quit", "mail.on_quit",
-                     "pets.on_quit", "portals.on_quit", "sift.on_quit", "borders.on_quit", "calls.on_quit"):
+                     "pets.on_quit", "portals.on_quit", "sift.on_quit", "borders.on_quit", "calls.on_quit", "pvp.on_quit"):
             obj, fn = part.split(".")
             try:
                 getattr(getattr(self, obj), fn)(p)
@@ -580,10 +588,13 @@ class GalaxyLink(Plugin):
     @event_handler
     def on_player_respawn(self, event: PlayerRespawnEvent):
         self.bedwars.on_respawn(event.player)
+        self.pvp.on_respawn(event.player)
 
     @event_handler
     def on_drop_item(self, event: PlayerDropItemEvent):
         if self.buildcontest.on_drop(event):  # nothing leaves the Build Contest
+            return
+        if self.pvp.on_drop(event):  # or PvP
             return
         self.bedwars.on_drop(event)  # the Leave Bedwars item can't be dropped
 
@@ -624,6 +635,14 @@ class GalaxyLink(Plugin):
         self.plots.on_interact_actor(event)  # animals, armor stands, chest minecarts in someone's plot
 
     @event_handler
+    def on_actor_knockback(self, event: ActorKnockbackEvent):
+        self.pvp.on_knockback(event)  # PvP's own knockback feel
+
+    @event_handler
+    def on_pickup(self, event: PlayerPickupItemEvent):
+        self.pvp.on_pickup(event)  # no picking things up in PvP
+
+    @event_handler
     def on_actor_teleport(self, event: ActorTeleportEvent):
         self.penguins.on_teleport(event)  # pets wait outside spawn
 
@@ -637,6 +656,8 @@ class GalaxyLink(Plugin):
             return
         if self.bedwars.on_damage(event):  # Bedwars deaths, teams and the waiting room
             return
+        if self.pvp.on_damage(event):  # PvP fights, deaths and the lobby
+            return
         if self.penguins.on_damage(event):  # only a penguin's owner can hurt it
             return
         self.npcs.on_damage(event)
@@ -648,6 +669,8 @@ class GalaxyLink(Plugin):
         if self.blocklog.on_break(event):  # block inspector
             return
         if self.bedwars.on_break(event):  # beds and the arena
+            return
+        if self.pvp.on_break(event):  # PvP arenas (only blocks placed in a Build fight can be broken)
             return
         if self.buildcontest.on_block(event, False):  # the Build Contest arena (no job money for Creative building)
             return
@@ -673,6 +696,8 @@ class GalaxyLink(Plugin):
             return
         if self.bedwars.on_place(event):  # the arena keeps track of placed blocks
             return
+        if self.pvp.on_place(event):  # PvP Build fights keep track of placed blocks
+            return
         if self.buildcontest.on_block(event, True):
             return
         self.plots.on_place(event)
@@ -686,6 +711,8 @@ class GalaxyLink(Plugin):
         if self.blocklog.on_interact(event):  # block inspector
             return
         if event.has_item and self.bedwars.on_use(event):  # the Leave Bedwars item
+            return
+        if event.has_item and self.pvp.on_use(event):  # the PvP hotbar and the pearl cooldown
             return
         if event.has_item and self.welcome.on_use(event):  # the GalaxySMP Menu compass
             return
@@ -779,6 +806,8 @@ class GalaxyLink(Plugin):
         if not event.command.lstrip("/").lower().startswith("afk"):
             self.afk.activity(event.player)
         if self.bedwars.on_command(event):  # only a few commands work during Bedwars
+            return
+        if self.pvp.on_command(event):  # ...and in PvP
             return
         if self.buildcontest.on_command(event):  # no teleporting out of the Build Contest
             return
@@ -879,6 +908,8 @@ class GalaxyLink(Plugin):
                 pass
         if getattr(self, "sift", None):
             self.sift.stopping()
+        if getattr(self, "pvp", None):
+            self.pvp.stopping()
         if getattr(self, "_voice", None):
             self.economy.sync()
             self._voice.stop()
@@ -982,7 +1013,9 @@ class GalaxyLink(Plugin):
             "parkour": lambda: self.parkour.command(sender, args),
             "minigames": lambda: self.minigames.open(sender),
             "bedwars": lambda: self.bedwars.command(sender, args),
-            "leave": lambda: self.buildcontest.leave(sender) or self.bedwars.leave(sender),
+            "leave": lambda: self.buildcontest.leave(sender) or self.bedwars.leave(sender) or self.pvp.leave_command(sender),
+            "pvp": lambda: self.pvp.command(sender, args),
+            "duel": lambda: self.pvp.duel_command(sender, args),
             "trade": lambda: self.trades.command(sender),
             "chatfilter": lambda: self.chatfilter.command(sender, args),
             "announcement": lambda: self.announcements.command(sender, args),
