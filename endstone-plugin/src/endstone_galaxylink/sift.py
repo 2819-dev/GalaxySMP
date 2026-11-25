@@ -302,6 +302,8 @@ class Sift:
         self.started = time.time()
         self.retry_at = 0        # after a piece wouldn't build: when to try again by itself
         self.booted = False
+        from endstone_galaxylink.blubpile import BlubPiles
+        self.piles = BlubPiles(plugin, self.cmd)   # now and then, resting wild Blubs pile up
 
     # ---------- state ----------
     def built(self):
@@ -563,6 +565,10 @@ class Sift:
             self.plugin.economy.set_config(MID, None)
         except Exception:
             pass
+        try:
+            self.piles.stopping()
+        except Exception:
+            pass
 
     # ---------- life: mobs and fireflies ----------
     def tick(self):
@@ -582,6 +588,10 @@ class Sift:
         except Exception:
             return
         sift_mobs = [a for a in actors if str(a.type).startswith("galaxysmp:") and self.inside(a.location)]
+        try:
+            self.piles.tick(here, sift_mobs)
+        except Exception as e:
+            self.plugin.logger.warning(f"Blub piles: {e}")
         for p in here:
             l = p.location
             near = [a for a in sift_mobs if (a.location.x - l.x) ** 2 + (a.location.z - l.z) ** 2 < 48 * 48]

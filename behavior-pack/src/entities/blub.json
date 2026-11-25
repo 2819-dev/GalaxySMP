@@ -5,7 +5,27 @@
    "identifier": "galaxysmp:blub",
    "is_spawnable": true,
    "is_summonable": true,
-   "is_experimental": false
+   "is_experimental": false,
+   "properties": {
+    "galaxysmp:piled": {
+     "type": "bool",
+     "default": false,
+     "client_sync": true
+    },
+    "galaxysmp:turn": {
+     "type": "int",
+     "range": [
+      0,
+      15
+     ],
+     "default": 0,
+     "client_sync": true
+    },
+    "galaxysmp:small": {
+     "type": "bool",
+     "default": false
+    }
+   }
   },
   "component_groups": {
    "galaxysmp:wild": {
@@ -175,6 +195,23 @@
    "minecraft:behavior.random_stroll": {
     "priority": 7,
     "speed_multiplier": 1.0
+   },
+   "minecraft:rideable": {
+    "seat_count": 1,
+    "family_types": [
+     "blub"
+    ],
+    "interact_text": "",
+    "pull_in_entities": false,
+    "seats": [
+     {
+      "position": [
+       0.0,
+       0.66,
+       0.0
+      ]
+     }
+    ]
    }
   },
   "events": {
@@ -198,6 +235,9 @@
           "galaxysmp:wild",
           "galaxysmp:baby"
          ]
+        },
+        "set_property": {
+         "galaxysmp:small": true
         }
        }
       ]
@@ -210,6 +250,9 @@
       "galaxysmp:baby",
       "galaxysmp:tame"
      ]
+    },
+    "set_property": {
+     "galaxysmp:small": true
     }
    },
    "galaxysmp:on_tame": {
@@ -234,6 +277,20 @@
      "component_groups": [
       "galaxysmp:adult"
      ]
+    },
+    "set_property": {
+     "galaxysmp:small": false
+    }
+   },
+   "galaxysmp:pile_on": {
+    "set_property": {
+     "galaxysmp:piled": true,
+     "galaxysmp:turn": "math.random_integer(0, 15)"
+    }
+   },
+   "galaxysmp:pile_off": {
+    "set_property": {
+     "galaxysmp:piled": false
     }
    }
   }

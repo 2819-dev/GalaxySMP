@@ -111,6 +111,53 @@
      ]
     }
    }
+  },
+  "animation.galaxysmp_blub.piled": {
+   "loop": true,
+   "bones": {
+    "root": {
+     "rotation": [
+      "math.mod(query.property('galaxysmp:turn') * 37, 13) - 6",
+      "query.property('galaxysmp:turn') * 22.5 + math.mod(query.property('galaxysmp:turn') * 11, 9)",
+      "math.mod(query.property('galaxysmp:turn') * 53, 11) - 5"
+     ]
+    },
+    "body": {
+     "scale": [
+      "1 + 0.05 * query.has_rider",
+      "1 - 0.08 * query.has_rider",
+      "1 + 0.05 * query.has_rider"
+     ]
+    },
+    "leg1": {
+     "rotation": [
+      "query.is_riding ? -20 : 0",
+      0,
+      "query.is_riding ? -10 : 0"
+     ]
+    },
+    "leg2": {
+     "rotation": [
+      "query.is_riding ? -20 : 0",
+      0,
+      "query.is_riding ? 10 : 0"
+     ]
+    },
+    "leg3": {
+     "rotation": [
+      "query.is_riding ? 20 : 0",
+      0,
+      "query.is_riding ? -10 : 0"
+     ]
+    },
+    "leg4": {
+     "rotation": [
+      "query.is_riding ? 20 : 0",
+      0,
+      "query.is_riding ? 10 : 0"
+     ]
+    }
+   }
   }
  }
 }

@@ -16,7 +16,8 @@
     "move": "animation.galaxysmp_blub.move",
     "idle": "animation.galaxysmp_blub.idle",
     "air": "animation.galaxysmp_blub.air",
-    "sit": "animation.galaxysmp_blub.sit"
+    "sit": "animation.galaxysmp_blub.sit",
+    "piled": "animation.galaxysmp_blub.piled"
    },
    "scripts": {
     "animate": [
@@ -29,6 +30,9 @@
      },
      {
       "sit": "query.is_sitting"
+     },
+     {
+      "piled": "query.property('galaxysmp:piled')"
      }
     ]
    },

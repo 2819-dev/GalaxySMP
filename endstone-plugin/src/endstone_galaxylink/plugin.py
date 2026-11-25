@@ -54,7 +54,7 @@ from endstone_galaxylink.shop import Shop
 from endstone_galaxylink.teleport import Teleports
 from endstone_galaxylink.voice import VoiceLink
 
-VERSION = "2.94.0"
+VERSION = "2.95.0"
 
 
 def _cmd(description, usage, perm, aliases=None):
@@ -360,6 +360,7 @@ class GalaxyLink(Plugin):
         self.server.scheduler.run_task(self, self._safe("borders.tick", self.borders.tick), delay=60, period=5)
         self.server.scheduler.run_task(self, self._safe("sift.build_tick", self.sift.build_tick), delay=20, period=1)
         self.server.scheduler.run_task(self, self._safe("sift.tick", self.sift.tick), delay=200, period=100)
+        self.server.scheduler.run_task(self, self._safe("sift.piles", self.sift.piles.fast_tick), delay=220, period=10)  # Blub piles get bumped
         # The Sift is never built automatically at start any more (building far-away land is the heaviest job there
         # is, and doing it at every start made the server unstable). Staff run /sift build when the server is quiet.
         self.server.scheduler.run_task(self, self._watched("checking AFK players", self.afk.tick), delay=100, period=100)
@@ -652,6 +653,7 @@ class GalaxyLink(Plugin):
 
     @event_handler
     def on_actor_damage(self, event: ActorDamageEvent):
+        self.sift.piles.on_damage(event)  # hitting a Blub pile knocks it over (never cancels the hit)
         if self.welcome.on_damage(event):  # nobody gets hurt on the welcome screen
             return
         if self.bedwars.on_damage(event):  # Bedwars deaths, teams and the waiting room

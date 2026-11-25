@@ -724,6 +724,15 @@ The bigger Sift is built in the background after the update, which takes about h
 - **Effects:** your kill and victory effects play in PvP too, and two new ones are in the Store: Galaxy Burst and Confetti.
 Find it on the Main Menu under **Play > PvP**. It opens as soon as its arenas finish building. Your survival items are kept safe while you play and come back when you leave.`,
   },
+  {
+    id: "2026-11-26-blub-piles",
+    title: "Blub piles in the Sift",
+    body: `Keep an eye out in the Sift: now and then, wild Blubs resting close together climb on top of each other into a little pile.
+- **Usually 2 or 3:** a tower of 5 is a rare sight.
+- **Every Blub faces its own way:** they lean a little, and the ones at the bottom get squished.
+- **Bump it:** walk into the pile or tap a Blub and they tumble off in every direction with a squeak. Leave them be and they climb down by themselves after a few minutes.
+Only grown-up, untamed Blubs join a pile. Your own Blubs stay with you.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).
