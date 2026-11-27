@@ -747,6 +747,14 @@ Only grown-up, untamed Blubs join a pile. Your own Blubs stay with you.`,
 - **Apply in a minute:** fill in a short form and chat privately with our staff. No account needed.
 Find it at galaxymc.us/partner.`,
   },
+  {
+    id: "2026-11-27-map-addon-blocks",
+    title: "The server map now recognizes every block",
+    body: `The live map at galaxymc.us/map now shows blocks from our add-ons in their real colors. Custom blocks used to appear as plain grey stone. The server now reads each block's own texture, so builds look the way they do in game.
+- **Both views:** the 2D map and the 3D view use the same colors.
+- **Automatic:** new blocks are recognized the first time anyone builds with them.
+- **Redrawing:** the land around players is refreshed gradually, so older areas update as people explore.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

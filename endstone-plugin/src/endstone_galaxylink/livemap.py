@@ -93,15 +93,26 @@ except Exception:
 BELOW = "below"
 
 
+ADDONS = None   # blockcolors.AddonColors (set by LiveMap): the colours of blocks from add-ons, read from their own pictures
+
+
 def color_of(block_id):
     """The Minecraft map colour of a block: (r, g, b), "below" (look at the block underneath) or None (invisible)."""
     if block_id in _cache:
         return _cache[block_id]
     name = block_id.split(":", 1)[-1]
-    if name in TABLE:
+    addon = ADDONS is not None and ":" in block_id and not block_id.startswith("minecraft:")
+    if addon:   # a block from an add-on: its own picture decides (found once, in the background)
+        c = ADDONS.get(block_id)
+        if c is not None:
+            _cache[block_id] = c
+            return c
+        ADDONS.want(block_id)
+    if name in TABLE and not addon:
         _cache[block_id] = TABLE[name]
         return TABLE[name]
-    unknown_seen.add(name)
+    if not addon:
+        unknown_seen.add(name)
     key = BLOCKS.get(name)
     if key is None and any(w in name for w in ("_log", "_wood", "_planks", "_slab", "_stairs", "_fence", "_stem", "_hyphae", "_trapdoor")):
         for wood in sorted(WOODS, key=len, reverse=True):
@@ -119,8 +130,9 @@ def color_of(block_id):
         key = "pink"
     if key is None:
         key = next((k for word, k in KEYWORDS if word in name), None)
-    c = MC.get(key, UNKNOWN) if key else UNKNOWN
-    _cache[block_id] = c
+    c = TABLE[name] if addon and name in TABLE and key is None else (MC.get(key, UNKNOWN) if key else UNKNOWN)
+    if not (addon and ADDONS.waiting(block_id)):   # an add-on block still being looked up gets its real colour in a few seconds
+        _cache[block_id] = c
     return c
 
 
@@ -144,6 +156,10 @@ class LiveMap:
         self.method = None       # how the top block is read (some server versions lack the fast way)
         self.started = False
         self.enabled = False     # switched on from the Control Panel (the website tells us when we connect)
+        global ADDONS
+        from endstone_galaxylink.blockcolors import AddonColors
+        ADDONS = AddonColors(plugin, MC)
+        ADDONS.on_change = self.redraw_all
 
     def voice(self):
         v = getattr(self.plugin, "_voice", None)
@@ -174,6 +190,13 @@ class LiveMap:
                 self.send_markers(voice)
             except Exception as e:
                 self.fail(f"Map markers failed: {e}")
+
+    def redraw_all(self):
+        """New add-on block colours were learned: the land near players is drawn again (a few chunks at a time) so it shows them."""
+        for k in [k for k, c in _cache.items() if c is UNKNOWN or c == UNKNOWN]:
+            if ":" in k and not k.startswith("minecraft:"):
+                _cache.pop(k, None)
+        self.drawn.clear()
 
     def set_enabled(self, on):
         if bool(on) != self.enabled:
