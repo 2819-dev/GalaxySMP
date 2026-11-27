@@ -9,3 +9,10 @@ server-files/
 __pycache__/
 endstone-plugin/build/
 *.egg-info/
+
+# Partner kit build outputs
+endstone-partner/dist/
+endstone-partner/kits/
+endstone-partner/logo-pack/dist/
+endstone-partner/**/__pycache__/
+endstone-partner/**/*.egg-info/

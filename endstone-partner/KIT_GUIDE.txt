@@ -1,0 +1,56 @@
+GALAXYSMP NETWORK KIT for {{SERVER}}
+====================================
+
+Welcome to the Northwork Games Network! This kit connects {{SERVER}} to GalaxySMP.
+
+WHAT IT DOES
+  - GalaxySMP ranks show in your chat and above players' heads.
+  - GalaxySMP's owner and admins get operator on your server, so we can help with
+    moderation and support. Your own operators are never touched.
+  - A small network logo shows in the top-right corner of every player's screen.
+
+WHAT IT DOES NOT DO
+  - It adds no menu. Players join straight into your world.
+  - It never shares your chat with GalaxySMP.
+  - It never sends items, locations, chat or anything else about your players.
+
+WHAT IT SENDS TO galaxymc.us (every minute)
+  The gamertags of the players who are online (to look up their GalaxySMP rank) and
+  that your server is online. That is all.
+
+WHAT YOU NEED
+  - A Minecraft Bedrock Dedicated Server with Endstone (the free plugin loader).
+  - Your server must be able to reach https://galaxymc.us
+  - The setup file (config.json) GalaxySMP sent you privately. Keep it private: it is
+    your server's key to the network. If it ever leaks, tell us and we will reset it.
+
+INSTALL (about 5 minutes)
+  1. Stop your server.
+  2. Copy the file ending in .whl from this kit into your server's "plugins" folder.
+  3. Start the server once. In the console you will see a line like
+         GalaxySMP Network: No setup file yet. Put the config.json GalaxySMP sent you in: <a folder>
+     That <a folder> is where the next two files go. Stop the server again.
+  4. Put the setup file there and name it exactly:  config.json
+     (Open it in Notepad to check: it should look like { "token": "gp_...", "website": "https://galaxymc.us" })
+  5. Copy {{PACK}} into the same folder.
+  6. Open server.properties and set:  texturepack-required=true
+     (so every player gets the logo)
+  7. Start the server. The console should say the setup file was found and the logo pack
+     was installed. Restart the server one more time so your players receive the logo.
+  8. In game, as an operator, type  /network  to see that it is connected.
+
+CHECKING IT WORKS
+  - /network says "connected".
+  - Players with a GalaxySMP rank show [RANK] in chat and above their head. (Players who
+    have never joined GalaxySMP have no rank.)
+  - The logo shows small in the top-right corner when playing.
+
+IF SOMETHING IS OFF
+  - "doesn't accept this setup file": the connection was paused or reset. Ask GalaxySMP for a new one.
+  - "Couldn't reach galaxymc.us": check your server's internet/firewall. Ranks stay as they were until it reconnects.
+  - No logo: check texturepack-required=true, that the pack was installed (console), and restart once.
+  - After you edit config.json, type /network reload (or restart).
+
+LEAVING THE NETWORK
+  Tell GalaxySMP. We pause your connection, and the plugin takes back the operator access it gave
+  (while your server is running). After that you can delete the plugin and the logo pack.

@@ -16,3 +16,13 @@
   "Remind me" on messages, share to DM, bounties, Party Time, weekly bingo, daily playtime chest, Galaxy Pet,
   Most Active this week, trivia nights, looking for group, weekly lottery, death chests (keep inventory is on),
   duels, weekly quests, rules quiz, top messages of the week, community achievements in the Achievements list, clips (30-second moments from podcasts/videos), /inbox in game, item mail, economy overview in the Control Panel, Spleef minigame, fishing contests, map time-lapse, team territories on the map, event servers appearing on the Main Menu automatically from the Events calendar, requiring two-step sign-in for staff. Add to this list whenever the owner says no.
+
+## Partner kit (Network Servers)
+
+- `/partner` page + Control Panel > Join requests > Partners (`src/routes/partners.js`). Replies to applicants always show as "Staff".
+- A Network Server is a server someone fully owns. Its plugin is `endstone-partner/` (ranks, GalaxySMP owner/admins as operators,
+  logo pack; no menu, no chat sync). It has NO plugin secret: each server has its own token (only the hash is stored), made and reset
+  in the Control Panel. Never give partners the main plugin or its secret.
+- Make a kit: `endstone-partner/make_kit.sh --name "Server Name" [--logo logo.png] [--pixel]`; tests: `cd endstone-partner &&
+  PYTHONPATH=src:logo-pack python3 tests/test_partner.py`. The setup file (token) is sent to the partner separately, never put in a kit.
+
