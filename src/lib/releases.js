@@ -738,6 +738,15 @@ Only grown-up, untamed Blubs join a pile. Your own Blubs stay with you.`,
     title: "Comfier Blub piles",
     body: `Blubs in a pile now lie down on each other with their little feet out in front, instead of standing on top of each other.`,
   },
+  {
+    id: "2026-11-27-partner-page",
+    title: "Partner with GalaxySMP",
+    body: `We've opened a new Partner page for communities and servers that want to work with us.
+- **Partner:** cross-promotion, with a listing on the website and a shout-out here in #Updates.
+- **Network Server:** bring your own server into our network, with GalaxySMP ranks and a small network logo on every player's screen.
+- **Apply in a minute:** fill in a short form and chat privately with our staff. No account needed.
+Find it at galaxymc.us/partner.`,
+  },
 ];
 
 // Ideas the server team posts in #Suggestions as @GalaxySMP so players can vote on them (each posted once).

@@ -51,6 +51,7 @@ import * as emoji from "./routes/emoji.js";
 import * as trades from "./routes/trades.js";
 import * as shops from "./routes/shops.js";
 import * as joinreq from "./routes/joinrequests.js";
+import * as partners from "./routes/partners.js";
 import * as serverctl from "./routes/servercontrol.js";
 import * as feed from "./routes/feed.js";
 import * as team from "./routes/team.js";
@@ -129,6 +130,10 @@ const routes = [
   ["POST", "/api/trades/:id/:action", trades.tradeAction],
   ["GET", "/api/shops", (req, env) => shops.listShops(req, env)],
   ["POST", "/api/join-requests", (req, env) => joinreq.createJoinRequest(req, env)],
+  ["POST", "/api/partner-requests", (req, env) => partners.createRequest(req, env)],
+  ["GET", "/api/partner-requests/:token", partners.getRequest],
+  ["POST", "/api/partner-requests/:token/messages", partners.postMessage],
+  ["POST", "/api/partner/sync", (req, env) => partners.sync(req, env)],
   ["GET", "/api/site-notice", (req, env) => serverctl.siteNotice(req, env)],
   ["GET", "/api/feed", feed.listFeed],
   ["GET", "/api/feed/now", feed.happeningNow],
@@ -166,6 +171,14 @@ const routes = [
   ["POST", "/api/panel/allowlist", (req, env) => serverctl.changeAllowlist(req, env)],
   ["GET", "/api/join-requests/:token", joinreq.getJoinRequest],
   ["POST", "/api/join-requests/:token/messages", joinreq.postJoinMessage],
+  ["GET", "/api/panel/partner-requests", partners.listRequests],
+  ["GET", "/api/panel/partner-requests/:id", partners.getRequestOwner],
+  ["POST", "/api/panel/partner-requests/:id/messages", partners.ownerMessage],
+  ["POST", "/api/panel/partner-requests/:id/decide", partners.decide],
+  ["GET", "/api/panel/partner-servers", (req, env) => partners.listServers(req, env)],
+  ["POST", "/api/panel/partner-servers", (req, env) => partners.createServer(req, env)],
+  ["POST", "/api/panel/partner-servers/:id/reset", partners.resetServer],
+  ["POST", "/api/panel/partner-servers/:id", partners.updateServer],
   ["GET", "/api/panel/join-requests", joinreq.listJoinRequests],
   ["GET", "/api/panel/join-requests/:id", joinreq.getJoinRequestOwner],
   ["POST", "/api/panel/join-requests/:id/messages", joinreq.ownerJoinMessage],

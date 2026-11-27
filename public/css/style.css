@@ -4938,3 +4938,21 @@ html[data-theme="light"] .mk-balance { color: rgb(160,110,8); }
 .dm-call.missed .dm-call-ico, .dm-call.declined .dm-call-ico { color: #ff6b6b; }
 .dm-call.ended .dm-call-ico { color: var(--ok); }
 .dm-call-btn svg { width: 15px; height: 15px; }
+
+/* Partner page (2.96): the two options as cards, a short icon list and the application form */
+.pt-cards { align-items: stretch; margin-top: 4px; }
+.pt-card { display: flex; flex-direction: column; gap: 4px; }
+.pt-card h2 { margin: 6px 0 2px; font-size: 1.3rem; }
+.pt-card .btn { align-self: flex-start; margin-top: auto; }
+.pt-featured { border-color: var(--accent-text); box-shadow: 0 0 0 1px var(--accent-tint); background: linear-gradient(180deg, var(--accent-tint), transparent 55%), var(--surface); }
+.pt-tag { align-self: flex-start; font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--accent-text); }
+.pt-list { list-style: none; margin: 14px 0 22px; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.pt-list li { display: flex; gap: 12px; align-items: flex-start; color: var(--text-2); font-size: .94rem; }
+.pt-list .ico { flex: none; width: 30px; height: 30px; border-radius: 8px; background: var(--surface-2); color: var(--accent-text); display: inline-flex; align-items: center; justify-content: center; }
+.pt-list .ico svg { width: 16px; height: 16px; }
+.pt-list b { color: var(--text); }
+.pt-needs { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; color: var(--text-2); }
+.pt-needs b { color: var(--text); }
+.pt-form .seg { max-width: 420px; }
+.pt-form textarea { min-height: 96px; }
+@media (max-width: 720px) { .pt-card .btn { align-self: stretch; } }

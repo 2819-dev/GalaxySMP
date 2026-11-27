@@ -11,6 +11,7 @@ import { setupPromos } from "/js/promos-panel.js";
 import { setupBadges } from "/js/badges-panel.js";
 import { setupPayments } from "/js/payments-panel.js";
 import { setupJoins } from "/js/joins-panel.js";
+import { setupPartners } from "/js/partners-panel.js";
 import { setupServerControl } from "/js/servercontrol-panel.js";
 import { setupMyPresence } from "/js/presence-panel.js";
 import { MC_COLORS, hexOf, GRADIENTS, GRADIENT_HEX, paint, gradientCss, rankTag } from "/js/rank-paint.js";
@@ -1149,6 +1150,7 @@ $("welcome-reset").addEventListener("click", () => openDialog({
   if (summary.owner) {
     setupPayments({ loaders });
     setupJoins({ loaders, toast, setBadge });
+    setupPartners({ loaders, toast, setBadge });
     document.querySelector('[data-tab="joins"]').hidden = false;
     setupServerControl({ loaders, toast });
     document.querySelector('[data-tab="serverctl"]').hidden = false;

@@ -2,6 +2,7 @@
 // Chat with them, then Approve (adds their gamertag to the server's allowlist) or Decline.
 import { h, openDialog, postJson, getJson, field } from "/js/dialog.js";
 import { renderThread, composer } from "/js/jr-chat.js";
+import { setJoinsBadge } from "/js/partners-panel.js";
 
 const when = (d) => new Date(d).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const STATUS = { open: ["Waiting", "planned"], approved: ["Approved", "done"], declined: ["Declined", "declined"] };
@@ -20,7 +21,7 @@ export function setupJoins({ loaders, toast, setBadge }) {
   loaders.joins = async () => {
     let d;
     try { d = await getJson(`/api/panel/join-requests?status=${status}`); } catch (e) { list.replaceChildren(h("p", { class: "text-3", text: e.message })); return; }
-    setBadge("joins", d.attention);
+    setJoinsBadge(setBadge, "joins", d.attention);
     if (!d.requests.length) { list.replaceChildren(h("div", { class: "panel empty", text: status === "open" ? "No one is waiting." : "None yet." })); return; }
     list.replaceChildren(...d.requests.map((r) => {
       const row = h("button", { type: "button", class: `jr-row${r.id === openId ? " active" : ""}`, onclick: () => openChat(r.id) },
@@ -80,5 +81,5 @@ export function setupJoins({ loaders, toast, setBadge }) {
       if (log) getJson(`/api/panel/join-requests/${openId}`).then((d) => renderThread(log, d.messages, true, { otherName: d.request.gamertag })).catch(() => {});
     }
   }, 10000);
-  getJson("/api/panel/join-requests?status=open").then((d) => setBadge("joins", d.attention)).catch(() => {});
+  getJson("/api/panel/join-requests?status=open").then((d) => setJoinsBadge(setBadge, "joins", d.attention)).catch(() => {});
 }

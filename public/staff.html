@@ -311,6 +311,11 @@
         </section>
 
         <section data-panel="joins" hidden>
+          <div class="tabs-mini" id="joins-mode" role="group" aria-label="Requests" style="margin-bottom:14px">
+            <button type="button" data-mode="joins" aria-pressed="true">Join requests <span class="count-badge" id="mode-joins-count"></span></button>
+            <button type="button" data-mode="partners" aria-pressed="false">Partners <span class="count-badge" id="mode-partners-count"></span></button>
+          </div>
+          <div id="joins-view">
           <div class="cx-row" style="justify-content:space-between;margin-bottom:12px">
             <div class="tabs-mini" id="joins-filter" role="group" aria-label="Show">
               <button type="button" data-status="open" aria-pressed="true">Waiting</button>
@@ -323,6 +328,28 @@
           <div class="jr-layout">
             <div id="joins-list" class="jr-list"></div>
             <div id="joins-chat" class="panel jr-pane"><p class="text-3" style="margin:0">Pick a request to read it and reply.</p></div>
+          </div>
+          </div>
+          <div id="partners-view" hidden>
+            <div class="cx-row" style="justify-content:space-between;margin-bottom:12px">
+              <div class="tabs-mini" id="partners-filter" role="group" aria-label="Show">
+                <button type="button" data-status="open" aria-pressed="true">Waiting</button>
+                <button type="button" data-status="accepted" aria-pressed="false">Accepted</button>
+                <button type="button" data-status="declined" aria-pressed="false">Declined</button>
+              </div>
+              <a class="text-3 small" href="/partner" target="_blank" rel="noopener">The page people use</a>
+            </div>
+            <p class="text-3 small" style="margin:0 0 12px">Only you can see these. Whatever you write, they see it as <b>Staff</b>, never your name.</p>
+            <div class="jr-layout">
+              <div id="partners-list" class="jr-list"></div>
+              <div id="partners-chat" class="panel jr-pane"><p class="text-3" style="margin:0">Pick an application to read it and reply.</p></div>
+            </div>
+            <div class="cx-row" style="justify-content:space-between;margin:26px 0 10px">
+              <h3 style="margin:0">Network Servers</h3>
+              <button type="button" class="btn btn-secondary btn-sm" id="partner-server-new">Set up a Network Server</button>
+            </div>
+            <p class="text-3 small" style="margin:0 0 12px">Each server connects with its own token, so it can be paused or reset any time without touching anything else. GalaxySMP's owner and admins are given operator on them (you can switch that off per server).</p>
+            <div id="partner-servers"></div>
           </div>
         </section>
 

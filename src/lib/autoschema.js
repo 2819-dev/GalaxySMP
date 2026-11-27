@@ -2,7 +2,7 @@
 // (each one only adds things, so running it again is harmless). Checked once per worker instance.
 import { getDb } from "./db.js";
 
-const PENDING = [
+export const PENDING = [
   ["0048_invites_looks", [
     "ALTER TABLE join_requests ADD COLUMN IF NOT EXISTS invited_by bigint REFERENCES users(id) ON DELETE SET NULL",
     `CREATE TABLE IF NOT EXISTS user_unlocks (
@@ -400,7 +400,7 @@ const PENDING = [
     "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS user_agent text",
     "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_used_at timestamptz",
     "INSERT INTO schema_migrations (version) VALUES ('0093_session_devices') ON CONFLICT DO NOTHING",
-  ]]
+  ]],
   ["0095_pvp", [
     "ALTER TABLE players ADD COLUMN IF NOT EXISTS pvp_kills integer NOT NULL DEFAULT 0",
     "ALTER TABLE players ADD COLUMN IF NOT EXISTS pvp_deaths integer NOT NULL DEFAULT 0",
@@ -417,6 +417,14 @@ const PENDING = [
     "CREATE TABLE IF NOT EXISTS pvp_match_players (match_id bigint NOT NULL REFERENCES pvp_matches(id) ON DELETE CASCADE, xuid text NOT NULL, name text NOT NULL, team text NOT NULL, won boolean NOT NULL DEFAULT false, kills integer NOT NULL DEFAULT 0, hits integer NOT NULL DEFAULT 0, rating_before integer, rating_after integer, PRIMARY KEY (match_id, xuid))",
     "CREATE INDEX IF NOT EXISTS pvp_match_players_xuid_idx ON pvp_match_players (xuid, match_id DESC)",
     "INSERT INTO schema_migrations (version) VALUES ('0095_pvp') ON CONFLICT DO NOTHING",
+  ]],
+  ["0096_partners", [
+    "CREATE TABLE IF NOT EXISTS partner_requests ( id bigserial PRIMARY KEY, token text NOT NULL UNIQUE, kind text NOT NULL CHECK (kind IN ('partner', 'network')), name text NOT NULL, contact text NOT NULL, about text NOT NULL, link text, status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'accepted', 'declined')), ip_hash text, owner_unread integer NOT NULL DEFAULT 0, req_unread integer NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now(), last_at timestamptz NOT NULL DEFAULT now(), decided_at timestamptz )",
+    "CREATE INDEX IF NOT EXISTS partner_requests_status_idx ON partner_requests (status, last_at DESC)",
+    "CREATE TABLE IF NOT EXISTS partner_request_messages ( id bigserial PRIMARY KEY, request_id bigint NOT NULL REFERENCES partner_requests(id) ON DELETE CASCADE, from_owner boolean NOT NULL DEFAULT false, body text NOT NULL, created_at timestamptz NOT NULL DEFAULT now() )",
+    "CREATE INDEX IF NOT EXISTS partner_request_messages_req_idx ON partner_request_messages (request_id, id)",
+    "CREATE TABLE IF NOT EXISTS partner_servers ( id bigserial PRIMARY KEY, request_id bigint REFERENCES partner_requests(id) ON DELETE SET NULL, name text NOT NULL, token_hash text NOT NULL UNIQUE, token_hint text NOT NULL, active boolean NOT NULL DEFAULT true, ops_enabled boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), last_seen_at timestamptz, players_online integer NOT NULL DEFAULT 0, plugin_version text )",
+    "INSERT INTO schema_migrations (version) VALUES ('0096_partners') ON CONFLICT DO NOTHING",
   ]],
 ];
 
